@@ -15,6 +15,7 @@ import type {
   FeedName,
   MailPreview,
   MailSourceConfig,
+  OwnKindInput,
   Project,
   QuestionRecord,
   SourceRun,
@@ -46,6 +47,8 @@ export const CHANNELS = {
   feedingFill: 'feeding:fill',
   feedingStep: 'feeding:step',
   deliverablesCatalog: 'deliverables:catalog',
+  kindSave: 'deliverables:kind:save',
+  kindRemove: 'deliverables:kind:remove',
   deliverablesList: 'deliverables:list',
   deliverablesStart: 'deliverables:start',
   deliverablesRevise: 'deliverables:revise',
@@ -113,8 +116,11 @@ export type OctoApi = {
   documentsState(projectId: string): Promise<Result<SourceState>>
   /** Writes the text of the Office and PDF files of the project beside them, now. */
   convertDocuments(projectId: string): Promise<Result<SourceRun>>
-  /** The kinds of deliverable Octo knows how to write. */
-  deliverableCatalog(): Promise<Result<DeliverableKind[]>>
+  /** The kinds Octo ships with, then the ones the PM defined for this project. */
+  deliverableCatalog(projectId: string): Promise<Result<DeliverableKind[]>>
+  /** Keeps a kind the PM defined in words for this project. */
+  saveDeliverableKind(projectId: string, input: OwnKindInput): Promise<Result<DeliverableKind>>
+  removeDeliverableKind(projectId: string, kindId: string): Promise<Result<null>>
   listDeliverables(projectId: string): Promise<Result<Deliverable[]>>
   /** Writes the first draft. A failure of the writing is in the deliverable, not in the result. */
   startDeliverable(

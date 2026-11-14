@@ -69,7 +69,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
 describe('writing a deliverable', () => {
   it('offers the catalog and refuses a kind it does not have or an input left empty', async () => {
     const { service } = setup()
-    expect(service.catalog().map((kind) => kind.id)).toContain('email-cliente')
+    expect((await service.catalog(project)).map((kind) => kind.id)).toContain('email-cliente')
 
     await expect(service.start(project, { kindId: 'nessuno', inputs })).rejects.toMatchObject({
       code: 'deliverable_kind_unknown',
@@ -110,6 +110,66 @@ describe('writing a deliverable', () => {
     await expect(service.start(project, { kindId: 'email-cliente', inputs })).rejects.toThrow(
       'disk full',
     )
+  })
+})
+
+describe('kinds the PM defines for a project', () => {
+  const own = {
+    title: 'Nota di rilascio',
+    summary: 'Che cosa cambia per chi usa il prodotto.',
+    audience: 'client' as const,
+    questions: ['Quale versione *', 'Che cosa mettere in evidenza'],
+    instructions: 'Scrivi le novità come le leggerebbe chi usa il prodotto.',
+    checklist: ['Nessun nome interno'],
+  }
+
+  it('enter the catalog after the built-in ones and are written like them', async () => {
+    const { service, requests } = setup()
+
+    const kind = await service.saveKind(project, own)
+
+    expect(kind.id).toBe('proprio-nota-di-rilascio')
+    expect((await service.catalog(project)).at(-1)).toEqual(kind)
+    const made = await service.start(project, {
+      kindId: kind.id,
+      inputs: { 'domanda-1': '3.4.0' },
+    })
+    expect(made).toMatchObject({ status: 'review', title: 'Nota di rilascio' })
+    expect(requests[0]?.kind.instructions).toBe(own.instructions)
+    await expect(service.start(project, { kindId: kind.id, inputs: {} })).rejects.toMatchObject({
+      code: 'deliverable_input_missing',
+    })
+  })
+
+  it('are replaced when saved again with the same title, and can be removed', async () => {
+    const { service } = setup()
+    await service.saveKind(project, own)
+    await service.saveKind(project, { ...own, summary: 'Nuova descrizione.' })
+    const mine = (await service.catalog(project)).filter((kind) => kind.id.startsWith('proprio-'))
+    expect(mine.map((kind) => kind.summary)).toEqual(['Nuova descrizione.'])
+
+    await service.removeKind(project, 'proprio-nota-di-rilascio')
+    expect((await service.catalog(project)).some((kind) => kind.id.startsWith('proprio-'))).toBe(
+      false,
+    )
+    await expect(service.removeKind(project, 'email-cliente')).rejects.toMatchObject({
+      code: 'deliverable_kind_unknown',
+    })
+  })
+
+  it('must have a title and say how they are written', async () => {
+    const { service } = setup()
+    const invalid = { code: 'deliverable_kind_invalid' }
+    await expect(service.saveKind(project, { ...own, title: ' ' })).rejects.toMatchObject(invalid)
+    await expect(service.saveKind(project, { ...own, instructions: '' })).rejects.toMatchObject(
+      invalid,
+    )
+    await expect(
+      service.saveKind(project, {
+        ...own,
+        questions: Array.from({ length: 9 }, (_, n) => `Q${n}`),
+      }),
+    ).rejects.toMatchObject(invalid)
   })
 })
 

@@ -95,6 +95,16 @@ const deliverableStartInput = byKind.extend({
   inputs: z.record(z.string().max(MAX_RULE_LENGTH), z.string().max(MAX_INPUT_LENGTH)),
 })
 const deliverableReviseInput = byDeliverable.extend({ request: z.string().max(MAX_INPUT_LENGTH) })
+const kindSaveInput = byProject.extend({
+  input: z.object({
+    title: z.string().max(MAX_RULE_LENGTH),
+    summary: z.string().max(MAX_INPUT_LENGTH),
+    audience: z.enum(['client', 'internal']),
+    questions: ruleList,
+    instructions: z.string().max(MAX_INSTRUCTIONS_LENGTH),
+    checklist: ruleList,
+  }),
+})
 const instructionsSaveInput = byKind.extend({ text: z.string().max(MAX_INSTRUCTIONS_LENGTH) })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
@@ -213,7 +223,18 @@ export function registerIpc(deps: IpcDeps): void {
   const writingProgress = (projectId: string) => (progress: unknown) =>
     deps.window.webContents.send(CHANNELS.deliverablesProgress, projectId, progress)
 
-  handle(CHANNELS.deliverablesCatalog, none, async () => [...deps.deliverables.catalog()])
+  handle(CHANNELS.deliverablesCatalog, byProject, async ({ projectId }) =>
+    deps.deliverables.catalog(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.kindSave, kindSaveInput, async ({ projectId, input }) =>
+    deps.deliverables.saveKind(await deps.projects.get(projectId), input),
+  )
+
+  handle(CHANNELS.kindRemove, byKind, async ({ projectId, kindId }) => {
+    await deps.deliverables.removeKind(await deps.projects.get(projectId), kindId)
+    return null
+  })
 
   handle(CHANNELS.deliverablesList, byProject, async ({ projectId }) =>
     deps.deliverables.list(await deps.projects.get(projectId)),

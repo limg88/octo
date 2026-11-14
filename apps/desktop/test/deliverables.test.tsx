@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import type { AgentProgress } from '@octo/application'
-import { DELIVERABLE_CATALOG, type Deliverable, type Project } from '@octo/domain'
+import {
+  DELIVERABLE_CATALOG,
+  type Deliverable,
+  type DeliverableKind,
+  type Project,
+} from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
@@ -9,6 +14,16 @@ import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
+
+const OWN_KIND: DeliverableKind = {
+  id: 'proprio-nota-di-rilascio',
+  title: 'Nota di rilascio',
+  summary: 'Novità per chi usa il prodotto.',
+  audience: 'client',
+  fields: [{ key: 'domanda-1', label: 'Quale versione', kind: 'long', required: true }],
+  instructions: 'Scrivi le novità.',
+  checklist: ['Nessun nome interno'],
+}
 
 const review: Deliverable = {
   id: 'd-1',
@@ -80,6 +95,8 @@ type DeliverablesApi = Pick<
   | 'deliverableInstructions'
   | 'saveDeliverableInstructions'
   | 'onDeliverableProgress'
+  | 'saveDeliverableKind'
+  | 'removeDeliverableKind'
   | 'hasLetterhead'
   | 'chooseLetterhead'
   | 'removeLetterhead'
@@ -100,6 +117,8 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
       progress = listener
       return () => {}
     },
+    saveDeliverableKind: vi.fn(async () => ok(OWN_KIND)),
+    removeDeliverableKind: vi.fn(async () => ok(null)),
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
@@ -232,6 +251,64 @@ describe('DeliverablesView', () => {
     render(<DeliverablesView api={api} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: messages.letterheadChoose }))
     expect(await screen.findByText(/non è un documento Word che posso usare/)).toBeTruthy()
+  })
+
+  it('lets the PM describe a kind of their own, change it and remove it', async () => {
+    const catalog = vi
+      .fn<OctoApi['deliverableCatalog']>()
+      .mockResolvedValueOnce(ok([...DELIVERABLE_CATALOG]))
+      .mockResolvedValue(ok([...DELIVERABLE_CATALOG, OWN_KIND]))
+    const { api } = fakeApi({ deliverableCatalog: catalog })
+    render(<DeliverablesView api={api} project={project} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: messages.ownKindNew }))
+    const save = screen.getByRole<HTMLButtonElement>('button', { name: messages.ownKindSave })
+    expect(save.disabled).toBe(true)
+    type(messages.ownKindTitle, 'Nota di rilascio')
+    type(messages.ownKindAudience, 'internal')
+    type(/^Che cosa chiederti/, 'Quale versione *\nChe cosa evidenziare')
+    type(/^Come va scritto/, 'Scrivi le novità.')
+    type(/^Che cosa controllare/, 'Nessun nome interno')
+    fireEvent.click(save)
+
+    await waitFor(() =>
+      expect(api.saveDeliverableKind).toHaveBeenCalledWith('p-1', {
+        title: 'Nota di rilascio',
+        summary: '',
+        audience: 'internal',
+        questions: ['Quale versione *', 'Che cosa evidenziare'],
+        instructions: 'Scrivi le novità.',
+        checklist: ['Nessun nome interno'],
+      }),
+    )
+    expect(await screen.findByText(/Per il cliente · Tuo/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica Nota di rilascio' }))
+    expect(screen.getByLabelText<HTMLInputElement>(messages.ownKindTitle).value).toBe(
+      'Nota di rilascio',
+    )
+    expect(screen.getByLabelText<HTMLTextAreaElement>(/^Che cosa chiederti/).value).toBe(
+      'Quale versione *',
+    )
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableNew }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina Nota di rilascio' }))
+    await waitFor(() =>
+      expect(api.removeDeliverableKind).toHaveBeenCalledWith('p-1', 'proprio-nota-di-rilascio'),
+    )
+  })
+
+  it('explains a kind it cannot save', async () => {
+    const { api } = fakeApi({
+      saveDeliverableKind: vi.fn(
+        async () => ({ ok: false, code: 'deliverable_kind_invalid' }) as Result<DeliverableKind>,
+      ),
+    })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.ownKindNew }))
+    type(messages.ownKindTitle, 'X')
+    type(/^Come va scritto/, 'Y')
+    fireEvent.click(screen.getByRole('button', { name: messages.ownKindSave }))
+    expect(await screen.findByText(/Servono un titolo e le istruzioni/)).toBeTruthy()
   })
 
   it('shows the register of what each deliverable cost', async () => {

@@ -50,6 +50,10 @@ Durata: 4 minuti. Mostra un deliverable dalla richiesta del PM al file approvato
     Atteso: «Impostata: i file Word escono sulla tua carta intestata.» Dal prossimo deliverable approvato il Word ha la tua intestazione; «Togli» torna alla pagina bianca.
     Dimostra: Octo scrive solo il testo; intestazione, piè di pagina, margini e caratteri restano quelli del tuo documento.
 
+11. **Un tipo tuo.** «Nuovo deliverable» → «Crea un tipo tuo». Come si chiama: `Nota di rilascio`. Come va scritto: `Scrivi le novità come le legge chi usa il prodotto.` Premi «Salva nel catalogo».
+    Atteso: nel catalogo compare «Nota di rilascio», marcata «Tuo», con «Modifica» ed «Elimina».
+    Dimostra: un deliverable che prepari spesso entra in Octo descrivendolo a parole; da lì ha gli stessi controlli degli altri.
+
 ## Con Claude vero
 ```bash
 REAL=1 bash demo/06-deliverable/run.sh

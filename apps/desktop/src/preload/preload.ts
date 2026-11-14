@@ -38,7 +38,12 @@ const api: OctoApi = {
     ipcRenderer.on(CHANNELS.sourcesChanged, handler)
     return () => ipcRenderer.removeListener(CHANNELS.sourcesChanged, handler)
   },
-  deliverableCatalog: () => ipcRenderer.invoke(CHANNELS.deliverablesCatalog),
+  deliverableCatalog: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.deliverablesCatalog, { projectId }),
+  saveDeliverableKind: (projectId, input) =>
+    ipcRenderer.invoke(CHANNELS.kindSave, { projectId, input }),
+  removeDeliverableKind: (projectId, kindId) =>
+    ipcRenderer.invoke(CHANNELS.kindRemove, { projectId, kindId }),
   listDeliverables: (projectId) => ipcRenderer.invoke(CHANNELS.deliverablesList, { projectId }),
   startDeliverable: (projectId, kindId, inputs) =>
     ipcRenderer.invoke(CHANNELS.deliverablesStart, { projectId, kindId, inputs }),

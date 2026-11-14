@@ -3,6 +3,9 @@ import {
   costOf,
   type Deliverable,
   type DeliverableKind,
+  isOwnKind,
+  type OwnKindInput,
+  ownKindInput,
   type Project,
   type RedTeamReport,
   registerTotals,
@@ -21,6 +24,7 @@ type Props = {
 type Shown =
   | { view: 'catalog' }
   | { view: 'register' }
+  | { view: 'own'; kindId: string | null }
   | { view: 'form'; kindId: string }
   | { view: 'one'; id: string }
 
@@ -38,7 +42,7 @@ export function DeliverablesView({ api, project }: Props) {
     setAll([])
     setShown({ view: 'catalog' })
     setError(null)
-    void api.deliverableCatalog().then((result) => {
+    void api.deliverableCatalog(project.id).then((result) => {
       if (current && result.ok) setCatalog(result.value)
     })
     void api.listDeliverables(project.id).then((result) => {
@@ -67,6 +71,16 @@ export function DeliverablesView({ api, project }: Props) {
     setAll((previous) => [made, ...previous.filter((other) => other.id !== made.id)])
     setShown({ view: 'one', id: made.id })
   }, [])
+
+  /** Changes the kinds of the project, then shows the catalog as it is now. */
+  async function changeCatalog(step: () => Promise<Result<unknown>>) {
+    setError(null)
+    const result = await step()
+    if (!result.ok) return setError(result.code)
+    const next = await api.deliverableCatalog(project.id)
+    if (next.ok) setCatalog(next.value)
+    setShown({ view: 'catalog' })
+  }
 
   const kindOf = (kindId: string) => catalog.find((kind) => kind.id === kindId)
   const one = shown.view === 'one' ? all.find((candidate) => candidate.id === shown.id) : undefined
@@ -116,12 +130,22 @@ export function DeliverablesView({ api, project }: Props) {
               catalog={catalog}
               empty={all.length === 0}
               onChoose={(kindId) => setShown({ view: 'form', kindId })}
+              onEdit={(kindId) => setShown({ view: 'own', kindId })}
+              onRemove={(kindId) =>
+                void changeCatalog(() => api.removeDeliverableKind(project.id, kindId))
+              }
             />
             <Letterhead api={api} project={project} />
           </>
         )}
         {shown.view === 'register' && (
           <Register all={all} titleOf={(id) => kindOf(id)?.title ?? id} />
+        )}
+        {shown.view === 'own' && (
+          <OwnKindForm
+            kind={shown.kindId ? kindOf(shown.kindId) : undefined}
+            onSave={(input) => void changeCatalog(() => api.saveDeliverableKind(project.id, input))}
+          />
         )}
         {formKind && (
           <KindForm
@@ -151,10 +175,14 @@ function Catalog({
   catalog,
   empty,
   onChoose,
+  onEdit,
+  onRemove,
 }: {
   catalog: DeliverableKind[]
   empty: boolean
   onChoose: (kindId: string) => void
+  onEdit: (kindId: string | null) => void
+  onRemove: (kindId: string) => void
 }) {
   return (
     <>
@@ -162,12 +190,32 @@ function Catalog({
       {empty && <p className="hint">{messages.deliverableNone}</p>}
       <div className="kinds">
         {catalog.map((kind) => (
-          <button key={kind.id} type="button" className="kind" onClick={() => onChoose(kind.id)}>
-            <strong>{kind.title}</strong>
-            <span className="hint">{messages.deliverableFor[kind.audience]}</span>
-            <span>{kind.summary}</span>
-          </button>
+          <div key={kind.id} className="kind-card">
+            <button type="button" className="kind" onClick={() => onChoose(kind.id)}>
+              <strong>{kind.title}</strong>
+              <span className="hint">
+                {messages.deliverableFor[kind.audience]}
+                {isOwnKind(kind.id) && ` · ${messages.ownKindBadge}`}
+              </span>
+              <span>{kind.summary}</span>
+            </button>
+            {isOwnKind(kind.id) && (
+              <div className="actions">
+                <button type="button" className="quiet" onClick={() => onEdit(kind.id)}>
+                  {messages.ownKindEdit} {kind.title}
+                </button>
+                <button type="button" className="quiet" onClick={() => onRemove(kind.id)}>
+                  {messages.ownKindRemove} {kind.title}
+                </button>
+              </div>
+            )}
+          </div>
         ))}
+      </div>
+      <div className="actions">
+        <button type="button" onClick={() => onEdit(null)}>
+          {messages.ownKindNew}
+        </button>
       </div>
     </>
   )
@@ -492,5 +540,98 @@ function Letterhead({ api, project }: Props) {
         )}
       </div>
     </section>
+  )
+}
+
+const EMPTY_KIND: OwnKindInput = {
+  title: '',
+  summary: '',
+  audience: 'client',
+  questions: [],
+  instructions: '',
+  checklist: [],
+}
+
+/** A kind of deliverable described in words by the PM: new, or one of theirs to change. */
+function OwnKindForm({
+  kind,
+  onSave,
+}: {
+  kind: DeliverableKind | undefined
+  onSave: (input: OwnKindInput) => void
+}) {
+  const [input, setInput] = useState<OwnKindInput>(kind ? ownKindInput(kind) : EMPTY_KIND)
+  const set = (change: Partial<OwnKindInput>) => setInput({ ...input, ...change })
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    onSave(input)
+  }
+  const ready = input.title.trim() !== '' && input.instructions.trim() !== ''
+
+  return (
+    <>
+      <h3>{kind ? kind.title : messages.ownKindNew}</h3>
+      <p className="hint">{messages.ownKindIntro}</p>
+      <form className="source-form" onSubmit={submit}>
+        <label>
+          {messages.ownKindTitle}
+          <input
+            type="text"
+            value={input.title}
+            onChange={(event) => set({ title: event.target.value })}
+          />
+        </label>
+        <label>
+          {messages.ownKindSummary}
+          <input
+            type="text"
+            value={input.summary}
+            onChange={(event) => set({ summary: event.target.value })}
+          />
+        </label>
+        <label>
+          {messages.ownKindAudience}
+          <select
+            value={input.audience}
+            onChange={(event) =>
+              set({ audience: event.target.value === 'internal' ? 'internal' : 'client' })
+            }
+          >
+            <option value="client">{messages.deliverableFor.client}</option>
+            <option value="internal">{messages.deliverableFor.internal}</option>
+          </select>
+        </label>
+        <label>
+          {messages.ownKindQuestions}
+          <textarea
+            rows={3}
+            value={input.questions.join('\n')}
+            onChange={(event) => set({ questions: event.target.value.split('\n') })}
+          />
+        </label>
+        <label>
+          {messages.ownKindInstructions}
+          <textarea
+            rows={8}
+            value={input.instructions}
+            onChange={(event) => set({ instructions: event.target.value })}
+          />
+          <span className="hint">{messages.ownKindInstructionsHint}</span>
+        </label>
+        <label>
+          {messages.ownKindChecklist}
+          <textarea
+            rows={3}
+            value={input.checklist.join('\n')}
+            onChange={(event) => set({ checklist: event.target.value.split('\n') })}
+          />
+        </label>
+        <div className="actions">
+          <button type="submit" disabled={!ready}>
+            {messages.ownKindSave}
+          </button>
+        </div>
+      </form>
+    </>
   )
 }

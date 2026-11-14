@@ -24,6 +24,7 @@ export const DOMAIN_ERROR_CODES = [
   'feed_failed',
   'deliverable_input_missing',
   'deliverable_kind_unknown',
+  'deliverable_kind_invalid',
   'deliverable_not_found',
   'deliverable_not_ready',
   'deliverable_busy',

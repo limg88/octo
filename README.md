@@ -51,7 +51,7 @@ Nella scheda «Deliverable» il PM sceglie dal catalogo (email al cliente, stato
 - con ogni fonte controllata dal codice;
 - riletta in un'esecuzione separata, come farebbe chi la riceve.
 
-Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo/deliverable/approvati/` e registra minuti di scrittura, minuti di revisione e giri nel registro del progetto. Nella stima i totali li calcola il codice. Se il PM ha scelto una carta intestata (un documento Word), il file esce su quella.
+Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo/deliverable/approvati/` e registra minuti di scrittura, minuti di revisione e giri nel registro del progetto. Nella stima i totali li calcola il codice. Il PM può aggiungere al catalogo del progetto tipi suoi, descritti a parole. Se il PM ha scelto una carta intestata (un documento Word), il file esce su quella.
 
 ## Comandi
 | Comando | Cosa fa |

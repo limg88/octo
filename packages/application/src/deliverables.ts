@@ -9,12 +9,16 @@ import {
   type DeliverableKind,
   DomainError,
   type DraftAnswer,
-  deliverableKind,
   type Evidence,
   isDomainError,
+  isOwnKind,
   JOBS_FOLDER,
   jobPath,
   LETTERHEAD_PATH,
+  OWN_KINDS_FOLDER,
+  type OwnKindInput,
+  ownKind,
+  ownKindPath,
   type Project,
   projectInstructionsPath,
   REGISTER_PATH,
@@ -57,8 +61,12 @@ export type ReviseInput = {
 }
 
 export type Deliverables = {
-  /** The kinds of deliverable Octo knows how to write. */
-  catalog(): readonly DeliverableKind[]
+  /** The kinds Octo ships with, then the ones the PM defined for this project. */
+  catalog(project: Project): Promise<DeliverableKind[]>
+  /** Keeps a kind the PM defined in words; one with the same title is replaced. */
+  saveKind(project: Project, input: OwnKindInput): Promise<DeliverableKind>
+  /** Forgets a kind the PM defined. The ones Octo ships with cannot be removed. */
+  removeKind(project: Project, kindId: string): Promise<void>
   /** The deliverables of a project, newest first. */
   list(project: Project): Promise<Deliverable[]>
   get(project: Project, deliverableId: string): Promise<Deliverable>
@@ -84,8 +92,23 @@ const WORD = 'docx'
 export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   const running = new Set<string>()
 
-  function kindOf(kindId: string): DeliverableKind {
-    const kind = deliverableKind(kindId)
+  async function ownKinds(project: Project): Promise<DeliverableKind[]> {
+    const paths = await deps.files.under(project.folder, OWN_KINDS_FOLDER)
+    const kinds: DeliverableKind[] = []
+    for (const path of paths.filter((candidate) => candidate.endsWith('.json'))) {
+      const text = await deps.files.readText(project.folder, path)
+      if (text !== null) kinds.push(JSON.parse(text) as DeliverableKind)
+    }
+    return kinds.sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  const catalog = async (project: Project): Promise<DeliverableKind[]> => [
+    ...DELIVERABLE_CATALOG,
+    ...(await ownKinds(project)),
+  ]
+
+  async function kindOf(project: Project, kindId: string): Promise<DeliverableKind> {
+    const kind = (await catalog(project)).find((candidate) => candidate.id === kindId)
     if (!kind) throw new DomainError('deliverable_kind_unknown', kindId)
     return kind
   }
@@ -110,7 +133,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   }
 
   async function instructions(project: Project, kindId: string): Promise<string> {
-    const path = projectInstructionsPath(kindOf(kindId).id)
+    const path = projectInstructionsPath((await kindOf(project, kindId)).id)
     return (await deps.files.readText(project.folder, path)) ?? ''
   }
 
@@ -136,7 +159,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   ): Promise<Deliverable> {
     if (running.has(deliverable.id)) throw new DomainError('deliverable_busy')
     running.add(deliverable.id)
-    const kind = kindOf(deliverable.kindId)
+    const kind = await kindOf(project, deliverable.kindId)
     const startedAt = deps.clock.now()
     const previous = deliverable.written
     try {
@@ -182,7 +205,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   }
 
   async function start(project: Project, input: StartInput): Promise<Deliverable> {
-    const kind = kindOf(input.kindId)
+    const kind = await kindOf(project, input.kindId)
     const inputs = cleanInputs(kind, input.inputs)
     await deps.memory.claim(project.folder)
     const title = TITLE_FIELDS.map((key) => inputs[key]).find(Boolean) ?? kind.title
@@ -257,7 +280,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     await deps.memory.write(
       project.folder,
       REGISTER_PATH,
-      registerMarkdown(await list(project), DELIVERABLE_CATALOG),
+      registerMarkdown(await list(project), await catalog(project)),
     )
     return done
   }
@@ -275,7 +298,17 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   }
 
   return {
-    catalog: () => DELIVERABLE_CATALOG,
+    catalog,
+    saveKind: async (project, input) => {
+      const kind = ownKind(input)
+      await deps.memory.claim(project.folder)
+      await deps.memory.write(project.folder, ownKindPath(kind.id), JSON.stringify(kind, null, 2))
+      return kind
+    },
+    removeKind: async (project, kindId) => {
+      if (!isOwnKind(kindId)) throw new DomainError('deliverable_kind_unknown', kindId)
+      await deps.files.remove(project.folder, ownKindPath(kindId))
+    },
     list,
     get,
     start,
@@ -285,7 +318,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     hasLetterhead,
     setLetterhead,
     saveInstructions: async (project, kindId, text) => {
-      const path = projectInstructionsPath(kindOf(kindId).id)
+      const path = projectInstructionsPath((await kindOf(project, kindId)).id)
       await deps.memory.claim(project.folder)
       await deps.memory.write(project.folder, path, text.trim() ? `${text.trim()}\n` : '')
     },

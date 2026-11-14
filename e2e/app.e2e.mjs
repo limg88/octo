@@ -2,7 +2,7 @@
 // of demo 01 in the real window. Run with `pnpm e2e` after `pnpm build`.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import { DEMO_ADO, extraItem, startDemoAdo } from '../demo/lib/fake-ado.ts'
@@ -206,6 +206,16 @@ try {
   // The numbers are a real table, not lines of pipes.
   await work06.getByRole('columnheader', { name: 'Fase' }).first().waitFor()
   await page.screenshot({ path: `${work}/stima.png` })
+  // A kind the PM describes in words enters the catalog of the project.
+  await work06.getByRole('button', { name: 'Nuovo deliverable' }).click()
+  await work06.getByRole('button', { name: 'Crea un tipo tuo' }).click()
+  await work06.getByLabel('Come si chiama').fill('Nota di rilascio')
+  await work06
+    .getByLabel(/^Come va scritto/)
+    .fill('Scrivi le novità come le legge chi usa il prodotto.')
+  await work06.getByRole('button', { name: 'Salva nel catalogo' }).click()
+  await work06.getByText(/Per il cliente · Tuo/).waitFor({ timeout: TIMEOUT_MS })
+  assert.ok(existsSync(`${work}/Aurora/_octo/.tipi/proprio-nota-di-rilascio.json`))
   await work06.getByRole('button', { name: 'Registro' }).click()
   await work06.getByRole('cell', { name: 'Data di consegna' }).waitFor()
   await work06.getByText(/^Approvati: 1 ·/).waitFor()

@@ -717,3 +717,18 @@ main > .warning {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+
+.kind-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kind-card .kind {
+  flex: 1;
+}
+
+.kind-card .actions button {
+  font-size: 12px;
+  padding: 2px 6px;
+}

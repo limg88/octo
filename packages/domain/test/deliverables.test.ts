@@ -9,7 +9,11 @@ import {
   ESTIMATE_PLACEHOLDER,
   estimate,
   estimateMarkdown,
+  isOwnKind,
   MAX_REVIEW_PAUSE_MS,
+  ownKind,
+  ownKindInput,
+  ownKindPath,
   registerMarkdown,
   registerTotals,
   reviewTimeSince,
@@ -208,5 +212,33 @@ describe('the register of a project', () => {
       reviewMinutes: 0,
       rounds: 0,
     })
+  })
+})
+
+describe('a kind the PM defines in words', () => {
+  it('turns questions into fields and comes back as it was typed', () => {
+    const input = {
+      title: ' Nota di rilascio ',
+      summary: ' Novità per chi usa il prodotto. ',
+      audience: 'client' as const,
+      questions: ['Quale versione *', '', ' Che cosa mettere in evidenza '],
+      instructions: ' Scrivi le novità. ',
+      checklist: ['Nessun nome interno', ' '],
+    }
+    const kind = ownKind(input)
+
+    expect(kind).toMatchObject({ id: 'proprio-nota-di-rilascio', title: 'Nota di rilascio' })
+    expect(kind.fields).toEqual([
+      { key: 'domanda-1', label: 'Quale versione', kind: 'long', required: true },
+      { key: 'domanda-2', label: 'Che cosa mettere in evidenza', kind: 'long', required: false },
+    ])
+    expect(kind.checklist).toEqual(['Nessun nome interno'])
+    expect(isOwnKind(kind.id)).toBe(true)
+    expect(isOwnKind('email-cliente')).toBe(false)
+    expect(ownKindPath(kind.id)).toBe('_octo/.tipi/proprio-nota-di-rilascio.json')
+    expect(ownKindInput(kind).questions).toEqual([
+      'Quale versione *',
+      'Che cosa mettere in evidenza',
+    ])
   })
 })

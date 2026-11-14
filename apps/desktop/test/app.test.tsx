@@ -68,6 +68,16 @@ const answered: QuestionRecord = {
 
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 
+const OWN_KIND: DeliverableKind = {
+  id: 'proprio-nota-di-rilascio',
+  title: 'Nota di rilascio',
+  summary: 'Novità per chi usa il prodotto.',
+  audience: 'client',
+  fields: [{ key: 'domanda-1', label: 'Quale versione', kind: 'long', required: true }],
+  instructions: 'Scrivi le novità.',
+  checklist: ['Nessun nome interno'],
+}
+
 const documentsRun: SourceRun = {
   at: '2026-11-14T10:00:00.000Z',
   written: 2,
@@ -121,6 +131,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     ),
     deliverableInstructions: vi.fn(async () => ok('')),
     saveDeliverableInstructions: vi.fn(async () => ok(null)),
+    saveDeliverableKind: vi.fn(async () => ok(OWN_KIND)),
+    removeDeliverableKind: vi.fn(async () => ok(null)),
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
