@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import type { AgentProgress } from '@octo/application'
-import { DomainError } from '@octo/domain'
+import { DomainError, type DomainErrorCode } from '@octo/domain'
 import { type z, toJSONSchema as zodToJsonSchema } from 'zod'
 import { parseStreamLine, type ResultEvent } from './stream-events.ts'
 
@@ -30,6 +30,8 @@ export type StructuredRun<Output> = {
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 const NOT_FOUND = 'ENOENT'
 const SIGN_IN_HINT = /\/login|not logged in|invalid api key|authentication/i
+/** What the CLI says when the PM's seat has no quota left for now. */
+const LIMIT_HINT = /usage limit|rate limit|limit reached|quota/i
 /** Variables of another Claude session or credential: the run must use the PM's own seat. */
 const SESSION_OVERRIDE = /^(ANTHROPIC_|CLAUDE)/
 /** Read-only tools: the agent can look at the whole project and change nothing. */
@@ -85,6 +87,12 @@ function runArguments(systemPrompt: string, jsonSchema: string): string[] {
   ]
 }
 
+/** Why a run gave nothing, as far as the CLI's own words tell. */
+function failureCode(detail: string): DomainErrorCode {
+  if (LIMIT_HINT.test(detail)) return 'agent_limit_reached'
+  return SIGN_IN_HINT.test(detail) ? 'agent_not_signed_in' : 'agent_failed'
+}
+
 function isNotFound(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === NOT_FOUND
 }
@@ -135,8 +143,7 @@ export async function runStructured<Output>(
   const { result } = output
   if (!result || result.is_error) {
     const detail = result?.result ?? output.stderr
-    const code = SIGN_IN_HINT.test(detail) ? 'agent_not_signed_in' : 'agent_failed'
-    throw new DomainError(code, `exit ${output.exitCode}`)
+    throw new DomainError(failureCode(detail), `exit ${output.exitCode}`)
   }
   const parsed = run.schema.safeParse(result.structured_output)
   if (!parsed.success) throw new DomainError('agent_output_invalid')

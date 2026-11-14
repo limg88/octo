@@ -103,6 +103,9 @@ if (question.includes('#lento')) {
 } else if (question.includes('#accesso')) {
   emit({ type: 'result', is_error: true, result: 'Invalid API key · Please run /login' })
   process.exit(1)
+} else if (question.includes('#limite')) {
+  emit({ type: 'result', is_error: true, result: 'Claude usage limit reached. Resets at 3pm.' })
+  process.exit(1)
 } else if (question.includes('#rotto')) {
   console.error('boom')
   process.exit(2)

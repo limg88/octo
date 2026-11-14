@@ -46,12 +46,12 @@ Tutto ciò che Octo scrive in un progetto sta sotto `_octo/`: la cartella si esc
 - **Avvio guidato**: in cima alla scheda «Fonti» un pannello dice che cosa è collegato e che cosa no, e un pulsante riempie la memoria da tutto ciò che è collegato. Octo propone parole chiave, date e cartelle; mostra un'anteprima della posta; elenca progetti e aree dei tracker da scegliere con un clic.
 
 ## Deliverable
-Nella scheda «Deliverable» il PM sceglie dal catalogo (email al cliente, stato di avanzamento, verbale), compila pochi campi e riceve una bozza:
+Nella scheda «Deliverable» il PM sceglie dal catalogo (email al cliente, stato di avanzamento, verbale, stima), compila pochi campi e riceve una bozza:
 - scritta da Claude dal progetto, in sola lettura;
 - con ogni fonte controllata dal codice;
 - riletta in un'esecuzione separata, come farebbe chi la riceve.
 
-Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo/deliverable/approvati/` e registra minuti di scrittura, minuti di revisione e giri.
+Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo/deliverable/approvati/` e registra minuti di scrittura, minuti di revisione e giri nel registro del progetto. Nella stima i totali li calcola il codice.
 
 ## Comandi
 | Comando | Cosa fa |

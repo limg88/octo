@@ -652,3 +652,58 @@ main > .warning {
   color: var(--muted);
   font-weight: 600;
 }
+
+.answer-text h1,
+.answer-text h2,
+.answer-text h3,
+.answer-text h4 {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin: 8px 0 0;
+}
+
+.answer-text h1 {
+  font-size: 18px;
+}
+
+.answer-text h2 {
+  font-size: 16px;
+}
+
+.answer-text table {
+  border-collapse: collapse;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+.answer-text th,
+.answer-text td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 12px 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.answer-text th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.answer-text code {
+  font-size: 13px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.answer-text hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  width: 100%;
+}

@@ -1,5 +1,7 @@
 import { type CheckedAnswer, type CheckedCitation, unverifiedCount } from '@octo/domain'
 import Markdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
+import remarkGfm from 'remark-gfm'
 import { linkMarkers, markerOfLink, sourceElementId } from './answer-text.ts'
 import { citationStatusText, dateText, messages } from './messages.ts'
 
@@ -7,6 +9,12 @@ type Props = {
   answer: CheckedAnswer
   onOpenSource: (path: string) => void
 }
+
+/**
+ * Tables, strike-through and task lists as people write them, and a line break where the text has
+ * one: an email keeps its lines, an estimate its tables.
+ */
+const MARKDOWN_PLUGINS = [remarkGfm, remarkBreaks]
 
 /** The answer as the model wrote it, with what the code found about each of its sources. */
 export function AnswerView({ answer, onOpenSource }: Props) {
@@ -16,6 +24,7 @@ export function AnswerView({ answer, onOpenSource }: Props) {
       <Summary answer={answer} />
       <div className="answer-text">
         <Markdown
+          remarkPlugins={MARKDOWN_PLUGINS}
           components={{
             a: ({ href, children }) => {
               const marker = markerOfLink(href)

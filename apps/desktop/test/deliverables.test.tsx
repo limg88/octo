@@ -175,6 +175,29 @@ describe('DeliverablesView', () => {
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md')
   })
 
+  it('shows the draft formatted: headings, tables and the lines of an email', async () => {
+    const formatted: Deliverable = {
+      ...review,
+      draft: {
+        text: '## Stima\n\nTotale **9,0 gg**.\n\n| Fase | gg |\n|---|---|\n| Sviluppo | 7,0 |\n\nGentile Carla,\nLe scrivo per il collaudo [1].',
+        citations: [review.draft?.citations[0]].flatMap((citation) => (citation ? [citation] : [])),
+        missing: [],
+        markersWithoutCitation: [],
+      },
+    }
+    const { api } = fakeApi({ listDeliverables: vi.fn(async () => ok([formatted])) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Stima' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Fase' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '7,0' })).toBeTruthy()
+    expect(screen.getByText('9,0 gg').tagName).toBe('STRONG')
+    const greeting = screen.getByText(/Gentile Carla,/)
+    expect(greeting.querySelector('br')).not.toBeNull()
+    expect(screen.queryByText(/\|---\|/)).toBeNull()
+  })
+
   it('shows the register of what each deliverable cost', async () => {
     const empty = fakeApi()
     render(<DeliverablesView api={empty.api} project={project} />)

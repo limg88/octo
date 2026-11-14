@@ -6,6 +6,7 @@ export const DOMAIN_ERROR_CODES = [
   'agent_not_installed',
   'agent_not_signed_in',
   'agent_failed',
+  'agent_limit_reached',
   'agent_output_invalid',
   'agent_cancelled',
   'source_not_configured',

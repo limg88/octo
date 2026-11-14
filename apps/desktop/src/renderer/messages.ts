@@ -209,6 +209,8 @@ const errors: Record<ErrorCode, string> = {
   agent_not_signed_in:
     'Claude non ha un accesso attivo: apri il terminale, scrivi «claude» e accedi.',
   agent_failed: 'Claude non ha risposto. Riprova fra poco.',
+  agent_limit_reached:
+    'Hai raggiunto il limite d’uso del tuo account Claude. Riprova quando il limite si azzera.',
   agent_output_invalid: 'La risposta di Claude non era leggibile. Riprova.',
   agent_cancelled: 'Domanda fermata.',
   source_not_configured: 'Questa fonte non è ancora configurata.',

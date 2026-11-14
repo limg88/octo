@@ -58,7 +58,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
 | F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
 | F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
-| F4 | in corso. Fatti il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Restano: la stima con i conti fatti dal codice, il registro in una pagina. Criterio di uscita da verificare su due deliverable reali |
+| F4 | in corso. Fatti il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale, stima), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Aggiunti stima e registro. Resta la carta intestata. Criterio di uscita da verificare su due deliverable reali |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -179,4 +179,8 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **Le regole del progetto valgono anche qui**: il `CLAUDE.md` della cartella vincola lo scrittore come vincola Chiedi.
 - **Il catalogo è codice di Octo**: tre tipi, ciascuno con campi da chiedere, istruzioni ed elenco di controllo. Riprendono le skill generalizzate di `second-brain-starter`.
 - **Le carte di Octo stanno in cartelle nascoste** (`_octo/.lavori`, `_octo/.impostazioni`, `_octo/.istruzioni`): nella prova reale lo scrittore aveva letto anche le bozze in corso e le impostazioni come se fossero fonti. La ricerca di Claude salta le cartelle nascoste.
-- **Non fatto**: stima (richiede i conti dal codice), carta intestata, PowerPoint ed Excel, deliverable specifici di un cliente.
+- **Stima** (quarto tipo): Claude propone le righe (attività, da che cosa dipende lo sforzo con la sua fonte, tre valori, stato dell'informazione); totali, intervallo all'80% e tabelle per fase e ruolo li calcola il codice con il PERT a tre punti dello starter. Una riga impossibile resta fuori dal totale e viene detta, mai corretta di nascosto. Provata con Claude vero: 29,6 giornate con intervallo, e la rilettura critica ha dato 12 rilievi.
+- **Registro**: una pagina nella scheda e il file `_octo/deliverable/registro.md`, aggiornato a ogni approvazione.
+- **Bozza formattata**: titoli, tabelle e a capo sono resi come tali (tabelle in stile GitHub, a capo semplice rispettato): un'email tiene le sue righe, una stima le sue tabelle.
+- **Limite d'uso riconosciuto**: quando il seat del PM ha finito la quota, Octo lo dice con parole sue invece di «Claude non ha risposto». Trovato perché la prima stima reale era caduta proprio per questo.
+- **Non fatto**: carta intestata, PowerPoint ed Excel, deliverable specifici di un cliente.

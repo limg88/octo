@@ -102,6 +102,7 @@ describe('claude cli runner', () => {
 
     await expect(ask('#accesso')).rejects.toMatchObject({ code: 'agent_not_signed_in' })
     await expect(ask('#rotto')).rejects.toMatchObject({ code: 'agent_failed' })
+    await expect(ask('#limite')).rejects.toMatchObject({ code: 'agent_limit_reached' })
     await expect(ask('#forma')).rejects.toMatchObject({ code: 'agent_output_invalid' })
   })
 

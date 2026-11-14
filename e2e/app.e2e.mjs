@@ -203,6 +203,9 @@ try {
   await work06.getByRole('button', { name: 'Scrivi la bozza' }).click()
   await work06.getByText(/Totale 9,0 gg/).waitFor({ timeout: TIMEOUT_MS })
   await work06.getByText(/Esclusa dai totali — W-03/).waitFor()
+  // The numbers are a real table, not lines of pipes.
+  await work06.getByRole('columnheader', { name: 'Fase' }).first().waitFor()
+  await page.screenshot({ path: `${work}/stima.png` })
   await work06.getByRole('button', { name: 'Registro' }).click()
   await work06.getByRole('cell', { name: 'Data di consegna' }).waitFor()
   await work06.getByText(/^Approvati: 1 ·/).waitFor()
