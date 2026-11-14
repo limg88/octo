@@ -193,3 +193,29 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **Dove stanno**: in `_octo/.tipi/`, uno per file, nascosti alla ricerca di Claude perché sono impostazioni e non fonti. Salvare di nuovo con lo stesso titolo sostituisce.
 - **Limite**: un tipo a parole produce testo (Markdown e Word). Non compila moduli Excel né deck PowerPoint del cliente, e non esegue script.
 - **Connettori del PM dentro Chiedi: non fattibile oggi.** Ho chiesto a Claude, in un'esecuzione non interattiva, quali strumenti dei connettori avesse: nessuno, né in modalità ristretta né senza. I connettori collegati all'account (posta, tracker) non arrivano a un'esecuzione lanciata da un programma. Finché è così, ciò che v0 legge dal vivo in Octo entra copiandolo nella cartella: è il lavoro di F2. Da riprovare a ogni aggiornamento di Claude Code.
+
+## Quali skill della Suite v0 entrano in Octo (deciso con il PM il 14/11/2026)
+Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un altro PM userebbe sul suo progetto e che risulta usato davvero (log delle correzioni e uso dichiarato).
+
+**Già in Octo**: email al cliente, verbale, stima, carta intestata.
+
+**Entrano come generiche, in quest'ordine**
+1. **Cruscotto bug e requisiti**, dentro Octo: bug per fase, fermi da N giorni, andamento, e i segnali dei requisiti poco chiari (in refinement, criteri di accettazione assenti, descrizione minima, in attesa, punti da chiarire nel testo). Unisce la dashboard e il report bug.
+2. **Riconciliazione delle ore**: ore del gestionale contro ore del tracker, per persona e periodo, con le esclusioni attese e la quadratura finale.
+3. **Excel e PowerPoint su modello**: prima il previsionale mensile per l'amministrazione (lo compilano tutti i PM con lo stesso modello), poi il modulo di avanzamento per posizione d'ordine e il deck dello stato di avanzamento.
+4. **Sei tipi di testo nel catalogo**: scenari di test, voce di backlog, note di rilascio, analisi funzionale e backlog da riunione, elenco delle modifiche da applicare a mano al tracker, technical proposal (parte narrativa).
+
+**Entra anche**: l'allineamento fra due tracker (uno del cliente, uno interno), perché è frequente fra i PM; le regole di corrispondenza vanno in configurazione.
+
+**Regole trasversali da portare in codice**
+- Filtro per il cliente: cifre seguite da unità di sforzo o di costo nei testi destinati al cliente, come controllo del codice su ogni deliverable per il cliente.
+- Calendario e squadra del progetto: periodi, sprint, persone con date di ingresso e uscita.
+- Domande pronte in Chiedi: stato del periodo, blocchi e rischi, triage delle mail, dopo la riunione.
+- Stima: confidenza per voce, nuovo distinto dal residuo, vista per il cliente.
+- Persone del progetto con le loro preferenze di lettura, usate dall'email.
+
+**Restano fuori dal catalogo** (nessuna usata con regolarità; ognuna si aggiunge come tipo proprio): pre-mortem, red-team della strategia, prioritizzazione, roadmap per outcome, mappa degli stakeholder, controllo grammaticale, retrospettiva; e le tre per chi sviluppa (documentazione di rilascio, confronto fra documentato e implementato, query).
+
+**Restano specifiche del progetto o del cliente**: il ciclo di vita dei documenti contrattuali con impaginazione sul precedente, budget e capacity finché dipendono da griglia e scheda di commessa.
+
+**Debito da non portare**: periodo attivo cablato, percorsi assoluti, connettori dismessi, note ed esclusioni come costanti nel codice, profili e glossario dentro il prompt. Note, esclusioni, profili e glossario sono dati del progetto, con data e autore.
