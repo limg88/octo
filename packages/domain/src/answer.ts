@@ -17,12 +17,14 @@ export type Evidence =
   | { kind: 'found'; text: string; modifiedAt: string }
   | { kind: 'missing' }
   | { kind: 'outside' }
+  | { kind: 'too_large' }
 
 export const CITATION_STATUSES = [
   'verified',
   'quote_not_found',
   'quote_too_short',
   'file_not_found',
+  'file_too_large',
   'outside_project',
 ] as const
 
@@ -58,14 +60,48 @@ export function checkCitation(citation: Citation, evidence: Evidence): CheckedCi
   if (evidence.kind === 'missing') {
     return { ...citation, status: 'file_not_found', modifiedAt: null }
   }
-  const quote = normalizeForMatch(citation.quote)
-  const status = quoteStatus(quote, normalizeForMatch(evidence.text))
+  if (evidence.kind === 'too_large') {
+    return { ...citation, status: 'file_too_large', modifiedAt: null }
+  }
+  const status = quoteStatus(normalizeForMatch(citation.quote), evidence)
   return { ...citation, status, modifiedAt: evidence.modifiedAt }
 }
 
-function quoteStatus(quote: string, text: string): CitationStatus {
+type FoundEvidence = Extract<Evidence, { kind: 'found' }>
+
+function quoteStatus(quote: string, evidence: FoundEvidence): CitationStatus {
   if (quote.length < MIN_QUOTE_LENGTH) return 'quote_too_short'
-  return text.includes(quote) ? 'verified' : 'quote_not_found'
+  const { plain, decoded } = searchable(evidence)
+  // A JSON export may write "—" as \u2014: the model quotes the character it read.
+  return plain.includes(quote) || decoded().includes(quote) ? 'verified' : 'quote_not_found'
+}
+
+type Searchable = { plain: string; decoded: () => string }
+
+/** One file is often cited many times: its text is prepared for matching only once. */
+const searchableByEvidence = new WeakMap<FoundEvidence, Searchable>()
+
+function searchable(evidence: FoundEvidence): Searchable {
+  const known = searchableByEvidence.get(evidence)
+  if (known) return known
+  let decoded: string | null = null
+  const prepared: Searchable = {
+    plain: normalizeForMatch(evidence.text),
+    decoded: () => {
+      decoded ??= normalizeForMatch(decodeUnicodeEscapes(evidence.text))
+      return decoded
+    },
+  }
+  searchableByEvidence.set(evidence, prepared)
+  return prepared
+}
+
+const UNICODE_ESCAPE = /\\u([0-9a-fA-F]{4})/g
+
+export function decodeUnicodeEscapes(text: string): string {
+  return text.replace(UNICODE_ESCAPE, (_match, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  )
 }
 
 export function markersIn(text: string): number[] {

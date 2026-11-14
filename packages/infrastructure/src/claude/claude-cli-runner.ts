@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import type { AgentRunner, AgentStatus, AskRequest } from '@octo/application'
 import { DomainError, type DraftAnswer } from '@octo/domain'
 import {
-  ASK_SYSTEM_PROMPT,
+  askSystemPrompt,
   DRAFT_ANSWER_JSON_SCHEMA,
   draftAnswerSchema,
   READ_ONLY_TOOLS,
@@ -48,8 +50,9 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
     return draftFrom(output)
   }
 
-  function run(request: AskRequest): Promise<RunOutput> {
-    const args = [...prefix, ...askArguments()]
+  async function run(request: AskRequest): Promise<RunOutput> {
+    const rules = await projectRules(request.projectFolder)
+    const args = [...prefix, ...askArguments(askSystemPrompt(rules))]
     const timeout = AbortSignal.timeout(config.askTimeoutMs ?? DEFAULT_ASK_TIMEOUT_MS)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
     return new Promise((resolve, reject) => {
@@ -85,7 +88,7 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
   return { status, ask }
 }
 
-function askArguments(): string[] {
+function askArguments(systemPrompt: string): string[] {
   return [
     '-p',
     '--output-format',
@@ -102,8 +105,21 @@ function askArguments(): string[] {
     // No connectors: an answer comes from the project folder only.
     '--strict-mcp-config',
     '--append-system-prompt',
-    ASK_SYSTEM_PROMPT,
+    systemPrompt,
   ]
+}
+
+const PROJECT_RULES_FILE = 'CLAUDE.md'
+/** Rules longer than this are cut: they travel in the prompt of every question. */
+const MAX_PROJECT_RULES_CHARS = 60_000
+
+async function projectRules(projectFolder: string): Promise<string | null> {
+  try {
+    const rules = await readFile(join(projectFolder, PROJECT_RULES_FILE), 'utf8')
+    return rules.slice(0, MAX_PROJECT_RULES_CHARS)
+  } catch {
+    return null
+  }
 }
 
 function draftFrom(output: RunOutput): DraftAnswer {

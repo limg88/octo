@@ -39,6 +39,7 @@ const citationStatus: Record<CitationStatus, string> = {
   quote_not_found: 'La frase non è nel file',
   quote_too_short: 'Frase troppo breve per valere come prova',
   file_not_found: 'File non trovato',
+  file_too_large: 'File troppo grande per il controllo',
   outside_project: 'File fuori dal progetto',
 }
 

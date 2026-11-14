@@ -3,14 +3,14 @@ import { relative, resolve, sep } from 'node:path'
 import type { EvidenceReader } from '@octo/application'
 import type { Evidence } from '@octo/domain'
 
-/** A cited file larger than this is not opened: it is not a text a PM wrote or received. */
-export const MAX_EVIDENCE_BYTES = 20 * 1024 * 1024
+/** Tracker exports reach tens of megabytes; beyond this a file is reported as too large. */
+export const MAX_EVIDENCE_BYTES = 200 * 1024 * 1024
 
 /**
  * Opens a cited file by its real path, so a link cannot lead outside the project folder.
  * An absolute path is accepted only when it lands inside the project.
  */
-export function createFsEvidenceReader(): EvidenceReader {
+export function createFsEvidenceReader(maxBytes = MAX_EVIDENCE_BYTES): EvidenceReader {
   return {
     async read(projectFolder, citedPath): Promise<Evidence> {
       const root = await realpath(projectFolder)
@@ -20,7 +20,8 @@ export function createFsEvidenceReader(): EvidenceReader {
       }
       if (!isInside(root, target)) return { kind: 'outside' }
       const info = await stat(target)
-      if (!info.isFile() || info.size > MAX_EVIDENCE_BYTES) return { kind: 'missing' }
+      if (!info.isFile()) return { kind: 'missing' }
+      if (info.size > maxBytes) return { kind: 'too_large' }
       return {
         kind: 'found',
         text: await readFile(target, 'utf8'),

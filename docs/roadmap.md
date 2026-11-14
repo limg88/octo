@@ -62,7 +62,8 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
   - non legge fuori dalla cartella del progetto;
   - non usa connettori;
   - non carica impostazioni, hook o plugin del computer né della cartella. Una cartella condivisa non può quindi far eseguire codice.
-- **Il `CLAUDE.md` del vault non è caricato come regola**: in modalità ristretta Claude lo ignora. Il prompt gli chiede di leggerlo per primo, come guida a come è organizzata la memoria. Da verificare su DEEM se basta per la qualità delle risposte di v0.
+- **Le regole del progetto vincolano la risposta**: in modalità ristretta Claude ignora il `CLAUDE.md` della cartella, quindi Octo lo legge e lo passa nel prompt come regole del PM (per esempio: niente numeri da uno snapshot più vecchio di 72 ore). Le parti su strumenti e skill non disponibili vengono ignorate; l'esecuzione resta di sola lettura qualunque cosa dicano.
+- **File grandi e export JSON** (trovato sulla prima prova con DEEM, 14/11): un file citato fino a 200 MB viene aperto; oltre è marcato «troppo grande», non «non trovato». Una frase vale anche se il file scrive i caratteri come `\uXXXX`.
 - **Modello**: quello predefinito di Claude Code del PM, come in v0. Una domanda banale costa poco in quota, ma il primo avvio carica un contesto ampio.
 - **Variabili di un'altra sessione Claude** (`ANTHROPIC_*`, `CLAUDE*`) tolte dall'ambiente del processo: vale sempre l'accesso del PM.
 - **La domanda viaggia sullo standard input**: nessun problema di virgolette su Windows.

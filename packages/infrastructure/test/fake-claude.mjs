@@ -47,6 +47,7 @@ if (question.includes('#lento')) {
   }
   if (question.includes('#ambiente')) {
     answer.missing = Object.keys(process.env).filter((name) => /^(ANTHROPIC_|CLAUDE)/.test(name))
+    answer.missing.push(`rules:${args.join(' ').includes('REGOLA-DI-PROVA')}`)
     answer.missing.push(
       `args:${args.includes('--restricted') && args.includes('--strict-mcp-config')}`,
     )

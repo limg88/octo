@@ -84,7 +84,17 @@ describe('claude cli runner', () => {
       env: { ANTHROPIC_API_KEY: 'k', CLAUDE_CODE_OAUTH_TOKEN: 't', CLAUDECODE: '1' },
     }).ask({ projectFolder: project, question: '#ambiente' })
 
-    expect(draft.missing).toEqual(['args:true'])
+    expect(draft.missing).toEqual(['rules:false', 'args:true'])
+  })
+
+  it('binds the answer to the rules the PM wrote for the project', async () => {
+    const withRules = join(root, 'con-regole')
+    await mkdir(withRules)
+    await writeFile(join(withRules, 'CLAUDE.md'), 'REGOLA-DI-PROVA: niente numeri oltre 72 ore.')
+
+    const draft = await runner().ask({ projectFolder: withRules, question: '#ambiente' })
+
+    expect(draft.missing).toContain('rules:true')
   })
 
   it('maps the failures to codes a PM can be told', async () => {
@@ -141,6 +151,11 @@ describe('evidence reader', () => {
     expect(await reader.read(project, '../fuori/segreto.md')).toEqual({ kind: 'outside' })
     expect(await reader.read(project, 'wiki/link.md')).toEqual({ kind: 'outside' })
     expect(await reader.read(project, '../fuori/assente.md')).toEqual({ kind: 'outside' })
+  })
+
+  it('says when a cited file is too large to check', async () => {
+    const tiny = createFsEvidenceReader(STATE_TEXT.length - 1)
+    expect(await tiny.read(project, 'wiki/stato.md')).toEqual({ kind: 'too_large' })
   })
 
   it('reports a missing file and refuses a folder', async () => {

@@ -38,6 +38,23 @@ describe('checkCitation', () => {
     expect(checkCitation(citation('ordini'), found).status).toBe('quote_too_short')
   })
 
+  it('verifies a quote the file writes with JSON escapes', () => {
+    const json: Evidence = {
+      kind: 'found',
+      text: '{"title": "Crystal Symphony \\u2014 Upgrade to the latest release"}',
+      modifiedAt: MODIFIED_AT,
+    }
+    expect(checkCitation(citation('"title": "Crystal Symphony — Upgrade'), json).status).toBe(
+      'verified',
+    )
+  })
+
+  it('says when a file is too large to be checked', () => {
+    expect(checkCitation(citation('fissata al 12 dicembre'), { kind: 'too_large' }).status).toBe(
+      'file_too_large',
+    )
+  })
+
   it('marks a missing file and a file outside the project', () => {
     const quote = 'fissata al 12 dicembre 2026'
     expect(checkCitation(citation(quote), { kind: 'missing' })).toMatchObject({
