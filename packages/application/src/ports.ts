@@ -1,4 +1,13 @@
-import type { DraftAnswer, Evidence, Project, QuestionRecord } from '@octo/domain'
+import type {
+  ArchivedMail,
+  DraftAnswer,
+  Evidence,
+  MailMessage,
+  Project,
+  QuestionRecord,
+  SourceState,
+  SourcesConfig,
+} from '@octo/domain'
 
 /** What the agent is doing right now, in terms a PM can read. */
 export type AgentProgress = {
@@ -50,4 +59,39 @@ export interface Clock {
 
 export interface IdGenerator {
   next(): string
+}
+
+/**
+ * The mail the PM's mail program keeps on this computer. Nothing is written and the program is
+ * not asked. Throws a DomainError `mail_archive_unreadable` when it cannot be opened.
+ */
+export interface MailArchive {
+  /** The mail received from `from` (included) to `to` (excluded), oldest first. */
+  between(from: Date, to: Date): Promise<ArchivedMail[]>
+  /** The message, or null when it is not downloaded or cannot be read as a mail. */
+  read(mail: ArchivedMail): Promise<MailMessage | null>
+}
+
+export type WriteOutcome = 'written' | 'unchanged'
+
+/** Writes a file of the memory inside the project folder, and nowhere else. */
+export interface MemoryWriter {
+  write(projectFolder: string, relativePath: string, content: string): Promise<WriteOutcome>
+}
+
+/** The sources of a project, kept in the project folder so they travel with it. */
+export interface SourceSettings {
+  load(projectFolder: string): Promise<SourcesConfig>
+  save(projectFolder: string, config: SourcesConfig): Promise<void>
+  /** A sensible place for the mail in this folder, following how it is already organised. */
+  suggestMailFolder(projectFolder: string): Promise<string>
+}
+
+export type SourceName = 'mail'
+
+/** What each source did last on this computer, and where its next reading starts. */
+export interface SourceStates {
+  get(projectId: string, source: SourceName): Promise<SourceState>
+  set(projectId: string, source: SourceName, state: SourceState): Promise<void>
+  removeProject(projectId: string): Promise<void>
 }

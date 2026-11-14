@@ -8,6 +8,7 @@ import {
   folderProbe,
   memoryQuestionLog,
   memoryRegistry,
+  memorySourceStates,
   STEP_MS,
   steppingClock,
 } from './fakes.ts'
@@ -22,14 +23,16 @@ const project: Project = {
 
 function projectsWith(initial: Project[] = []) {
   const questions = memoryQuestionLog()
+  const sourceStates = memorySourceStates()
   const projects = createProjects({
     registry: memoryRegistry(initial),
     questions,
+    sourceStates,
     folders: folderProbe([FOLDER, `${FOLDER}/`]),
     clock: steppingClock(),
     ids: countingIds('p'),
   })
-  return { projects, questions }
+  return { projects, questions, sourceStates }
 }
 
 describe('projects', () => {
@@ -52,7 +55,7 @@ describe('projects', () => {
   })
 
   it('forgets a project with its questions', async () => {
-    const { projects, questions } = projectsWith([project])
+    const { projects, questions, sourceStates } = projectsWith([project])
     await questions.append({
       id: 'q-1',
       projectId: project.id,
@@ -63,10 +66,16 @@ describe('projects', () => {
       error: 'agent_failed',
     })
 
+    await sourceStates.set(project.id, 'mail', {
+      cursor: '2026-11-10T00:00:00.000Z',
+      lastRun: null,
+    })
+
     await projects.remove(project.id)
 
     expect(await projects.list()).toEqual([])
     expect(questions.all()).toEqual([])
+    expect(sourceStates.all().size).toBe(0)
     await expect(projects.get(project.id)).rejects.toMatchObject({ code: 'project_not_found' })
   })
 })

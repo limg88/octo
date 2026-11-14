@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { AgentProgress, AgentStatus } from '@octo/application'
+import type { AgentProgress, AgentStatus, MailSourceView } from '@octo/application'
 import type { Project, QuestionRecord } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +53,12 @@ const answered: QuestionRecord = {
 
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 
+const mailView: MailSourceView = {
+  config: null,
+  suggestedFolder: 'Posta',
+  state: { cursor: null, lastRun: null },
+}
+
 function fakeApi(overrides: Partial<OctoApi> = {}) {
   let emit: (projectId: string, progress: AgentProgress) => void = () => {}
   const status: AgentStatus = { available: true, version: '2.1' }
@@ -69,6 +75,12 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       emit = listener
       return () => {}
     },
+    mailSource: vi.fn(async () => ok(mailView)),
+    saveMailSource: vi.fn(async () => ok(mailView)),
+    syncMail: vi.fn(async () =>
+      ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
+    ),
+    onSourcesChanged: () => () => {},
     ...overrides,
   }
   return { api, emit: (projectId: string, step: AgentProgress) => emit(projectId, step) }
@@ -216,5 +228,21 @@ describe('answer text', () => {
   it('describes a step with or without a target', () => {
     expect(progressText({ kind: 'writing', target: '' })).toBe('Scrivo la risposta')
     expect(progressText({ kind: 'searching', target: 'budget' })).toBe('Cerco budget')
+  })
+})
+
+describe('project tabs', () => {
+  it('switches between asking and the sources of the project', async () => {
+    const { api } = fakeApi()
+    render(<App api={api} />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+    expect(await screen.findByText(messages.mailNotConfigured)).toBeTruthy()
+    // The page loads once: with the real clock it must not reload at every render.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(api.mailSource).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('tab', { name: messages.ask }))
+    expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
   })
 })

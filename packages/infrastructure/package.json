@@ -12,6 +12,7 @@
   "dependencies": {
     "@octo/application": "workspace:*",
     "@octo/domain": "workspace:*",
+    "postal-mime": "4.2.0",
     "zod": "4.6.7"
   }
 }

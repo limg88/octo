@@ -2,6 +2,7 @@
 // of demo 01 in the real window. Run with `pnpm e2e` after `pnpm build`.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 
@@ -10,6 +11,9 @@ const work = `${root}.tmp/e2e`
 const TIMEOUT_MS = 20_000
 
 execFileSync('bash', ['-c', `source "${root}demo/lib/project.sh" && make_demo_project "${work}"`])
+const fakeMail = (...extra) =>
+  execFileSync('node', [`${root}demo/lib/fake-mail.ts`, `${work}/Mail`, ...extra])
+fakeMail()
 
 // OCTO_E2E_EXECUTABLE points the same steps at an installed or packaged app.
 const packaged = process.env.OCTO_E2E_EXECUTABLE
@@ -20,6 +24,7 @@ const launch = () =>
       ...process.env,
       OCTO_DATA_DIR: `${work}/dati`,
       OCTO_CLAUDE_PATH: `${root}demo/lib/fake-claude`,
+      OCTO_MAIL_ROOT: `${work}/Mail`,
     },
   })
 
@@ -42,6 +47,27 @@ try {
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('La frase non è nel file').waitFor({ timeout: TIMEOUT_MS })
   await page.screenshot({ path: `${work}/chiedi.png` })
+
+  // Demo 02: the mail of the project enters its folder, once.
+  await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByText('La posta di questo progetto non è ancora configurata.').waitFor()
+  await page.getByLabel('Parole chiave').fill('Aurora')
+  await page.getByLabel('Mittenti da escludere').fill('avvisi@monitor.example')
+  await page.getByRole('button', { name: 'Salva' }).click()
+  await page.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Leggi ora' }).click()
+  await page.getByText('2 nuove, 0 già presenti').waitFor({ timeout: TIMEOUT_MS })
+  const month = new Date(Date.now() - 30 * 3600 * 1000).toISOString().slice(0, 7)
+  const written = readdirSync(`${work}/Aurora/Posta/${month}`)
+  assert.equal(written.length, 2)
+  const first = readFileSync(`${work}/Aurora/Posta/${month}/${written[0]}`, 'utf8')
+  assert.match(first, /oggetto: "Aurora: data del collaudo"/)
+  assert.match(first, /spostato a giovedì 17 dicembre 2026/)
+  fakeMail('extra')
+  await page.getByRole('button', { name: 'Leggi ora' }).click()
+  await page.getByText('1 nuove, 2 già presenti').waitFor({ timeout: TIMEOUT_MS })
+  await page.screenshot({ path: `${work}/fonti.png` })
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.
   await app.close()

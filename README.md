@@ -33,7 +33,11 @@ Le dipendenze puntano solo verso l'interno: `domain` ← `application` ← `infr
 - La domanda passa sullo standard input; la risposta torna in un formato fisso (testo, citazioni, cose non trovate).
 - Octo apre ogni file citato e cerca la frase: ciò che non trova resta nella risposta, marcato «da controllare».
 
-Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_DIR` (cartella dello stato dell'app).
+Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_DIR` (cartella dello stato dell'app), `OCTO_MAIL_ROOT` (un'altra cartella di Mail, per le demo).
+
+## Come Octo alimenta la memoria
+- **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `.octo/sources.json` nella cartella del progetto.
+- La lettura parte su richiesta e ogni 15 minuti ad app aperta.
 
 ## Comandi
 | Comando | Cosa fa |

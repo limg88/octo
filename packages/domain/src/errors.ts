@@ -8,6 +8,11 @@ export const DOMAIN_ERROR_CODES = [
   'agent_failed',
   'agent_output_invalid',
   'agent_cancelled',
+  'source_not_configured',
+  'source_config_invalid',
+  'source_busy',
+  'mail_archive_unreadable',
+  'mail_reader_missing',
 ] as const
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]

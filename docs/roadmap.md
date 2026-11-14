@@ -55,7 +55,8 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 
 | Fetta | Stato |
 |---|---|
-| F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`; criterio di uscita da verificare su DEEM e sul PC Windows del pilota |
+| F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
+| F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Restano: file Office convertiti in testo, ADO, Jira, DWSI, posta su Windows |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -72,3 +73,16 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Interfaccia isolata**: nessun accesso a Node, un solo ponte con richieste validate; ogni errore arriva come codice e l'interfaccia lo spiega a parole.
 - **Versioni delle dipendenze**: solo rilasci pubblicati da almeno 14 giorni.
 - **Non verificato**: installatore e avvio su Windows; il percorso di Claude Code su Windows è cercato solo nell'installazione nativa (`%USERPROFILE%\.local\bin\claude.exe`), altrimenti sul PATH.
+
+## Scelte prese durante F2 (posta)
+- **Si parte dalla posta**: nel confronto con v0 quasi tutte le azioni richieste al PM venivano da mail della settimana, che Octo non vedeva.
+- **Lettore portato da octobrief-new** (`addons/sync`): legge l'archivio che Mail tiene sul Mac (indice e un file per messaggio), senza chiedere nulla a Mail e senza scrivere. Nessun modello è coinvolto.
+- **Quali mail entrano lo decide il codice**: parole chiave cercate come parole intere, indirizzi o `@dominio`, cartelle di posta, mittenti esclusi. Fuori sempre bozze, cestino, indesiderata e le risposte agli inviti.
+- **Una mail è un file Markdown** nella cartella del progetto, sotto `<cartella>/<anno-mese>/`, con giorno, ora e oggetto nel nome. In testa mittente, destinatari, data, cartella di posta e allegati (solo i nomi). Il testo è quello scritto dall'autore: i messaggi citati sotto si tolgono, salvo scelta contraria.
+- **Dove va la posta**: Octo propone `raw/Mail` se la cartella ha già `raw/` (vault della Suite), altrimenti `Posta`.
+- **Le regole stanno nel progetto** (`.octo/sources.json`), così viaggiano con la cartella. Cursore ed esito dell'ultima lettura stanno sul computer.
+- **Lettura**: su richiesta e ogni 15 minuti ad app aperta. Riparte da due giorni prima dell'ultima, perché una mail può arrivare in archivio dopo quelle successive; ciò che è già scritto risulta «già presente». Cambiare le regole fa ripartire dal giorno di inizio.
+- **Freschezza**: la pagina Fonti mostra l'ultima lettura e avvisa dopo un giorno senza letture o se l'ultima è fallita.
+- **Permesso su macOS**: leggere `~/Library/Mail` richiede «Accesso completo al disco» per Octo. Se manca, la pagina lo dice.
+- **Windows**: nessun lettore ancora; la pagina dice che la posta non è disponibile. Dipende da quale Outlook ha il pilota.
+- **Non verificato**: la lettura della posta reale (fatta solo su archivio finto, anche nella finestra vera).

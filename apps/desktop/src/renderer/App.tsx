@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AskView } from './AskView.tsx'
 import { errorText, messages } from './messages.ts'
+import { SourcesView } from './SourcesView.tsx'
+
+type Tab = 'ask' | 'sources'
 
 type Props = {
   api: OctoApi
@@ -14,6 +17,7 @@ export function App({ api }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
+  const [tab, setTab] = useState<Tab>('ask')
 
   useEffect(() => {
     void api.agentStatus().then((result) => {
@@ -99,7 +103,20 @@ export function App({ api }: Props) {
                 {messages.removeProject}
               </button>
             </header>
-            <AskView api={api} project={selected} />
+            <div className="tabs" role="tablist">
+              <TabButton current={tab} tab="ask" label={messages.ask} onSelect={setTab} />
+              <TabButton
+                current={tab}
+                tab="sources"
+                label={messages.sourcesTab}
+                onSelect={setTab}
+              />
+            </div>
+            {tab === 'ask' ? (
+              <AskView api={api} project={selected} />
+            ) : (
+              <SourcesView api={api} project={selected} />
+            )}
           </>
         ) : (
           <div className="notice">
@@ -109,5 +126,29 @@ export function App({ api }: Props) {
         )}
       </main>
     </div>
+  )
+}
+
+function TabButton({
+  current,
+  tab,
+  label,
+  onSelect,
+}: {
+  current: Tab
+  tab: Tab
+  label: string
+  onSelect: (tab: Tab) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={current === tab}
+      className={current === tab ? 'tab tab-selected' : 'tab'}
+      onClick={() => onSelect(tab)}
+    >
+      {label}
+    </button>
   )
 }

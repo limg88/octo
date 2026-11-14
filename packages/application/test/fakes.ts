@@ -1,4 +1,15 @@
-import type { DraftAnswer, Evidence, Project, QuestionRecord } from '@octo/domain'
+import {
+  type ArchivedMail,
+  type DraftAnswer,
+  type Evidence,
+  type MailMessage,
+  NEVER_READ,
+  NO_SOURCES,
+  type Project,
+  type QuestionRecord,
+  type SourceState,
+  type SourcesConfig,
+} from '@octo/domain'
 import type {
   AgentRunner,
   AskRequest,
@@ -6,8 +17,12 @@ import type {
   EvidenceReader,
   FolderProbe,
   IdGenerator,
+  MailArchive,
+  MemoryWriter,
   ProjectRegistry,
   QuestionLog,
+  SourceSettings,
+  SourceStates,
 } from '../src/index.ts'
 
 export const STEP_MS = 1000
@@ -78,5 +93,62 @@ export function agentAnswering(
       if (reply instanceof Error) throw reply
       return reply
     },
+  }
+}
+
+export function memorySourceStates(): SourceStates & { all(): Map<string, SourceState> } {
+  const states = new Map<string, SourceState>()
+  return {
+    all: () => states,
+    get: async (projectId, source) => states.get(`${projectId}/${source}`) ?? NEVER_READ,
+    set: async (projectId, source, state) => {
+      states.set(`${projectId}/${source}`, state)
+    },
+    removeProject: async (projectId) => {
+      for (const key of [...states.keys()]) {
+        if (key.startsWith(`${projectId}/`)) states.delete(key)
+      }
+    },
+  }
+}
+
+export function memorySourceSettings(initial: SourcesConfig = NO_SOURCES): SourceSettings {
+  let config = initial
+  return {
+    load: async () => config,
+    save: async (_folder, next) => {
+      config = next
+    },
+    suggestMailFolder: async () => 'Posta',
+  }
+}
+
+export function memoryWriter(): MemoryWriter & { files: Map<string, string> } {
+  const files = new Map<string, string>()
+  return {
+    files,
+    write: async (_folder, path, content) => {
+      if (files.get(path) === content) return 'unchanged'
+      files.set(path, content)
+      return 'written'
+    },
+  }
+}
+
+export type FakeArchivedMail = ArchivedMail & { message: MailMessage | null }
+
+export function archiveOf(
+  mails: FakeArchivedMail[] | Error,
+): MailArchive & { windows: Array<{ from: Date; to: Date }> } {
+  const windows: Array<{ from: Date; to: Date }> = []
+  return {
+    windows,
+    between: async (from, to) => {
+      windows.push({ from, to })
+      if (mails instanceof Error) throw mails
+      return mails.filter((mail) => mail.receivedAt >= from && mail.receivedAt < to)
+    },
+    read: async (mail) =>
+      mails instanceof Error ? null : (mails.find((m) => m.id === mail.id)?.message ?? null),
   }
 }

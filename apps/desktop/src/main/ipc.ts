@@ -5,6 +5,7 @@ import type {
   EvidenceReader,
   Projects,
   QuestionLog,
+  Sources,
 } from '@octo/application'
 import { isDomainError } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
@@ -18,14 +19,30 @@ export type IpcDeps = {
   questions: QuestionLog
   evidence: EvidenceReader
   askQuestion: AskQuestion
+  sources: Sources
   folderDialogTitle: string
 }
 
 const MAX_QUESTION_LENGTH = 4000
+const MAX_RULE_LENGTH = 300
 const none = z.undefined()
 const byProject = z.object({ projectId: z.string().min(1) })
 const askInput = byProject.extend({ question: z.string().max(MAX_QUESTION_LENGTH) })
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
+const MAX_RULES = 200
+const ruleList = z.array(z.string().max(MAX_RULE_LENGTH)).max(MAX_RULES)
+const mailSaveInput = byProject.extend({
+  config: z
+    .object({
+      since: z.string().max(MAX_RULE_LENGTH),
+      keywords: ruleList,
+      folders: ruleList,
+      excludeSenders: ruleList,
+      keepQuoted: z.boolean(),
+      targetFolder: z.string().max(MAX_RULE_LENGTH),
+    })
+    .nullable(),
+})
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -76,6 +93,18 @@ export function registerIpc(deps: IpcDeps): void {
     running.get(projectId)?.abort()
     return null
   })
+
+  handle(CHANNELS.mailGet, byProject, async ({ projectId }) =>
+    deps.sources.mail(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.mailSave, mailSaveInput, async ({ projectId, config }) =>
+    deps.sources.saveMail(await deps.projects.get(projectId), config),
+  )
+
+  handle(CHANNELS.mailSync, byProject, async ({ projectId }) =>
+    deps.sources.syncMail(await deps.projects.get(projectId)),
+  )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {
     const project = await deps.projects.get(projectId)

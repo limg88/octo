@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { access, constants, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { access, constants, rm, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { FolderProbe, ProjectRegistry, QuestionLog } from '@octo/application'
 import {
   CITATION_STATUSES,
@@ -9,6 +8,7 @@ import {
   type QuestionRecord,
 } from '@octo/domain'
 import { z } from 'zod'
+import { readJsonOr, writeJson } from './json-file.ts'
 
 const projectSchema = z.object({
   id: z.string(),
@@ -50,8 +50,8 @@ const PRIVATE_FILE_MODE = 0o600
 export function createJsonProjectRegistry(dataFolder: string): ProjectRegistry {
   const file = join(dataFolder, PROJECTS_FILE)
   return {
-    list: async (): Promise<Project[]> => z.array(projectSchema).parse(await readJson(file, [])),
-    save: (projects) => writeJson(file, projects),
+    list: async (): Promise<Project[]> => z.array(projectSchema).parse(await readJsonOr(file, [])),
+    save: (projects) => writeJson(file, projects, PRIVATE_FILE_MODE),
   }
 }
 
@@ -59,11 +59,15 @@ export function createJsonQuestionLog(dataFolder: string): QuestionLog {
   const fileOf = (projectId: string) =>
     join(dataFolder, QUESTIONS_FOLDER, `${encodeURIComponent(projectId)}.json`)
   const list = async (projectId: string): Promise<QuestionRecord[]> =>
-    z.array(questionSchema).parse(await readJson(fileOf(projectId), []))
+    z.array(questionSchema).parse(await readJsonOr(fileOf(projectId), []))
   return {
     list,
     append: async (record) => {
-      await writeJson(fileOf(record.projectId), [...(await list(record.projectId)), record])
+      await writeJson(
+        fileOf(record.projectId),
+        [...(await list(record.projectId)), record],
+        PRIVATE_FILE_MODE,
+      )
     },
     removeProject: (projectId) => rm(fileOf(projectId), { force: true }),
   }
@@ -80,21 +84,4 @@ export function createFsFolderProbe(): FolderProbe {
       }
     },
   }
-}
-
-async function readJson(file: string, fallback: unknown): Promise<unknown> {
-  try {
-    return JSON.parse(await readFile(file, 'utf8'))
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return fallback
-    throw error
-  }
-}
-
-/** Written beside the target and renamed over it: a crash never leaves half a file. */
-async function writeJson(file: string, value: unknown): Promise<void> {
-  await mkdir(dirname(file), { recursive: true })
-  const temporary = `${file}.${randomUUID()}.tmp`
-  await writeFile(temporary, JSON.stringify(value, null, 2), { mode: PRIVATE_FILE_MODE })
-  await rename(temporary, file)
 }

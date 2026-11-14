@@ -4,22 +4,65 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createAskQuestion, createProjects } from '@octo/application'
 import {
+  createAskQuestion,
+  createProjects,
+  createSources,
+  type MailArchive,
+  type Projects,
+  type Sources,
+} from '@octo/application'
+import { DomainError, isDomainError } from '@octo/domain'
+import {
+  createAppleMailArchive,
   createClaudeCliRunner,
   createFsEvidenceReader,
   createFsFolderProbe,
+  createFsMemoryWriter,
+  createFsSourceSettings,
   createJsonProjectRegistry,
   createJsonQuestionLog,
+  createJsonSourceStates,
   locateClaude,
 } from '@octo/infrastructure'
 import { app, BrowserWindow } from 'electron'
+import { CHANNELS } from '../shared/api.ts'
 import { registerIpc } from './ipc.ts'
 
 const WINDOW_SIZE = { width: 1280, height: 860, minWidth: 900, minHeight: 600 }
 const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 /** Lets a demo or a test keep its state apart from the PM's real one. */
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
+/** Points the mail reader at another Mail folder: a demo's fake archive. */
+const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
+const MAC = 'darwin'
+/** How often the sources of every project are read while the app is open. */
+const SYNC_INTERVAL_MS = 15 * 60 * 1000
+const FIRST_SYNC_DELAY_MS = 10 * 1000
+
+/** The mail program this computer keeps its mail in. Today only Mail on a Mac is read. */
+function mailArchive(): MailArchive {
+  const root = process.env[MAIL_ROOT_VARIABLE]
+  if (root || process.platform === MAC) return createAppleMailArchive(root)
+  const missing = async (): Promise<never> => {
+    throw new DomainError('mail_reader_missing')
+  }
+  return { between: missing, read: missing }
+}
+
+/** Reads the sources of every project, one after the other, and tells the window. */
+async function syncAll(projects: Projects, sources: Sources, window: BrowserWindow): Promise<void> {
+  for (const project of await projects.list()) {
+    try {
+      if (!(await sources.hasMail(project))) continue
+      await sources.syncMail(project)
+      if (!window.isDestroyed()) window.webContents.send(CHANNELS.sourcesChanged, project.id)
+    } catch (error) {
+      // A reading already running or a broken configuration: the Sources page shows it.
+      if (!isDomainError(error)) console.error('[octo] periodic reading failed', error)
+    }
+  }
+}
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 
@@ -46,6 +89,7 @@ function start(): void {
   const clock = { now: () => new Date() }
   const ids = { next: () => randomUUID() }
   const questions = createJsonQuestionLog(dataFolder)
+  const sourceStates = createJsonSourceStates(dataFolder)
   const evidence = createFsEvidenceReader()
   const agent = createClaudeCliRunner({
     command: locateClaude({
@@ -59,12 +103,25 @@ function start(): void {
   const projects = createProjects({
     registry: createJsonProjectRegistry(dataFolder),
     questions,
+    sourceStates,
     folders: createFsFolderProbe(),
     clock,
     ids,
   })
+  const sources = createSources({
+    settings: createFsSourceSettings(),
+    states: sourceStates,
+    archive: mailArchive(),
+    writer: createFsMemoryWriter(),
+    clock,
+  })
+  const window = createWindow()
+  const periodic = () => void syncAll(projects, sources, window)
+  setTimeout(periodic, FIRST_SYNC_DELAY_MS)
+  setInterval(periodic, SYNC_INTERVAL_MS)
   registerIpc({
-    window: createWindow(),
+    window,
+    sources,
     agent,
     projects,
     questions,

@@ -1,9 +1,17 @@
 import { DomainError, type Project, projectNameFromFolder, sameFolder } from '@octo/domain'
-import type { Clock, FolderProbe, IdGenerator, ProjectRegistry, QuestionLog } from './ports.ts'
+import type {
+  Clock,
+  FolderProbe,
+  IdGenerator,
+  ProjectRegistry,
+  QuestionLog,
+  SourceStates,
+} from './ports.ts'
 
 export type ProjectsDeps = {
   registry: ProjectRegistry
   questions: QuestionLog
+  sourceStates: SourceStates
   folders: FolderProbe
   clock: Clock
   ids: IdGenerator
@@ -41,12 +49,13 @@ export function createProjects(deps: ProjectsDeps): Projects {
     return project
   }
 
-  /** Forgets the project and its questions. The folder itself is never touched. */
+  /** Forgets the project, its questions and its readings. The folder itself is never touched. */
   async function remove(id: string): Promise<void> {
     const project = await get(id)
     const projects = await deps.registry.list()
     await deps.registry.save(projects.filter((candidate) => candidate.id !== project.id))
     await deps.questions.removeProject(project.id)
+    await deps.sourceStates.removeProject(project.id)
   }
 
   return { list: () => deps.registry.list(), get, add, remove }

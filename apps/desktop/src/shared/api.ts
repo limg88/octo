@@ -1,5 +1,11 @@
-import type { AgentProgress, AgentStatus } from '@octo/application'
-import type { DomainErrorCode, Project, QuestionRecord } from '@octo/domain'
+import type { AgentProgress, AgentStatus, MailSourceView } from '@octo/application'
+import type {
+  DomainErrorCode,
+  MailSourceConfig,
+  Project,
+  QuestionRecord,
+  SourceRun,
+} from '@octo/domain'
 
 /** A failure that is not one of the expected ones: the detail is in the app's log. */
 export const UNEXPECTED_ERROR = 'unexpected'
@@ -17,6 +23,10 @@ export const CHANNELS = {
   questionsCancel: 'questions:cancel',
   questionsProgress: 'questions:progress',
   evidenceOpen: 'evidence:open',
+  mailGet: 'sources:mail:get',
+  mailSave: 'sources:mail:save',
+  mailSync: 'sources:mail:sync',
+  sourcesChanged: 'sources:changed',
 } as const
 
 /** What the interface can ask the app. It is the only door between the two. */
@@ -30,6 +40,16 @@ export type OctoApi = {
   ask(projectId: string, question: string): Promise<Result<QuestionRecord>>
   cancelAsk(projectId: string): Promise<Result<null>>
   openEvidence(projectId: string, path: string): Promise<Result<null>>
+  mailSource(projectId: string): Promise<Result<MailSourceView>>
+  /** Null switches the mail of the project off. */
+  saveMailSource(
+    projectId: string,
+    config: MailSourceConfig | null,
+  ): Promise<Result<MailSourceView>>
+  /** Reads the new mail now. A failure of the reading is in the run, not in the result. */
+  syncMail(projectId: string): Promise<Result<SourceRun>>
   /** Returns the function that stops listening. */
   onProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
+  /** Tells when a periodic reading has ended for a project. */
+  onSourcesChanged(listener: (projectId: string) => void): () => void
 }
