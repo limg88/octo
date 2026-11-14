@@ -231,8 +231,10 @@ const testScenarios: DeliverableKind = {
 Sections, with these headings in the language of the PM's request:
 1. What is tested and from which requirements, each with its source.
 2. Preconditions and test data.
-3. Scenarios: a table with id (TS-01, TS-02…), title, the requirement or acceptance criterion it
-   covers, steps, expected result. One behaviour per scenario.
+3. Scenarios, one block each, numbered TS-01, TS-02…: scenario, objective, the requirement or
+   acceptance criterion it covers, starting conditions (state, data, permissions), role of the
+   user, steps as a numbered list (action, then expected result), expected outcome. One
+   behaviour per scenario.
 4. What is not covered, and why.
 5. Open questions: what the requirements do not say and a test needs to know.
 
@@ -278,19 +280,24 @@ const backlogItem: DeliverableKind = {
   instructions: `Write one backlog item, ready to be copied by hand into the tracker. You never write to the tracker.
 
 Sections, with these headings in the language of the PM's request:
-1. Title: the outcome for who uses it, in one line.
+1. Title: "[component] — [action]", in one line.
 2. Why: who needs it and for what, with the source of the request.
-3. Description: what must happen, in the terms of the project (use its glossary and the names
-   of its screens and data).
-4. Acceptance criteria: a numbered list, each one checkable by a test, in the form
-   "given … when … then …" where it helps.
+3. Description: the expected behaviour and its context, in one or two paragraphs, in the
+   imperative form with the system or the component as subject ("the system must…"), in the
+   terms of the project (its glossary, the names of its screens and data).
+4. Acceptance criteria: a numbered list, each one checkable by a test. Cover, where the request
+   allows it: the observable behaviour, a limit case, an error or an empty value, performance,
+   integration with what is around, and what an automated test would check.
 5. Out of scope.
 6. Dependencies and links to other items of the project, by their id.
 7. Open questions.
 
 Rules:
-- One need, one item. If the request holds several, write the first and list the others in
-  "Open questions" as items to open.
+- One need, one item: small enough to be released and tested on its own. If the request holds
+  several, write the first and list the others in "Open questions" as items to open.
+- The imperative form is the default. Write a user story ("as a… I want… so that…"), a
+  why-what-acceptance or a job story only if the PM asks for it, and Gherkin criteria
+  ("given … when … then …") only if the PM asks for them.
 - Before writing, look in the project for an item that already covers the need: if there is one,
   say so at the top and write what would change in it instead of a duplicate.
 - No estimate, no priority and no assignee: the team decides those.
@@ -332,23 +339,25 @@ const releaseNotes: DeliverableKind = {
 
 Sections, with these headings in the language of the PM's request:
 1. Release and date, and in two lines what it brings.
-2. New: what one can do now that was not possible before.
-3. Changed: what works differently, and what the user must do differently.
-4. Fixed: the problems solved, described as the user saw them.
-5. Known issues, each with how to work around it.
-6. What to do before or after the release, if anything.
+2. New features: what one can do now that was not possible before.
+3. Improvements: what works better.
+4. Fixes: the problems solved, described as the user saw them.
+5. Breaking changes: what works differently, and what the user must do differently.
+6. Deprecations: what will go away, and when.
+7. Known issues, each with how to work around it.
 
 Rules:
 ${CLIENT_RULES}
 - An item enters only if the project shows it as released or closed for this release: the tracker
   with the date of its reading, or a document that says so. What is still open is not "new".
-- Write for the user: the effect, not the implementation. No names of branches, tables, classes
-  or internal components. The id of the item stays in brackets at the end of its line.
+- For each change find what changed, who benefits and why it matters; then write one to three
+  sentences that start from the benefit. No jargon, no code names, no names of branches, tables
+  or internal components, no ticket numbers.
 - An empty section is left out, not filled.
 ${NO_INVENTION}`,
   checklist: [
     'Ogni voce risulta rilasciata o chiusa nel tracker, con la data dei dati',
-    'È scritto per chi usa il sistema: effetti, non dettagli tecnici',
+    'Ogni voce parte dal beneficio per chi usa il sistema, senza gergo né numeri di ticket',
     'I problemi noti hanno il loro modo di aggirarli',
     'Nessun dato interno (giornate, costi, tariffe, codici commessa)',
   ],
@@ -381,13 +390,16 @@ const functionalAnalysis: DeliverableKind = {
 Sections, with these headings in the language of the PM's request:
 1. Meeting, date, participants, and the function or area discussed.
 2. Context: how it works today, as the meeting described it.
-3. Requirements: a table with id (RF-01, RF-02…), the requirement in one sentence, who asked for
-   it, and the passage of the transcript it comes from.
-4. Business rules and data: validations, calculations, states, roles, as they were said.
-5. Proposed backlog items: a table with title, the requirements it covers, and whether an item
-   of the project already covers it (with its id) or it is new.
-6. Decisions taken in the meeting.
-7. Open questions: what the meeting left undecided or contradictory, each with who can answer.
+3. Functional requirements: a table with id (RF-01, RF-02…), the requirement in one sentence,
+   who asked for it, and the passage of the transcript it comes from.
+4. Non-functional requirements, constraints and dependencies, apart from the functional ones.
+5. Business rules and data: validations, calculations, states, roles, as they were said.
+6. Proposed backlog items: a table with title, the requirements it covers, and whether an item
+   of the project already covers it (with its id) or it is new. With a wide scope, group them
+   by stream of work.
+7. Decisions taken in the meeting.
+8. Open questions: what the meeting left undecided, ambiguous or contradictory, each with who
+   can answer and whether it blocks the work.
 
 Rules:
 - The source is the transcript or the notes. An automatic summary made by the meeting tool is
@@ -396,7 +408,8 @@ Rules:
   discussed does not enter, even if it is obvious.
 - Two participants who said different things are both reported, with their words: the document
   does not choose.
-- Use the terms of the project. A new term heard in the meeting is quoted and marked as new.
+- Use the terms of the project. Where the client corrected a term, the client's term wins and
+  the wrong one does not come back. A new term heard in the meeting is quoted and marked as new.
 - The proposed items are proposals to be opened by hand in the tracker; give no estimate.
 - If you cannot find the meeting, write nothing invented: say so in "missing".`,
   checklist: [
@@ -412,7 +425,7 @@ const trackerChanges: DeliverableKind = {
   id: 'modifiche-al-tracker',
   title: 'Modifiche da applicare al tracker',
   summary:
-    'L’elenco delle modifiche da fare a mano sul tracker: voce, campo, valore di oggi, valore nuovo, perché.',
+    'L’elenco delle modifiche da fare a mano sul tracker: voce, azione, testo di oggi, testo nuovo, decisione.',
   audience: 'internal',
   fields: [
     {
@@ -434,26 +447,35 @@ const trackerChanges: DeliverableKind = {
   instructions: `Write the list of changes a person will apply by hand to the tracker. You never write to the tracker.
 
 Sections, with these headings in the language of the PM's request:
-1. What the changes come from, and the date of the tracker data you read.
-2. Changes to existing items: a table with a progressive number, the id and title of the item,
-   the field, its value today, the new value, and the source that decides the change.
-3. Items to create: a table with title, type, parent, and the source that asks for it.
-4. Not applied: what the source asks that you could not turn into a change, and why.
+1. Summary: what the changes come from, the date of the tracker data you read, how many items
+   are touched and how many changes of each kind.
+2. Changes, grouped by feature (or parent item) and, inside it, by sprint. For each item:
+   - its id and title, owner, sprint and state today;
+   - the action: change, addition, removal, suspension (taken out of scope), or whole
+     replacement;
+   - the field and its text today, word for word from the project's copy of the tracker;
+   - the new text;
+   - the decision it comes from and who took it, with its source.
+3. Items to create: title, type, parent, and the source that asks for it.
+4. Suspended or under re-evaluation: the items taken out of scope or waiting for a decision,
+   apart from the others.
+5. Not applied: what the source asks that you could not turn into a change, and why.
 
 Rules:
-- One line, one field of one item: the person ticks them off one by one.
-- "Value today" is what the project's copy of the tracker says, never what you assume. If the
-  value today is already the new one, the line is left out.
-- Every line cites the decision it comes from. A change nobody decided does not enter, however
-  sensible: it goes in "Not applied" as a proposal.
-- Group the lines by item, and the items in the order of their id, so the list follows the
-  tracker's screen.
-- If the tracker data are older than the source of the changes, say so at the top: a value may
-  have changed since.
+- One change, one field of one item: the person ticks them off one by one.
+- "Text today" is what the project's copy of the tracker says, never what you assume. If it is
+  already the new text, the change is left out.
+- The new text comes only from a decision that can be traced: minutes, an addendum, an open
+  question that was answered. A change nobody decided does not enter, however sensible: it goes
+  in "Not applied" as a proposal.
+- If the project says how old the tracker data may be and they are older, write no list: say so
+  in the summary and ask in "missing" for fresh data. If they are older than the source of the
+  changes, say so at the top: a text may have changed since.
 ${NO_INVENTION}`,
   checklist: [
-    'Ogni riga è un solo campo di una sola voce, con valore di oggi e valore nuovo',
-    'Ogni modifica ha la decisione da cui viene',
+    'Ogni modifica è un solo campo di una sola voce, con il testo di oggi e il testo nuovo',
+    'Il testo di oggi è quello del tracker, parola per parola',
+    'Ogni modifica ha la decisione da cui viene e chi l’ha presa',
     'La data dei dati del tracker è dichiarata',
     'Nessuna modifica che nessuno ha deciso',
   ],
