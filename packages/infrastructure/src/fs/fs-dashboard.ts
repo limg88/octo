@@ -1,9 +1,16 @@
 import { open, readFile, realpath, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { DashboardSettingsStore, ExportCandidates, TrackerExports } from '@octo/application'
+import type {
+  DashboardSettingsStore,
+  ExportCandidates,
+  HoursSettingsStore,
+  TrackerExports,
+} from '@octo/application'
 import {
   cleanDashboardSettings,
+  cleanHoursSettings,
   DEFAULT_DASHBOARD_SETTINGS,
+  DEFAULT_HOURS_SETTINGS,
   DomainError,
   isDomainError,
   NO_DECISIONS,
@@ -54,6 +61,32 @@ export function createFsDashboardSettings(): DashboardSettingsStore {
       const parsed = settingsSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       if (!parsed.success) throw new DomainError('dashboard_settings_invalid', DASHBOARD_FILE)
       return cleanDashboardSettings(parsed.data)
+    },
+    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const HOURS_FILE = 'hours.json'
+const hoursSchema = z.object({
+  timesheetPath: z.string().default(DEFAULT_HOURS_SETTINGS.timesheetPath),
+  worklogPath: z.string().default(DEFAULT_HOURS_SETTINGS.worklogPath),
+  projects: z.array(z.string()).default(DEFAULT_HOURS_SETTINGS.projects),
+  thresholdPct: z.number().default(DEFAULT_HOURS_SETTINGS.thresholdPct),
+  cutoff: z.string().default(DEFAULT_HOURS_SETTINGS.cutoff),
+  noWorklogExpected: z.array(z.string()).default(DEFAULT_HOURS_SETTINGS.noWorklogExpected),
+  noTimesheetExpected: z.array(z.string()).default(DEFAULT_HOURS_SETTINGS.noTimesheetExpected),
+  aliases: z
+    .array(z.object({ worklog: z.string(), timesheet: z.string() }))
+    .default(DEFAULT_HOURS_SETTINGS.aliases),
+})
+
+export function createFsHoursSettings(): HoursSettingsStore {
+  const fileOf = (projectFolder: string) => join(projectFolder, PROJECT_SETTINGS_FOLDER, HOURS_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = hoursSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('hours_settings_invalid', HOURS_FILE)
+      return cleanHoursSettings(parsed.data)
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }

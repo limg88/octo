@@ -9,6 +9,7 @@ import type {
 } from '@octo/application'
 import {
   DEFAULT_DASHBOARD_SETTINGS,
+  DEFAULT_HOURS_SETTINGS,
   type Deliverable,
   type DeliverableKind,
   type FeedName,
@@ -137,6 +138,10 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
+    hoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
+    saveHoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
+    hoursCandidates: vi.fn(async () => ok({ timesheets: [], worklogs: [] })),
+    hoursView: vi.fn(async () => ({ ok: false as const, code: 'hours_sources_not_set' as const })),
     dashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     saveDashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),

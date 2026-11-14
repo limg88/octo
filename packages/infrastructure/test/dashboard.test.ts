@@ -1,9 +1,13 @@
 import { mkdir, mkdtemp, realpath, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_DASHBOARD_SETTINGS } from '@octo/domain'
+import { DEFAULT_DASHBOARD_SETTINGS, DEFAULT_HOURS_SETTINGS } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createFsDashboardSettings, createFsTrackerExports } from '../src/index.ts'
+import {
+  createFsDashboardSettings,
+  createFsHoursSettings,
+  createFsTrackerExports,
+} from '../src/index.ts'
 
 let root: string
 let folder: string
@@ -92,5 +96,21 @@ describe('dashboard settings on disk', () => {
     })
     await writeFile(file, JSON.stringify({ stuckDays: 'many' }))
     await expect(store.load(folder)).rejects.toMatchObject({ code: 'dashboard_settings_invalid' })
+  })
+})
+
+describe('hours settings on disk', () => {
+  it('starts from the defaults, keeps what is saved and refuses a damaged file', async () => {
+    const store = createFsHoursSettings()
+    expect(await store.load(folder)).toEqual(DEFAULT_HOURS_SETTINGS)
+    const settings = {
+      ...DEFAULT_HOURS_SETTINGS,
+      timesheetPath: 'ore/Timesheets',
+      aliases: [{ worklog: 'u1', timesheet: 'Rossi Mario' }],
+    }
+    await store.save(folder, settings)
+    expect(await store.load(folder)).toEqual(settings)
+    await writeFile(join(folder, '_octo', '.impostazioni', 'hours.json'), '{"thresholdPct":"x"}')
+    await expect(store.load(folder)).rejects.toMatchObject({ code: 'hours_settings_invalid' })
   })
 })

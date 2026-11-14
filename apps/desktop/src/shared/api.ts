@@ -7,6 +7,8 @@ import type {
   FeedingStatus,
   FeedingStep,
   FeedView,
+  HoursCandidates,
+  HoursView,
   MailSourceView,
 } from '@octo/application'
 import type {
@@ -17,6 +19,8 @@ import type {
   FeedChoices,
   FeedConfig,
   FeedName,
+  HoursPeriod,
+  HoursSettings,
   MailPreview,
   MailSourceConfig,
   OwnKindInput,
@@ -72,6 +76,10 @@ export const CHANNELS = {
   dashboardSettingsSave: 'dashboard:settings:save',
   dashboardCandidates: 'dashboard:candidates',
   dashboardView: 'dashboard:view',
+  hoursSettingsGet: 'hours:settings:get',
+  hoursSettingsSave: 'hours:settings:save',
+  hoursCandidates: 'hours:candidates',
+  hoursView: 'hours:view',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -164,6 +172,12 @@ export type OctoApi = {
   dashboardCandidates(projectId: string): Promise<Result<ExportCandidates>>
   /** The dashboard over a period; every number is computed by the app from the tracker export. */
   dashboardView(projectId: string, range: DashboardRange): Promise<Result<DashboardView>>
+  hoursSettings(projectId: string): Promise<Result<HoursSettings>>
+  saveHoursSettings(projectId: string, settings: HoursSettings): Promise<Result<HoursSettings>>
+  /** Where the timesheets and the tracker hours seem to be kept in the project folder. */
+  hoursCandidates(projectId: string): Promise<Result<HoursCandidates>>
+  /** Timesheet hours against tracker hours over a period, person by person. */
+  hoursView(projectId: string, period: HoursPeriod): Promise<Result<HoursView>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

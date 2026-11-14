@@ -58,6 +58,11 @@ const api: OctoApi = {
   hasLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadGet, { projectId }),
   chooseLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadChoose, { projectId }),
   removeLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadRemove, { projectId }),
+  hoursSettings: (projectId) => ipcRenderer.invoke(CHANNELS.hoursSettingsGet, { projectId }),
+  saveHoursSettings: (projectId, settings) =>
+    ipcRenderer.invoke(CHANNELS.hoursSettingsSave, { projectId, settings }),
+  hoursCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.hoursCandidates, { projectId }),
+  hoursView: (projectId, period) => ipcRenderer.invoke(CHANNELS.hoursView, { projectId, period }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>

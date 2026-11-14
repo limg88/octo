@@ -19,6 +19,7 @@ const fakeDocuments = (...extra) =>
   execFileSync('node', [`${root}demo/lib/fake-documents.ts`, `${work}/Aurora`, ...extra])
 fakeDocuments()
 execFileSync('node', [`${root}demo/lib/fake-tracker.ts`, `${work}/Aurora`])
+execFileSync('node', [`${root}demo/lib/fake-hours.ts`, `${work}/Aurora`])
 
 const ado = await startDemoAdo()
 
@@ -272,6 +273,31 @@ try {
     decisions.excludedRequirements.map((entry) => entry.id),
     ['2006'],
   )
+
+  // Demo 08: timesheet hours against tracker hours, from the exports in the project folder.
+  await page.getByRole('tab', { name: 'Ore' }).click()
+  const setup08 = page.getByRole('region', { name: 'Da dove leggo le ore' })
+  await setup08.waitFor({ timeout: TIMEOUT_MS })
+  await page.waitForFunction(
+    () => document.querySelector('.settings-form input')?.value === 'dati/Timesheets',
+  )
+  await setup08.getByLabel(/^Codici di progetto/).fill('PRJ000101')
+  await setup08.getByRole('button', { name: 'Salva' }).click()
+  await page.getByText('Quadratura: 664 ore approvate, tutte nel confronto').waitFor({
+    timeout: TIMEOUT_MS,
+  })
+  const hoursRow = (person) => page.locator('table.data tbody tr', { hasText: person })
+  await hoursRow('Bianchi Anna').getByText('Da guardare').waitFor()
+  await page.getByText('16 ore di timesheet non ancora approvate').waitFor()
+  await page.getByText(/8 ore sul codice PRJ000999/).waitFor()
+  await page.getByRole('button', { name: 'È atteso: Neri Sara' }).click()
+  await hoursRow('Neri Sara').getByText('Atteso').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('Impostazioni delle ore').click()
+  await page.getByLabel(/^Stessa persona, nomi diversi/).fill('E. Costa = Costa Elena')
+  await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
+  await hoursRow('Costa Elena').getByText('Torna').waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(await hoursRow('E. Costa').count(), 0)
+  await page.screenshot({ path: `${work}/ore.png` })
 
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 

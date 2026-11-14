@@ -7,11 +7,12 @@ import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
+import { HoursView } from './HoursView.tsx'
 import { errorText, messages } from './messages.ts'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 
-type Tab = 'ask' | 'deliverables' | 'dashboard' | 'sources'
+type Tab = 'ask' | 'deliverables' | 'dashboard' | 'hours' | 'sources'
 
 type Props = {
   api: OctoApi
@@ -124,6 +125,7 @@ export function App({ api }: Props) {
                 label={messages.dashboardTab}
                 onSelect={setTab}
               />
+              <TabButton current={tab} tab="hours" label={messages.hoursTab} onSelect={setTab} />
               <TabButton
                 current={tab}
                 tab="sources"
@@ -137,6 +139,8 @@ export function App({ api }: Props) {
               <DeliverablesView api={api} project={selected} />
             ) : tab === 'dashboard' ? (
               <DashboardView api={api} project={selected} />
+            ) : tab === 'hours' ? (
+              <HoursView api={api} project={selected} />
             ) : (
               <div className="sources-page">
                 <SetupGuide api={api} project={selected} />

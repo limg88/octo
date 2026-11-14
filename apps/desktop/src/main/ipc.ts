@@ -9,6 +9,7 @@ import type {
   EvidenceReader,
   Feeding,
   Feeds,
+  Hours,
   Projects,
   QuestionLog,
   Sources,
@@ -31,6 +32,7 @@ export type IpcDeps = {
   feeding: Feeding
   deliverables: Deliverables
   dashboard: Dashboard
+  hours: Hours
   folderDialogTitle: string
   letterheadDialogTitle: string
 }
@@ -134,6 +136,20 @@ const dashboardSettingsInput = byProject.extend({
 const dashboardViewInput = byProject.extend({
   range: z.object({ from: rule, to: rule, granularity: z.enum(['week', 'month']) }),
 })
+
+const hoursSettingsInput = byProject.extend({
+  settings: z.object({
+    timesheetPath: rule,
+    worklogPath: rule,
+    projects: ruleList,
+    thresholdPct: z.number(),
+    cutoff: rule,
+    noWorklogExpected: ruleList,
+    noTimesheetExpected: ruleList,
+    aliases: z.array(z.object({ worklog: rule, timesheet: rule })).max(MAX_RULES),
+  }),
+})
+const hoursViewInput = byProject.extend({ period: z.object({ from: rule, to: rule }) })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -336,6 +352,22 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.dashboardView, dashboardViewInput, async (input) =>
     deps.dashboard.view(await deps.projects.get(input.projectId), input.range),
+  )
+
+  handle(CHANNELS.hoursSettingsGet, byProject, async ({ projectId }) =>
+    deps.hours.settings(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.hoursSettingsSave, hoursSettingsInput, async (input) =>
+    deps.hours.saveSettings(await deps.projects.get(input.projectId), input.settings),
+  )
+
+  handle(CHANNELS.hoursCandidates, byProject, async ({ projectId }) =>
+    deps.hours.candidates(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.hoursView, hoursViewInput, async (input) =>
+    deps.hours.view(await deps.projects.get(input.projectId), input.period),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

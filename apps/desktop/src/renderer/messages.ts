@@ -91,6 +91,66 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  hoursTab: 'Ore',
+  hours: {
+    loading: 'Leggo le ore…',
+    setupTitle: 'Da dove leggo le ore',
+    setupIntro:
+      'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Leggo due esportazioni tenute nella cartella del progetto: non le modifico e non scrivo in nessun sistema.',
+    timesheetPath: 'Timesheet: file o cartella delle esportazioni (JSON)',
+    worklogPath: 'Ore del tracker: file o cartella delle esportazioni (CSV)',
+    worklogHint:
+      'Va bene l’esportazione dello strumento con cui si segnano le ore sul tracker: servono le colonne persona, data e ore.',
+    projects: 'Codici di progetto dei timesheet che sono di questo progetto (nessuno: tutti)',
+    threshold: 'Scostamento oltre il quale una persona è da guardare (%)',
+    cutoff: 'Ultimo giorno completo (i giorni dopo restano fuori dal confronto; vuoto: nessuno)',
+    noWorklogExpected: 'Persone che non segnano ore sul tracker (separate da virgola)',
+    noTimesheetExpected: 'Persone senza timesheet qui, per esempio esterni (separate da virgola)',
+    aliases:
+      'Stessa persona, nomi diversi: una riga per persona, «nome sul tracker = nome nel timesheet»',
+    save: 'Salva',
+    settings: 'Impostazioni delle ore',
+    month: 'Mese',
+    from: 'Dal',
+    to: 'Al',
+    columnPerson: 'Persona',
+    columnTimesheet: 'Timesheet (h)',
+    columnWorklog: 'Tracker (h)',
+    columnDelta: 'Scostamento',
+    columnStatus: 'Stato',
+    total: 'Totale',
+    noRows: 'Nessuna ora nel periodo.',
+    pct: (value: number | null) => (value === null ? '—' : `${value.toLocaleString('it-IT')}%`),
+    amount: (value: number) => value.toLocaleString('it-IT', { maximumFractionDigits: 2 }),
+    status: {
+      ok: 'Torna',
+      outlier: 'Da guardare',
+      no_worklog: 'Nessuna ora sul tracker',
+      no_timesheet: 'Nessun timesheet',
+      expected: 'Atteso',
+    },
+    markExpected: 'È atteso',
+    markExpectedHint: 'Da ora la mancanza di ore di questa persona non è più segnalata.',
+    tieOutOk: (hours: string) => `Quadratura: ${hours} ore approvate, tutte nel confronto`,
+    tieOutFailed: (approved: string, accounted: string) =>
+      `Quadratura fallita: ${approved} ore approvate, ${accounted} nel confronto. Non usare questi numeri.`,
+    sources: (timesheets: number, worklogs: number) =>
+      `Letti ${timesheets} file di timesheet e ${worklogs} di ore del tracker`,
+    lastDays: (timesheet: string, worklog: string) =>
+      `Ultimo giorno con ore: timesheet ${timesheet}, tracker ${worklog}`,
+    noDay: 'nessuno',
+    excludedTitle: 'Rimasto fuori dal confronto',
+    notApproved: (hours: string) => `${hours} ore di timesheet non ancora approvate`,
+    partial: (timesheet: string, worklog: string) =>
+      `Dopo l’ultimo giorno completo: ${timesheet} ore di timesheet e ${worklog} del tracker`,
+    otherProject: (project: string, hours: string) =>
+      `${hours} ore sul codice ${project || 'senza codice'}, che non è fra quelli del progetto`,
+    unreadable: (path: string) => `Non è un’esportazione che so leggere: ${path}`,
+    nothingExcluded: 'Niente.',
+    possibleDuplicate: (hours: string, first: string, second: string) =>
+      `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
+    codesFound: 'Codici trovati nel periodo',
+  },
   dashboardTab: 'Cruscotto',
   dashboard: {
     loading: 'Leggo l’esportazione del tracker…',
@@ -367,6 +427,13 @@ const errors: Record<ErrorCode, string> = {
   tracker_export_missing: 'Il file dell’esportazione non c’è più nella cartella del progetto.',
   tracker_export_unreadable: 'Questo file non è un’esportazione del tracker che so leggere.',
   dashboard_range_invalid: 'Il periodo non è valido o è troppo lungo per il passo scelto.',
+  hours_sources_not_set: 'Indica dove sono i timesheet e le ore del tracker.',
+  hours_timesheet_missing: 'Non trovo esportazioni di timesheet (file .json) nel posto indicato.',
+  hours_worklog_missing:
+    'Non trovo esportazioni delle ore del tracker (file .csv) nel posto indicato.',
+  hours_period_invalid: 'Il periodo non è valido.',
+  hours_settings_invalid:
+    'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',
   dashboard_settings_invalid: 'Le impostazioni del cruscotto sono rovinate: salvale di nuovo.',
   letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',
   unexpected: 'Qualcosa non ha funzionato. Riprova.',

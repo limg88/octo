@@ -11,6 +11,7 @@ import type {
   FeedIndex,
   FeedName,
   FeedStep,
+  HoursSettings,
   MailMessage,
   Project,
   QuestionRecord,
@@ -236,4 +237,10 @@ export interface TrackerExports {
   readJson(projectFolder: string, relativePath: string): Promise<unknown | null>
   /** Files that look like an export or like a history, to propose to the PM. */
   candidates(projectFolder: string): Promise<ExportCandidates>
+}
+
+/** How a project compares timesheets and tracker hours, kept with Octo's settings of the project. */
+export interface HoursSettingsStore {
+  load(projectFolder: string): Promise<HoursSettings>
+  save(projectFolder: string, settings: HoursSettings): Promise<void>
 }
