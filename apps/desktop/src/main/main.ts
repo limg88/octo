@@ -17,6 +17,7 @@ import {
   createProgress,
   createProjects,
   createSources,
+  createTeam,
   type Feeding,
   type MailArchive,
   type Projects,
@@ -38,7 +39,9 @@ import {
   createFsMemoryWriter,
   createFsProgressSettings,
   createFsProjectFiles,
+  createFsProjectScaffold,
   createFsSourceSettings,
+  createFsTeamStore,
   createFsTrackerExports,
   createJiraHoursReader,
   createJsonFeedIndexes,
@@ -59,6 +62,7 @@ const WINDOW_SIZE = { width: 1280, height: 860, minWidth: 900, minHeight: 600 }
 const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 const LETTERHEAD_DIALOG_TITLE = 'Scegli il documento Word da usare come carta intestata'
 const DECK_MODEL_DIALOG_TITLE = 'Scegli la presentazione da usare come modello'
+const NEW_PROJECT_DIALOG_TITLE = 'Scegli dove creare la cartella del progetto'
 /** Lets a demo or a test keep its state apart from the PM's real one. */
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 /** Points the mail reader at another Mail folder: a demo's fake archive. */
@@ -159,6 +163,7 @@ function start(): void {
     questions,
     sourceStates,
     folders: createFsFolderProbe(),
+    scaffold: createFsProjectScaffold(),
     clock,
     ids,
   })
@@ -191,6 +196,7 @@ function start(): void {
     states: sourceStates,
     clock,
   })
+  const team = createTeam({ store: createFsTeamStore(), writer })
   const hours = createHours({
     settings: createFsHoursSettings(),
     files,
@@ -199,6 +205,7 @@ function start(): void {
     tracker: createJiraHoursReader({ devEndpoints }),
     writer,
     clock,
+    team: (project) => team.get(project),
   })
   const sheets = createXlsxModel()
   const dashboardSettings = createFsDashboardSettings()
@@ -249,6 +256,8 @@ function start(): void {
     folderDialogTitle: FOLDER_DIALOG_TITLE,
     letterheadDialogTitle: LETTERHEAD_DIALOG_TITLE,
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
+    newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
+    team,
   })
 }
 

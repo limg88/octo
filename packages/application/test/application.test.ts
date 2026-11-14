@@ -24,15 +24,22 @@ const project: Project = {
 function projectsWith(initial: Project[] = []) {
   const questions = memoryQuestionLog()
   const sourceStates = memorySourceStates()
+  const created: Array<{ parent: string; name: string; paths: string[] }> = []
   const projects = createProjects({
     registry: memoryRegistry(initial),
     questions,
     sourceStates,
-    folders: folderProbe([FOLDER, `${FOLDER}/`]),
+    folders: folderProbe([FOLDER, `${FOLDER}/`, '/progetti/Boreale 2']),
+    scaffold: {
+      create: async (parent, name, files) => {
+        created.push({ parent, name, paths: files.map((file) => file.path) })
+        return `${parent}/${name}`
+      },
+    },
     clock: steppingClock(),
     ids: countingIds('p'),
   })
-  return { projects, questions, sourceStates }
+  return { projects, questions, sourceStates, created }
 }
 
 describe('projects', () => {
@@ -43,6 +50,31 @@ describe('projects', () => {
     expect(added).toMatchObject({ id: 'p-1', name: 'Aurora', folder: FOLDER })
     expect(await projects.list()).toEqual([added])
     expect(await projects.get('p-1')).toEqual(added)
+  })
+
+  it('makes the folder of a new project with its starter files, and adds it', async () => {
+    const { projects, created } = projectsWith()
+    const made = await projects.create('/progetti', '  Boreale   2 ')
+    expect(made).toMatchObject({ name: 'Boreale 2', folder: '/progetti/Boreale 2' })
+    expect(created).toEqual([
+      {
+        parent: '/progetti',
+        name: 'Boreale 2',
+        paths: [
+          'LEGGIMI.md',
+          'Contratti/LEGGIMI.md',
+          'Documenti/LEGGIMI.md',
+          'Riunioni/LEGGIMI.md',
+          'Tracker/LEGGIMI.md',
+        ],
+      },
+    ])
+    for (const name of ['', '  ', 'a/b', 'a\\b', '.nascosto', 'fine.', 'x'.repeat(81), 'a:b']) {
+      await expect(projects.create('/progetti', name)).rejects.toMatchObject({
+        code: 'project_name_invalid',
+      })
+    }
+    expect(created).toHaveLength(1)
   })
 
   it('refuses a folder it cannot read and a folder already added', async () => {

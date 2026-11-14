@@ -59,7 +59,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
 | F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
 | F4 | codice chiuso il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale, stima), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Aggiunti stima, registro e carta intestata. Criterio di uscita da verificare su due deliverable reali |
-| F5 | in corso. Fatti il 14/11/2026: tipi di deliverable definiti dal PM a parole. Non fattibile oggi: i connettori del PM dentro Chiedi (vedi sotto). Restano: cartella di un progetto nuovo da modello; deliverable con modelli Excel e PowerPoint del cliente |
+| F5 | in corso. Fatti il 14/11/2026: tipi di deliverable definiti dal PM a parole. Non fattibile oggi: i connettori del PM dentro Chiedi (vedi sotto). Fatti poi: Excel e PowerPoint su modello (previsionale, modulo di avanzamento, presentazione: demo 09, 10, 11) e la cartella di un progetto nuovo creata da Octo con un posto per contratti, documenti, riunioni e tracker (demo 14). Restano le prove su un progetto vero |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -250,10 +250,10 @@ Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un a
 
 **Regole trasversali da portare in codice**
 - Filtro per il cliente: cifre seguite da unità di sforzo o di costo nei testi destinati al cliente, come controllo del codice su ogni deliverable per il cliente. **Fatto** (passo 4 della demo 06): nella revisione di ogni deliverable destinato al cliente il codice elenca le giornate di lavoro (gg, giornate, GU, MD, FTE…) e gli importi che trova, con le parole intorno. Non toglie nulla e non blocca l'approvazione: non sa se un importo è un prezzo già concordato. Scadenze in giorni o ore, date e percentuali non sono segnalate. Restano fuori le parole senza cifra (margine, tariffa) e il testo dentro le immagini.
-- Calendario e squadra del progetto: periodi, sprint, persone con date di ingresso e uscita.
-- Domande pronte in Chiedi: stato del periodo, blocchi e rischi, triage delle mail, dopo la riunione.
+- Calendario e squadra del progetto: periodi, sprint, persone con date di ingresso e uscita. **Fatto** (demo 14): in «Fonti», sezione «Persone e calendario». Il PM scrive le persone (ruolo, da che parte stanno, dal, al, come scrivere loro) e i periodi con le date; Octo li tiene nelle impostazioni del progetto e li scrive anche come testo in `_octo/progetto/persone-e-calendario.md`, che risposte e deliverable leggono e citano. Chi ha lasciato il progetto prima di un periodo, o ci è entrato dopo, non è segnalato nelle ore di quel periodo. Non legge file di configurazione che il progetto ha già: per un progetto esistente si riscrivono qui.
+- Domande pronte in Chiedi: stato del periodo, blocchi e rischi, triage delle mail, dopo la riunione. **Fatto** (demo 14): quattro pulsanti sopra il riquadro della domanda; riempiono il testo e non inviano, così il PM lo corregge. Uguali per tutti i progetti.
 - Stima: confidenza per voce, nuovo distinto dal residuo, vista per il cliente.
-- Persone del progetto con le loro preferenze di lettura, usate dall'email.
+- Persone del progetto con le loro preferenze di lettura, usate dall'email. **Fatto** insieme a persone e calendario: la nota «come scrivergli» di ogni persona sta nel testo del progetto e le istruzioni dell'email dicono di seguirla.
 
 **Restano fuori dal catalogo** (nessuna usata con regolarità; ognuna si aggiunge come tipo proprio): pre-mortem, red-team della strategia, prioritizzazione, roadmap per outcome, mappa degli stakeholder, controllo grammaticale, retrospettiva; e le tre per chi sviluppa (documentazione di rilascio, confronto fra documentato e implementato, query).
 

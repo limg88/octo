@@ -35,6 +35,7 @@ import type {
   OwnKindInput,
   ProgressSettings,
   Project,
+  ProjectTeam,
   QuestionRecord,
   SourceRun,
   SourceState,
@@ -108,6 +109,9 @@ export const CHANNELS = {
   alignmentSettingsSave: 'alignment:settings:save',
   alignmentView: 'alignment:view',
   alignmentExport: 'alignment:export',
+  teamGet: 'team:get',
+  teamSave: 'team:save',
+  projectsCreate: 'projects:create',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -244,6 +248,14 @@ export type OctoApi = {
   alignmentView(projectId: string): Promise<Result<AlignmentView>>
   /** Writes the missing items as a file the supplier's tracker imports. */
   exportMissingTickets(projectId: string): Promise<Result<AlignmentFile>>
+  /** The people and the calendar of the project. */
+  team(projectId: string): Promise<Result<ProjectTeam>>
+  saveTeam(projectId: string, team: ProjectTeam): Promise<Result<ProjectTeam>>
+  /**
+   * Makes the folder of a new project where the PM chooses and adds it; null when the PM closes
+   * the dialog.
+   */
+  createProject(name: string): Promise<Result<Project | null>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

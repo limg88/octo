@@ -88,6 +88,9 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.alignmentSettingsSave, { projectId, settings }),
   alignmentView: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentView, { projectId }),
   exportMissingTickets: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentExport, { projectId }),
+  team: (projectId) => ipcRenderer.invoke(CHANNELS.teamGet, { projectId }),
+  saveTeam: (projectId, team) => ipcRenderer.invoke(CHANNELS.teamSave, { projectId, team }),
+  createProject: (name) => ipcRenderer.invoke(CHANNELS.projectsCreate, { name }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>

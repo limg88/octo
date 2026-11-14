@@ -7,6 +7,7 @@ import type {
   ForecastSettingsStore,
   HoursSettingsStore,
   ProgressSettingsStore,
+  TeamStore,
   TrackerExports,
 } from '@octo/application'
 import {
@@ -15,6 +16,7 @@ import {
   cleanForecastSettings,
   cleanHoursSettings,
   cleanProgressSettings,
+  cleanTeam,
   DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
@@ -24,6 +26,7 @@ import {
   isDomainError,
   NO_DECISIONS,
   PHASES,
+  TEAM_SIDES,
 } from '@octo/domain'
 import { z } from 'zod'
 import { realPathInside, walkFiles } from './fs-project-files.ts'
@@ -224,6 +227,36 @@ export function createFsAlignmentSettings(): AlignmentSettingsStore {
       return cleanAlignmentSettings(parsed.data)
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const TEAM_SETTINGS_FILE = 'team.json'
+const teamSchema = z.object({
+  people: z
+    .array(
+      z.object({
+        name: z.string(),
+        role: z.string().default(''),
+        side: z.enum(TEAM_SIDES).default('supplier'),
+        from: z.string().default(''),
+        to: z.string().default(''),
+        note: z.string().default(''),
+      }),
+    )
+    .default([]),
+  periods: z.array(z.object({ name: z.string(), from: z.string(), to: z.string() })).default([]),
+})
+
+export function createFsTeamStore(): TeamStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, TEAM_SETTINGS_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = teamSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('team_invalid', TEAM_SETTINGS_FILE)
+      return cleanTeam(parsed.data)
+    },
+    save: (projectFolder, team) => writeJson(fileOf(projectFolder), team),
   }
 }
 

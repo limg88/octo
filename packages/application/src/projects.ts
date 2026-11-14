@@ -1,9 +1,17 @@
-import { DomainError, type Project, projectNameFromFolder, sameFolder } from '@octo/domain'
+import {
+  DomainError,
+  type Project,
+  projectFolderName,
+  projectNameFromFolder,
+  sameFolder,
+  starterFiles,
+} from '@octo/domain'
 import type {
   Clock,
   FolderProbe,
   IdGenerator,
   ProjectRegistry,
+  ProjectScaffold,
   QuestionLog,
   SourceStates,
 } from './ports.ts'
@@ -13,6 +21,7 @@ export type ProjectsDeps = {
   questions: QuestionLog
   sourceStates: SourceStates
   folders: FolderProbe
+  scaffold: ProjectScaffold
   clock: Clock
   ids: IdGenerator
 }
@@ -21,6 +30,8 @@ export type Projects = {
   list(): Promise<Project[]>
   get(id: string): Promise<Project>
   add(folder: string): Promise<Project>
+  /** Makes a new folder with the starter files inside `parent`, and adds it as a project. */
+  create(parent: string, name: string): Promise<Project>
   remove(id: string): Promise<void>
 }
 
@@ -58,5 +69,11 @@ export function createProjects(deps: ProjectsDeps): Projects {
     await deps.sourceStates.removeProject(project.id)
   }
 
-  return { list: () => deps.registry.list(), get, add, remove }
+  async function create(parent: string, name: string): Promise<Project> {
+    const folderName = projectFolderName(name)
+    if (folderName === null) throw new DomainError('project_name_invalid', name)
+    return add(await deps.scaffold.create(parent, folderName, starterFiles(folderName)))
+  }
+
+  return { list: () => deps.registry.list(), get, add, create, remove }
 }

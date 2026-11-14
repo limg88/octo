@@ -5,10 +5,13 @@ import {
   type HoursPeriod,
   type HoursSettings,
   monthsOf,
+  NO_TEAM,
   OCTO_FOLDER,
   type Project,
+  type ProjectTeam,
   parseTimesheetExport,
   parseWorklogExport,
+  peopleAway,
   type Reconciliation,
   reconcileHours,
   worklogCsv,
@@ -33,6 +36,8 @@ export type HoursDeps = {
   tracker: TrackerHoursReader
   writer: MemoryWriter
   clock: Clock
+  /** The people of the project with the days they are on it; without it, everyone always is. */
+  team?: (project: Project) => Promise<ProjectTeam>
 }
 
 /** What a reading of the hours from the tracker brought. */
@@ -218,6 +223,13 @@ export function createHours(deps: HoursDeps): Hours {
       const unreadable: string[] = []
       const timesheet = await timesheetRows(project, timesheetFiles, unreadable)
       const worklog = await read(project, worklogFiles, parseWorklogExport, unreadable)
+      // Who left before the period or joined after it is expected to have no hours in it.
+      const away = peopleAway((await deps.team?.(project)) ?? NO_TEAM, period.from, period.to)
+      const withAway = {
+        ...settings,
+        noWorklogExpected: [...settings.noWorklogExpected, ...away],
+        noTimesheetExpected: [...settings.noTimesheetExpected, ...away],
+      }
       const codes = new Set<string>()
       for (const row of timesheet) {
         if (row.project !== null && row.day >= period.from && row.day <= period.to) {
@@ -226,7 +238,7 @@ export function createHours(deps: HoursDeps): Hours {
       }
       return {
         period,
-        reconciliation: reconcileHours(timesheet, worklog, settings, period),
+        reconciliation: reconcileHours(timesheet, worklog, withAway, period),
         sources: {
           timesheetFiles: timesheetFiles.length,
           worklogFiles: worklogFiles.length,

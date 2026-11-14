@@ -46,7 +46,9 @@ Rules:
 ${CLIENT_RULES}
 - A fact you could not verify in the project does not enter the text: it goes in "missing" as a
   question for the PM.
-- Formal register, in the language of the PM's request. No headings, no tables: it is an email.`,
+- Formal register, in the language of the PM's request. No headings, no tables: it is an email.
+- If the project has a text on its people, follow what it says about the recipient: how to
+  address them, what they want to read first, what they must not be told.`,
   checklist: [
     'Una sola richiesta, con chi deve rispondere e per quando',
     'Nessun dato interno (giornate, costi, tariffe, codici commessa)',
@@ -92,6 +94,7 @@ ${CLIENT_RULES}
 - The report is also shown as slides, one per section: give each section a second-level heading,
   keep a section to a few short lines or one table, and put in a table what is a list of items
   with the same attributes (objectives, risks, decisions).
+- If the project has a text with its calendar, take the dates of the period from there.
 - Look at the previous report, if the project has one: a number that changed is declared as a
   change, and nothing of the previous period is left as if it were new.`,
   checklist: [

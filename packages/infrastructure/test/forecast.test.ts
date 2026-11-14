@@ -7,6 +7,7 @@ import {
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_PROGRESS_SETTINGS,
   NO_ROW_INPUTS,
+  NO_TEAM,
   readForecastModel,
 } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
@@ -17,6 +18,8 @@ import {
   createFsForecastSettings,
   createFsProgressSettings,
   createFsProjectFiles,
+  createFsProjectScaffold,
+  createFsTeamStore,
   createXlsxModel,
 } from '../src/index.ts'
 import { forecastModelXlsx } from './support/forecast-xlsx.ts'
@@ -222,5 +225,43 @@ describe('the settings of the forecast on disk', () => {
     expect(records).toEqual([
       { title: '[AZDO 101] Esportazione', record: { key: 'AUR-1', status: 'In corso' } },
     ])
+  })
+
+  it('keep the people and the calendar', async () => {
+    const store = createFsTeamStore()
+    expect(await store.load(folder)).toEqual(NO_TEAM)
+    const team = {
+      people: [
+        {
+          name: 'Carla Bianchi',
+          role: 'referente',
+          side: 'client' as const,
+          from: '',
+          to: '',
+          note: '',
+        },
+      ],
+      periods: [{ name: 'Sprint 28', from: '2026-10-26', to: '2026-11-13' }],
+    }
+    await store.save(folder, team)
+    expect(await store.load(folder)).toEqual(team)
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(folder, '_octo', '.impostazioni', 'team.json'), '{"people":1}')
+    await expect(store.load(folder)).rejects.toThrow('team_invalid')
+  })
+
+  it('make the folder of a new project once, and never over one that is there', async () => {
+    const scaffold = createFsProjectScaffold()
+    const files = [
+      { path: 'LEGGIMI.md', content: '# Boreale\n' },
+      { path: 'Riunioni/LEGGIMI.md', content: '# Riunioni\n' },
+    ]
+    const made = await scaffold.create(folder, 'Boreale', files)
+    expect(made).toBe(join(folder, 'Boreale'))
+    expect(await readFile(join(made, 'Riunioni', 'LEGGIMI.md'), 'utf8')).toBe('# Riunioni\n')
+    await expect(scaffold.create(folder, 'Boreale', files)).rejects.toThrow('project_folder_exists')
+    await expect(scaffold.create(join(folder, 'assente'), 'X', files)).rejects.toThrow(
+      'folder_not_readable',
+    )
   })
 })

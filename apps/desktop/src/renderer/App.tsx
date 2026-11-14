@@ -14,6 +14,7 @@ import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
+import { TeamSection } from './TeamSection.tsx'
 
 type Tab =
   | 'ask'
@@ -35,6 +36,7 @@ export function App({ api }: Props) {
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [tab, setTab] = useState<Tab>('ask')
+  const [newName, setNewName] = useState<string | null>(null)
 
   useEffect(() => {
     void api.agentStatus().then((result) => {
@@ -56,6 +58,18 @@ export function App({ api }: Props) {
     setProjects((previous) => [...previous, added])
     setSelectedId(added.id)
     // A new project starts from what feeds it.
+    setTab('sources')
+  }
+
+  async function createProject(name: string) {
+    setError(null)
+    const result = await api.createProject(name)
+    if (!result.ok) return setError(result.code)
+    const created = result.value
+    if (created === null) return
+    setNewName(null)
+    setProjects((previous) => [...previous, created])
+    setSelectedId(created.id)
     setTab('sources')
   }
 
@@ -92,6 +106,32 @@ export function App({ api }: Props) {
         <button type="button" className="add-project" onClick={() => void addProject()}>
           {messages.addProject}
         </button>
+        {newName === null ? (
+          <button type="button" className="add-project" onClick={() => setNewName('')}>
+            {messages.newProject}
+          </button>
+        ) : (
+          <form
+            className="new-project"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void createProject(newName)
+            }}
+          >
+            <label>
+              {messages.newProjectName}
+              <input
+                type="text"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+              />
+            </label>
+            <p className="hint">{messages.newProjectHint}</p>
+            <button type="submit" disabled={newName.trim() === ''}>
+              {messages.newProjectCreate}
+            </button>
+          </form>
+        )}
         {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
       </nav>
       <main>
@@ -184,6 +224,7 @@ export function App({ api }: Props) {
                   <FeedSection key={feed} api={api} project={selected} feed={feed} />
                 ))}
                 <DocumentsSection api={api} project={selected} />
+                <TeamSection api={api} project={selected} />
               </div>
             )}
           </>

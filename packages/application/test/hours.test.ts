@@ -6,6 +6,7 @@ import {
   type JiraFeedConfig,
   NO_SOURCES,
   type Project,
+  type ProjectTeam,
   type TrackerHours,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
@@ -51,6 +52,7 @@ const jira: JiraFeedConfig = {
 }
 
 type TrackerSetup = {
+  team?: ProjectTeam
   configured?: boolean
   secret?: string | null
   hours?: TrackerHours[]
@@ -91,6 +93,7 @@ function setup(initial: Partial<HoursSettings> = {}, tracker: TrackerSetup = {})
     },
   }
   const hours = createHours({
+    ...(tracker.team ? { team: async () => tracker.team as ProjectTeam } : {}),
     settings,
     files,
     sources: memorySourceSettings(
@@ -270,6 +273,32 @@ describe('hours', () => {
     release()
     await first
     expect(hours.asked).toEqual([])
+  })
+
+  it('does not flag the missing hours of who was not on the project in the period', async () => {
+    const person = (name: string, from: string, to: string) => ({
+      name,
+      role: '',
+      side: 'supplier' as const,
+      from,
+      to,
+      note: '',
+    })
+    const paths = { timesheetPath: 'ore/Timesheets', worklogPath: 'ore/jira/' }
+    const statusOf = async (team: ProjectTeam) =>
+      (await setup(paths, { team }).view(project, JUNE)).reconciliation.rows.find(
+        (row) => row.person === 'Bianchi Anna',
+      )?.status
+    expect(await statusOf({ people: [], periods: [] })).toBe('no_worklog')
+    expect(
+      await statusOf({ people: [person('Anna Bianchi', '', '2026-05-31')], periods: [] }),
+    ).toBe('expected')
+    expect(
+      await statusOf({ people: [person('Anna Bianchi', '2026-07-01', '')], periods: [] }),
+    ).toBe('expected')
+    expect(
+      await statusOf({ people: [person('Anna Bianchi', '', '2026-06-15')], periods: [] }),
+    ).toBe('no_worklog')
   })
 
   it('hands the timesheet rows to what else is computed from them, each once', async () => {

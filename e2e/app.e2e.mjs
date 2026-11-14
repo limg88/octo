@@ -508,7 +508,35 @@ try {
   assert.match(importFile, /Il listino arriva in Excel\.\nUna riga per articolo/)
   await page.screenshot({ path: `${work}/allineamento.png` })
 
+  // Demo 14: people and calendar of the project, and their effect on the hours.
+  await page.getByRole('tab', { name: 'Fonti' }).click()
+  const team14 = page.getByRole('region', { name: 'Persone e calendario' })
+  await team14
+    .getByLabel(/^Persone:/)
+    .fill(
+      'Neri Sara; analista; nostra; ; 31/01/2026\nCarla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta',
+    )
+  await team14.getByLabel(/^Calendario:/).fill('Sprint 28; 26/10/2026; 13/11/2026')
+  await team14.getByRole('button', { name: 'Salva persone e calendario' }).click()
+  await team14.getByText('Salvate 2 persone e 1 periodi.').waitFor({ timeout: TIMEOUT_MS })
+  const teamText = readFileSync(`${work}/Aurora/_octo/progetto/persone-e-calendario.md`, 'utf8')
+  assert.match(teamText, /\*\*Carla Bianchi\*\*, referente/)
+  assert.match(teamText, /\| Sprint 28 \| 26\/10\/2026 \| 13\/11\/2026 \|/)
+  assert.equal(
+    JSON.parse(readFileSync(`${work}/Aurora/_octo/.impostazioni/team.json`, 'utf8')).people[0].to,
+    '2026-01-31',
+  )
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
+  // A ready question fills the composer and waits for the PM.
+  await page
+    .getByRole('group', { name: 'Domande pronte' })
+    .getByRole('button', { name: 'Blocchi e rischi' })
+    .click()
+  assert.match(
+    await page.getByLabel('Chiedi qualcosa su questo progetto…').inputValue(),
+    /^Quali sono oggi i blocchi e i rischi aperti/,
+  )
 
   // The history survives a restart of the app.
   await app.close()

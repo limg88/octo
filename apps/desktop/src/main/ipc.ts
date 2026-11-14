@@ -16,8 +16,16 @@ import type {
   Projects,
   QuestionLog,
   Sources,
+  Team,
 } from '@octo/application'
-import { DomainError, FEED_NAMES, isDomainError, PHASES, WAREHOUSE_TLS_MODES } from '@octo/domain'
+import {
+  DomainError,
+  FEED_NAMES,
+  isDomainError,
+  PHASES,
+  TEAM_SIDES,
+  WAREHOUSE_TLS_MODES,
+} from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import { CHANNELS, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
@@ -39,9 +47,11 @@ export type IpcDeps = {
   forecasts: Forecasts
   progress: Progress
   alignments: Alignments
+  team: Team
   folderDialogTitle: string
   letterheadDialogTitle: string
   deckModelDialogTitle: string
+  newProjectDialogTitle: string
 }
 
 const MAX_QUESTION_LENGTH = 4000
@@ -249,6 +259,25 @@ const alignmentSettingsInput = byProject.extend({
   }),
 })
 
+const teamInput = byProject.extend({
+  team: z.object({
+    people: z
+      .array(
+        z.object({
+          name: rule,
+          role: rule,
+          side: z.enum(TEAM_SIDES),
+          from: rule,
+          to: rule,
+          note: z.string().max(MAX_INPUT_LENGTH),
+        }),
+      )
+      .max(MAX_RULES),
+    periods: z.array(z.object({ name: rule, from: rule, to: rule })).max(MAX_RULES),
+  }),
+})
+const newProjectInput = z.object({ name: rule })
+
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
   const running = new Map<string, AbortController>()
@@ -264,6 +293,23 @@ export function registerIpc(deps: IpcDeps): void {
     const folder = choice.filePaths[0]
     return choice.canceled || !folder ? null : deps.projects.add(folder)
   })
+
+  handle(CHANNELS.projectsCreate, newProjectInput, async ({ name }) => {
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.newProjectDialogTitle,
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    const parent = choice.filePaths[0]
+    return choice.canceled || !parent ? null : deps.projects.create(parent, name)
+  })
+
+  handle(CHANNELS.teamGet, byProject, async ({ projectId }) =>
+    deps.team.get(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.teamSave, teamInput, async (input) =>
+    deps.team.save(await deps.projects.get(input.projectId), input.team),
+  )
 
   handle(CHANNELS.projectsRemove, byProject, async ({ projectId }) => {
     running.get(projectId)?.abort()

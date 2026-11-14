@@ -20,12 +20,14 @@ import type {
   MailMessage,
   ProgressSettings,
   Project,
+  ProjectTeam,
   QuestionRecord,
   RedTeamReport,
   SheetGrid,
   SourceFileStamp,
   SourceState,
   SourcesConfig,
+  StarterFile,
   TrackerHours,
 } from '@octo/domain'
 
@@ -71,6 +73,16 @@ export interface QuestionLog {
 
 export interface FolderProbe {
   isReadableFolder(folder: string): Promise<boolean>
+}
+
+/** Makes the folder of a new project. */
+export interface ProjectScaffold {
+  /**
+   * Creates `name` inside `parent` with the files given and returns its path. Throws a
+   * DomainError `project_folder_exists` when something with that name is already there, and
+   * `folder_not_readable` when the parent cannot be written.
+   */
+  create(parent: string, name: string, files: readonly StarterFile[]): Promise<string>
 }
 
 export interface Clock {
@@ -313,4 +325,10 @@ export type FeedRecord = { title: string; record: Record<string, unknown> }
 export interface FeedRecords {
   /** Every item under the folder; files that are not items of a feed are skipped. */
   under(projectFolder: string, folder: string): Promise<FeedRecord[]>
+}
+
+/** The people and the calendar of a project, kept with Octo's settings of the project. */
+export interface TeamStore {
+  load(projectFolder: string): Promise<ProjectTeam>
+  save(projectFolder: string, team: ProjectTeam): Promise<void>
 }

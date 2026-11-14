@@ -91,6 +91,46 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  team: {
+    title: 'Persone e calendario',
+    intro:
+      'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Octo li scrive anche come testo del progetto: risposte e deliverable li leggono e li citano. Chi non era sul progetto in un periodo non viene segnalato per le ore che mancano.',
+    people: 'Persone: una riga ciascuna, «nome; ruolo; nostra o cliente; dal; al; come scrivergli»',
+    peopleHint:
+      'Solo il nome è obbligatorio. Le date sono giorno/mese/anno; vuote se la persona c’è dall’inizio o c’è ancora. Esempio: «Carla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta».',
+    periods: 'Calendario: una riga per periodo o sprint, «nome; dal; al»',
+    save: 'Salva persone e calendario',
+    saved: (people: number, periods: number) => `Salvate ${people} persone e ${periods} periodi.`,
+    sides: { supplier: 'nostra', client: 'cliente' },
+  },
+  newProject: 'Nuovo progetto',
+  newProjectName: 'Nome del nuovo progetto',
+  newProjectCreate: 'Scegli dove crearlo',
+  newProjectHint:
+    'Creo una cartella con questo nome, con un posto per contratti, documenti, riunioni e tracker.',
+  askReady: [
+    {
+      label: 'Stato del periodo',
+      question:
+        'Qual è lo stato del periodo in corso? Che cosa è stato completato, che cosa è in corso e che cosa è in ritardo rispetto al piano, con le date dei dati che usi.',
+    },
+    {
+      label: 'Blocchi e rischi',
+      question:
+        'Quali sono oggi i blocchi e i rischi aperti del progetto? Per ciascuno: da quando, chi ne è responsabile e che cosa serve per chiuderlo.',
+    },
+    {
+      label: 'Posta da smaltire',
+      question:
+        'Quali mail degli ultimi sette giorni aspettano una mia risposta o una mia decisione? In ordine di urgenza, con mittente, data e che cosa mi viene chiesto.',
+    },
+    {
+      label: 'Dopo la riunione',
+      question:
+        'Dall’ultima riunione del progetto: quali decisioni sono state prese, quali azioni sono state assegnate, a chi e per quando, e che cosa è rimasto aperto?',
+    },
+  ],
+  askReadyTitle: 'Domande pronte',
   alignmentTab: 'Allineamento',
   alignment: {
     loading: 'Confronto i due tracker…',
@@ -675,6 +715,11 @@ const errors: Record<ErrorCode, string> = {
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',
   dashboard_settings_invalid: 'Le impostazioni del cruscotto sono rovinate: salvale di nuovo.',
+  team_invalid: 'Le persone e il calendario del progetto non sono leggibili.',
+  project_name_invalid:
+    'Questo nome non può essere il nome di una cartella: togli i caratteri speciali e non iniziare con un punto.',
+  project_folder_exists:
+    'Lì c’è già una cartella con questo nome: scegli un altro nome o un altro posto.',
   deck_model_invalid:
     'Questo file non è una presentazione che posso usare come modello: serve almeno una slide, dopo la copertina, con un titolo.',
   letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',

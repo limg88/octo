@@ -87,6 +87,22 @@ export function AskView({ api, project }: Props) {
         )}
         <div ref={end} />
       </div>
+      {pending === null && (
+        // biome-ignore lint/a11y/useSemanticElements: a group of buttons, not a set of form fields.
+        <div className="actions" role="group" aria-label={messages.askReadyTitle}>
+          {messages.askReady.map((ready) => (
+            <button
+              key={ready.label}
+              type="button"
+              className="quiet"
+              title={ready.question}
+              onClick={() => setQuestion(ready.question)}
+            >
+              {ready.label}
+            </button>
+          ))}
+        </div>
+      )}
       <form className="composer" onSubmit={(event) => void submit(event)}>
         <textarea
           aria-label={messages.askPlaceholder}

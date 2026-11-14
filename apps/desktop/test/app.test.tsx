@@ -16,12 +16,14 @@ import {
   type Deliverable,
   type DeliverableKind,
   type FeedName,
+  NO_TEAM,
   type Project,
+  type ProjectTeam,
   type QuestionRecord,
   type SourceRun,
   type SourceState,
 } from '@octo/domain'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
 import { linkMarkers, markerOfLink } from '../src/renderer/answer-text.ts'
@@ -144,6 +146,9 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     hasDeckModel: vi.fn(async () => ok(false)),
     chooseDeckModel: vi.fn(async () => ok(true)),
     removeDeckModel: vi.fn(async () => ok(null)),
+    team: vi.fn(async () => ok(NO_TEAM)),
+    saveTeam: vi.fn(async (_id: string, team: ProjectTeam) => ok(team)),
+    createProject: vi.fn(async () => ok<Project | null>(boreale)),
     alignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
     saveAlignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
     alignmentView: vi.fn(async () => ({
@@ -300,6 +305,46 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Boreale' })).toBeNull())
     expect(api.removeProject).toHaveBeenCalledWith('p-2')
     expect(screen.getByRole('heading', { name: 'Aurora' })).toBeTruthy()
+  })
+
+  it('makes a new project from its name and opens its sources', async () => {
+    const { api } = fakeApi({
+      createProject: vi
+        .fn<OctoApi['createProject']>()
+        .mockResolvedValueOnce({ ok: false, code: 'project_folder_exists' })
+        .mockResolvedValueOnce(ok(null))
+        .mockResolvedValue(ok(boreale)),
+    })
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.newProject }))
+    const create = screen.getByRole<HTMLButtonElement>('button', {
+      name: messages.newProjectCreate,
+    })
+    expect(create.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(messages.newProjectName), {
+      target: { value: 'Boreale' },
+    })
+    fireEvent.click(create)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/c’è già una cartella/)
+    // The PM closes the dialog: the name stays, to try again.
+    fireEvent.click(create)
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(2))
+    expect(screen.getByLabelText<HTMLInputElement>(messages.newProjectName).value).toBe('Boreale')
+    fireEvent.click(create)
+    expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    expect(api.createProject).toHaveBeenLastCalledWith('Boreale')
+    expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
+    expect(screen.queryByLabelText(messages.newProjectName)).toBeNull()
+  })
+
+  it('offers ready questions that fill the composer without asking', async () => {
+    const { api } = fakeApi()
+    render(<App api={api} />)
+    const ready = await screen.findByRole('group', { name: messages.askReadyTitle })
+    fireEvent.click(within(ready).getByRole('button', { name: 'Blocchi e rischi' }))
+    const composer = screen.getByLabelText<HTMLTextAreaElement>(messages.askPlaceholder)
+    expect(composer.value).toMatch(/^Quali sono oggi i blocchi e i rischi aperti/)
+    expect(api.ask).not.toHaveBeenCalled()
   })
 
   it('guides a PM with no project and no agent, and explains errors', async () => {

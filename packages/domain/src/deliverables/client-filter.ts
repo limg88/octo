@@ -13,7 +13,7 @@ const NUMBER = String.raw`\d+(?:[.,]\d+)*`
  * calendar ("entro 5 giorni" is a deadline, and stays).
  */
 const EFFORT_UNIT = String.raw`(?:gg|g\.?\s?u\.?|giornat[ae](?:\s+uomo)?|giorn[oi][\s/-]uomo|ore[\s/-]uomo|m\.?d\.?|man[\s-]?days?|man[\s-]?hours?|person[\s-]days?|fte)`
-const MONEY_UNIT = String.raw`(?:k?€|euro|eur)`
+const MONEY_UNIT = '(?:k?€|euro|eur)'
 const EFFORT = new RegExp(String.raw`(?<![\w.,])${NUMBER}\s?${EFFORT_UNIT}(?![\w])`, 'giu')
 const MONEY = new RegExp(
   String.raw`(?<![\w.,])${NUMBER}\s?(?:k|mila\s|milioni\s(?:di\s)?)?\s?${MONEY_UNIT}(?![\w])|(?:€|eur)\s?${NUMBER}`,
