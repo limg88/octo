@@ -10,5 +10,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 04 | Sistemi: i work item di Azure DevOps (finto) letti con un token di sola lettura e scritti nel progetto, credenziale custodita dal sistema, nota sull'età dei dati | `bash demo/04-sistemi/run.sh` | [COPIONE](04-sistemi/COPIONE.md) |
 | 05 | Avvio guidato: da un progetto vuoto a una memoria piena, con parole chiave proposte, anteprima della posta, progetto e aree scelti con un clic e un solo pulsante che legge tutto | `bash demo/05-avvio-guidato/run.sh` | [COPIONE](05-avvio-guidato/COPIONE.md) |
 | 06 | Deliverable: un'email al cliente dalla richiesta al file Word approvato, con fonti controllate, rilettura critica, modifiche a parole e conteggio di tempi e giri | `bash demo/06-deliverable/run.sh` | [COPIONE](06-deliverable/COPIONE.md) |
+| 07 | Cruscotto: bug aperti per fase, fermi oltre soglia, andamento su un periodo a scelta e requisiti poco chiari, calcolati dal codice da un'esportazione del tracker nella cartella | `bash demo/07-cruscotto/run.sh` | [COPIONE](07-cruscotto/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 06 nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 07 nella finestra vera, senza intervento.

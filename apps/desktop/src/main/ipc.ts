@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type {
   AgentRunner,
   AskQuestion,
+  Dashboard,
   Deliverables,
   Documents,
   EvidenceReader,
@@ -12,7 +13,7 @@ import type {
   QuestionLog,
   Sources,
 } from '@octo/application'
-import { DomainError, FEED_NAMES, isDomainError, WAREHOUSE_TLS_MODES } from '@octo/domain'
+import { DomainError, FEED_NAMES, isDomainError, PHASES, WAREHOUSE_TLS_MODES } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import { CHANNELS, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
@@ -29,6 +30,7 @@ export type IpcDeps = {
   feeds: Feeds
   feeding: Feeding
   deliverables: Deliverables
+  dashboard: Dashboard
   folderDialogTitle: string
   letterheadDialogTitle: string
 }
@@ -106,6 +108,32 @@ const kindSaveInput = byProject.extend({
   }),
 })
 const instructionsSaveInput = byKind.extend({ text: z.string().max(MAX_INSTRUCTIONS_LENGTH) })
+
+const MAX_DECISIONS = 5000
+const dated = { id: rule, at: rule }
+const dashboardSettingsInput = byProject.extend({
+  settings: z.object({
+    exportPath: rule,
+    historyPath: rule,
+    tags: ruleList,
+    bugTypes: ruleList,
+    storyTypes: ruleList,
+    stuckDays: z.number(),
+    requirementPeriods: ruleList,
+    phases: z.record(rule, z.enum(PHASES)),
+    handoverStates: ruleList,
+    decisions: z.object({
+      excludedRequirements: z.array(z.object(dated)).max(MAX_DECISIONS),
+      removedSignals: z.array(z.object({ ...dated, signal: rule })).max(MAX_DECISIONS),
+      notes: z
+        .array(z.object({ ...dated, text: z.string().max(MAX_INPUT_LENGTH) }))
+        .max(MAX_DECISIONS),
+    }),
+  }),
+})
+const dashboardViewInput = byProject.extend({
+  range: z.object({ from: rule, to: rule, granularity: z.enum(['week', 'month']) }),
+})
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -293,6 +321,22 @@ export function registerIpc(deps: IpcDeps): void {
     await deps.deliverables.setLetterhead(await deps.projects.get(projectId), null)
     return null
   })
+
+  handle(CHANNELS.dashboardSettingsGet, byProject, async ({ projectId }) =>
+    deps.dashboard.settings(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.dashboardSettingsSave, dashboardSettingsInput, async (input) =>
+    deps.dashboard.saveSettings(await deps.projects.get(input.projectId), input.settings),
+  )
+
+  handle(CHANNELS.dashboardCandidates, byProject, async ({ projectId }) =>
+    deps.dashboard.candidates(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.dashboardView, dashboardViewInput, async (input) =>
+    deps.dashboard.view(await deps.projects.get(input.projectId), input.range),
+  )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {
     const project = await deps.projects.get(projectId)

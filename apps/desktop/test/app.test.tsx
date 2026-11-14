@@ -7,14 +7,15 @@ import type {
   FeedView,
   MailSourceView,
 } from '@octo/application'
-import type {
-  Deliverable,
-  DeliverableKind,
-  FeedName,
-  Project,
-  QuestionRecord,
-  SourceRun,
-  SourceState,
+import {
+  DEFAULT_DASHBOARD_SETTINGS,
+  type Deliverable,
+  type DeliverableKind,
+  type FeedName,
+  type Project,
+  type QuestionRecord,
+  type SourceRun,
+  type SourceState,
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -136,6 +137,13 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
+    dashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
+    saveDashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
+    dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),
+    dashboardView: vi.fn(async () => ({
+      ok: false as const,
+      code: 'tracker_export_not_set' as const,
+    })),
     onDeliverableProgress: () => () => {},
     previewMail: vi.fn(async () => ok({ count: 0, subjects: [] })),
     feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: false, feeds: [] })),

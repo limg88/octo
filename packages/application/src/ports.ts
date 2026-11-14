@@ -1,5 +1,6 @@
 import type {
   ArchivedMail,
+  DashboardSettings,
   DeliverableDraft,
   DeliverableKind,
   DraftAnswer,
@@ -215,4 +216,24 @@ export interface DocumentRenderer {
   word(title: string, markdown: string, letterhead?: Uint8Array): Promise<Uint8Array>
   /** Throws a DomainError `letterhead_invalid` when the bytes are not a usable Word document. */
   checkLetterhead(bytes: Uint8Array): Promise<void>
+}
+
+/** How a project reads its tracker for the dashboard, kept with Octo's settings of the project. */
+export interface DashboardSettingsStore {
+  load(projectFolder: string): Promise<DashboardSettings>
+  save(projectFolder: string, settings: DashboardSettings): Promise<void>
+}
+
+/** The tracker exports found in a project folder, by what they hold. */
+export type ExportCandidates = { exports: string[]; histories: string[] }
+
+/** Tracker exports kept as JSON files in the project folder. Never leaves the folder. */
+export interface TrackerExports {
+  /**
+   * The content of a JSON file of the project; null when it does not exist. A file that is not
+   * JSON, or a path leading outside the folder, is a `tracker_export_unreadable`.
+   */
+  readJson(projectFolder: string, relativePath: string): Promise<unknown | null>
+  /** Files that look like an export or like a history, to propose to the PM. */
+  candidates(projectFolder: string): Promise<ExportCandidates>
 }

@@ -1,12 +1,16 @@
 import type {
   AgentProgress,
   AgentStatus,
+  DashboardRange,
+  DashboardView,
+  ExportCandidates,
   FeedingStatus,
   FeedingStep,
   FeedView,
   MailSourceView,
 } from '@octo/application'
 import type {
+  DashboardSettings,
   Deliverable,
   DeliverableKind,
   DomainErrorCode,
@@ -64,6 +68,10 @@ export const CHANNELS = {
   feedSync: 'sources:feed:sync',
   documentsGet: 'sources:documents:get',
   documentsConvert: 'sources:documents:convert',
+  dashboardSettingsGet: 'dashboard:settings:get',
+  dashboardSettingsSave: 'dashboard:settings:save',
+  dashboardCandidates: 'dashboard:candidates',
+  dashboardView: 'dashboard:view',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -147,6 +155,15 @@ export type OctoApi = {
   /** Lets the PM choose a Word document as letterhead; false when the PM closes the dialog. */
   chooseLetterhead(projectId: string): Promise<Result<boolean>>
   removeLetterhead(projectId: string): Promise<Result<null>>
+  dashboardSettings(projectId: string): Promise<Result<DashboardSettings>>
+  saveDashboardSettings(
+    projectId: string,
+    settings: DashboardSettings,
+  ): Promise<Result<DashboardSettings>>
+  /** Tracker exports found in the project folder, to propose to the PM. */
+  dashboardCandidates(projectId: string): Promise<Result<ExportCandidates>>
+  /** The dashboard over a period; every number is computed by the app from the tracker export. */
+  dashboardView(projectId: string, range: DashboardRange): Promise<Result<DashboardView>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

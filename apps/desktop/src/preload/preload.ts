@@ -58,6 +58,14 @@ const api: OctoApi = {
   hasLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadGet, { projectId }),
   chooseLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadChoose, { projectId }),
   removeLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadRemove, { projectId }),
+  dashboardSettings: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
+  saveDashboardSettings: (projectId, settings) =>
+    ipcRenderer.invoke(CHANNELS.dashboardSettingsSave, { projectId, settings }),
+  dashboardCandidates: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.dashboardCandidates, { projectId }),
+  dashboardView: (projectId, range) =>
+    ipcRenderer.invoke(CHANNELS.dashboardView, { projectId, range }),
   onDeliverableProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
       listener(projectId, progress)

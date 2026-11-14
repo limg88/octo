@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   createAskQuestion,
+  createDashboard,
   createDeliverables,
   createDocuments,
   createFeeding,
@@ -23,11 +24,13 @@ import {
   createClaudeDeliverableWriter,
   createConnectorFeedReader,
   createFileVault,
+  createFsDashboardSettings,
   createFsEvidenceReader,
   createFsFolderProbe,
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
+  createFsTrackerExports,
   createJsonFeedIndexes,
   createJsonProjectRegistry,
   createJsonQuestionLog,
@@ -198,6 +201,11 @@ function start(): void {
       memory: writer,
       clock,
       ids,
+    }),
+    dashboard: createDashboard({
+      settings: createFsDashboardSettings(),
+      exports: createFsTrackerExports(),
+      clock,
     }),
     agent,
     projects,

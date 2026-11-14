@@ -13,7 +13,7 @@ const OFFICE_LOCK_PREFIX = '~$'
 const portable = (path: string): string => path.split(sep).join('/')
 
 /** The real path of a place inside the project; a path or a link leading outside is refused. */
-async function inside(projectFolder: string, relativePath: string): Promise<string> {
+export async function realPathInside(projectFolder: string, relativePath: string): Promise<string> {
   const root = await realpath(projectFolder)
   const target = await realpath(resolve(root, relativePath))
   const fromRoot = relative(root, target)
@@ -24,7 +24,11 @@ async function inside(projectFolder: string, relativePath: string): Promise<stri
 }
 
 /** Every file under a folder, links not followed, as paths from `base`. */
-async function walk(base: string, folder: string, skipFolders: boolean): Promise<string[]> {
+export async function walkFiles(
+  base: string,
+  folder: string,
+  skipFolders: boolean,
+): Promise<string[]> {
   const entries = await readdir(join(base, folder), { withFileTypes: true }).catch(
     (error: unknown) => {
       if (isMissing(error)) return []
@@ -37,7 +41,7 @@ async function walk(base: string, folder: string, skipFolders: boolean): Promise
     if (entry.isFile()) found.push(path)
     if (!entry.isDirectory()) continue
     const skipped = entry.name.startsWith(HIDDEN_PREFIX) || SKIPPED_FOLDERS.has(entry.name)
-    if (!skipFolders || !skipped) found.push(...(await walk(base, path, skipFolders)))
+    if (!skipFolders || !skipped) found.push(...(await walkFiles(base, path, skipFolders)))
   }
   return found
 }
@@ -48,7 +52,7 @@ export function createFsProjectFiles(): ProjectFiles {
       const wanted = new Set(extensions)
       const root = await realpath(projectFolder)
       const stamps: SourceFileStamp[] = []
-      for (const path of await walk(root, '', true)) {
+      for (const path of await walkFiles(root, '', true)) {
         const name = path.split('/').at(-1) ?? ''
         const extension = name.includes('.') ? (name.split('.').pop() ?? '').toLowerCase() : ''
         if (!wanted.has(extension) || name.startsWith(OFFICE_LOCK_PREFIX)) continue
@@ -58,10 +62,10 @@ export function createFsProjectFiles(): ProjectFiles {
       return stamps.sort((a, b) => a.path.localeCompare(b.path))
     },
     read: async (projectFolder, relativePath) =>
-      readFile(await inside(projectFolder, relativePath)),
+      readFile(await realPathInside(projectFolder, relativePath)),
     async readText(projectFolder, relativePath) {
       try {
-        return await readFile(await inside(projectFolder, relativePath), 'utf8')
+        return await readFile(await realPathInside(projectFolder, relativePath), 'utf8')
       } catch (error) {
         if (isMissing(error)) return null
         throw error
@@ -69,10 +73,10 @@ export function createFsProjectFiles(): ProjectFiles {
     },
     async under(projectFolder, folder) {
       const root = await realpath(projectFolder)
-      const files = await walk(root, portable(folder), false)
+      const files = await walkFiles(root, portable(folder), false)
       return files.sort()
     },
     remove: async (projectFolder, relativePath) =>
-      rm(await inside(projectFolder, relativePath), { force: true }),
+      rm(await realPathInside(projectFolder, relativePath), { force: true }),
   }
 }

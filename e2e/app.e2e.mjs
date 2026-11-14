@@ -18,6 +18,7 @@ fakeMail()
 const fakeDocuments = (...extra) =>
   execFileSync('node', [`${root}demo/lib/fake-documents.ts`, `${work}/Aurora`, ...extra])
 fakeDocuments()
+execFileSync('node', [`${root}demo/lib/fake-tracker.ts`, `${work}/Aurora`])
 
 const ado = await startDemoAdo()
 
@@ -27,6 +28,14 @@ const packaged = process.env.OCTO_E2E_EXECUTABLE
 async function assertEventually(check) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (check()) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  assert.fail('the app did not get there in time')
+}
+
+async function assertEventuallyAsync(check) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (await check()) return
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
   assert.fail('the app did not get there in time')
@@ -221,6 +230,48 @@ try {
   await work06.getByText(/^Approvati: 1 ·/).waitFor()
   const register = readFileSync(`${work}/Aurora/_octo/deliverable/registro.md`, 'utf8')
   assert.match(register, /\| Email al cliente \| Data di consegna \| approvato \|/)
+
+  // Demo 07: the dashboard is computed from the tracker export found in the project folder.
+  await page.getByRole('tab', { name: 'Cruscotto' }).click()
+  const setup07 = page.getByRole('region', { name: 'Da dove leggo bug e requisiti' })
+  await assert.doesNotReject(setup07.waitFor({ timeout: TIMEOUT_MS }))
+  await page.waitForFunction(
+    () => document.querySelector('.settings-form input')?.value === 'dati/tracker/export.json',
+  )
+  await setup07.getByLabel(/^Solo gli elementi con questi tag/).fill('Squadra')
+  await setup07.getByRole('button', { name: 'Salva' }).click()
+  await page.getByText(/Dati aggiornati/).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('su 30 bug nel perimetro').waitFor()
+  const figure = async (label) =>
+    (await page.locator('.figure', { hasText: label }).first().locator('dd').innerText()).split(
+      '\n',
+    )[0]
+  assert.equal(await figure('Bug aperti'), '15')
+  assert.equal(await figure('In verifica'), '5')
+  assert.equal(await figure('Fermi da oltre 30 giorni'), '11')
+  const trendRows = page.locator('.trend tbody tr')
+  assert.equal(await trendRows.count(), 8)
+  await page.getByRole('button', { name: '12 mesi' }).click()
+  await assertEventuallyAsync(async () => (await trendRows.count()) === 12)
+  await page.screenshot({ path: `${work}/cruscotto.png` })
+  const open07 = page.getByRole('region', { name: 'Bug aperti' })
+  await open07.getByRole('button', { name: 'Scrivi una nota' }).first().click()
+  await open07.getByRole('textbox').fill('Sentito il cliente: dati entro venerdì')
+  await open07.getByRole('button', { name: 'Salva la nota' }).click()
+  await open07.getByText(/Nota tua/).waitFor({ timeout: TIMEOUT_MS })
+  const requirements07 = page.getByRole('region', { name: 'Requisiti poco chiari' })
+  await requirements07.getByText(/ancora da definire con il cliente/).waitFor()
+  assert.equal(await requirements07.locator('tbody tr').count(), 4)
+  await requirements07.getByRole('button', { name: 'È chiaro' }).last().click()
+  await assertEventuallyAsync(async () => (await requirements07.locator('tbody tr').count()) === 3)
+  const decisions = JSON.parse(
+    readFileSync(`${work}/Aurora/_octo/.impostazioni/dashboard.json`, 'utf8'),
+  ).decisions
+  assert.equal(decisions.notes.length, 1)
+  assert.deepEqual(
+    decisions.excludedRequirements.map((entry) => entry.id),
+    ['2006'],
+  )
 
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
