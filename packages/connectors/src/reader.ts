@@ -43,6 +43,11 @@ export interface ConnectorReader {
     secret: string,
     scope: readonly string[],
   ): Promise<{ config: Record<string, unknown>; perimeter: string[] }>
+  /**
+   * What the credential can see, for the PM to choose from: the projects of the system or, for an
+   * Azure DevOps configuration that names its project (`projectId`), its areas and iterations.
+   */
+  entries(kind: PullSourceKind, rawConfig: unknown, secret: string): Promise<PerimeterOption[]>
   /** The next batch after `cursor` (null: from the beginning). */
   pull(source: ReadableSource, cursor: unknown, signal: AbortSignal): Promise<ConnectorDelivery>
 }
@@ -150,15 +155,22 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
     }
   }
 
+  /** Checks the credential, then lists what it can see for this configuration. */
+  function optionsOf(kind: PullSourceKind, config: unknown, secret: string) {
+    const signal = new AbortController().signal
+    return withContext(kind, { config, perimeter: [], secret }, signal, async (connector, ctx) => {
+      const check = await connector.test(ctx)
+      if (!check.ok) throw new ConnectorError(check.code)
+      return connector.perimeterOptions(ctx) as Promise<PerimeterOption[]>
+    })
+  }
+
   return {
+    entries: (kind, rawConfig, secret) =>
+      optionsOf(kind, connectors[kind].parseConfig(rawConfig), secret),
+
     async connect(kind, rawConfig, secret, scope) {
-      const signal = new AbortController().signal
-      const optionsFor = (config: unknown) =>
-        withContext(kind, { config, perimeter: [], secret }, signal, async (connector, ctx) => {
-          const check = await connector.test(ctx)
-          if (!check.ok) throw new ConnectorError(check.code)
-          return connector.perimeterOptions(ctx) as Promise<PerimeterOption[]>
-        })
+      const optionsFor = (config: unknown) => optionsOf(kind, config, secret)
       let config = connectors[kind].parseConfig(rawConfig)
       let entries = await optionsFor(config)
       if (kind === 'ado') {

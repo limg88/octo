@@ -6,6 +6,7 @@ import {
   createNetGuard,
   dwsiConnector,
   type NetGuardOptions,
+  type PerimeterOption,
   prjOption,
   renderSyncFile,
   SecretValue,
@@ -17,12 +18,15 @@ import {
   type Delivery,
   DomainError,
   type DomainErrorCode,
+  type FeedChoice,
+  type FeedChoices,
   type FeedConfig,
   type FeedFile,
   type FeedName,
   type FeedStep,
   type JiraFeedConfig,
   MAX_ITEMS_PER_DELIVERY,
+  NO_CHOICES,
   type PullSourceKind,
   recordBody,
   rowsBody,
@@ -106,6 +110,30 @@ const trackerOf = {
     config: { site: jiraSite(config.site), email: config.email, readOnlyToken: true },
     scope: config.projects,
   }),
+}
+
+const PROJECT_OPTION_PREFIX = 'project:'
+const AREA_OPTION_PREFIX = 'area:'
+const KEY_IN_LABEL = /\(([^()]+)\)$/
+
+/** A Jira project is named by its key, which its label carries in brackets. */
+function jiraProjectChoice(entry: PerimeterOption): FeedChoice {
+  return { value: KEY_IN_LABEL.exec(entry.label)?.[1] ?? entry.label, label: entry.label }
+}
+
+/** The areas under the root of a project, each as the path a PM would write. */
+function areaChoices(nodes: readonly PerimeterOption[]): FeedChoice[] {
+  const areas = nodes.filter((node) => node.id.startsWith(AREA_OPTION_PREFIX))
+  const byId = new Map(areas.map((node) => [node.id, node]))
+  const pathOf = (node: PerimeterOption): string[] => {
+    const parent = node.parentId === undefined ? undefined : byId.get(node.parentId)
+    return parent ? [...pathOf(parent), node.label] : []
+  }
+  return areas
+    .map((node) => pathOf(node).join('\\'))
+    .filter((path) => path.length > 0)
+    .sort()
+    .map((path) => ({ value: path, label: path }))
 }
 
 const day = (at: Date | null): string => (at ? `${at.toISOString().slice(0, 10)}-` : '')
@@ -259,7 +287,32 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
     }
   }
 
+  /** The projects of a tracker and, when the configuration names one, its areas as paths. */
+  async function trackerChoices(
+    feed: FeedName,
+    config: FeedConfig,
+    secret: string,
+  ): Promise<FeedChoices> {
+    const { kind, config: raw } = tracker(feed, config)
+    const listed = await trackers.entries(kind, raw, secret)
+    if (kind === 'jira') return { projects: listed.map(jiraProjectChoice), areas: [] }
+    const projects = listed.map((entry) => ({ value: entry.label, label: entry.label }))
+    const wanted = (config as AdoFeedConfig).project.trim().toLowerCase()
+    const chosen = listed.find((entry) => entry.label.toLowerCase() === wanted)
+    if (!chosen) return { projects, areas: [] }
+    const projectId = chosen.id.slice(PROJECT_OPTION_PREFIX.length)
+    const nodes = await trackers.entries(kind, { ...raw, projectId }, secret)
+    return { projects, areas: areaChoices(nodes) }
+  }
+
   return {
+    async choices(feed, config, secret) {
+      try {
+        return feed === 'dwsi' ? NO_CHOICES : await trackerChoices(feed, config, secret)
+      } catch (error) {
+        throw failure(error)
+      }
+    },
     async check(feed, config, secret) {
       try {
         if (feed === 'dwsi') {

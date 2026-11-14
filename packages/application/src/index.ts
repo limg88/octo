@@ -1,5 +1,6 @@
 export * from './ask-question.ts'
 export * from './documents.ts'
+export * from './feeding.ts'
 export * from './feeds.ts'
 export * from './ports.ts'
 export * from './projects.ts'

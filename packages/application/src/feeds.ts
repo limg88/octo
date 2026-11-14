@@ -3,6 +3,7 @@ import {
   DomainError,
   FEED_NAMES,
   FEED_NOTE_FILE,
+  type FeedChoices,
   type FeedConfig,
   type FeedConfigs,
   type FeedIndex,
@@ -59,6 +60,16 @@ export type Feeds = {
     config: FeedConfigs[Name] | null,
     secret: string | null,
   ): Promise<FeedView<Name>>
+  /**
+   * What the credential can see, to pick from while setting the feed up. Nothing is saved. A null
+   * secret uses the one already stored.
+   */
+  choices(
+    project: Project,
+    feed: FeedName,
+    config: FeedConfig,
+    secret: string | null,
+  ): Promise<FeedChoices>
   /** Reads what changed into the project folder. One reading per project and feed at a time. */
   sync(project: Project, feed: FeedName): Promise<SourceRun>
   /** The feeds configured for a project: those a periodic reading takes. */
@@ -199,7 +210,18 @@ export function createFeeds(deps: FeedsDeps): Feeds {
     return FEED_NAMES.filter((feed) => sources[feed] !== null)
   }
 
-  return { view, save, sync, configured }
+  async function choices(
+    project: Project,
+    feed: FeedName,
+    config: FeedConfig,
+    secret: string | null,
+  ): Promise<FeedChoices> {
+    const credential = secret?.trim() || (await deps.secrets.get(secretKey(project, feed)))
+    if (!credential) throw new DomainError('secret_missing', feed)
+    return deps.reader.choices(feed, config, credential)
+  }
+
+  return { view, save, choices, sync, configured }
 }
 
 type Counts = Pick<SourceRun, 'written' | 'unchanged'>

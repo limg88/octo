@@ -125,6 +125,21 @@ describe('Azure DevOps as files of the project', () => {
     expect((await itemFiles()).map((name) => name.split('-')[0])).toEqual(['1', '2', '4'])
   })
 
+  it('lists the projects the token sees and, once one is named, its areas', async () => {
+    const { feeds, project } = await start([])
+    const choices = (name: string) =>
+      feeds.choices(project, 'ado', { ...config, project: name }, PAT)
+
+    expect(await choices('')).toEqual({
+      projects: [{ value: PROJECT, label: PROJECT }],
+      areas: [],
+    })
+    expect((await choices('aurora')).areas).toEqual([{ value: 'Team A', label: 'Team A' }])
+    await expect(feeds.choices(project, 'ado', config, 'pat-sbagliato')).rejects.toMatchObject({
+      code: 'feed_credential_refused',
+    })
+  })
+
   it('refuses a wrong token and a project or an area the account does not see', async () => {
     const { feeds, project } = await start([])
     const save = (changes: Partial<AdoFeedConfig>, secret = PAT) =>
@@ -175,6 +190,21 @@ describe('Jira as files of the project', () => {
     expect(issue).toBeDefined()
     expect(files.some((name) => name.startsWith('zef-'))).toBe(false)
     expect(await text(`Fonti/Jira/${issue}`)).toContain('Bug sul login')
+  })
+
+  it('lists the projects of the account by their key', async () => {
+    fake = await startFakeJira({
+      email: config.email,
+      token: PAT,
+      projects: [aurora, zefiro],
+      issues: [],
+    })
+    const { feeds, project } = await setup({ devEndpoints: { jira: fake.server.origin } })
+
+    const choices = await feeds.choices(project, 'jira', { ...config, projects: [] }, PAT)
+
+    expect(choices.projects.map((choice) => choice.value)).toEqual(['AUR', 'ZEF'])
+    expect(choices.areas).toEqual([])
   })
 
   it('reads the site however it is written', () => {

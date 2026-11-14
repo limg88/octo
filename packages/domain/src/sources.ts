@@ -24,6 +24,13 @@ export type SourceState = {
   lastRun: SourceRun | null
 }
 
+/** What a configuration of the mail would bring in, shown before anything is written. */
+export type MailPreview = {
+  count: number
+  /** The subjects of the newest ones, to see at a glance whether the rules are right. */
+  subjects: string[]
+}
+
 export const NEVER_READ: SourceState = { cursor: null, lastRun: null }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/

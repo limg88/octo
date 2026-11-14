@@ -4,6 +4,7 @@ import type {
   AskQuestion,
   Documents,
   EvidenceReader,
+  Feeding,
   Feeds,
   Projects,
   QuestionLog,
@@ -24,6 +25,7 @@ export type IpcDeps = {
   sources: Sources
   documents: Documents
   feeds: Feeds
+  feeding: Feeding
   folderDialogTitle: string
 }
 
@@ -35,18 +37,16 @@ const askInput = byProject.extend({ question: z.string().max(MAX_QUESTION_LENGTH
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
 const MAX_RULES = 200
 const ruleList = z.array(z.string().max(MAX_RULE_LENGTH)).max(MAX_RULES)
-const mailSaveInput = byProject.extend({
-  config: z
-    .object({
-      since: z.string().max(MAX_RULE_LENGTH),
-      keywords: ruleList,
-      folders: ruleList,
-      excludeSenders: ruleList,
-      keepQuoted: z.boolean(),
-      targetFolder: z.string().max(MAX_RULE_LENGTH),
-    })
-    .nullable(),
+const mailConfig = z.object({
+  since: z.string().max(MAX_RULE_LENGTH),
+  keywords: ruleList,
+  folders: ruleList,
+  excludeSenders: ruleList,
+  keepQuoted: z.boolean(),
+  targetFolder: z.string().max(MAX_RULE_LENGTH),
 })
+const mailSaveInput = byProject.extend({ config: mailConfig.nullable() })
+const mailPreviewInput = byProject.extend({ config: mailConfig })
 
 const MAX_SECRET_LENGTH = 4000
 const rule = z.string().max(MAX_RULE_LENGTH)
@@ -54,35 +54,29 @@ const byFeed = byProject.extend({ feed: z.enum(FEED_NAMES) })
 const feedBase = { since: rule, targetFolder: rule }
 const secret = z.string().max(MAX_SECRET_LENGTH).nullable()
 /** The configuration is checked against the feed it is for: no field of another feed passes. */
+const feedConfigs = {
+  ado: z.object({ ...feedBase, organization: rule, project: rule, areas: ruleList }),
+  jira: z.object({ ...feedBase, site: rule, email: rule, projects: ruleList }),
+  dwsi: z.object({
+    ...feedBase,
+    host: rule,
+    port: z.number().int(),
+    database: rule,
+    user: rule,
+    ownerEmail: rule,
+    projectCodes: ruleList,
+    tls: z.enum(WAREHOUSE_TLS_MODES),
+  }),
+}
+const feedChoicesInput = z.discriminatedUnion('feed', [
+  byProject.extend({ feed: z.literal('ado'), secret, config: feedConfigs.ado }),
+  byProject.extend({ feed: z.literal('jira'), secret, config: feedConfigs.jira }),
+  byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi }),
+])
 const feedSaveInput = z.discriminatedUnion('feed', [
-  byProject.extend({
-    feed: z.literal('ado'),
-    secret,
-    config: z
-      .object({ ...feedBase, organization: rule, project: rule, areas: ruleList })
-      .nullable(),
-  }),
-  byProject.extend({
-    feed: z.literal('jira'),
-    secret,
-    config: z.object({ ...feedBase, site: rule, email: rule, projects: ruleList }).nullable(),
-  }),
-  byProject.extend({
-    feed: z.literal('dwsi'),
-    secret,
-    config: z
-      .object({
-        ...feedBase,
-        host: rule,
-        port: z.number().int(),
-        database: rule,
-        user: rule,
-        ownerEmail: rule,
-        projectCodes: ruleList,
-        tls: z.enum(WAREHOUSE_TLS_MODES),
-      })
-      .nullable(),
-  }),
+  byProject.extend({ feed: z.literal('ado'), secret, config: feedConfigs.ado.nullable() }),
+  byProject.extend({ feed: z.literal('jira'), secret, config: feedConfigs.jira.nullable() }),
+  byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi.nullable() }),
 ])
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
@@ -139,13 +133,41 @@ export function registerIpc(deps: IpcDeps): void {
     deps.sources.mail(await deps.projects.get(projectId)),
   )
 
-  handle(CHANNELS.mailSave, mailSaveInput, async ({ projectId, config }) =>
-    deps.sources.saveMail(await deps.projects.get(projectId), config),
-  )
+  /** What is linked changed: every part of the page that shows it reads it again. */
+  const sourcesChanged = (projectId: string) =>
+    deps.window.webContents.send(CHANNELS.sourcesChanged, projectId)
+
+  handle(CHANNELS.mailSave, mailSaveInput, async ({ projectId, config }) => {
+    const view = await deps.sources.saveMail(await deps.projects.get(projectId), config)
+    sourcesChanged(projectId)
+    return view
+  })
 
   handle(CHANNELS.mailSync, byProject, async ({ projectId }) =>
     deps.sources.syncMail(await deps.projects.get(projectId)),
   )
+
+  handle(CHANNELS.mailPreview, mailPreviewInput, async ({ projectId, config }) =>
+    deps.sources.previewMail(await deps.projects.get(projectId), config),
+  )
+
+  handle(CHANNELS.feedingStatus, byProject, async ({ projectId }) =>
+    deps.feeding.status(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.feedingFill, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    const steps = await deps.feeding.fill(project, (step) =>
+      deps.window.webContents.send(CHANNELS.feedingStep, projectId, step),
+    )
+    sourcesChanged(projectId)
+    return steps
+  })
+
+  handle(CHANNELS.feedChoices, feedChoicesInput, async (input) => {
+    const project = await deps.projects.get(input.projectId)
+    return deps.feeds.choices(project, input.feed, input.config, input.secret)
+  })
 
   handle(CHANNELS.feedGet, byFeed, async ({ projectId, feed }) =>
     deps.feeds.view(await deps.projects.get(projectId), feed),
@@ -153,7 +175,9 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.feedSave, feedSaveInput, async (input) => {
     const project = await deps.projects.get(input.projectId)
-    return deps.feeds.save(project, input.feed, input.config, input.secret)
+    const view = await deps.feeds.save(project, input.feed, input.config, input.secret)
+    sourcesChanged(input.projectId)
+    return view
   })
 
   handle(CHANNELS.feedSync, byFeed, async ({ projectId, feed }) =>

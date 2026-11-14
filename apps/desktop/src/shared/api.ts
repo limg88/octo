@@ -1,8 +1,17 @@
-import type { AgentProgress, AgentStatus, FeedView, MailSourceView } from '@octo/application'
+import type {
+  AgentProgress,
+  AgentStatus,
+  FeedingStatus,
+  FeedingStep,
+  FeedView,
+  MailSourceView,
+} from '@octo/application'
 import type {
   DomainErrorCode,
+  FeedChoices,
   FeedConfig,
   FeedName,
+  MailPreview,
   MailSourceConfig,
   Project,
   QuestionRecord,
@@ -29,6 +38,11 @@ export const CHANNELS = {
   mailGet: 'sources:mail:get',
   mailSave: 'sources:mail:save',
   mailSync: 'sources:mail:sync',
+  mailPreview: 'sources:mail:preview',
+  feedChoices: 'sources:feed:choices',
+  feedingStatus: 'feeding:status',
+  feedingFill: 'feeding:fill',
+  feedingStep: 'feeding:step',
   feedGet: 'sources:feed:get',
   feedSave: 'sources:feed:save',
   feedSync: 'sources:feed:sync',
@@ -56,6 +70,21 @@ export type OctoApi = {
   ): Promise<Result<MailSourceView>>
   /** Reads the new mail now. A failure of the reading is in the run, not in the result. */
   syncMail(projectId: string): Promise<Result<SourceRun>>
+  /** What these rules would bring in from the mail archive, without writing anything. */
+  previewMail(projectId: string, config: MailSourceConfig): Promise<Result<MailPreview>>
+  /** Which sources of the project are set up. */
+  feedingStatus(projectId: string): Promise<Result<FeedingStatus>>
+  /** Feeds the project from everything set up, one source after the other. */
+  fill(projectId: string): Promise<Result<FeedingStep[]>>
+  /** Tells each step of a filling as it ends. Returns the function that stops listening. */
+  onFeedingStep(listener: (projectId: string, step: FeedingStep) => void): () => void
+  /** What the credential sees in the system, to pick from. A null secret uses the stored one. */
+  feedChoices(
+    projectId: string,
+    feed: FeedName,
+    config: FeedConfig,
+    secret: string | null,
+  ): Promise<Result<FeedChoices>>
   feed(projectId: string, feed: FeedName): Promise<Result<FeedView>>
   /**
    * Checks the configuration against the system and saves it. A null secret keeps the one

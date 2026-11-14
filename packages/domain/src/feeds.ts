@@ -68,6 +68,14 @@ export type FeedStep = {
   dataAsOf: Date | null
 }
 
+/** One thing the PM can pick instead of typing it: a project of the system, an area of it. */
+export type FeedChoice = { value: string; label: string }
+
+/** What a credential can see in a system, offered while the feed is being set up. */
+export type FeedChoices = { projects: FeedChoice[]; areas: FeedChoice[] }
+
+export const NO_CHOICES: FeedChoices = { projects: [], areas: [] }
+
 /** What was written for each item, so an unchanged one is not written again. */
 export type FeedIndex = Record<string, { version: string; path: string }>
 

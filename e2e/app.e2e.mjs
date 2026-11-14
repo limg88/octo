@@ -67,14 +67,25 @@ try {
 
   // Demo 02: the mail of the project enters its folder, once.
   await page.getByRole('tab', { name: 'Fonti' }).click()
+  // Demo 05: the guide shows what is still to link, and the mail starts from the project's name.
+  const guide = page.getByRole('region', { name: 'Avvio del progetto' })
+  const guideStep = (text) => guide.getByRole('listitem').filter({ hasText: text })
+  await guideStep('Posta').getByText('da fare').waitFor({ timeout: TIMEOUT_MS })
+  await guideStep('Azure DevOps').getByText('da fare').waitFor({ timeout: TIMEOUT_MS })
   const mail = page.getByRole('region', { name: 'Posta' })
+  assert.equal(await mail.getByLabel('Parole chiave').inputValue(), 'Aurora')
+  await mail.getByRole('button', { name: 'Anteprima' }).click()
+  await mail.getByText('3 mail entrerebbero con queste regole.').waitFor({ timeout: TIMEOUT_MS })
+  await mail.getByText('[FIRING] Aurora - disco pieno').waitFor({ timeout: TIMEOUT_MS })
   await mail.getByText('La posta di questo progetto non è ancora configurata.').waitFor()
   await mail.getByLabel('Parole chiave').fill('Aurora')
   await mail.getByLabel('Mittenti da escludere').fill('avvisi@monitor.example')
   await mail.getByRole('button', { name: 'Salva', exact: true }).click()
   await mail.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
+  await guideStep('Posta').getByText('fatto').waitFor({ timeout: TIMEOUT_MS })
   await mail.getByRole('button', { name: 'Leggi ora' }).click()
-  await mail.getByText('2 nuove, 0 già presenti').waitFor({ timeout: TIMEOUT_MS })
+  // The periodic reading may have run just before the click: either way two mails are there.
+  await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
   const month = new Date(Date.now() - 30 * 3600 * 1000).toISOString().slice(0, 7)
   const written = readdirSync(`${work}/Aurora/Posta/${month}`)
   assert.equal(written.length, 2)
@@ -101,21 +112,32 @@ try {
 
   // Demo 04: a system of record read with the PM's token into files of the project.
   const adoSection = page.getByRole('region', { name: 'Azure DevOps' })
-  const linkAdo = async (token) => {
-    await adoSection.getByLabel('Organizzazione').fill(DEMO_ADO.organization)
-    await adoSection.getByLabel('Progetto', { exact: true }).fill(DEMO_ADO.project)
-    await adoSection.getByLabel(/^Personal Access Token/).fill(token)
-    await adoSection.getByRole('button', { name: 'Prova e salva' }).click()
-  }
+  const adoProject = adoSection.getByLabel('Progetto', { exact: true })
+  const adoToken = adoSection.getByLabel(/^Personal Access Token/)
+  const searchAdo = () => adoSection.getByRole('button', { name: 'Cerca progetti e aree' }).click()
+  const saveAdo = () => adoSection.getByRole('button', { name: 'Prova e salva' }).click()
   await adoSection.getByText('Non collegato.').waitFor({ timeout: TIMEOUT_MS })
-  await linkAdo('sbagliato')
+  await adoSection.getByLabel('Organizzazione').fill(DEMO_ADO.organization)
+  await adoProject.fill(DEMO_ADO.project)
+  await adoToken.fill('sbagliato')
+  await saveAdo()
   await adoSection.getByText(/ha rifiutato la credenziale/).waitFor({ timeout: TIMEOUT_MS })
-  await linkAdo(DEMO_ADO.pat)
+  // The project and its area are picked from what the token sees, not typed.
+  await adoProject.fill('')
+  await adoToken.fill(DEMO_ADO.pat)
+  await searchAdo()
+  await adoSection.getByRole('button', { name: DEMO_ADO.project, exact: true }).click()
+  assert.equal(await adoProject.inputValue(), DEMO_ADO.project)
+  await searchAdo()
+  await adoSection
+    .getByRole('button', { name: 'Team A', exact: true })
+    .waitFor({ timeout: TIMEOUT_MS })
+  await saveAdo()
   await adoSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
   assert.doesNotMatch(readFileSync(`${work}/Aurora/.octo/sources.json`, 'utf8'), /demo-pat/)
   await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
   await adoSection
-    .getByText(/Ultima lettura .* aggiornati, 0 invariati/)
+    .getByText(/Ultima lettura .* aggiornati, \d+ invariati/)
     .waitFor({ timeout: TIMEOUT_MS })
   const workItems = () =>
     readdirSync(`${work}/Aurora/Fonti/ADO`).filter((name) => /^\d+-[0-9a-f]{8}\.md$/.test(name))
@@ -130,6 +152,15 @@ try {
   ado.options.items.push(extraItem())
   await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
   await assertEventually(() => workItems().length === 4)
+
+  // Demo 05: one button reads everything that is linked.
+  await guideStep('Azure DevOps').getByText('fatto').waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByRole('button', { name: 'Riempi la memoria ora' }).click()
+  await guide.getByText('Fatto. Ora puoi fare domande').waitFor({ timeout: TIMEOUT_MS })
+  for (const source of ['Posta', 'Azure DevOps', 'Documenti']) {
+    await guide.getByText(new RegExp(`^${source}: \\d+ nuovi o aggiornati`)).waitFor()
+  }
+  await page.screenshot({ path: `${work}/guida.png`, fullPage: true })
   await page.screenshot({ path: `${work}/fonti.png` })
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 

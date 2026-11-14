@@ -155,3 +155,26 @@ describe('configuring the mail of a project', () => {
     expect((await sources.saveMail(project, null)).config).toBeNull()
   })
 })
+
+describe('previewing the mail of a project', () => {
+  it('counts what the rules would bring in and shows the newest subjects, writing nothing', async () => {
+    const { sources, writer } = setup([
+      mail('1', '2026-11-10T08:00:00Z', 'Aurora: uno'),
+      mail('2', '2026-11-11T08:00:00Z', 'Zefiro: preventivo'),
+      mail('3', '2026-11-12T08:00:00Z', 'Aurora: tre'),
+      mail('4', '2026-10-01T08:00:00Z', 'Aurora: troppo vecchia'),
+    ])
+
+    const preview = await sources.previewMail(project, { ...config, keywords: [' Aurora '] })
+
+    expect(preview).toEqual({ count: 2, subjects: ['Aurora: tre', 'Aurora: uno'] })
+    expect(writer.files.size).toBe(0)
+  })
+
+  it('refuses rules that are not valid', async () => {
+    const { sources } = setup([])
+    await expect(sources.previewMail(project, { ...config, since: 'ieri' })).rejects.toMatchObject({
+      code: 'source_config_invalid',
+    })
+  })
+})

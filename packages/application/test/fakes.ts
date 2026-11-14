@@ -222,6 +222,11 @@ export function scriptedFeed(script: { steps?: FeedStep[]; fails?: Error }): Scr
       checks.push({ feed, secret })
       if (script.fails) throw script.fails
     },
+    choices: async (feed, _config, secret) => {
+      checks.push({ feed, secret })
+      if (script.fails) throw script.fails
+      return { projects: [{ value: 'Aurora', label: 'Aurora' }], areas: [] }
+    },
     async *read(_feed, _config, _secret, cursor) {
       cursors.push(cursor)
       for (const step of script.steps ?? []) yield step

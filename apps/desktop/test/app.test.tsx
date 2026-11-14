@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import type { AgentProgress, AgentStatus, FeedView, MailSourceView } from '@octo/application'
+import type {
+  AgentProgress,
+  AgentStatus,
+  FeedingStatus,
+  FeedingStep,
+  FeedView,
+  MailSourceView,
+} from '@octo/application'
 import type { FeedName, Project, QuestionRecord, SourceRun, SourceState } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -95,6 +102,11 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
     ),
+    previewMail: vi.fn(async () => ok({ count: 0, subjects: [] })),
+    feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: false, feeds: [] })),
+    fill: vi.fn(async () => ok<FeedingStep[]>([])),
+    onFeedingStep: () => () => {},
+    feedChoices: vi.fn(async () => ok({ projects: [], areas: [] })),
     feed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
     saveFeed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
     syncFeed: vi.fn(async () => ok(documentsRun)),

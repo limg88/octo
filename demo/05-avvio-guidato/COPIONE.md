@@ -1,0 +1,51 @@
+# Demo 05 — Avvio guidato
+
+Durata: 5 minuti. Mostra che un PM porta un progetto da zero a una memoria piena senza scrivere percorsi, nomi di progetto o regole a mano: Octo propone, il PM conferma, un solo pulsante legge tutto.
+
+## Prerequisiti
+- Node 24, pnpm 12, un Mac.
+- Nessun sistema reale: posta e Azure DevOps sono finti e girano su questo computer.
+
+## Passi
+
+1. **Avvia la demo.**
+   ```bash
+   bash demo/05-avvio-guidato/run.sh
+   ```
+   Atteso: si apre Octo sul progetto «Aurora».
+
+2. **Apri «Fonti».** In cima c'è «Avvio del progetto».
+   Atteso: cinque passi. Posta, Azure DevOps, Jira e NetSuite sono «da fare»; i documenti sono «fatto» perché non richiedono nulla.
+   Dimostra: il PM vede in un colpo che cosa manca. Su un progetto appena aggiunto questa pagina si apre da sola.
+
+3. **Posta: guarda la proposta.** Nella sezione «Posta» le parole chiave contengono già `Aurora`, il nome del progetto. Premi «Anteprima».
+   Atteso: «3 mail entrerebbero con queste regole.» e sotto gli oggetti delle più recenti, fra cui un avviso automatico «[FIRING] Aurora - disco pieno».
+   Dimostra: si vede l'effetto delle regole prima di scrivere qualcosa.
+
+4. **Posta: correggi e salva.** In «Mittenti da escludere» scrivi `avvisi@monitor.example`, premi di nuovo «Anteprima» (ora 2 mail), poi «Salva».
+   Atteso: nella guida la posta passa a «fatto».
+
+5. **Azure DevOps: scegli invece di scrivere.** Organizzazione `contoso`, Personal Access Token `demo-pat`. Premi «Cerca progetti e aree».
+   Atteso: compare il progetto «Aurora» come pulsante. Un clic lo scrive nel campo «Progetto»; un secondo «Cerca progetti e aree» mostra anche l'area «Team A».
+   Dimostra: il PM non deve conoscere a memoria nomi e percorsi del tracker.
+
+6. **Azure DevOps: collega.** Premi «Prova e salva».
+   Atteso: «Collegamento riuscito e salvato.» e, nella guida, Azure DevOps «fatto».
+
+7. **Riempi.** Torna in cima e premi «Riempi la memoria ora».
+   Atteso: una riga per fonte man mano che finisce — Posta, Azure DevOps, Documenti — con quanti elementi sono entrati, poi «Fatto. Ora puoi fare domande nella scheda «Chiedi».»
+
+8. **Guarda il progetto.** Nel terminale:
+   ```bash
+   find .tmp/demo-05/Aurora -name '*.md' | sort
+   ```
+   Atteso: le mail sotto `Posta/`, i work item sotto `Fonti/ADO/` con la nota `_lettura.md`, i testi dei documenti sotto `_octo/testo/`.
+
+## Con Claude vero
+```bash
+REAL=1 bash demo/05-avvio-guidato/run.sh
+```
+Dopo i passi 2-7, in «Chiedi» scrivi `Che cosa è bloccato, quando è il collaudo e quanto costa il canone?`. Atteso: una risposta che cita un work item, una mail e l'offerta in Word. Consuma quota del tuo seat.
+
+## Senza interfaccia
+`pnpm e2e` esegue gli stessi passi nella finestra vera e stampa `e2e: ok`.

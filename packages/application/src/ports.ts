@@ -3,6 +3,7 @@ import type {
   DraftAnswer,
   Evidence,
   Extraction,
+  FeedChoices,
   FeedConfig,
   FeedIndex,
   FeedName,
@@ -132,6 +133,11 @@ export interface ProjectFiles {
 export interface FeedReader {
   /** Checks that the credential opens what the configuration names. */
   check(feed: FeedName, config: FeedConfig, secret: string): Promise<void>
+  /**
+   * What the credential can see, to choose from: the projects of the system and, once the
+   * configuration names one, its areas. Empty for a system that lists nothing.
+   */
+  choices(feed: FeedName, config: FeedConfig, secret: string): Promise<FeedChoices>
   /**
    * What changed after `cursor` (null: from the first day of the configuration), step by step.
    * A system without a cursor of its own gives everything at each reading.

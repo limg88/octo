@@ -3,6 +3,7 @@ import {
   DomainError,
   folderWanted,
   isDomainError,
+  type MailPreview,
   type MailSourceConfig,
   mailDocument,
   mailWanted,
@@ -32,6 +33,8 @@ export type MailSourceView = {
 export type Sources = {
   mail(project: Project): Promise<MailSourceView>
   saveMail(project: Project, config: MailSourceConfig | null): Promise<MailSourceView>
+  /** What these rules would bring in from the archive, without writing anything. */
+  previewMail(project: Project, config: MailSourceConfig): Promise<MailPreview>
   /** Reads the new mail into the project folder. One reading per project at a time. */
   syncMail(project: Project): Promise<SourceRun>
   /** The projects whose mail is configured: those a periodic reading takes. */
@@ -42,6 +45,9 @@ export type Sources = {
  * A mail can reach the archive after later ones (a slow download, a second computer), so each
  * reading goes back this far. What is already written is found unchanged.
  */
+/** Subjects shown in a preview: enough to judge the rules, few enough to read. */
+export const PREVIEW_SUBJECTS = 5
+
 export const MAIL_OVERLAP_MS = 2 * 24 * 60 * 60 * 1000
 
 export function createSources(deps: SourcesDeps): Sources {
@@ -117,9 +123,25 @@ export function createSources(deps: SourcesDeps): Sources {
     }
   }
 
+  async function previewMail(_project: Project, raw: MailSourceConfig): Promise<MailPreview> {
+    const config = cleanMailSource(raw)
+    const seen = new Map<string, string>()
+    for (const archived of await deps.archive.between(startOfDay(config.since), deps.clock.now())) {
+      if (!folderWanted(archived.folder, config)) continue
+      const message = await deps.archive.read(archived)
+      if (!message || !mailWanted(message, config)) continue
+      const document = mailDocument(archived, message, config)
+      seen.set(document.externalId, message.subject)
+    }
+    // The archive lists oldest first: the last ones are the newest.
+    const subjects = [...seen.values()].slice(-PREVIEW_SUBJECTS).reverse()
+    return { count: seen.size, subjects }
+  }
+
   return {
     mail,
     saveMail,
+    previewMail,
     syncMail,
     hasMail: async (project) => (await deps.settings.load(project.folder)).mail !== null,
   }

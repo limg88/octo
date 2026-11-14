@@ -7,16 +7,15 @@ import { fileURLToPath } from 'node:url'
 import {
   createAskQuestion,
   createDocuments,
+  createFeeding,
   createFeeds,
   createProjects,
   createSources,
-  type Documents,
-  type Feeds,
+  type Feeding,
   type MailArchive,
   type Projects,
-  type Sources,
 } from '@octo/application'
-import { DomainError, isDomainError } from '@octo/domain'
+import { DomainError } from '@octo/domain'
 import {
   createAppleMailArchive,
   createClaudeCliRunner,
@@ -87,28 +86,14 @@ function mailArchive(): MailArchive {
   return { between: missing, read: missing }
 }
 
-type Feeding = { projects: Projects; sources: Sources; feeds: Feeds; documents: Documents }
-
-/** One step of a periodic reading: a failure of it never stops the others. */
-async function quietly(step: () => Promise<unknown>): Promise<void> {
-  try {
-    await step()
-  } catch (error) {
-    // A reading already running or a broken configuration: the Sources page shows it.
-    if (!isDomainError(error)) console.error('[octo] periodic reading failed', error)
-  }
-}
-
 /** Feeds the memory of every project, one after the other, and tells the window. */
-async function feedAll(feeding: Feeding, window: BrowserWindow): Promise<void> {
-  for (const project of await feeding.projects.list()) {
-    await quietly(async () => {
-      if (await feeding.sources.hasMail(project)) await feeding.sources.syncMail(project)
-    })
-    for (const feed of await feeding.feeds.configured(project).catch(() => [])) {
-      await quietly(() => feeding.feeds.sync(project, feed))
+async function feedAll(projects: Projects, feeding: Feeding, window: BrowserWindow): Promise<void> {
+  for (const project of await projects.list()) {
+    try {
+      await feeding.fill(project)
+    } catch (error) {
+      console.error('[octo] periodic reading failed', error)
     }
-    await quietly(() => feeding.documents.convert(project))
     if (!window.isDestroyed()) window.webContents.send(CHANNELS.sourcesChanged, project.id)
   }
 }
@@ -190,7 +175,8 @@ function start(): void {
     clock,
   })
   const window = createWindow()
-  const periodic = () => void feedAll({ projects, sources, feeds, documents }, window)
+  const feeding = createFeeding({ sources, feeds, documents })
+  const periodic = () => void feedAll(projects, feeding, window)
   setTimeout(periodic, FIRST_SYNC_DELAY_MS)
   setInterval(periodic, SYNC_INTERVAL_MS)
   registerIpc({
@@ -198,6 +184,7 @@ function start(): void {
     sources,
     feeds,
     documents,
+    feeding,
     agent,
     projects,
     questions,

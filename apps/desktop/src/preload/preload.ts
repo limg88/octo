@@ -1,4 +1,4 @@
-import type { AgentProgress } from '@octo/application'
+import type { AgentProgress, FeedingStep } from '@octo/application'
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS, type OctoApi } from '../shared/api.ts'
 
@@ -15,6 +15,18 @@ const api: OctoApi = {
   saveMailSource: (projectId, config) =>
     ipcRenderer.invoke(CHANNELS.mailSave, { projectId, config }),
   syncMail: (projectId) => ipcRenderer.invoke(CHANNELS.mailSync, { projectId }),
+  previewMail: (projectId, config) =>
+    ipcRenderer.invoke(CHANNELS.mailPreview, { projectId, config }),
+  feedingStatus: (projectId) => ipcRenderer.invoke(CHANNELS.feedingStatus, { projectId }),
+  fill: (projectId) => ipcRenderer.invoke(CHANNELS.feedingFill, { projectId }),
+  onFeedingStep: (listener) => {
+    const handler = (_event: unknown, projectId: string, step: FeedingStep) =>
+      listener(projectId, step)
+    ipcRenderer.on(CHANNELS.feedingStep, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.feedingStep, handler)
+  },
+  feedChoices: (projectId, feed, config, secret) =>
+    ipcRenderer.invoke(CHANNELS.feedChoices, { projectId, feed, config, secret }),
   feed: (projectId, feed) => ipcRenderer.invoke(CHANNELS.feedGet, { projectId, feed }),
   saveFeed: (projectId, feed, config, secret) =>
     ipcRenderer.invoke(CHANNELS.feedSave, { projectId, feed, config, secret }),

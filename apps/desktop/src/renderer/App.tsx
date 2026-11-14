@@ -6,6 +6,7 @@ import { AskView } from './AskView.tsx'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
 import { errorText, messages } from './messages.ts'
+import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 
 type Tab = 'ask' | 'sources'
@@ -40,6 +41,8 @@ export function App({ api }: Props) {
     if (added === null) return
     setProjects((previous) => [...previous, added])
     setSelectedId(added.id)
+    // A new project starts from what feeds it.
+    setTab('sources')
   }
 
   async function removeProject(project: Project) {
@@ -118,6 +121,7 @@ export function App({ api }: Props) {
               <AskView api={api} project={selected} />
             ) : (
               <div className="sources-page">
+                <SetupGuide api={api} project={selected} />
                 <SourcesView api={api} project={selected} />
                 {FEED_NAMES.map((feed) => (
                   <FeedSection key={feed} api={api} project={selected} feed={feed} />

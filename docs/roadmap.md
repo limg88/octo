@@ -57,6 +57,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 |---|---|
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
 | F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
+| F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -116,3 +117,17 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Test**: il warehouse finto è un Postgres vero (`pnpm db:setup`, porta 5460); dove non c'è, quei test restano fuori.
 - **Non verificato**: Azure DevOps, Jira e DWSI reali. In octobrief-new il primo contatto con un ADO vero aveva richiesto due correzioni, già incluse nei connettori portati.
 - **Aperto per F4**: le skill di v0 leggono lo snapshot ADO in un loro formato (`azdo_latest.json`). I deliverable di Octo dovranno leggere questi file, oppure Octo dovrà scrivere anche quello snapshot.
+
+## Scelte prese durante F3 (configurazione guidata)
+- **La guida è un pannello, non una procedura a passi obbligati**: «Avvio del progetto», in cima alla pagina Fonti, elenca posta, Azure DevOps, Jira, NetSuite e documenti come «fatto» o «da fare». Ogni passo è facoltativo e ci si torna quando si vuole. Su un progetto appena aggiunto la pagina si apre da sola.
+- **Octo propone, il PM conferma**:
+  - parole chiave della posta: il nome del progetto;
+  - giorno di inizio: 30 giorni fa;
+  - cartelle di destinazione: secondo come è fatta la cartella (`raw/…` oppure `Posta`, `Fonti/…`);
+  - porta e sicurezza del warehouse: i valori più comuni.
+- **Anteprima della posta**: prima di salvare, il PM vede quante mail entrerebbero con le regole scritte e gli oggetti delle cinque più recenti. Nulla viene scritto.
+- **Scegliere invece di scrivere**: con organizzazione e token, «Cerca progetti e aree» elenca i progetti che il token vede; scelto il progetto, anche le sue aree. Un clic li mette nei campi. Per Jira elenca i progetti con la loro chiave.
+- **NetSuite resta a mano**: il connettore legge solo le commesse che il PM dichiara e a cui è legato; non elenca le altre. È una protezione voluta, non una mancanza: i codici PRJ li scrive il PM.
+- **Un solo pulsante**: «Riempi la memoria ora» legge posta, sistemi collegati e documenti, uno dopo l'altro, e dice l'esito di ciascuno man mano. Una fonte che fallisce non ferma le altre. È lo stesso caso d'uso della lettura periodica.
+- **La guida segue ciò che cambia**: ogni salvataggio di una fonte avvisa l'interfaccia. Trovato dalla prova nella finestra vera: prima la guida si aggiornava solo alla lettura successiva.
+- **Non fatto**: creare la cartella di un progetto nuovo da un modello (oggi il PM sceglie o crea la cartella dalla finestra di sistema); rilevare da soli organizzazione ADO o sito Jira.

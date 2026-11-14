@@ -1,5 +1,5 @@
 import type { MailSourceView } from '@octo/application'
-import type { MailSourceConfig, Project, SourceState } from '@octo/domain'
+import type { MailPreview, MailSourceConfig, Project, SourceState } from '@octo/domain'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { dateTimeText, errorText, messages } from './messages.ts'
@@ -27,10 +27,11 @@ const lines = (text: string): string[] => text.split('\n')
 const joined = (values: readonly string[]): string => values.join('\n')
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 
-function formOf(view: MailSourceView, now: Date): MailForm {
+function formOf(view: MailSourceView, now: Date, projectName: string): MailForm {
   const config = view.config
   return {
-    keywords: joined(config?.keywords ?? []),
+    // A project not set up yet starts from its own name: the PM corrects it if it is not enough.
+    keywords: joined(config?.keywords ?? [projectName]),
     folders: joined(config?.folders ?? []),
     excludeSenders: joined(config?.excludeSenders ?? []),
     since: config?.since ?? dayOf(new Date(now.getTime() - DEFAULT_DAYS_BACK * DAY_MS)),
@@ -57,14 +58,15 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
   const [form, setForm] = useState<MailForm | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [preview, setPreview] = useState<MailPreview | 'loading' | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
 
   const show = useCallback(
     (next: MailSourceView, resetForm: boolean) => {
       setView(next)
-      if (resetForm) setForm(formOf(next, now()))
+      if (resetForm) setForm(formOf(next, now(), project.name))
     },
-    [now],
+    [now, project.name],
   )
 
   const reload = useCallback(
@@ -81,6 +83,7 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
     setForm(null)
     setError(null)
     setSaved(false)
+    setPreview(null)
     void reload(true)
     return api.onSourcesChanged((projectId) => {
       if (projectId === project.id) void reload(false)
@@ -95,6 +98,15 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
     setSaved(result.ok)
     if (result.ok) show(result.value, true)
     else setError(result.code)
+  }
+
+  async function showPreview() {
+    if (!form) return
+    setError(null)
+    setPreview('loading')
+    const result = await api.previewMail(project.id, configOf(form))
+    setPreview(result.ok ? result.value : null)
+    if (!result.ok) setError(result.code)
   }
 
   async function sync() {
@@ -165,9 +177,32 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
           <button type="button" disabled={busy || view.config === null} onClick={() => void sync()}>
             {messages.mailSync}
           </button>
+          <button type="button" disabled={preview === 'loading'} onClick={() => void showPreview()}>
+            {messages.mailPreview}
+          </button>
           {saved && <span className="hint">{messages.mailSaved}</span>}
         </div>
       </form>
+      {preview === 'loading' && (
+        <p className="progress" role="status">
+          {messages.mailPreviewing}
+        </p>
+      )}
+      {preview !== null && preview !== 'loading' && (
+        <div className="preview">
+          <p>{messages.mailPreviewCount(preview.count)}</p>
+          {preview.subjects.length > 0 && (
+            <>
+              <p className="hint">{messages.mailPreviewNewest}</p>
+              <ul>
+                {preview.subjects.map((subject) => (
+                  <li key={subject}>{subject}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </section>
   )
 }

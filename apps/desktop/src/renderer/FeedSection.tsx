@@ -1,5 +1,6 @@
 import type { FeedView } from '@octo/application'
 import {
+  type FeedChoices,
   type FeedConfig,
   type FeedName,
   feedLabel,
@@ -93,6 +94,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [choices, setChoices] = useState<FeedChoices | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
 
   const show = useCallback(
@@ -117,6 +119,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
     setError(null)
     setSaved(false)
     setSecret('')
+    setChoices(null)
     void reload(true)
     return api.onSourcesChanged((projectId) => {
       if (projectId === project.id) void reload(false)
@@ -133,6 +136,25 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
     setSecret('')
     setSaved(config !== null)
     show(result.value, true)
+  }
+
+  async function search() {
+    setBusy(true)
+    setError(null)
+    const typed = secret === '' ? null : secret
+    const result = await api.feedChoices(project.id, feed, configOf(feed, form), typed)
+    setBusy(false)
+    if (result.ok) setChoices(result.value)
+    else setError(result.code)
+  }
+
+  const listField: FieldKey = feed === 'ado' ? 'areas' : 'projects'
+  /** A project chosen names the one read (Azure DevOps) or joins those read (Jira). */
+  const pickProject = (value: string) =>
+    feed === 'ado' ? setForm({ ...form, project: value }) : addLine(listField, value)
+  const addLine = (key: FieldKey, value: string) => {
+    const lines = (form[key] ?? '').split('\n').filter((line) => line.trim() !== '')
+    if (!lines.includes(value)) setForm({ ...form, [key]: [...lines, value].join('\n') })
   }
 
   async function sync() {
@@ -198,9 +220,29 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
               {messages.feedOff}
             </button>
           )}
+          {feed !== 'dwsi' && (
+            <button type="button" disabled={busy} onClick={() => void search()}>
+              {messages.feedChoices}
+            </button>
+          )}
           {saved && <span className="hint">{messages.feedSaved}</span>}
         </div>
       </form>
+      {choices && (
+        <div className="preview">
+          {choices.projects.length === 0 && <p>{messages.feedChoicesNone}</p>}
+          <ChoiceList
+            title={messages.feedChoicesProjects}
+            choices={choices.projects}
+            onPick={pickProject}
+          />
+          <ChoiceList
+            title={messages.feedChoicesAreas}
+            choices={choices.areas}
+            onPick={(value) => addLine('areas', value)}
+          />
+        </div>
+      )}
     </section>
   )
 }
@@ -274,5 +316,29 @@ function FieldInput({
       {label}
       <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
+  )
+}
+
+function ChoiceList({
+  title,
+  choices,
+  onPick,
+}: {
+  title: string
+  choices: FeedChoices['projects']
+  onPick: (value: string) => void
+}) {
+  if (choices.length === 0) return null
+  return (
+    <>
+      <p className="hint">{title}</p>
+      <div className="choices">
+        {choices.map((choice) => (
+          <button key={choice.value} type="button" onClick={() => onPick(choice.value)}>
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </>
   )
 }

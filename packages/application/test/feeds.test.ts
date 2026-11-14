@@ -202,3 +202,21 @@ describe('reading a feed', () => {
     await expect(broken.feeds.sync(project, 'ado')).rejects.toThrow('disk full')
   })
 })
+
+describe('choosing instead of typing', () => {
+  it('lists what the credential sees, with the typed secret or the stored one', async () => {
+    const { feeds, secrets, reader } = setup({}, null)
+    await expect(feeds.choices(project, 'ado', config, null)).rejects.toMatchObject({
+      code: 'secret_missing',
+    })
+
+    expect(await feeds.choices(project, 'ado', config, ' pat ')).toEqual({
+      projects: [{ value: 'Aurora', label: 'Aurora' }],
+      areas: [],
+    })
+    secrets.all.set('p-1/ado', 'salvato')
+    await feeds.choices(project, 'ado', config, null)
+    expect(reader.checks.map((check) => check.secret)).toEqual(['pat', 'salvato'])
+    expect(secrets.all.get('p-1/ado')).toBe('salvato')
+  })
+})

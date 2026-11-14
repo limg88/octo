@@ -91,6 +91,42 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  guideTitle: 'Avvio del progetto',
+  guideIntro:
+    'Collega ciò che alimenta la memoria di questo progetto. Ogni passo è facoltativo: puoi tornarci quando vuoi.',
+  guideDone: 'fatto',
+  guideTodo: 'da fare',
+  guideSteps: {
+    mail: 'Posta: quali mail riguardano il progetto',
+    ado: 'Azure DevOps: work item del progetto',
+    jira: 'Jira: issue del progetto',
+    dwsi: 'NetSuite: ore, ordini e fatture delle commesse',
+    documents: 'Documenti della cartella resi leggibili (automatico)',
+  },
+  guideFill: 'Riempi la memoria ora',
+  guideFilling: 'Sto leggendo tutte le fonti collegate…',
+  guideStep: (label: string, written: number, unchanged: number) =>
+    `${label}: ${written} nuovi o aggiornati, ${unchanged} invariati.`,
+  guideStepFailed: (label: string) => `${label}: non riuscito.`,
+  guideSources: {
+    mail: 'Posta',
+    ado: 'Azure DevOps',
+    jira: 'Jira',
+    dwsi: 'NetSuite',
+    documents: 'Documenti',
+  },
+  guideAsk: 'Fatto. Ora puoi fare domande nella scheda «Chiedi».',
+  mailPreview: 'Anteprima',
+  mailPreviewing: 'Sto cercando nella posta…',
+  mailPreviewCount: (count: number) =>
+    count === 1
+      ? '1 mail entrerebbe con queste regole.'
+      : `${count} mail entrerebbero con queste regole.`,
+  mailPreviewNewest: 'Le più recenti:',
+  feedChoices: 'Cerca progetti e aree',
+  feedChoicesProjects: 'Progetti che vedi (clic per scegliere):',
+  feedChoicesAreas: 'Aree del progetto (clic per aggiungere):',
+  feedChoicesNone: 'Nessun progetto visibile con questa credenziale.',
   documentsTitle: 'Documenti',
   documentsIntro:
     'Octo scrive il testo di Word, Excel, PowerPoint e PDF della cartella in «_octo/testo», così Claude può cercarlo e citarlo. Gli originali non vengono toccati.',
