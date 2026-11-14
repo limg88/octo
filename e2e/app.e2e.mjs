@@ -135,7 +135,7 @@ try {
   await saveAdo()
   await adoSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
   assert.doesNotMatch(
-    readFileSync(`${work}/Aurora/_octo/impostazioni/sources.json`, 'utf8'),
+    readFileSync(`${work}/Aurora/_octo/.impostazioni/sources.json`, 'utf8'),
     /demo-pat/,
   )
   await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
@@ -167,6 +167,35 @@ try {
   }
   await page.screenshot({ path: `${work}/guida.png`, fullPage: true })
   await page.screenshot({ path: `${work}/fonti.png` })
+
+  // Demo 06: a deliverable from the PM's request to the approved Word file.
+  await page.getByRole('tab', { name: 'Deliverable' }).click()
+  const work06 = page.getByRole('region', { name: 'Deliverable' })
+  await work06.getByRole('button', { name: /Email al cliente/ }).click()
+  await work06.getByLabel('A chi scrivi').fill('Carla Bianchi')
+  await work06.getByLabel(/^Di che cosa/).fill('Data di consegna')
+  await work06.getByLabel(/^Che cosa chiedi/).fill('Conferma della data')
+  await work06.getByRole('button', { name: 'Scrivi la bozza' }).click()
+  await work06.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
+  await work06.getByText('Può uscire: nessun punto contestabile trovato.').waitFor()
+  await work06.getByLabel('Che cosa vuoi cambiare?').fill('Aggiungi il budget #inventa')
+  await work06.getByRole('button', { name: 'Chiedi modifica' }).click()
+  await work06.getByText('Da correggere prima di farlo uscire.').waitFor({ timeout: TIMEOUT_MS })
+  await work06.getByText('Il budget non ha una fonte').waitFor()
+  await work06.getByText(/2 giri/).waitFor()
+  await page.screenshot({ path: `${work}/deliverable.png` })
+  await work06.getByRole('button', { name: 'Approva' }).click()
+  await work06.getByText('File pronti').waitFor({ timeout: TIMEOUT_MS })
+  const approvedFiles = readdirSync(`${work}/Aurora/_octo/deliverable/approvati`).sort()
+  assert.equal(approvedFiles.length, 2)
+  assert.match(approvedFiles[0], /_email-cliente_data-di-consegna\.docx$/)
+  const approvedText = readFileSync(
+    `${work}/Aurora/_octo/deliverable/approvati/${approvedFiles[1]}`,
+    'utf8',
+  )
+  assert.match(approvedText, /La consegna è il 12 dicembre\./)
+  assert.doesNotMatch(approvedText, /\[\d\]/)
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

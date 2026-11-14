@@ -13,17 +13,6 @@ export const draftAnswerSchema = z.object({
   missing: z.array(z.string()),
 })
 
-/** The CLI refuses a schema that names its dialect, so `$schema` is left out. */
-function jsonSchemaOf(schema: z.ZodType): string {
-  const { $schema: _dialect, ...body } = z.toJSONSchema(schema)
-  return JSON.stringify(body)
-}
-
-export const DRAFT_ANSWER_JSON_SCHEMA = jsonSchemaOf(draftAnswerSchema)
-
-/** Read-only tools: the agent can look at the whole project and change nothing. */
-export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'] as const
-
 export const ASK_SYSTEM_PROMPT = `You answer a Project Manager's question about one project.
 The project is the current folder: read as many files as you need, with no fixed limit.
 If the folder has an index or a manifest (for example wiki/indice.md, raw/_MANIFEST.md), read it

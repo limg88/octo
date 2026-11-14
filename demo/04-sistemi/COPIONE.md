@@ -23,7 +23,7 @@ Durata: 4 minuti. Mostra che Octo legge un sistema con la credenziale di sola le
 
 4. **Collega.** Token `demo-pat`, poi «Prova e salva».
    Atteso: «Collegamento riuscito e salvato.» Il campo del token si svuota e dice «Già salvata su questo computer».
-   Dimostra: la credenziale non torna più a schermo e non finisce nella cartella del progetto: `_octo/impostazioni/sources.json` contiene organizzazione e progetto, non il token.
+   Dimostra: la credenziale non torna più a schermo e non finisce nella cartella del progetto: `_octo/.impostazioni/sources.json` contiene organizzazione e progetto, non il token.
 
 5. **Leggi.** Premi «Leggi ora».
    Atteso: «Ultima lettura …: N aggiornati, 0 invariati.»

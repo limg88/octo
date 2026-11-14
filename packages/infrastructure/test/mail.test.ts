@@ -191,18 +191,18 @@ describe('files of a project', () => {
     await settings.save(project, { ...NO_SOURCES, mail })
     expect(await createFsSourceSettings().load(project)).toEqual({ ...NO_SOURCES, mail })
     expect(
-      JSON.parse(await readFile(join(project, '_octo', 'impostazioni', 'sources.json'), 'utf8')),
+      JSON.parse(await readFile(join(project, '_octo', '.impostazioni', 'sources.json'), 'utf8')),
     ).toEqual({
       ...NO_SOURCES,
       mail,
     })
 
     await writeFile(
-      join(project, '_octo', 'impostazioni', 'sources.json'),
+      join(project, '_octo', '.impostazioni', 'sources.json'),
       '{"mail": {"since": 3}}',
     )
     await expect(settings.load(project)).rejects.toMatchObject({ code: 'source_config_invalid' })
-    await writeFile(join(project, '_octo', 'impostazioni', 'sources.json'), '{ rotto')
+    await writeFile(join(project, '_octo', '.impostazioni', 'sources.json'), '{ rotto')
     await expect(settings.load(project)).rejects.toThrow()
   })
 

@@ -1,4 +1,5 @@
 export * from './ask-question.ts'
+export * from './deliverables.ts'
 export * from './documents.ts'
 export * from './feeding.ts'
 export * from './feeds.ts'

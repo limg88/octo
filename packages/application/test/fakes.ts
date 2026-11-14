@@ -141,6 +141,9 @@ export function memoryWriter(): MemoryWriter & { files: Map<string, string> } {
       return 'written'
     },
     claim: async () => {},
+    writeBytes: async (_folder, path, bytes) => {
+      files.set(path, `<${bytes.length} bytes>`)
+    },
   }
 }
 

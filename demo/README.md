@@ -9,5 +9,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 03 | Documenti: Word, Excel, PowerPoint e PDF della cartella resi leggibili a Claude come testo accanto agli originali, riconvertiti solo se cambiano | `bash demo/03-documenti/run.sh` | [COPIONE](03-documenti/COPIONE.md) |
 | 04 | Sistemi: i work item di Azure DevOps (finto) letti con un token di sola lettura e scritti nel progetto, credenziale custodita dal sistema, nota sull'età dei dati | `bash demo/04-sistemi/run.sh` | [COPIONE](04-sistemi/COPIONE.md) |
 | 05 | Avvio guidato: da un progetto vuoto a una memoria piena, con parole chiave proposte, anteprima della posta, progetto e aree scelti con un clic e un solo pulsante che legge tutto | `bash demo/05-avvio-guidato/run.sh` | [COPIONE](05-avvio-guidato/COPIONE.md) |
+| 06 | Deliverable: un'email al cliente dalla richiesta al file Word approvato, con fonti controllate, rilettura critica, modifiche a parole e conteggio di tempi e giri | `bash demo/06-deliverable/run.sh` | [COPIONE](06-deliverable/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 05 nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 06 nella finestra vera, senza intervento.

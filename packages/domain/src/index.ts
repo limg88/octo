@@ -1,4 +1,6 @@
 export * from './answer.ts'
+export * from './deliverables/catalog.ts'
+export * from './deliverables/deliverable.ts'
 export * from './errors.ts'
 export * from './extracted-document.ts'
 export * from './extraction.ts'

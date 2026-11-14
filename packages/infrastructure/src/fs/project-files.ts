@@ -78,7 +78,7 @@ const stateSchema = z.object({
 const statesSchema = z.record(z.string(), stateSchema)
 
 /** Octo's settings of a project: with the rest of what Octo writes, under its own folder. */
-export const PROJECT_SETTINGS_FOLDER = `${OCTO_FOLDER}/impostazioni`
+export const PROJECT_SETTINGS_FOLDER = `${OCTO_FOLDER}/.impostazioni`
 const SOURCES_FILE = 'sources.json'
 const STATES_FOLDER = 'sources'
 const MAIL_FOLDER = `${OCTO_FOLDER}/posta`
@@ -102,21 +102,23 @@ const PRIVATE_FILE_MODE = 0o600
  * Writes inside the project folder only: the real path of the place written must be under the
  * real path of the project, so neither `..` nor a link leads outside.
  */
+/** The place of a file to write, with its folder made; a path leading outside is refused. */
+async function targetInside(projectFolder: string, relativePath: string): Promise<string> {
+  const root = await realpath(projectFolder)
+  const target = resolve(root, relativePath)
+  await mkdir(dirname(target), { recursive: true })
+  const parent = await realpath(dirname(target))
+  const fromRoot = relative(root, parent)
+  if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || resolve(root, fromRoot) !== parent) {
+    throw new DomainError('source_config_invalid', relativePath)
+  }
+  return target
+}
+
 export function createFsMemoryWriter(): MemoryWriter {
   return {
     async write(projectFolder, relativePath, content) {
-      const root = await realpath(projectFolder)
-      const target = resolve(root, relativePath)
-      await mkdir(dirname(target), { recursive: true })
-      const parent = await realpath(dirname(target))
-      const fromRoot = relative(root, parent)
-      if (
-        fromRoot === '..' ||
-        fromRoot.startsWith(`..${sep}`) ||
-        resolve(root, fromRoot) !== parent
-      ) {
-        throw new DomainError('source_config_invalid', relativePath)
-      }
+      const target = await targetInside(projectFolder, relativePath)
       const current = await readFile(target, 'utf8').catch((error: unknown) => {
         if (isMissing(error)) return null
         throw error
@@ -125,6 +127,8 @@ export function createFsMemoryWriter(): MemoryWriter {
       await writeAtomic(target, content)
       return 'written'
     },
+    writeBytes: async (projectFolder, relativePath, bytes) =>
+      writeAtomic(await targetInside(projectFolder, relativePath), bytes),
     async claim(projectFolder) {
       const folder = join(await realpath(projectFolder), OCTO_FOLDER)
       await mkdir(folder, { recursive: true })

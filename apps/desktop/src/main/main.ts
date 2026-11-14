@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   createAskQuestion,
+  createDeliverables,
   createDocuments,
   createFeeding,
   createFeeds,
@@ -19,6 +20,7 @@ import { DomainError } from '@octo/domain'
 import {
   createAppleMailArchive,
   createClaudeCliRunner,
+  createClaudeDeliverableWriter,
   createConnectorFeedReader,
   createFileVault,
   createFsEvidenceReader,
@@ -30,6 +32,7 @@ import {
   createJsonProjectRegistry,
   createJsonQuestionLog,
   createJsonSourceStates,
+  createWordRenderer,
   createWorkerTextExtractor,
   locateClaude,
   type SecretCipher,
@@ -125,7 +128,7 @@ function start(): void {
   const questions = createJsonQuestionLog(dataFolder)
   const sourceStates = createJsonSourceStates(dataFolder)
   const evidence = createFsEvidenceReader()
-  const agent = createClaudeCliRunner({
+  const claude = {
     command: locateClaude({
       platform: process.platform,
       env: process.env,
@@ -133,7 +136,8 @@ function start(): void {
       exists: existsSync,
     }),
     env: process.env,
-  })
+  }
+  const agent = createClaudeCliRunner(claude)
   const projects = createProjects({
     registry: createJsonProjectRegistry(dataFolder),
     questions,
@@ -185,6 +189,15 @@ function start(): void {
     feeds,
     documents,
     feeding,
+    deliverables: createDeliverables({
+      writer: createClaudeDeliverableWriter(claude),
+      renderer: createWordRenderer(),
+      evidence,
+      files,
+      memory: writer,
+      clock,
+      ids,
+    }),
     agent,
     projects,
     questions,

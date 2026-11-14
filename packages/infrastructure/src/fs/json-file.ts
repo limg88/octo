@@ -17,7 +17,11 @@ export async function readJsonOr(file: string, fallback: unknown): Promise<unkno
 }
 
 /** Written beside the target and renamed over it: a crash never leaves half a file. */
-export async function writeAtomic(file: string, content: string, mode?: number): Promise<void> {
+export async function writeAtomic(
+  file: string,
+  content: string | Uint8Array,
+  mode?: number,
+): Promise<void> {
   await mkdir(dirname(file), { recursive: true })
   const temporary = `${file}.${randomUUID()}.tmp`
   await writeFile(temporary, content, mode === undefined ? {} : { mode })

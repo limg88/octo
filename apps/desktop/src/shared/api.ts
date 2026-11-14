@@ -7,6 +7,8 @@ import type {
   MailSourceView,
 } from '@octo/application'
 import type {
+  Deliverable,
+  DeliverableKind,
   DomainErrorCode,
   FeedChoices,
   FeedConfig,
@@ -43,6 +45,14 @@ export const CHANNELS = {
   feedingStatus: 'feeding:status',
   feedingFill: 'feeding:fill',
   feedingStep: 'feeding:step',
+  deliverablesCatalog: 'deliverables:catalog',
+  deliverablesList: 'deliverables:list',
+  deliverablesStart: 'deliverables:start',
+  deliverablesRevise: 'deliverables:revise',
+  deliverablesApprove: 'deliverables:approve',
+  deliverablesProgress: 'deliverables:progress',
+  instructionsGet: 'deliverables:instructions:get',
+  instructionsSave: 'deliverables:instructions:save',
   feedGet: 'sources:feed:get',
   feedSave: 'sources:feed:save',
   feedSync: 'sources:feed:sync',
@@ -100,6 +110,31 @@ export type OctoApi = {
   documentsState(projectId: string): Promise<Result<SourceState>>
   /** Writes the text of the Office and PDF files of the project beside them, now. */
   convertDocuments(projectId: string): Promise<Result<SourceRun>>
+  /** The kinds of deliverable Octo knows how to write. */
+  deliverableCatalog(): Promise<Result<DeliverableKind[]>>
+  listDeliverables(projectId: string): Promise<Result<Deliverable[]>>
+  /** Writes the first draft. A failure of the writing is in the deliverable, not in the result. */
+  startDeliverable(
+    projectId: string,
+    kindId: string,
+    inputs: Record<string, string>,
+  ): Promise<Result<Deliverable>>
+  /** Writes the draft again with a change asked in words. */
+  reviseDeliverable(
+    projectId: string,
+    deliverableId: string,
+    request: string,
+  ): Promise<Result<Deliverable>>
+  approveDeliverable(projectId: string, deliverableId: string): Promise<Result<Deliverable>>
+  /** What the PM added, for this project, to how a kind is written. */
+  deliverableInstructions(projectId: string, kindId: string): Promise<Result<string>>
+  saveDeliverableInstructions(
+    projectId: string,
+    kindId: string,
+    text: string,
+  ): Promise<Result<null>>
+  /** Tells what the writer is doing. Returns the function that stops listening. */
+  onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */
   onProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Tells when a periodic reading has ended for a project. */

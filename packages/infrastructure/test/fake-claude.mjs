@@ -22,6 +22,30 @@ const answer = {
   missing: [],
 }
 
+// A run of the red team: it is told so in its system prompt, and reads the text on standard input.
+if (args.join(' ').includes('You attack the content of a deliverable')) {
+  const invented = question.includes('99.000')
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      verdict: invented ? 'fix_first' : 'deliverable',
+      findings: invented
+        ? [
+            {
+              severity: 'grave',
+              finding: 'Il budget non ha una fonte',
+              where: 'budget residuo è di 99.000 euro',
+              why: 'Il cliente può chiedere da dove viene',
+            },
+          ]
+        : [],
+      holds: 'La data di consegna è sostenuta dalla fonte.',
+    },
+  })
+  process.exit(0)
+}
+
 emit({ type: 'system', subtype: 'init' })
 console.log('not json at all')
 

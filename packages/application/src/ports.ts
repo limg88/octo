@@ -1,5 +1,6 @@
 import type {
   ArchivedMail,
+  DeliverableKind,
   DraftAnswer,
   Evidence,
   Extraction,
@@ -11,6 +12,7 @@ import type {
   MailMessage,
   Project,
   QuestionRecord,
+  RedTeamReport,
   SourceFileStamp,
   SourceState,
   SourcesConfig,
@@ -84,6 +86,8 @@ export type WriteOutcome = 'written' | 'unchanged'
 /** Writes a file of the memory inside the project folder, and nowhere else. */
 export interface MemoryWriter {
   write(projectFolder: string, relativePath: string, content: string): Promise<WriteOutcome>
+  /** A file that is not text (a Word document), written whole. */
+  writeBytes(projectFolder: string, relativePath: string, bytes: Uint8Array): Promise<void>
   /**
    * Marks Octo's own folder of the project so that a versioned project leaves it out and the
    * agent's search still looks inside it. Safe to call at every start.
@@ -169,4 +173,40 @@ export interface FeedIndexes {
   load(projectId: string, feed: FeedName): Promise<{ scope: string | null; items: FeedIndex }>
   save(projectId: string, feed: FeedName, scope: string, items: FeedIndex): Promise<void>
   removeProject(projectId: string): Promise<void>
+}
+
+/** What the writer of a deliverable is given. */
+export type DraftRequest = {
+  projectFolder: string
+  kind: DeliverableKind
+  /** The instructions the PM added for this kind in this project, or null. */
+  projectInstructions: string | null
+  inputs: Readonly<Record<string, string>>
+  /** A change asked in words on the draft shown; null for the first draft. */
+  revision: { draft: DraftAnswer; request: string } | null
+  onProgress?: (progress: AgentProgress) => void
+  signal?: AbortSignal
+}
+
+export type RedTeamRequest = {
+  projectFolder: string
+  kind: DeliverableKind
+  /** The text as the reader would get it. The red team never sees how it was written. */
+  text: string
+  signal?: AbortSignal
+}
+
+/**
+ * Writes the draft of a deliverable from the project folder, read-only, and reads a draft again
+ * as the one who will receive it. Failures are DomainErrors with an `agent_*` code.
+ */
+export interface DeliverableWriter {
+  draft(request: DraftRequest): Promise<DraftAnswer>
+  redTeam(request: RedTeamRequest): Promise<RedTeamReport>
+}
+
+/** Turns an approved text into the files a person sends or files away. */
+export interface DocumentRenderer {
+  /** The bytes of a Word document with this title and Markdown body. */
+  word(title: string, markdown: string): Promise<Uint8Array>
 }

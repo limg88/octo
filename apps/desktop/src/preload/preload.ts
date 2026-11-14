@@ -38,6 +38,24 @@ const api: OctoApi = {
     ipcRenderer.on(CHANNELS.sourcesChanged, handler)
     return () => ipcRenderer.removeListener(CHANNELS.sourcesChanged, handler)
   },
+  deliverableCatalog: () => ipcRenderer.invoke(CHANNELS.deliverablesCatalog),
+  listDeliverables: (projectId) => ipcRenderer.invoke(CHANNELS.deliverablesList, { projectId }),
+  startDeliverable: (projectId, kindId, inputs) =>
+    ipcRenderer.invoke(CHANNELS.deliverablesStart, { projectId, kindId, inputs }),
+  reviseDeliverable: (projectId, deliverableId, request) =>
+    ipcRenderer.invoke(CHANNELS.deliverablesRevise, { projectId, deliverableId, request }),
+  approveDeliverable: (projectId, deliverableId) =>
+    ipcRenderer.invoke(CHANNELS.deliverablesApprove, { projectId, deliverableId }),
+  deliverableInstructions: (projectId, kindId) =>
+    ipcRenderer.invoke(CHANNELS.instructionsGet, { projectId, kindId }),
+  saveDeliverableInstructions: (projectId, kindId, text) =>
+    ipcRenderer.invoke(CHANNELS.instructionsSave, { projectId, kindId, text }),
+  onDeliverableProgress: (listener) => {
+    const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
+      listener(projectId, progress)
+    ipcRenderer.on(CHANNELS.deliverablesProgress, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.deliverablesProgress, handler)
+  },
   onProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
       listener(projectId, progress)

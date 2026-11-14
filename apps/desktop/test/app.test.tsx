@@ -7,7 +7,15 @@ import type {
   FeedView,
   MailSourceView,
 } from '@octo/application'
-import type { FeedName, Project, QuestionRecord, SourceRun, SourceState } from '@octo/domain'
+import type {
+  Deliverable,
+  DeliverableKind,
+  FeedName,
+  Project,
+  QuestionRecord,
+  SourceRun,
+  SourceState,
+} from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
@@ -102,6 +110,18 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
     ),
+    deliverableCatalog: vi.fn(async () => ok<DeliverableKind[]>([])),
+    listDeliverables: vi.fn(async () => ok<Deliverable[]>([])),
+    startDeliverable: vi.fn(async () => ({ ok: false, code: 'unexpected' }) as Result<Deliverable>),
+    reviseDeliverable: vi.fn(
+      async () => ({ ok: false, code: 'unexpected' }) as Result<Deliverable>,
+    ),
+    approveDeliverable: vi.fn(
+      async () => ({ ok: false, code: 'unexpected' }) as Result<Deliverable>,
+    ),
+    deliverableInstructions: vi.fn(async () => ok('')),
+    saveDeliverableInstructions: vi.fn(async () => ok(null)),
+    onDeliverableProgress: () => () => {},
     previewMail: vi.fn(async () => ok({ count: 0, subjects: [] })),
     feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: false, feeds: [] })),
     fill: vi.fn(async () => ok<FeedingStep[]>([])),

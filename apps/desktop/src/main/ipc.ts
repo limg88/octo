@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import type {
   AgentRunner,
   AskQuestion,
+  Deliverables,
   Documents,
   EvidenceReader,
   Feeding,
@@ -26,6 +27,7 @@ export type IpcDeps = {
   documents: Documents
   feeds: Feeds
   feeding: Feeding
+  deliverables: Deliverables
   folderDialogTitle: string
 }
 
@@ -78,6 +80,18 @@ const feedSaveInput = z.discriminatedUnion('feed', [
   byProject.extend({ feed: z.literal('jira'), secret, config: feedConfigs.jira.nullable() }),
   byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi.nullable() }),
 ])
+
+const MAX_INPUT_LENGTH = 4000
+const MAX_INSTRUCTIONS_LENGTH = 20_000
+/** An id Octo made, used in a file name: letters, digits and dashes only. */
+const id = z.string().regex(/^[A-Za-z0-9-]{1,80}$/)
+const byKind = byProject.extend({ kindId: id })
+const byDeliverable = byProject.extend({ deliverableId: id })
+const deliverableStartInput = byKind.extend({
+  inputs: z.record(z.string().max(MAX_RULE_LENGTH), z.string().max(MAX_INPUT_LENGTH)),
+})
+const deliverableReviseInput = byDeliverable.extend({ request: z.string().max(MAX_INPUT_LENGTH) })
+const instructionsSaveInput = byKind.extend({ text: z.string().max(MAX_INSTRUCTIONS_LENGTH) })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -191,6 +205,45 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.documentsConvert, byProject, async ({ projectId }) =>
     deps.documents.convert(await deps.projects.get(projectId)),
   )
+
+  const writingProgress = (projectId: string) => (progress: unknown) =>
+    deps.window.webContents.send(CHANNELS.deliverablesProgress, projectId, progress)
+
+  handle(CHANNELS.deliverablesCatalog, none, async () => [...deps.deliverables.catalog()])
+
+  handle(CHANNELS.deliverablesList, byProject, async ({ projectId }) =>
+    deps.deliverables.list(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.deliverablesStart, deliverableStartInput, async (input) =>
+    deps.deliverables.start(await deps.projects.get(input.projectId), {
+      kindId: input.kindId,
+      inputs: input.inputs,
+      onProgress: writingProgress(input.projectId),
+    }),
+  )
+
+  handle(CHANNELS.deliverablesRevise, deliverableReviseInput, async (input) =>
+    deps.deliverables.revise(await deps.projects.get(input.projectId), {
+      deliverableId: input.deliverableId,
+      request: input.request,
+      onProgress: writingProgress(input.projectId),
+    }),
+  )
+
+  handle(CHANNELS.deliverablesApprove, byDeliverable, async ({ projectId, deliverableId }) =>
+    deps.deliverables.approve(await deps.projects.get(projectId), deliverableId),
+  )
+
+  handle(CHANNELS.instructionsGet, byKind, async ({ projectId, kindId }) =>
+    deps.deliverables.instructions(await deps.projects.get(projectId), kindId),
+  )
+
+  handle(CHANNELS.instructionsSave, instructionsSaveInput, async (input) => {
+    const project = await deps.projects.get(input.projectId)
+    await deps.deliverables.saveInstructions(project, input.kindId, input.text)
+    return null
+  })
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {
     const project = await deps.projects.get(projectId)

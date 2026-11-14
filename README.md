@@ -39,11 +39,19 @@ Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_
 ## Come Octo alimenta la memoria
 Tutto ciò che Octo scrive in un progetto sta sotto `_octo/`: la cartella si esclude da git da sola e resta visibile alla ricerca di Claude. Octo non scrive mai nelle cartelle del PM.
 
-- **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `_octo/impostazioni/sources.json` nella cartella del progetto.
+- **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `_octo/.impostazioni/sources.json` nella cartella del progetto.
 - **Documenti**: scrive in `_octo/testo/` il testo di Word, Excel, PowerPoint e PDF della cartella, con lo stesso percorso dell'originale, così Claude può cercarlo e citarlo. Riconverte solo ciò che cambia.
 - **Azure DevOps, Jira, NetSuite (DWSI)**: legge work item, issue e viste del warehouse con la credenziale di sola lettura del PM e ne scrive un file per elemento, più una nota (`_lettura.md`) sull'età dei dati. La credenziale resta sul computer, cifrata dal sistema.
 - Tutte le fonti partono su richiesta e ogni 15 minuti ad app aperta.
 - **Avvio guidato**: in cima alla scheda «Fonti» un pannello dice che cosa è collegato e che cosa no, e un pulsante riempie la memoria da tutto ciò che è collegato. Octo propone parole chiave, date e cartelle; mostra un'anteprima della posta; elenca progetti e aree dei tracker da scegliere con un clic.
+
+## Deliverable
+Nella scheda «Deliverable» il PM sceglie dal catalogo (email al cliente, stato di avanzamento, verbale), compila pochi campi e riceve una bozza:
+- scritta da Claude dal progetto, in sola lettura;
+- con ogni fonte controllata dal codice;
+- riletta in un'esecuzione separata, come farebbe chi la riceve.
+
+Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo/deliverable/approvati/` e registra minuti di scrittura, minuti di revisione e giri.
 
 ## Comandi
 | Comando | Cosa fa |

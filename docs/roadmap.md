@@ -58,6 +58,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
 | F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
 | F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
+| F4 | in corso. Fatti il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Restano: la stima con i conti fatti dal codice, il registro in una pagina. Criterio di uscita da verificare su due deliverable reali |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -148,7 +149,7 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - Il pilota su Windows è la collega che lavora sullo stesso vault.
 
 **Cosa ho cambiato subito**
-- **Tutto ciò che Octo scrive sta sotto `_octo/`**: posta (`_octo/posta`), sistemi (`_octo/fonti/…`), testi estratti (`_octo/testo`), impostazioni (`_octo/impostazioni`). Octo non propone più cartelle sotto `raw/`.
+- **Tutto ciò che Octo scrive sta sotto `_octo/`**: posta (`_octo/posta`), sistemi (`_octo/fonti/…`), testi estratti (`_octo/testo`), impostazioni (`_octo/.impostazioni`). Octo non propone più cartelle sotto `raw/`.
 - **`_octo/` si esclude da git da sola** (un suo `.gitignore`), senza toccare i file del progetto.
 - **La ricerca di Claude salta ciò che git ignora**: verificato, una cartella ignorata diventava invisibile a Chiedi. Un file `.ignore` nella stessa cartella la riammette alla ricerca e lascia git com'è.
 - Chiedi legge per primo anche il manifest delle fonti, se il progetto ne ha uno.
@@ -165,3 +166,17 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **Registro automatico**: per ogni deliverable, minuti di bozza, giri e minuti di revisione. È la misura del ritorno che a mano non veniva compilata.
 - **Istruzioni del progetto**: il PM corregge a parole le istruzioni di un deliverable per il suo progetto; Octo le tiene in `_octo/deliverable/` e le applica ai cicli successivi.
 - **Fuori da F4**: PowerPoint e Excel su modelli del cliente, e i deliverable specifici di un cliente (modulo economico, dashboard). Sono F5.
+
+## Scelte prese durante F4 (deliverable)
+- **Claude non scrive file**: restituisce il testo in un formato fisso (testo con richiami, citazioni, cose mancanti), come in Chiedi, e i file li scrive Octo. La prova di scrittura confinata in una cartella era riuscita, ma così non serve nessun permesso di scrittura.
+- **Tre letture per ogni bozza**: lo scrittore; il codice, che apre ogni file citato e cerca la frase; la rilettura critica, in un'esecuzione separata che non vede come la bozza è stata scritta. Provato con Claude vero su un progetto sintetico: bozza in 96 secondi, tutte le fonti controllate, rilettura che trova un'incoerenza reale fra due frasi.
+- **La rilettura critica non blocca l'approvazione**: dice «può uscire» o «da correggere prima» con i suoi rilievi; decide il PM. È un contraddittorio, non un cancello.
+- **Modifica a parole**: lo scrittore riceve la bozza in revisione e la richiesta, e restituisce la bozza intera. Se la modifica fallisce, la bozza resta com'era.
+- **Ciò che esce non ha i richiami alle fonti**: servono al PM; nel file approvato spariscono.
+- **Approvare scrive due file** sotto `_octo/deliverable/approvati/`: Markdown e Word. Il Word lo produce il codice (titoli, paragrafi, elenchi, tabelle): lo stesso testo dà sempre lo stesso documento. Non è ancora sulla carta intestata.
+- **Tempi e giri misurati da Octo**: minuti di scrittura, minuti di revisione e numero di giri per ogni deliverable. Una pausa oltre 20 minuti non conta come revisione.
+- **Istruzioni del progetto**: per ogni tipo di deliverable il PM può aggiungere istruzioni che valgono per quel progetto. Raffinano quelle del catalogo; non possono autorizzare ciò che non deve mai arrivare a un cliente.
+- **Le regole del progetto valgono anche qui**: il `CLAUDE.md` della cartella vincola lo scrittore come vincola Chiedi.
+- **Il catalogo è codice di Octo**: tre tipi, ciascuno con campi da chiedere, istruzioni ed elenco di controllo. Riprendono le skill generalizzate di `second-brain-starter`.
+- **Le carte di Octo stanno in cartelle nascoste** (`_octo/.lavori`, `_octo/.impostazioni`, `_octo/.istruzioni`): nella prova reale lo scrittore aveva letto anche le bozze in corso e le impostazioni come se fossero fonti. La ricerca di Claude salta le cartelle nascoste.
+- **Non fatto**: stima (richiede i conti dal codice), carta intestata, PowerPoint ed Excel, deliverable specifici di un cliente.

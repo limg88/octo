@@ -19,7 +19,7 @@ Durata: 4 minuti. Mostra che Octo legge la posta che Mail tiene sul computer, sc
 
 3. **Configura.** In «Parole chiave» scrivi `Aurora`. In «Mittenti da escludere» scrivi `avvisi@monitor.example`. Premi «Salva».
    Atteso: «Salvato. La prossima lettura riparte dal giorno indicato.» e l'etichetta «Mai letta.»
-   Dimostra: le regole stanno nella cartella del progetto (`_octo/impostazioni/sources.json`), quindi viaggiano con lei.
+   Dimostra: le regole stanno nella cartella del progetto (`_octo/.impostazioni/sources.json`), quindi viaggiano con lei.
 
 4. **Leggi.** Premi «Leggi ora».
    Atteso: «Ultima lettura …: 2 nuove, 0 già presenti.»

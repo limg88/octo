@@ -3,13 +3,14 @@ import { FEED_NAMES, type Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AskView } from './AskView.tsx'
+import { DeliverablesView } from './DeliverablesView.tsx'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 
-type Tab = 'ask' | 'sources'
+type Tab = 'ask' | 'deliverables' | 'sources'
 
 type Props = {
   api: OctoApi
@@ -112,6 +113,12 @@ export function App({ api }: Props) {
               <TabButton current={tab} tab="ask" label={messages.ask} onSelect={setTab} />
               <TabButton
                 current={tab}
+                tab="deliverables"
+                label={messages.deliverablesTab}
+                onSelect={setTab}
+              />
+              <TabButton
+                current={tab}
                 tab="sources"
                 label={messages.sourcesTab}
                 onSelect={setTab}
@@ -119,6 +126,8 @@ export function App({ api }: Props) {
             </div>
             {tab === 'ask' ? (
               <AskView api={api} project={selected} />
+            ) : tab === 'deliverables' ? (
+              <DeliverablesView api={api} project={selected} />
             ) : (
               <div className="sources-page">
                 <SetupGuide api={api} project={selected} />
