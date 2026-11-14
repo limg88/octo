@@ -209,7 +209,7 @@ Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un a
    - *Giorni nello stato*: contati fino alla data dell'esportazione, non a oggi. Avviso oltre 24 ore, più forte oltre 3 giorni.
    - *Decisioni del PM* (nota su un elemento, requisito giudicato chiaro, segnale tolto): dati con la data in `_octo/.impostazioni/dashboard.json`; nel tracker non si scrive nulla.
    - *Verifica*: sullo stesso snapshot reale i numeri di oggi e le mediane coincidono con la dashboard v0; l'andamento settimanale differisce di un bug in tre settimane perché v0 contava come aperti alcuni stati di chiusura con il nome vecchio.
-   - *Restano*: leggere anche gli elementi scritti dai connettori di Octo; costruire la cronologia da sé quando il file non c'è; l'intervallo oltre il passo mensile non serve finché il limite è 520 passi.
+   - *Restano*: leggere anche gli elementi scritti dai connettori di Octo; costruire la cronologia da sé quando il file non c'è. Un periodo ha al massimo 520 passi.
 2. **Riconciliazione delle ore**: ore del gestionale contro ore del tracker, per persona e periodo, con le esclusioni attese e la quadratura finale.
 3. **Excel e PowerPoint su modello**: prima il previsionale mensile per l'amministrazione (lo compilano tutti i PM con lo stesso modello), poi il modulo di avanzamento per posizione d'ordine e il deck dello stato di avanzamento.
 4. **Sei tipi di testo nel catalogo**: scenari di test, voce di backlog, note di rilascio, analisi funzionale e backlog da riunione, elenco delle modifiche da applicare a mano al tracker, technical proposal (parte narrativa).
