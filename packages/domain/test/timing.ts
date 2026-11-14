@@ -13,11 +13,13 @@ export const GROWTH_FRACTIONS = [1 / 8, 1 / 4, 1 / 2, 1] as const
 
 /** Timing samples per size; the minimum is kept, because load only ever adds time. */
 const SAMPLES = 5
+/** On Windows the CPU clock ticks every 15.6 ms: a batch must last several ticks to be measured. */
+const WINDOWS_MIN_BATCH_MS = 60
 /**
  * Shortest batch that is timed, in ms of CPU. A call faster than this is repeated within one
  * sample, so every point of the fit sits well above the timer resolution.
  */
-const MIN_BATCH_MS = 5
+const MIN_BATCH_MS = process.platform === 'win32' ? WINDOWS_MIN_BATCH_MS : 5
 /** Upper bound on the repetitions of one call per sample. */
 const MAX_REPEATS = 1 << 16
 

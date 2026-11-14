@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { extract as extractByName } from '../src/extract/extract.ts'
 import { docx, encryptedPdf, pdfWithPages, pptx, utf8, xlsx } from './support/files.ts'
 
+const SLOW_TEST_TIMEOUT_MS = 60_000
 const PDF = 'application/pdf'
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -292,12 +293,17 @@ describe('other files', () => {
     expect(result).toMatchObject({ chunks: [], warnings: ['unsupported_format'] })
   })
 
-  it('a zip declaring more than the uncompressed limit is refused', async () => {
-    const huge = new Uint8Array(101 * 1024 * 1024)
-    const bytes = zipSync({ 'word/document.xml': huge }, { level: 1 })
-    const result = await extract(bytes, DOCX, 'bomb.docx')
-    expect(result).toMatchObject({ chunks: [], warnings: ['unsupported_format'] })
-  })
+  it(
+    'a zip declaring more than the uncompressed limit is refused',
+    async () => {
+      const huge = new Uint8Array(101 * 1024 * 1024)
+      const bytes = zipSync({ 'word/document.xml': huge }, { level: 1 })
+      const result = await extract(bytes, DOCX, 'bomb.docx')
+      expect(result).toMatchObject({ chunks: [], warnings: ['unsupported_format'] })
+      // Compressing 101 MB takes seconds on a slow machine: the limit is on the test, not the product.
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  )
 
   it('the same bytes always give the same extraction', async () => {
     const bytes = docx(['a', 'b'])

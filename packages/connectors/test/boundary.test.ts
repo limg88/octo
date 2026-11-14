@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const repoRoot = join(import.meta.dirname, '../../..')
@@ -30,7 +30,8 @@ describe('the way connectors reach the network', () => {
     const dirs = [join(repoRoot, 'packages/connectors/src')]
     const offending = dirs
       .flatMap(walk)
-      .map((f) => relative(repoRoot, f))
+      // The allowed files are named with `/`, whatever the system writes.
+      .map((f) => relative(repoRoot, f).split(sep).join('/'))
       .filter((f) => !SAFE_CLIENT.includes(f))
       .filter((f) => NETWORK.test(readFileSync(join(repoRoot, f), 'utf8')))
     expect(offending).toEqual([])
