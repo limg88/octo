@@ -437,6 +437,27 @@ try {
   )
   await page.screenshot({ path: `${work}/presentazione.png` })
 
+  // Demo 12: the six kinds of text added to the catalog.
+  await work11.getByRole('button', { name: 'Nuovo deliverable' }).click()
+  for (const kind of [
+    'Analisi funzionale da riunione',
+    'Voce di backlog',
+    'Modifiche da applicare al tracker',
+    'Scenari di test',
+    'Technical proposal',
+  ]) {
+    await work11.getByRole('button', { name: new RegExp(`^${kind}`) }).waitFor()
+  }
+  await work11.getByRole('button', { name: /^Note di rilascio/ }).click()
+  await work11.getByLabel(/^Quale rilascio/).fill('2.4 di novembre')
+  await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
+  await work11.getByText('Problemi noti').waitFor({ timeout: TIMEOUT_MS })
+  await work11.getByText('Elenco delle voci chiuse per questo rilascio').waitFor()
+  await work11
+    .getByText('Nessun dato interno (giornate, costi, tariffe, codici commessa)')
+    .waitFor()
+  await page.screenshot({ path: `${work}/tipi-di-testo.png` })
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

@@ -72,6 +72,27 @@ if (args.join(' ').includes('Write the status report of the period')) {
   process.exit(0)
 }
 
+// A run of the writer of release notes: what changes for who uses the system.
+if (args.join(' ').includes('Write the release notes')) {
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: [
+        '## Rilascio',
+        'Il rilascio porta il modulo ordini, la cui consegna è fissata al 12 dicembre 2026 [1].',
+        '## Novità',
+        '- Gestione degli ordini dal nuovo modulo',
+        '## Problemi noti',
+        '- Nessuno segnalato nelle fonti del progetto',
+      ].join('\n\n'),
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: ['Elenco delle voci chiuse per questo rilascio'],
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the writer of an estimate: it gives the lines, never the totals.
 if (args.join(' ').includes('Write an estimate of effort in days')) {
   emit({

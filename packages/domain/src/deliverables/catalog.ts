@@ -200,12 +200,333 @@ Rules:
   ],
 }
 
+const NO_INVENTION = `- A fact you could not verify in the project does not enter the text: it goes in "missing" as a
+  question for the PM.`
+
+const testScenarios: DeliverableKind = {
+  id: 'scenari-di-test',
+  title: 'Scenari di test',
+  summary:
+    'I casi da provare per una funzione, dai requisiti: passi, dati, esito atteso, casi limite.',
+  audience: 'internal',
+  fields: [
+    {
+      key: 'tema',
+      label: 'Che cosa va provato',
+      kind: 'text',
+      required: true,
+      hint: 'La funzione, la voce di backlog o il requisito',
+    },
+    {
+      key: 'livello',
+      label: 'Che tipo di prova',
+      kind: 'text',
+      required: false,
+      hint: 'Per esempio: collaudo con il cliente, regressione, integrazione',
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write the test scenarios of a function, from what the project says it must do.
+
+Sections, with these headings in the language of the PM's request:
+1. What is tested and from which requirements, each with its source.
+2. Preconditions and test data.
+3. Scenarios: a table with id (TS-01, TS-02…), title, the requirement or acceptance criterion it
+   covers, steps, expected result. One behaviour per scenario.
+4. What is not covered, and why.
+5. Open questions: what the requirements do not say and a test needs to know.
+
+Rules:
+- Every scenario covers a requirement or an acceptance criterion written in the project, and
+  cites it. A scenario you would add from experience alone goes in "Open questions" as a proposal.
+- The expected result is what the source says, in its words where they are precise. Where the
+  source is vague, do not invent a threshold or a message: ask in "Open questions".
+- Beside the main path write the negative and the limit cases the requirement implies: empty
+  values, limits, missing permissions, wrong order of the steps.
+- Steps are written so that someone who does not know the system can follow them.
+${NO_INVENTION}`,
+  checklist: [
+    'Ogni scenario dice quale requisito o criterio di accettazione copre',
+    'Gli esiti attesi vengono dai requisiti, non sono inventati',
+    'Ci sono i casi negativi e i casi limite, non solo il percorso principale',
+    'Ciò che non è coperto è dichiarato',
+  ],
+}
+
+const backlogItem: DeliverableKind = {
+  id: 'voce-di-backlog',
+  title: 'Voce di backlog',
+  summary: 'Una storia pronta da copiare nel tracker: perché, che cosa, criteri di accettazione.',
+  audience: 'internal',
+  fields: [
+    {
+      key: 'tema',
+      label: 'Quale bisogno',
+      kind: 'text',
+      required: true,
+      hint: 'Per esempio: esportazione degli ordini in Excel',
+    },
+    {
+      key: 'origine',
+      label: 'Da dove viene',
+      kind: 'text',
+      required: false,
+      hint: 'La riunione, la mail o il documento che lo chiede',
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write one backlog item, ready to be copied by hand into the tracker. You never write to the tracker.
+
+Sections, with these headings in the language of the PM's request:
+1. Title: the outcome for who uses it, in one line.
+2. Why: who needs it and for what, with the source of the request.
+3. Description: what must happen, in the terms of the project (use its glossary and the names
+   of its screens and data).
+4. Acceptance criteria: a numbered list, each one checkable by a test, in the form
+   "given … when … then …" where it helps.
+5. Out of scope.
+6. Dependencies and links to other items of the project, by their id.
+7. Open questions.
+
+Rules:
+- One need, one item. If the request holds several, write the first and list the others in
+  "Open questions" as items to open.
+- Before writing, look in the project for an item that already covers the need: if there is one,
+  say so at the top and write what would change in it instead of a duplicate.
+- No estimate, no priority and no assignee: the team decides those.
+- The words of who asked are quoted, not improved: an ambiguity in the request stays visible and
+  becomes an open question.
+${NO_INVENTION}`,
+  checklist: [
+    'Un solo bisogno, con la fonte della richiesta',
+    'I criteri di accettazione si possono provare uno per uno',
+    'Non duplica una voce che c’è già',
+    'Nessuna stima, priorità o assegnatario decisi al posto della squadra',
+  ],
+}
+
+const releaseNotes: DeliverableKind = {
+  id: 'note-di-rilascio',
+  title: 'Note di rilascio',
+  summary: 'Che cosa cambia per chi usa il sistema: novità, correzioni, problemi noti.',
+  audience: 'client',
+  fields: [
+    {
+      key: 'tema',
+      label: 'Quale rilascio',
+      kind: 'text',
+      required: true,
+      hint: 'Versione o nome, per esempio: 2.4 di novembre',
+    },
+    { key: 'data', label: 'Data del rilascio', kind: 'date', required: false },
+    {
+      key: 'perimetro',
+      label: 'Che cosa contiene',
+      kind: 'long',
+      required: false,
+      hint: 'Lo sprint, il periodo o l’elenco delle voci rilasciate',
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write the release notes for the people who use the system.
+
+Sections, with these headings in the language of the PM's request:
+1. Release and date, and in two lines what it brings.
+2. New: what one can do now that was not possible before.
+3. Changed: what works differently, and what the user must do differently.
+4. Fixed: the problems solved, described as the user saw them.
+5. Known issues, each with how to work around it.
+6. What to do before or after the release, if anything.
+
+Rules:
+${CLIENT_RULES}
+- An item enters only if the project shows it as released or closed for this release: the tracker
+  with the date of its reading, or a document that says so. What is still open is not "new".
+- Write for the user: the effect, not the implementation. No names of branches, tables, classes
+  or internal components. The id of the item stays in brackets at the end of its line.
+- An empty section is left out, not filled.
+${NO_INVENTION}`,
+  checklist: [
+    'Ogni voce risulta rilasciata o chiusa nel tracker, con la data dei dati',
+    'È scritto per chi usa il sistema: effetti, non dettagli tecnici',
+    'I problemi noti hanno il loro modo di aggirarli',
+    'Nessun dato interno (giornate, costi, tariffe, codici commessa)',
+  ],
+}
+
+const functionalAnalysis: DeliverableKind = {
+  id: 'analisi-funzionale',
+  title: 'Analisi funzionale da riunione',
+  summary:
+    'Dalla trascrizione di una riunione con il cliente: requisiti, regole, voci di backlog proposte.',
+  audience: 'internal',
+  fields: [
+    {
+      key: 'riunione',
+      label: 'Quale riunione',
+      kind: 'text',
+      required: true,
+      hint: 'Titolo e data, o il nome del file della trascrizione',
+    },
+    {
+      key: 'ambito',
+      label: 'Quale funzione o area',
+      kind: 'text',
+      required: false,
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write the functional analysis of what a meeting with the client asked for, from its transcript or notes.
+
+Sections, with these headings in the language of the PM's request:
+1. Meeting, date, participants, and the function or area discussed.
+2. Context: how it works today, as the meeting described it.
+3. Requirements: a table with id (RF-01, RF-02…), the requirement in one sentence, who asked for
+   it, and the passage of the transcript it comes from.
+4. Business rules and data: validations, calculations, states, roles, as they were said.
+5. Proposed backlog items: a table with title, the requirements it covers, and whether an item
+   of the project already covers it (with its id) or it is new.
+6. Decisions taken in the meeting.
+7. Open questions: what the meeting left undecided or contradictory, each with who can answer.
+
+Rules:
+- The source is the transcript or the notes. An automatic summary made by the meeting tool is
+  not a source.
+- A requirement is what someone asked, not what would be reasonable to build: a solution nobody
+  discussed does not enter, even if it is obvious.
+- Two participants who said different things are both reported, with their words: the document
+  does not choose.
+- Use the terms of the project. A new term heard in the meeting is quoted and marked as new.
+- The proposed items are proposals to be opened by hand in the tracker; give no estimate.
+- If you cannot find the meeting, write nothing invented: say so in "missing".`,
+  checklist: [
+    'La fonte è la trascrizione o gli appunti, non il riepilogo automatico',
+    'Ogni requisito ha chi l’ha chiesto e il passaggio da cui viene',
+    'Nessuna soluzione che in riunione non è stata discussa',
+    'Le contraddizioni sono riportate, non risolte',
+    'Le voci proposte dicono se nel progetto c’è già qualcosa che le copre',
+  ],
+}
+
+const trackerChanges: DeliverableKind = {
+  id: 'modifiche-al-tracker',
+  title: 'Modifiche da applicare al tracker',
+  summary:
+    'L’elenco delle modifiche da fare a mano sul tracker: voce, campo, valore di oggi, valore nuovo, perché.',
+  audience: 'internal',
+  fields: [
+    {
+      key: 'tema',
+      label: 'Che cosa va sistemato',
+      kind: 'text',
+      required: true,
+      hint: 'Per esempio: esiti della riunione di pianificazione del 12/11',
+    },
+    {
+      key: 'origine',
+      label: 'Da dove vengono le modifiche',
+      kind: 'text',
+      required: false,
+      hint: 'La riunione, la mail o il documento che le decide',
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write the list of changes a person will apply by hand to the tracker. You never write to the tracker.
+
+Sections, with these headings in the language of the PM's request:
+1. What the changes come from, and the date of the tracker data you read.
+2. Changes to existing items: a table with a progressive number, the id and title of the item,
+   the field, its value today, the new value, and the source that decides the change.
+3. Items to create: a table with title, type, parent, and the source that asks for it.
+4. Not applied: what the source asks that you could not turn into a change, and why.
+
+Rules:
+- One line, one field of one item: the person ticks them off one by one.
+- "Value today" is what the project's copy of the tracker says, never what you assume. If the
+  value today is already the new one, the line is left out.
+- Every line cites the decision it comes from. A change nobody decided does not enter, however
+  sensible: it goes in "Not applied" as a proposal.
+- Group the lines by item, and the items in the order of their id, so the list follows the
+  tracker's screen.
+- If the tracker data are older than the source of the changes, say so at the top: a value may
+  have changed since.
+${NO_INVENTION}`,
+  checklist: [
+    'Ogni riga è un solo campo di una sola voce, con valore di oggi e valore nuovo',
+    'Ogni modifica ha la decisione da cui viene',
+    'La data dei dati del tracker è dichiarata',
+    'Nessuna modifica che nessuno ha deciso',
+  ],
+}
+
+const technicalProposal: DeliverableKind = {
+  id: 'technical-proposal',
+  title: 'Technical proposal',
+  summary:
+    'La parte narrativa di una proposta: contesto, perimetro, attività, approccio, assunzioni. Senza cifre.',
+  audience: 'client',
+  fields: [
+    {
+      key: 'tema',
+      label: 'Per quale fase o progetto',
+      kind: 'text',
+      required: true,
+      hint: 'Per esempio: fase 3, da gennaio a marzo',
+    },
+    {
+      key: 'perimetro',
+      label: 'Quale perimetro',
+      kind: 'long',
+      required: true,
+      hint: 'Dove è deciso che cosa è dentro: la presentazione di pianificazione, un elenco, una mail',
+    },
+    { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
+  ],
+  instructions: `Write the narrative part of a technical proposal for a phase of work.
+
+Sections, with these headings in the language of the PM's request:
+1. Context and objectives of the phase.
+2. Scope, by stream of work: what is done in each.
+3. Activities and deliverables.
+4. Approach and way of working: ceremonies, environments, quality, how changes are handled.
+5. Assumptions and dependencies on the client.
+6. Out of scope.
+7. Organisation of the team, by role.
+
+Rules:
+${CLIENT_RULES}
+- No figures at all: no days, no effort, no costs, no rates, no capacity, no head count, in the
+  text or in a table. Effort and prices travel in another document.
+- The scope is what the source named by the PM decides, not everything the tracker lists for the
+  phase. An item of the tracker that the source does not name stays out and is listed in
+  "missing" as a question.
+- Exclusions written in the source are kept word for word.
+- If the project holds the proposal of the previous phase, follow its structure and its terms,
+  and leave nothing of the previous phase as if it were of this one. A deliberate reference to
+  the previous phase ("in continuity with…") stays.
+- Roles, never names of people, unless the source names them for this purpose.
+${NO_INVENTION}`,
+  checklist: [
+    'Nessuna cifra: né giornate, né costi, né capacità, nemmeno nelle tabelle',
+    'Il perimetro è quello deciso nella fonte indicata, non l’elenco del tracker',
+    'Le esclusioni sono riportate parola per parola',
+    'Nessun residuo della fase precedente',
+    'Assunzioni e dipendenze dal cliente sono esplicite',
+  ],
+}
+
 /** The deliverables that ship with Octo, in the order the catalog shows them. */
 export const DELIVERABLE_CATALOG: readonly DeliverableKind[] = [
   emailToClient,
   statusReport,
   minutes,
   estimateKind,
+  functionalAnalysis,
+  backlogItem,
+  trackerChanges,
+  testScenarios,
+  releaseNotes,
+  technicalProposal,
 ]
 
 export function deliverableKind(id: string): DeliverableKind | null {

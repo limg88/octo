@@ -55,6 +55,33 @@ describe('the catalog', () => {
       expect(kind.checklist.length).toBeGreaterThan(0)
       expect(kind.instructions.length).toBeGreaterThan(100)
     }
+    expect(ids).toEqual([
+      'email-cliente',
+      'stato-avanzamento',
+      'verbale',
+      'stima',
+      'analisi-funzionale',
+      'voce-di-backlog',
+      'modifiche-al-tracker',
+      'scenari-di-test',
+      'note-di-rilascio',
+      'technical-proposal',
+    ])
+    // Every kind asks for what names the deliverable in the lists.
+    for (const kind of DELIVERABLE_CATALOG) {
+      const naming = kind.fields.filter((field) =>
+        ['tema', 'periodo', 'riunione'].includes(field.key),
+      )
+      expect(naming.map((field) => field.required)).toEqual([true])
+    }
+    // What goes to the client carries the rules on internal data; only the report is shown.
+    for (const kind of DELIVERABLE_CATALOG.filter((kind) => kind.audience === 'client')) {
+      expect(kind.instructions).toContain('The reader is the client')
+    }
+    expect(DELIVERABLE_CATALOG.filter((kind) => kind.deck).map((kind) => kind.id)).toEqual([
+      'stato-avanzamento',
+    ])
+    expect(deliverableKind('technical-proposal')?.instructions).toContain('No figures at all')
     expect(deliverableKind('verbale')?.audience).toBe('internal')
     expect(deliverableKind('nessuno')).toBeNull()
   })

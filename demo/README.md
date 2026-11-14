@@ -15,5 +15,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 09 | Previsionale: il modello Excel dell'amministrazione compilato dal codice, una riga per codice di progetto, con formule vive, dati mancanti dichiarati e originale intatto | `bash demo/09-previsionale/run.sh` | [COPIONE](09-previsionale/COPIONE.md) |
 | 10 | Avanzamento: le richieste di stato di avanzamento per posizione d'ordine, percentuali calcolate dal codice e scritte sul modulo Excel del cliente secondo una mappa delle celle | `bash demo/10-avanzamento/run.sh` | [COPIONE](10-avanzamento/COPIONE.md) |
 | 11 | Presentazione: lo stato di avanzamento approvato reso come slide PowerPoint sulla presentazione del periodo scorso, con la sua copertina, il suo layout e le sue tabelle | `bash demo/11-presentazione/run.sh` | [COPIONE](11-presentazione/COPIONE.md) |
+| 12 | Tipi di testo: sei tipi in più nel catalogo dei deliverable (analisi funzionale da riunione, voce di backlog, modifiche al tracker, scenari di test, note di rilascio, technical proposal), ognuno con le sue domande, le sue regole e i suoi controlli | `bash demo/12-tipi-di-testo/run.sh` | [COPIONE](12-tipi-di-testo/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 11 (nella 11 il modello è già scelto: la finestra di scelta del file è del sistema) nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 12 (nella 11 il modello è già scelto: la finestra di scelta del file è del sistema) nella finestra vera, senza intervento.
