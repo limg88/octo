@@ -56,7 +56,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | Fetta | Stato |
 |---|---|
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
-| F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Restano: ADO, Jira, DWSI, posta su Windows |
+| F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -99,3 +99,20 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Claude lo sa**: il prompt di Chiedi dice dove sta il testo e di citare quel file.
 - **Non portato**: l'isolamento in un processo separato con limite di memoria. Su un server multiutente serviva; qui i file sono quelli del PM. Da rivedere quando la cartella sarà condivisa fra più persone.
 - **Non verificato**: la conversione su un vault reale (numero e peso dei file di DEEM).
+
+## Scelte prese durante F2 (Azure DevOps, Jira, NetSuite/DWSI)
+- **Connettori portati per intero da octobrief-new** (`packages/connectors`, con i loro 355 test): sola lettura, chiamate HTTP solo verso i percorsi ammessi, nessun redirect, warehouse letto con un utente che non può scrivere. Non conoscono il resto di Octo: dipendono solo dal dominio.
+- **Tutto gira sul computer del PM**, con la sua credenziale nominativa. Nessun server, nessuna richiesta all'IT.
+- **La credenziale non sta nella cartella del progetto**: è cifrata dall'archivio del sistema operativo (Portachiavi su Mac, DPAPI su Windows) in un file dei dati dell'app. Una volta salvata non torna più a schermo. Senza archivio sicuro, Octo non la salva.
+- **«Prova e salva»**: nulla viene salvato finché il sistema non accetta la credenziale per ciò che è stato indicato. Un token sbagliato, un progetto che non esiste e una credenziale che può scrivere danno ciascuno il suo messaggio.
+- **Un elemento, un file**: ogni work item o issue è un file Markdown (titolo, campi, descrizione, commenti); ogni vista del warehouse è un file per commessa, con tutte le righe. Il formato è quello dell'incremento 8a di octobrief-new.
+- **Dove**: Octo propone `raw/ADO`, `raw/Jira`, `raw/NetSuite` se la cartella ha già `raw/`, altrimenti `Fonti/…`.
+- **Nota sull'età dei dati**: ogni fonte tiene nella sua cartella `_lettura.md` con la data della lettura, fino a quando arrivano i dati e quanti elementi ci sono. Il prompt di Chiedi dice a Claude di citarla. Sostituisce il `_freshness.json` che in v0 si pubblicava a mano.
+- **Lettura incrementale**: i tracker ripartono dall'ultimo punto letto; il warehouse non ha un cursore e si rilegge intero, ma si riscrive solo ciò che cambia. Il punto raggiunto si salva a ogni passo: una lettura interrotta riprende da lì.
+- **Cambiare cosa si legge** (altro progetto, altre aree, altri codici) toglie i file della fonte e riparte: non restano elementi fuori perimetro.
+- **Warehouse**: ore dal giorno di inizio; ordini, fatture e ricavi sempre interi, perché residui e totali ne hanno bisogno. Il server si indica per nome, non per indirizzo. La sicurezza della connessione la dichiara il PM (cifrata e verificata, cifrata, non cifrata): quella più debole resta sul suo computer.
+- **Quando**: «Leggi ora» e ogni 15 minuti ad app aperta, dopo la posta e prima dei documenti.
+- **App impacchettata**: il client Postgres è una libreria CommonJS; il processo principale ha ora il suo `require`.
+- **Test**: il warehouse finto è un Postgres vero (`pnpm db:setup`, porta 5460); dove non c'è, quei test restano fuori.
+- **Non verificato**: Azure DevOps, Jira e DWSI reali. In octobrief-new il primo contatto con un ADO vero aveva richiesto due correzioni, già incluse nei connettori portati.
+- **Aperto per F4**: le skill di v0 leggono lo snapshot ADO in un loro formato (`azdo_latest.json`). I deliverable di Octo dovranno leggere questi file, oppure Octo dovrà scrivere anche quello snapshot.

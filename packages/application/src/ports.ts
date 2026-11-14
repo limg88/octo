@@ -3,6 +3,10 @@ import type {
   DraftAnswer,
   Evidence,
   Extraction,
+  FeedConfig,
+  FeedIndex,
+  FeedName,
+  FeedStep,
   MailMessage,
   Project,
   QuestionRecord,
@@ -87,9 +91,11 @@ export interface SourceSettings {
   save(projectFolder: string, config: SourcesConfig): Promise<void>
   /** A sensible place for the mail in this folder, following how it is already organised. */
   suggestMailFolder(projectFolder: string): Promise<string>
+  /** A sensible place for the items of a feed in this folder. */
+  suggestFeedFolder(projectFolder: string, feed: FeedName): Promise<string>
 }
 
-export type SourceName = 'mail' | 'documents'
+export type SourceName = 'mail' | 'documents' | FeedName
 
 /** What each source did last on this computer, and where its next reading starts. */
 export interface SourceStates {
@@ -117,4 +123,39 @@ export interface ProjectFiles {
   /** Every file under a folder of the project, as paths from the project root. */
   under(projectFolder: string, folder: string): Promise<string[]>
   remove(projectFolder: string, relativePath: string): Promise<void>
+}
+
+/**
+ * Reads a system of record with the PM's own read-only credential and hands over files of the
+ * memory. Never writes to the system. Failures are DomainErrors with a `feed_*` code.
+ */
+export interface FeedReader {
+  /** Checks that the credential opens what the configuration names. */
+  check(feed: FeedName, config: FeedConfig, secret: string): Promise<void>
+  /**
+   * What changed after `cursor` (null: from the first day of the configuration), step by step.
+   * A system without a cursor of its own gives everything at each reading.
+   */
+  read(
+    feed: FeedName,
+    config: FeedConfig,
+    secret: string,
+    cursor: unknown,
+    signal: AbortSignal,
+  ): AsyncIterable<FeedStep>
+}
+
+/** Credentials of the feeds, kept by the operating system's own store on this computer. */
+export interface SecretVault {
+  get(key: string): Promise<string | null>
+  /** Throws a DomainError `secret_store_unavailable` when the system offers no safe store. */
+  set(key: string, value: string): Promise<void>
+  remove(key: string): Promise<void>
+}
+
+/** What each feed wrote in a project from this computer. */
+export interface FeedIndexes {
+  load(projectId: string, feed: FeedName): Promise<{ scope: string | null; items: FeedIndex }>
+  save(projectId: string, feed: FeedName, scope: string, items: FeedIndex): Promise<void>
+  removeProject(projectId: string): Promise<void>
 }

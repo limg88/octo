@@ -427,7 +427,10 @@ main > .warning {
 }
 
 .source-form textarea,
+.source-form select,
 .source-form input[type="text"],
+.source-form input[type="number"],
+.source-form input[type="password"],
 .source-form input[type="date"] {
   font: inherit;
   font-weight: 400;

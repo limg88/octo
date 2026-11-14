@@ -35,6 +35,8 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
+    // Built files are not sources: the rules are about what people write.
+    exclude: { path: '(^|/)(dist|release)/' },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.base.json' },
     enhancedResolveOptions: { extensions: ['.ts', '.tsx', '.js'] },

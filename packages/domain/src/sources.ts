@@ -10,13 +10,6 @@ export type MailSourceConfig = MailRules & {
   targetFolder: string
 }
 
-/** What feeds the memory of a project. Lives in the project folder, so it is shared with it. */
-export type SourcesConfig = {
-  mail: MailSourceConfig | null
-}
-
-export const NO_SOURCES: SourcesConfig = { mail: null }
-
 /** What the last reading of a source did, kept on this computer. */
 export type SourceRun = {
   at: string

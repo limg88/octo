@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@octo/application": "workspace:*",
+    "@octo/connectors": "workspace:*",
     "@octo/domain": "workspace:*",
     "fflate": "0.8.3",
     "postal-mime": "4.2.0",

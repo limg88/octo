@@ -1,16 +1,18 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { MailSourceConfig } from '@octo/domain'
+import { type MailSourceConfig, NO_SOURCES } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   createAppleMailArchive,
+  createFileVault,
   createFsMemoryWriter,
   createFsSourceSettings,
   createJsonSourceStates,
   MailFormatError,
   messageBytes,
   parseEmlx,
+  type SecretCipher,
   shardOf,
 } from '../src/index.ts'
 import { addFakeMail, emlx } from './support/mail-folder.ts'
@@ -180,14 +182,15 @@ describe('files of a project', () => {
     await mkdir(project)
     const settings = createFsSourceSettings()
 
-    expect(await settings.load(project)).toEqual({ mail: null })
+    expect(await settings.load(project)).toEqual(NO_SOURCES)
     expect(await settings.suggestMailFolder(project)).toBe('Posta')
     await mkdir(join(project, 'raw'))
     expect(await settings.suggestMailFolder(project)).toBe('raw/Mail')
 
-    await settings.save(project, { mail })
-    expect(await createFsSourceSettings().load(project)).toEqual({ mail })
+    await settings.save(project, { ...NO_SOURCES, mail })
+    expect(await createFsSourceSettings().load(project)).toEqual({ ...NO_SOURCES, mail })
     expect(JSON.parse(await readFile(join(project, '.octo', 'sources.json'), 'utf8'))).toEqual({
+      ...NO_SOURCES,
       mail,
     })
 
@@ -212,5 +215,43 @@ describe('files of a project', () => {
     expect(await createJsonSourceStates(data).get('p-1', 'mail')).toEqual(state)
     await createJsonSourceStates(data).removeProject('p-1')
     expect((await createJsonSourceStates(data).get('p-1', 'mail')).cursor).toBeNull()
+  })
+})
+
+describe('the vault of the credentials', () => {
+  const reversed = (text: string) => [...text].reverse().join('')
+  const cipher = (available = true): SecretCipher => ({
+    available: () => available,
+    encrypt: (value) => new TextEncoder().encode(reversed(value)),
+    decrypt: (bytes) => {
+      const text = new TextDecoder().decode(bytes)
+      if (text.startsWith('!')) throw new Error('not mine')
+      return reversed(text)
+    },
+  })
+
+  it('keeps each credential encrypted and forgets it on request', async () => {
+    const data = join(root, 'vault')
+    const vault = createFileVault(data, cipher())
+
+    expect(await vault.get('p-1/ado')).toBeNull()
+    await vault.set('p-1/ado', 'pat-segreto')
+    await vault.set('p-1/jira', 'token')
+    expect(await createFileVault(data, cipher()).get('p-1/ado')).toBe('pat-segreto')
+    expect(await readFile(join(data, 'secrets.json'), 'utf8')).not.toContain('pat-segreto')
+
+    await vault.remove('p-1/ado')
+    expect(await vault.get('p-1/ado')).toBeNull()
+    expect(await vault.get('p-1/jira')).toBe('token')
+  })
+
+  it('saves nothing without a safe store, and ignores what it cannot read back', async () => {
+    const data = join(root, 'vault-chiuso')
+    await expect(createFileVault(data, cipher(false)).set('k', 'v')).rejects.toMatchObject({
+      code: 'secret_store_unavailable',
+    })
+    await createFileVault(data, cipher()).set('k', 'v!')
+    expect(await createFileVault(data, cipher()).get('k')).toBeNull()
+    expect(await createFileVault(data, cipher(false)).get('k')).toBeNull()
   })
 })

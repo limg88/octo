@@ -1,4 +1,4 @@
-import { EXTRACTED_TEXT_FOLDER, MIN_QUOTE_LENGTH } from '@octo/domain'
+import { EXTRACTED_TEXT_FOLDER, FEED_NOTE_FILE, MIN_QUOTE_LENGTH } from '@octo/domain'
 import { z } from 'zod'
 
 export const draftAnswerSchema = z.object({
@@ -30,6 +30,8 @@ If the folder has an index (for example wiki/indice.md), read it first: it tells
 organised and which sources to prefer.
 
 How to look:
+- A folder fed from a system of record (Azure DevOps, Jira, NetSuite) has a \`${FEED_NOTE_FILE}\` note:
+  it says when the system was last read. Cite it for the age of those data.
 - Word, Excel, PowerPoint and PDF files have their text in \`${EXTRACTED_TEXT_FOLDER}/<path of the
   file>.md\`. Read and search that text, and cite that file: the original is not readable as text.
 - Do not stop at the files the index points to. Search the whole folder for the key terms of the

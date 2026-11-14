@@ -1,4 +1,10 @@
-import { DomainError, type MailMessage, type MailSourceConfig, type Project } from '@octo/domain'
+import {
+  DomainError,
+  type MailMessage,
+  type MailSourceConfig,
+  NO_SOURCES,
+  type Project,
+} from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import { createSources, MAIL_OVERLAP_MS } from '../src/index.ts'
 import {
@@ -49,7 +55,7 @@ function setup(mails: FakeArchivedMail[] | Error, initial: MailSourceConfig | nu
   const states = memorySourceStates()
   let now = NOW
   const sources = createSources({
-    settings: memorySourceSettings({ mail: initial }),
+    settings: memorySourceSettings({ ...NO_SOURCES, mail: initial }),
     states,
     archive,
     writer,

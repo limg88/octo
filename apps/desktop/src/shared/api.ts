@@ -1,6 +1,8 @@
-import type { AgentProgress, AgentStatus, MailSourceView } from '@octo/application'
+import type { AgentProgress, AgentStatus, FeedView, MailSourceView } from '@octo/application'
 import type {
   DomainErrorCode,
+  FeedConfig,
+  FeedName,
   MailSourceConfig,
   Project,
   QuestionRecord,
@@ -27,6 +29,9 @@ export const CHANNELS = {
   mailGet: 'sources:mail:get',
   mailSave: 'sources:mail:save',
   mailSync: 'sources:mail:sync',
+  feedGet: 'sources:feed:get',
+  feedSave: 'sources:feed:save',
+  feedSync: 'sources:feed:sync',
   documentsGet: 'sources:documents:get',
   documentsConvert: 'sources:documents:convert',
   sourcesChanged: 'sources:changed',
@@ -51,6 +56,18 @@ export type OctoApi = {
   ): Promise<Result<MailSourceView>>
   /** Reads the new mail now. A failure of the reading is in the run, not in the result. */
   syncMail(projectId: string): Promise<Result<SourceRun>>
+  feed(projectId: string, feed: FeedName): Promise<Result<FeedView>>
+  /**
+   * Checks the configuration against the system and saves it. A null secret keeps the one
+   * already stored; a null configuration switches the feed off.
+   */
+  saveFeed(
+    projectId: string,
+    feed: FeedName,
+    config: FeedConfig | null,
+    secret: string | null,
+  ): Promise<Result<FeedView>>
+  syncFeed(projectId: string, feed: FeedName): Promise<Result<SourceRun>>
   documentsState(projectId: string): Promise<Result<SourceState>>
   /** Writes the text of the Office and PDF files of the project beside them, now. */
   convertDocuments(projectId: string): Promise<Result<SourceRun>>

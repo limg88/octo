@@ -15,6 +15,10 @@ const api: OctoApi = {
   saveMailSource: (projectId, config) =>
     ipcRenderer.invoke(CHANNELS.mailSave, { projectId, config }),
   syncMail: (projectId) => ipcRenderer.invoke(CHANNELS.mailSync, { projectId }),
+  feed: (projectId, feed) => ipcRenderer.invoke(CHANNELS.feedGet, { projectId, feed }),
+  saveFeed: (projectId, feed, config, secret) =>
+    ipcRenderer.invoke(CHANNELS.feedSave, { projectId, feed, config, secret }),
+  syncFeed: (projectId, feed) => ipcRenderer.invoke(CHANNELS.feedSync, { projectId, feed }),
   documentsState: (projectId) => ipcRenderer.invoke(CHANNELS.documentsGet, { projectId }),
   convertDocuments: (projectId) => ipcRenderer.invoke(CHANNELS.documentsConvert, { projectId }),
   onSourcesChanged: (listener) => {

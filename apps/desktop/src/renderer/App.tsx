@@ -1,9 +1,10 @@
 import type { AgentStatus } from '@octo/application'
-import type { Project } from '@octo/domain'
+import { FEED_NAMES, type Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AskView } from './AskView.tsx'
 import { DocumentsSection } from './DocumentsSection.tsx'
+import { FeedSection } from './FeedSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { SourcesView } from './SourcesView.tsx'
 
@@ -118,6 +119,9 @@ export function App({ api }: Props) {
             ) : (
               <div className="sources-page">
                 <SourcesView api={api} project={selected} />
+                {FEED_NAMES.map((feed) => (
+                  <FeedSection key={feed} api={api} project={selected} feed={feed} />
+                ))}
                 <DocumentsSection api={api} project={selected} />
               </div>
             )}

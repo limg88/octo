@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import type { AgentProgress, AgentStatus, MailSourceView } from '@octo/application'
-import type { Project, QuestionRecord, SourceRun, SourceState } from '@octo/domain'
+import type { AgentProgress, AgentStatus, FeedView, MailSourceView } from '@octo/application'
+import type { FeedName, Project, QuestionRecord, SourceRun, SourceState } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
@@ -60,6 +60,14 @@ const documentsRun: SourceRun = {
   error: null,
 }
 
+const feedView = (feed: FeedName): FeedView => ({
+  feed,
+  config: null,
+  suggestedFolder: `Fonti/${feed}`,
+  hasSecret: false,
+  state: { cursor: null, lastRun: null },
+})
+
 const mailView: MailSourceView = {
   config: null,
   suggestedFolder: 'Posta',
@@ -87,6 +95,9 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
     ),
+    feed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
+    saveFeed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
+    syncFeed: vi.fn(async () => ok(documentsRun)),
     documentsState: vi.fn(async () => ok<SourceState>({ cursor: null, lastRun: null })),
     convertDocuments: vi.fn(async () => ok(documentsRun)),
     onSourcesChanged: () => () => {},

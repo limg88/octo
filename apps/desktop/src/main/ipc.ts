@@ -4,11 +4,12 @@ import type {
   AskQuestion,
   Documents,
   EvidenceReader,
+  Feeds,
   Projects,
   QuestionLog,
   Sources,
 } from '@octo/application'
-import { isDomainError } from '@octo/domain'
+import { FEED_NAMES, isDomainError, WAREHOUSE_TLS_MODES } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import { CHANNELS, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
@@ -22,6 +23,7 @@ export type IpcDeps = {
   askQuestion: AskQuestion
   sources: Sources
   documents: Documents
+  feeds: Feeds
   folderDialogTitle: string
 }
 
@@ -45,6 +47,43 @@ const mailSaveInput = byProject.extend({
     })
     .nullable(),
 })
+
+const MAX_SECRET_LENGTH = 4000
+const rule = z.string().max(MAX_RULE_LENGTH)
+const byFeed = byProject.extend({ feed: z.enum(FEED_NAMES) })
+const feedBase = { since: rule, targetFolder: rule }
+const secret = z.string().max(MAX_SECRET_LENGTH).nullable()
+/** The configuration is checked against the feed it is for: no field of another feed passes. */
+const feedSaveInput = z.discriminatedUnion('feed', [
+  byProject.extend({
+    feed: z.literal('ado'),
+    secret,
+    config: z
+      .object({ ...feedBase, organization: rule, project: rule, areas: ruleList })
+      .nullable(),
+  }),
+  byProject.extend({
+    feed: z.literal('jira'),
+    secret,
+    config: z.object({ ...feedBase, site: rule, email: rule, projects: ruleList }).nullable(),
+  }),
+  byProject.extend({
+    feed: z.literal('dwsi'),
+    secret,
+    config: z
+      .object({
+        ...feedBase,
+        host: rule,
+        port: z.number().int(),
+        database: rule,
+        user: rule,
+        ownerEmail: rule,
+        projectCodes: ruleList,
+        tls: z.enum(WAREHOUSE_TLS_MODES),
+      })
+      .nullable(),
+  }),
+])
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -106,6 +145,19 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.mailSync, byProject, async ({ projectId }) =>
     deps.sources.syncMail(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.feedGet, byFeed, async ({ projectId, feed }) =>
+    deps.feeds.view(await deps.projects.get(projectId), feed),
+  )
+
+  handle(CHANNELS.feedSave, feedSaveInput, async (input) => {
+    const project = await deps.projects.get(input.projectId)
+    return deps.feeds.save(project, input.feed, input.config, input.secret)
+  })
+
+  handle(CHANNELS.feedSync, byFeed, async ({ projectId, feed }) =>
+    deps.feeds.sync(await deps.projects.get(projectId), feed),
   )
 
   handle(CHANNELS.documentsGet, byProject, async ({ projectId }) =>

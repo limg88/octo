@@ -50,6 +50,47 @@ export const messages = {
   mailLastFailed: (at: string) => `Ultima lettura ${at} non riuscita.`,
   mailStale: 'La posta non viene letta da più di un giorno.',
   mailNotConfigured: 'La posta di questo progetto non è ancora configurata.',
+  feedIntro: {
+    ado: 'Work item del progetto, uno per file, letti con il tuo Personal Access Token di sola lettura (Work Items: Read, Project and Team: Read).',
+    jira: 'Issue dei progetti indicati, una per file, lette con la tua email e un API token di sola lettura.',
+    dwsi: 'Ore, ordini, fatture e ricavi delle commesse indicate, letti dal data warehouse con il tuo utente di sola lettura. La connessione resta su questo computer.',
+  },
+  feedSecret: { ado: 'Personal Access Token', jira: 'API token', dwsi: 'Password' },
+  feedSecretKept: 'Già salvata su questo computer: lascia vuoto per tenerla.',
+  feedSecretHint:
+    'Resta su questo computer, cifrata dal sistema. Non finisce nella cartella del progetto.',
+  feedSave: 'Prova e salva',
+  feedSaved: 'Collegamento riuscito e salvato.',
+  feedSync: 'Leggi ora',
+  feedSyncing: 'Sto leggendo…',
+  feedOff: 'Scollega',
+  feedNotConfigured: 'Non collegato.',
+  feedNeverRead: 'Mai letto.',
+  feedLastRun: (at: string, written: number, unchanged: number) =>
+    `Ultima lettura ${at}: ${written} aggiornati, ${unchanged} invariati.`,
+  feedStale: 'Non viene letto da più di un giorno.',
+  feedFields: {
+    organization: 'Organizzazione',
+    project: 'Progetto',
+    areas: 'Aree (una per riga; vuoto: tutto il progetto)',
+    site: 'Sito (es. contoso.atlassian.net)',
+    email: 'La tua email su Jira',
+    projects: 'Progetti (chiave o nome, uno per riga)',
+    host: 'Server (nome, non indirizzo)',
+    port: 'Porta',
+    database: 'Database',
+    user: 'Utente',
+    ownerEmail: 'La tua email aziendale',
+    projectCodes: 'Codici commessa (PRJ e sei cifre, uno per riga)',
+    tls: 'Sicurezza della connessione',
+    since: 'Dal giorno',
+    targetFolder: 'Cartella nel progetto',
+  },
+  feedTls: {
+    verify_full: 'Cifrata e verificata',
+    unverified: 'Cifrata, certificato non verificato',
+    plaintext: 'Non cifrata (solo rete interna)',
+  },
   documentsTitle: 'Documenti',
   documentsIntro:
     'Octo scrive il testo di Word, Excel, PowerPoint e PDF della cartella in «_octo/testo», così Claude può cercarlo e citarlo. Gli originali non vengono toccati.',
@@ -90,6 +131,19 @@ const errors: Record<ErrorCode, string> = {
   mail_archive_unreadable:
     'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo.',
   mail_reader_missing: 'Su questo sistema la lettura della posta non è ancora disponibile.',
+  secret_missing: 'Serve la credenziale: su questo computer non ce n’è una salvata.',
+  secret_store_unavailable:
+    'Questo computer non offre un archivio sicuro per le credenziali: non posso salvarla.',
+  feed_credential_refused:
+    'Il sistema ha rifiutato la credenziale: è sbagliata, scaduta o senza i permessi di lettura.',
+  feed_write_access_refused:
+    'Questa credenziale può anche scrivere o vede più del necessario. Octo accetta solo credenziali di sola lettura.',
+  feed_connection_not_secure: 'La connessione al sistema non è sicura come dichiarato: rifiutata.',
+  feed_unreachable: 'Il sistema non risponde. Controlla rete e VPN e riprova.',
+  feed_not_found:
+    'Non trovo ciò che hai indicato: controlla nomi di organizzazione, progetto, aree o codici.',
+  feed_failed:
+    'La lettura non è riuscita. Riprova; se si ripete, il sistema ha risposto in modo inatteso.',
   secret_value_invalid: 'La credenziale non è valida: controlla di averla copiata per intero.',
   private_host_invalid: 'Il nome del server non è valido: serve un nome, non un indirizzo.',
   private_host_unknown: 'Questo server non è fra quelli ammessi.',

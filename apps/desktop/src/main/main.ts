@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url'
 import {
   createAskQuestion,
   createDocuments,
+  createFeeds,
   createProjects,
   createSources,
   type Documents,
+  type Feeds,
   type MailArchive,
   type Projects,
   type Sources,
@@ -18,18 +20,22 @@ import { DomainError, isDomainError } from '@octo/domain'
 import {
   createAppleMailArchive,
   createClaudeCliRunner,
+  createConnectorFeedReader,
+  createFileVault,
   createFsEvidenceReader,
   createFsFolderProbe,
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
+  createJsonFeedIndexes,
   createJsonProjectRegistry,
   createJsonQuestionLog,
   createJsonSourceStates,
   createWorkerTextExtractor,
   locateClaude,
+  type SecretCipher,
 } from '@octo/infrastructure'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, safeStorage } from 'electron'
 import { CHANNELS } from '../shared/api.ts'
 import { registerIpc } from './ipc.ts'
 
@@ -43,6 +49,31 @@ const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
 const FIRST_SYNC_DELAY_MS = 10 * 1000
+/** Demos and tests only: a fake Jira or Azure DevOps on this computer instead of the real one. */
+const DEV_JIRA_VARIABLE = 'OCTO_DEV_JIRA_URL'
+const DEV_ADO_VARIABLE = 'OCTO_DEV_ADO_URL'
+/**
+ * Demos and tests only: credentials kept without the system's store, so a run needs no keychain.
+ * Never set for real use: the file would hold the credentials in clear.
+ */
+const DEMO_SECRETS_VARIABLE = 'OCTO_DEMO_PLAIN_SECRETS'
+
+/** The operating system's own store (Keychain, DPAPI): only this user reads the secrets back. */
+function secretCipher(): SecretCipher {
+  if (process.env[DEMO_SECRETS_VARIABLE] === '1') {
+    return {
+      available: () => true,
+      encrypt: (value) => new TextEncoder().encode(value),
+      decrypt: (bytes) => new TextDecoder().decode(bytes),
+    }
+  }
+  return {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (value) => safeStorage.encryptString(value),
+    decrypt: (bytes) => safeStorage.decryptString(Buffer.from(bytes)),
+  }
+}
+
 /** Built beside this file by scripts/build.mjs. */
 const EXTRACT_WORKER_FILE = 'extract-worker.mjs'
 
@@ -56,7 +87,7 @@ function mailArchive(): MailArchive {
   return { between: missing, read: missing }
 }
 
-type Feeding = { projects: Projects; sources: Sources; documents: Documents }
+type Feeding = { projects: Projects; sources: Sources; feeds: Feeds; documents: Documents }
 
 /** One step of a periodic reading: a failure of it never stops the others. */
 async function quietly(step: () => Promise<unknown>): Promise<void> {
@@ -74,6 +105,9 @@ async function feedAll(feeding: Feeding, window: BrowserWindow): Promise<void> {
     await quietly(async () => {
       if (await feeding.sources.hasMail(project)) await feeding.sources.syncMail(project)
     })
+    for (const feed of await feeding.feeds.configured(project).catch(() => [])) {
+      await quietly(() => feeding.feeds.sync(project, feed))
+    }
     await quietly(() => feeding.documents.convert(project))
     if (!window.isDestroyed()) window.webContents.send(CHANNELS.sourcesChanged, project.id)
   }
@@ -124,27 +158,45 @@ function start(): void {
     ids,
   })
   const writer = createFsMemoryWriter()
+  const settings = createFsSourceSettings()
   const sources = createSources({
-    settings: createFsSourceSettings(),
+    settings,
     states: sourceStates,
     archive: mailArchive(),
     writer,
     clock,
   })
+  const files = createFsProjectFiles()
+  const feeds = createFeeds({
+    settings,
+    states: sourceStates,
+    indexes: createJsonFeedIndexes(dataFolder),
+    secrets: createFileVault(dataFolder, secretCipher()),
+    reader: createConnectorFeedReader({
+      devEndpoints: {
+        jira: process.env[DEV_JIRA_VARIABLE],
+        ado: process.env[DEV_ADO_VARIABLE],
+      },
+    }),
+    writer,
+    files,
+    clock,
+  })
   const documents = createDocuments({
-    files: createFsProjectFiles(),
+    files,
     extractor: createWorkerTextExtractor(join(here, EXTRACT_WORKER_FILE)),
     writer,
     states: sourceStates,
     clock,
   })
   const window = createWindow()
-  const periodic = () => void feedAll({ projects, sources, documents }, window)
+  const periodic = () => void feedAll({ projects, sources, feeds, documents }, window)
   setTimeout(periodic, FIRST_SYNC_DELAY_MS)
   setInterval(periodic, SYNC_INTERVAL_MS)
   registerIpc({
     window,
     sources,
+    feeds,
     documents,
     agent,
     projects,

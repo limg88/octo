@@ -113,7 +113,7 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
   const set = (change: Partial<MailForm>) => setForm({ ...form, ...change })
 
   return (
-    <section className="sources" aria-label={messages.sourcesTab}>
+    <section className="sources" aria-label={messages.mailTitle}>
       <h3>{messages.mailTitle}</h3>
       <p className="hint">{messages.mailIntro}</p>
       <Freshness state={view.state} configured={view.config !== null} busy={busy} now={now()} />

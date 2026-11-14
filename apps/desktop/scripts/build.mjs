@@ -11,7 +11,8 @@ const shared = {
   bundle: true,
   platform: 'node',
   target: NODE_TARGET,
-  external: ['electron'],
+  // `pg-native` is an optional accelerator of `pg` that is not installed.
+  external: ['electron', 'pg-native'],
   sourcemap: true,
   logLevel: 'info',
 }
@@ -20,6 +21,11 @@ await bundle({
   ...shared,
   entryPoints: ['src/main/main.ts'],
   format: 'esm',
+  // CommonJS libraries bundled here (the Postgres client) still call `require` for Node's own
+  // modules: an ES module has none unless it is made.
+  banner: {
+    js: "import { createRequire as __octoCreateRequire } from 'node:module';const require = __octoCreateRequire(import.meta.url);",
+  },
   outfile: 'dist/main/main.mjs',
 })
 

@@ -18,7 +18,8 @@ pnpm dev          # compila e apre l'app
 ```
 packages/
   domain/          regole pure: risposta, citazioni e loro controllo, progetto
-  application/     casi d'uso e porte: fare una domanda, gestire i progetti
+  application/     casi d'uso e porte: fare una domanda, gestire i progetti, alimentare la memoria
+  connectors/      connettori di sola lettura per Azure DevOps, Jira e NetSuite/DWSI (da octobrief-new)
   infrastructure/  adattatori: Claude Code da riga di comando, archivio di Mail, estrazione del testo da Office e PDF, file del progetto, stato dell'app in JSON
 apps/
   desktop/         app Electron: processo principale (composition root), preload, interfaccia React
@@ -33,12 +34,13 @@ Le dipendenze puntano solo verso l'interno: `domain` ← `application` ← `infr
 - La domanda passa sullo standard input; la risposta torna in un formato fisso (testo, citazioni, cose non trovate).
 - Octo apre ogni file citato e cerca la frase: ciò che non trova resta nella risposta, marcato «da controllare».
 
-Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_DIR` (cartella dello stato dell'app), `OCTO_MAIL_ROOT` (un'altra cartella di Mail, per le demo).
+Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_DIR` (cartella dello stato dell'app), `OCTO_MAIL_ROOT` (un'altra cartella di Mail, per le demo). Solo per demo e test: `OCTO_DEV_ADO_URL`, `OCTO_DEV_JIRA_URL` (sistemi finti) e `OCTO_DEMO_PLAIN_SECRETS=1` (credenziali senza il Portachiavi).
 
 ## Come Octo alimenta la memoria
 - **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `.octo/sources.json` nella cartella del progetto.
 - **Documenti**: scrive in `_octo/testo/` il testo di Word, Excel, PowerPoint e PDF della cartella, con lo stesso percorso dell'originale, così Claude può cercarlo e citarlo. Riconverte solo ciò che cambia.
-- Posta e documenti partono su richiesta e ogni 15 minuti ad app aperta.
+- **Azure DevOps, Jira, NetSuite (DWSI)**: legge work item, issue e viste del warehouse con la credenziale di sola lettura del PM e ne scrive un file per elemento, più una nota (`_lettura.md`) sull'età dei dati. La credenziale resta sul computer, cifrata dal sistema.
+- Tutte le fonti partono su richiesta e ogni 15 minuti ad app aperta.
 
 ## Comandi
 | Comando | Cosa fa |
@@ -46,6 +48,7 @@ Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_
 | `pnpm dev` | compila e apre l'app |
 | `pnpm typecheck` | TypeScript strict su tutto il monorepo |
 | `pnpm lint` | Biome e regole di architettura |
+| `pnpm db:setup` | avvia il Postgres di prova per i test del warehouse (Docker) |
 | `pnpm test` | test unitari e di integrazione |
 | `pnpm test:coverage` | test con soglia di coverage all'80% |
 | `pnpm e2e` | compila e segue la demo 01 nella finestra vera, con il modello finto |

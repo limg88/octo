@@ -1,14 +1,17 @@
 import { mkdir, readFile, realpath, rm, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import type { MemoryWriter, SourceSettings, SourceStates } from '@octo/application'
+import type { FeedIndexes, MemoryWriter, SourceSettings, SourceStates } from '@octo/application'
 import {
+  cleanFeedConfig,
   cleanMailSource,
   DOMAIN_ERROR_CODES,
   DomainError,
+  type FeedName,
   NEVER_READ,
   NO_SOURCES,
   type SourceState,
   type SourcesConfig,
+  WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { z } from 'zod'
 import { isMissing, readJsonOr, writeAtomic, writeJson } from './json-file.ts'
@@ -22,7 +25,42 @@ const mailSchema = z.object({
   targetFolder: z.string(),
 })
 
-const sourcesSchema = z.object({ mail: mailSchema.nullable() })
+const feedBase = { since: z.string(), targetFolder: z.string() }
+const adoSchema = z.object({
+  ...feedBase,
+  organization: z.string(),
+  project: z.string(),
+  areas: z.array(z.string()),
+})
+const jiraSchema = z.object({
+  ...feedBase,
+  site: z.string(),
+  email: z.string(),
+  projects: z.array(z.string()),
+})
+const dwsiSchema = z.object({
+  ...feedBase,
+  host: z.string(),
+  port: z.number(),
+  database: z.string(),
+  user: z.string(),
+  ownerEmail: z.string(),
+  projectCodes: z.array(z.string()),
+  tls: z.enum(WAREHOUSE_TLS_MODES),
+})
+
+// A file written before a source existed simply does not name it.
+const sourcesSchema = z.object({
+  mail: mailSchema.nullable().default(null),
+  ado: adoSchema.nullable().default(null),
+  jira: jiraSchema.nullable().default(null),
+  dwsi: dwsiSchema.nullable().default(null),
+})
+
+const indexSchema = z.object({
+  scope: z.string().nullable(),
+  items: z.record(z.string(), z.object({ version: z.string(), path: z.string() })),
+})
 
 const stateSchema = z.object({
   cursor: z.string().nullable(),
@@ -46,6 +84,13 @@ const STATES_FOLDER = 'sources'
 const VAULT_INBOX = 'raw'
 const MAIL_FOLDER_IN_VAULT = 'raw/Mail'
 const MAIL_FOLDER = 'Posta'
+const FEEDS_FOLDER = 'Fonti'
+const FEED_FOLDERS: Readonly<Record<FeedName, string>> = {
+  ado: 'ADO',
+  jira: 'Jira',
+  dwsi: 'NetSuite',
+}
+const INDEXES_FOLDER = 'feeds'
 const PRIVATE_FILE_MODE = 0o600
 
 /**
@@ -78,6 +123,11 @@ export function createFsMemoryWriter(): MemoryWriter {
   }
 }
 
+async function hasVaultInbox(projectFolder: string): Promise<boolean> {
+  const inbox = await stat(join(projectFolder, VAULT_INBOX)).catch(() => null)
+  return inbox?.isDirectory() === true
+}
+
 export function createFsSourceSettings(): SourceSettings {
   const fileOf = (projectFolder: string) =>
     join(projectFolder, PROJECT_SETTINGS_FOLDER, SOURCES_FILE)
@@ -85,12 +135,21 @@ export function createFsSourceSettings(): SourceSettings {
     async load(projectFolder): Promise<SourcesConfig> {
       const parsed = sourcesSchema.safeParse(await readJsonOr(fileOf(projectFolder), NO_SOURCES))
       if (!parsed.success) throw new DomainError('source_config_invalid', SOURCES_FILE)
-      return { mail: parsed.data.mail ? cleanMailSource(parsed.data.mail) : null }
+      const { mail, ado, jira, dwsi } = parsed.data
+      return {
+        mail: mail ? cleanMailSource(mail) : null,
+        ado: ado ? cleanFeedConfig('ado', ado) : null,
+        jira: jira ? cleanFeedConfig('jira', jira) : null,
+        dwsi: dwsi ? cleanFeedConfig('dwsi', dwsi) : null,
+      }
     },
     save: (projectFolder, config) => writeJson(fileOf(projectFolder), config),
     async suggestMailFolder(projectFolder) {
-      const inbox = await stat(join(projectFolder, VAULT_INBOX)).catch(() => null)
-      return inbox?.isDirectory() ? MAIL_FOLDER_IN_VAULT : MAIL_FOLDER
+      return (await hasVaultInbox(projectFolder)) ? MAIL_FOLDER_IN_VAULT : MAIL_FOLDER
+    },
+    async suggestFeedFolder(projectFolder, feed) {
+      const base = (await hasVaultInbox(projectFolder)) ? VAULT_INBOX : FEEDS_FOLDER
+      return `${base}/${FEED_FOLDERS[feed]}`
     },
   }
 }
@@ -108,5 +167,19 @@ export function createJsonSourceStates(dataFolder: string): SourceStates {
       await writeJson(fileOf(projectId), next, PRIVATE_FILE_MODE)
     },
     removeProject: (projectId) => rm(fileOf(projectId), { force: true }),
+  }
+}
+
+/** What each feed wrote from this computer: kept in the app's data folder, beside the cursors. */
+export function createJsonFeedIndexes(dataFolder: string): FeedIndexes {
+  const folderOf = (projectId: string) =>
+    join(dataFolder, INDEXES_FOLDER, encodeURIComponent(projectId))
+  const fileOf = (projectId: string, feed: FeedName) => join(folderOf(projectId), `${feed}.json`)
+  return {
+    load: async (projectId, feed) =>
+      indexSchema.parse(await readJsonOr(fileOf(projectId, feed), { scope: null, items: {} })),
+    save: (projectId, feed, scope, items) =>
+      writeJson(fileOf(projectId, feed), { scope, items }, PRIVATE_FILE_MODE),
+    removeProject: (projectId) => rm(folderOf(projectId), { recursive: true, force: true }),
   }
 }

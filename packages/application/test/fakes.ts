@@ -2,6 +2,9 @@ import {
   type ArchivedMail,
   type DraftAnswer,
   type Evidence,
+  type FeedIndex,
+  type FeedName,
+  type FeedStep,
   type MailMessage,
   NEVER_READ,
   NO_SOURCES,
@@ -15,12 +18,16 @@ import type {
   AskRequest,
   Clock,
   EvidenceReader,
+  FeedIndexes,
+  FeedReader,
   FolderProbe,
   IdGenerator,
   MailArchive,
   MemoryWriter,
+  ProjectFiles,
   ProjectRegistry,
   QuestionLog,
+  SecretVault,
   SourceSettings,
   SourceStates,
 } from '../src/index.ts'
@@ -120,6 +127,7 @@ export function memorySourceSettings(initial: SourcesConfig = NO_SOURCES): Sourc
       config = next
     },
     suggestMailFolder: async () => 'Posta',
+    suggestFeedFolder: async (_folder, feed) => `Fonti/${feed}`,
   }
 }
 
@@ -150,5 +158,74 @@ export function archiveOf(
     },
     read: async (mail) =>
       mails instanceof Error ? null : (mails.find((m) => m.id === mail.id)?.message ?? null),
+  }
+}
+
+export function memoryVault(): SecretVault & { all: Map<string, string> } {
+  const all = new Map<string, string>()
+  return {
+    all,
+    get: async (key) => all.get(key) ?? null,
+    set: async (key, value) => {
+      all.set(key, value)
+    },
+    remove: async (key) => {
+      all.delete(key)
+    },
+  }
+}
+
+export function memoryFeedIndexes(): FeedIndexes {
+  const all = new Map<string, { scope: string | null; items: FeedIndex }>()
+  return {
+    load: async (projectId, feed) => all.get(`${projectId}/${feed}`) ?? { scope: null, items: {} },
+    save: async (projectId, feed, scope, items) => {
+      all.set(`${projectId}/${feed}`, { scope, items: { ...items } })
+    },
+    removeProject: async (projectId) => {
+      for (const key of [...all.keys()]) {
+        if (key.startsWith(`${projectId}/`)) all.delete(key)
+      }
+    },
+  }
+}
+
+/** The removals of a project, applied to the files a memory writer holds. */
+export function removerOf(files: Map<string, string>): ProjectFiles {
+  const unused = async (): Promise<never> => {
+    throw new Error('not used by this test')
+  }
+  return {
+    withExtensions: unused,
+    read: unused,
+    readText: async (_folder, path) => files.get(path) ?? null,
+    under: unused,
+    remove: async (_folder, path) => {
+      files.delete(path)
+    },
+  }
+}
+
+export type ScriptedFeed = FeedReader & {
+  checks: Array<{ feed: FeedName; secret: string }>
+  cursors: unknown[]
+}
+
+/** A feed reader that gives the steps of a script, or fails as told. */
+export function scriptedFeed(script: { steps?: FeedStep[]; fails?: Error }): ScriptedFeed {
+  const checks: ScriptedFeed['checks'] = []
+  const cursors: unknown[] = []
+  return {
+    checks,
+    cursors,
+    check: async (feed, _config, secret) => {
+      checks.push({ feed, secret })
+      if (script.fails) throw script.fails
+    },
+    async *read(_feed, _config, _secret, cursor) {
+      cursors.push(cursor)
+      for (const step of script.steps ?? []) yield step
+      if (script.fails) throw script.fails
+    },
   }
 }
