@@ -41,7 +41,10 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
     }))
   }, [candidates])
 
-  const change = (part: Partial<DashboardSettings>) => setDraft({ ...draft, ...part })
+  // Always from the latest draft: two quick changes never lose the first.
+  const update = (part: (current: DashboardSettings) => Partial<DashboardSettings>) =>
+    setDraft((current) => ({ ...current, ...part(current) }))
+  const change = (part: Partial<DashboardSettings>) => update(() => part)
   const verifyStates = view?.states.filter((entry) => entry.phase === 'verify') ?? []
 
   async function submit() {
@@ -93,7 +96,9 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
           options={view.periods}
           chosen={draft.requirementPeriods}
           onToggle={(period) =>
-            change({ requirementPeriods: toggled(draft.requirementPeriods, period) })
+            update((current) => ({
+              requirementPeriods: toggled(current.requirementPeriods, period),
+            }))
           }
         />
       )}
@@ -102,7 +107,9 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
           legend={text.handover}
           options={verifyStates.map((entry) => entry.state)}
           chosen={draft.handoverStates}
-          onToggle={(state) => change({ handoverStates: toggled(draft.handoverStates, state) })}
+          onToggle={(state) =>
+            update((current) => ({ handoverStates: toggled(current.handoverStates, state) }))
+          }
         />
       )}
       {view && view.states.length > 0 && (
@@ -117,9 +124,9 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
               <select
                 value={draft.phases[entry.state] ?? entry.phase}
                 onChange={(event) =>
-                  change({
-                    phases: { ...draft.phases, [entry.state]: event.target.value as Phase },
-                  })
+                  update((current) => ({
+                    phases: { ...current.phases, [entry.state]: event.target.value as Phase },
+                  }))
                 }
               >
                 {PHASES.map((phase) => (

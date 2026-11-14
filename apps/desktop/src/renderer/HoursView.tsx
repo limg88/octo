@@ -380,7 +380,10 @@ function SettingsForm({
         type={type}
         list={options.length > 0 ? `hours-${name}` : undefined}
         value={draft[name]}
-        onChange={(event) => setDraft({ ...draft, [name]: event.target.value })}
+        onChange={(event) => {
+          const { value } = event.target
+          setDraft((current) => ({ ...current, [name]: value }))
+        }}
       />
       {options.length > 0 && (
         <datalist id={`hours-${name}`}>
@@ -426,7 +429,10 @@ function SettingsForm({
         {text.aliases}
         <textarea
           value={draft.aliases}
-          onChange={(event) => setDraft({ ...draft, aliases: event.target.value })}
+          onChange={(event) => {
+            const { value } = event.target
+            setDraft((current) => ({ ...current, aliases: value }))
+          }}
         />
       </label>
       <div className="actions">
