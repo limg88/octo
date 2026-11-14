@@ -91,6 +91,75 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  progressTab: 'Avanzamento',
+  progress: {
+    loading: 'Preparo l’avanzamento…',
+    intro:
+      'Compilo il modulo con cui si chiede al cliente di riconoscere una quota dell’ordine: una richiesta per fattura. Le percentuali per posizione vengono dagli importi dell’ordine e delle richieste che scrivi qui: nessuna cifra è presa altrove. Scrivo una copia del modulo: quello vuoto non lo tocco.',
+    orderTitle: 'Ordine e richieste',
+    order: 'Ordine, come lo nomina il modulo',
+    total: 'Totale dichiarato dall’ordine (per controllo)',
+    positions: 'Posizioni dell’ordine: una riga per posizione, «codice; importo»',
+    requestsTitle: 'Richieste, in ordine di tempo',
+    requestN: (n: number) => `Richiesta ${n}`,
+    from: 'Dal',
+    to: 'Al',
+    amount: 'Importo della richiesta',
+    requestPositions:
+      'Solo su queste posizioni (separate da virgola; vuoto: a partire dalla prima)',
+    note: 'Annotazione',
+    addRequest: 'Aggiungi una richiesta',
+    removeRequest: (n: number) => `Togli la richiesta ${n}`,
+    save: 'Salva',
+    formTitle: 'Il modulo del cliente',
+    modelPath: 'Modulo vuoto: file Excel nella cartella del progetto',
+    fields: 'Che cosa va in ogni cella: una riga per cella, «cella = testo»',
+    fieldsHint:
+      'Nel testo puoi usare {n} (numero della richiesta), {ordine}, {posizioni}, {dal}, {al}, {al_precedente}, {nota}. Tutto il resto è scritto com’è.',
+    table:
+      'Tabella delle posizioni: «prima riga; numero di righe; colonna posizione; precedente; attuale; di periodo»',
+    columnPosition: 'Posizione',
+    columnAmount: 'Importo',
+    columnPrevious: 'Precedente',
+    columnCurrent: 'Attuale',
+    columnPeriod: 'Di periodo',
+    share: (value: number) =>
+      `${(value * 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+    money: (value: number) =>
+      value.toLocaleString('it-IT', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: 'always',
+      }),
+    summary: (period: string, amount: string, cumulative: string, total: string) =>
+      `${period}: ${amount}, in tutto ${cumulative} su ${total}`,
+    period: (from: string, to: string) => `dal ${from || '…'} al ${to || '…'}`,
+    closing: 'Raggiunge il totale dell’ordine: tutte le posizioni chiudono al 100%.',
+    drift: (amount: string) =>
+      `Le percentuali, arrotondate a due decimali, ricostruiscono ${amount} in più o in meno dell’importo chiesto: il modulo non ha importi, lo scarto non si può togliere.`,
+    noRequests: 'Nessuna richiesta: aggiungine una.',
+    problem: {
+      no_positions: 'Scrivi le posizioni dell’ordine con i loro importi.',
+      over_total: (n: number, excess: string) =>
+        `La richiesta ${n} porta il totale chiesto ${excess} oltre il totale dell’ordine.`,
+      unknown_positions: (n: number, codes: string) =>
+        `La richiesta ${n} nomina posizioni che l’ordine non ha: ${codes}.`,
+      over_positions: (n: number, excess: string) =>
+        `La richiesta ${n} supera di ${excess} quello che resta sulle posizioni che nomina.`,
+    },
+    warning: {
+      total_differs: (declared: string, positions: string) =>
+        `Le posizioni sommano ${positions}, l’ordine dichiara ${declared}: controlla gli importi.`,
+      dates_missing: (n: number) => `Richiesta ${n}: mancano le date.`,
+      dates_not_chained: (n: number) =>
+        `Richiesta ${n}: «Dal» non è l’«Al» della richiesta precedente.`,
+      note_missing: (n: number) =>
+        `Richiesta ${n}: manca l’annotazione (la fattura a cui si riferisce).`,
+    },
+    compile: (n: number) => `Compila il modulo della richiesta ${n}`,
+    compiled: (path: string) => `Modulo compilato in ${path}. Quello vuoto non è stato toccato.`,
+    open: 'Apri il file',
+  },
   forecastTab: 'Previsionale',
   forecast: {
     loading: 'Preparo il previsionale…',
@@ -517,6 +586,15 @@ const errors: Record<ErrorCode, string> = {
   forecast_month_invalid: 'Il mese non è valido.',
   forecast_settings_invalid:
     'Le impostazioni del previsionale non sono valide: il modello deve stare nella cartella del progetto.',
+  progress_model_not_set: 'Indica il file Excel del modulo vuoto.',
+  progress_model_missing: 'Non trovo il file del modulo nel posto indicato.',
+  progress_model_invalid:
+    'Non riesco a scrivere nel modulo: non è un file Excel leggibile, o una cella indicata sta su una riga che il modulo non ha.',
+  progress_settings_invalid:
+    'Le impostazioni dell’avanzamento non sono valide: il modulo deve stare nella cartella del progetto.',
+  progress_not_computable:
+    'Le percentuali non si possono calcolare, o le posizioni sono più delle righe della tabella del modulo: correggi i dati segnalati.',
+  progress_request_missing: 'Questa richiesta non c’è più.',
   forecast_timesheet_not_set: 'Indica prima, nella scheda «Ore», dove sono i timesheet.',
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',

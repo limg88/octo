@@ -2,10 +2,19 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SheetWrite } from '@octo/application'
-import { DEFAULT_FORECAST_SETTINGS, NO_ROW_INPUTS, readForecastModel } from '@octo/domain'
+import {
+  DEFAULT_FORECAST_SETTINGS,
+  DEFAULT_PROGRESS_SETTINGS,
+  NO_ROW_INPUTS,
+  readForecastModel,
+} from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createFsForecastSettings, createXlsxModel } from '../src/index.ts'
+import {
+  createFsForecastSettings,
+  createFsProgressSettings,
+  createXlsxModel,
+} from '../src/index.ts'
 import { forecastModelXlsx } from './support/forecast-xlsx.ts'
 
 const sheets = createXlsxModel()
@@ -98,6 +107,8 @@ describe('a spreadsheet model', () => {
     expect(after['xl/styles.xml']).toContain(
       '<xf fontId="0" fillId="0" borderId="0" xfId="0" numFmtId="10" applyNumberFormat="1"/><xf fontId="0" fillId="0" borderId="0" xfId="0" numFmtId="10" applyNumberFormat="1"/></cellXfs>',
     )
+    const number: SheetWrite = { ref: 'H2', cell: { kind: 'number', value: 0.5, percent: true } }
+    expect(partsOf(sheets.fill(model, [number]))[SHEET]).toContain('<c r="H2" s="4"><v>0.5</v></c>')
     // A workbook without styles keeps the cell as it is.
     const { 'xl/styles.xml': _styles, ...bare } = unzipSync(model)
     const plain = partsOf(sheets.fill(zipSync(bare), [share('H2')]))
@@ -137,5 +148,27 @@ describe('the settings of the forecast on disk', () => {
     const { writeFile } = await import('node:fs/promises')
     await writeFile(file, JSON.stringify({ rates: 'none' }))
     await expect(store.load(folder)).rejects.toThrow('forecast_settings_invalid')
+  })
+
+  it('keep the order, the requests and the map of the form', async () => {
+    const store = createFsProgressSettings()
+    expect(await store.load(folder)).toEqual(DEFAULT_PROGRESS_SETTINGS)
+    const settings = {
+      ...DEFAULT_PROGRESS_SETTINGS,
+      modelPath: 'Moduli/Richiesta.xlsx',
+      positions: [{ code: '1', amount: 600 }],
+      requests: [
+        { n: 1, from: '2026-03-01', to: '2026-03-31', amount: 100, note: 'x', positions: ['1'] },
+      ],
+      form: {
+        fields: [{ ref: 'D2', text: '{n}' }],
+        table: { firstRow: 14, rows: 6, position: 'A', previous: 'B', current: 'C', period: 'D' },
+      },
+    }
+    await store.save(folder, settings)
+    expect(await store.load(folder)).toEqual(settings)
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(folder, '_octo', '.impostazioni', 'progress.json'), '{"positions":1}')
+    await expect(store.load(folder)).rejects.toThrow('progress_settings_invalid')
   })
 })

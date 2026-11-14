@@ -2,11 +2,17 @@ import type { ForecastExternal, ForecastRate } from '@octo/domain'
 
 const FIELD_SEPARATOR = ';'
 
-/** A number as an Italian PM types it: `1.234,5` and `1234.5` are the same amount. */
+const THOUSANDS = /^\d{1,3}(\.\d{3})+$/
+
+/**
+ * A number as an Italian PM types it: `1.234,5` and `1234.5` are the same amount, and points
+ * every three digits (`120.000`) separate thousands.
+ */
 export function amountOf(typed: string): number | null {
   const compact = typed.replace(/\s|€/g, '')
   if (compact === '') return null
-  const plain = compact.includes(',') ? compact.replaceAll('.', '').replace(',', '.') : compact
+  const italian = compact.includes(',') || THOUSANDS.test(compact)
+  const plain = italian ? compact.replaceAll('.', '').replace(',', '.') : compact
   const value = Number(plain)
   return Number.isFinite(value) ? value : null
 }

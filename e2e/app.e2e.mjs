@@ -367,6 +367,55 @@ try {
   assert.ok(readFileSync(modelFile).equals(modelBefore))
   await page.screenshot({ path: `${work}/previsionale.png` })
 
+  // Demo 10: progress requests on the form of the client.
+  execFileSync('node', [`${root}demo/lib/fake-progress.ts`, `${work}/Aurora`])
+  const formFile = `${work}/Aurora/Moduli/Richiesta stato avanzamento.xlsx`
+  const formBefore = readFileSync(formFile)
+  await page.getByRole('tab', { name: 'Avanzamento' }).click()
+  const order10 = page.getByRole('region', { name: 'Ordine e richieste' })
+  await order10.waitFor({ timeout: TIMEOUT_MS })
+  await order10.getByLabel(/^Ordine, come/).fill('ORD-2026-077')
+  await order10.getByLabel(/^Totale dichiarato/).fill('340.000')
+  await order10
+    .getByLabel(/^Posizioni dell’ordine/)
+    .fill('00001; 100.000\n00002; 60.000\n00003; 142.000\n00004; 38.000')
+  const addRequest = async (n, from, to, amount, note) => {
+    await page.getByRole('button', { name: 'Aggiungi una richiesta' }).click()
+    const group = page.getByRole('group', { name: `Richiesta ${n}` })
+    if (from) await group.getByLabel('Dal', { exact: true }).fill(from)
+    await group.getByLabel('Al', { exact: true }).fill(to)
+    await group.getByLabel('Importo della richiesta').fill(amount)
+    await group.getByLabel('Annotazione').fill(note)
+  }
+  await addRequest(1, '2026-03-01', '2026-03-31', '289.540', 'Fattura n. 101 del 31/03/2026')
+  await page.locator('.settings-form').getByRole('button', { name: 'Salva' }).click()
+  const request10 = (n) => page.getByRole('region', { name: `Richiesta ${n}`, exact: true })
+  await request10(1).getByText('91,23%').first().waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('Ordine e richieste').click()
+  await addRequest(2, '', '2026-04-30', '50.460', 'Fattura da emettere il 30/04/2026')
+  assert.equal(
+    await page
+      .getByRole('group', { name: 'Richiesta 2' })
+      .getByLabel('Dal', { exact: true })
+      .inputValue(),
+    '2026-03-31',
+  )
+  await page.locator('.settings-form').getByRole('button', { name: 'Salva' }).click()
+  await request10(2)
+    .getByText(/^Raggiunge il totale dell’ordine/)
+    .waitFor({ timeout: TIMEOUT_MS })
+  await request10(2).getByText('8,77%').waitFor()
+  await page.getByRole('button', { name: 'Compila il modulo della richiesta 1' }).click()
+  await page
+    .getByText(/^Modulo compilato in _octo\/avanzamento\/Richiesta stato avanzamento - 1\.xlsx/)
+    .waitFor({ timeout: TIMEOUT_MS })
+  const filledForm = readFileSync(
+    `${work}/Aurora/_octo/avanzamento/Richiesta stato avanzamento - 1.xlsx`,
+  )
+  assert.ok(filledForm.length > 0 && !filledForm.equals(formBefore))
+  assert.ok(readFileSync(formFile).equals(formBefore))
+  await page.screenshot({ path: `${work}/avanzamento.png` })
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

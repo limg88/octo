@@ -12,6 +12,8 @@ import type {
   HoursCandidates,
   HoursView,
   MailSourceView,
+  ProgressFile,
+  ProgressView,
   TrackerHoursRun,
 } from '@octo/application'
 import type {
@@ -28,6 +30,7 @@ import type {
   MailPreview,
   MailSourceConfig,
   OwnKindInput,
+  ProgressSettings,
   Project,
   QuestionRecord,
   SourceRun,
@@ -90,6 +93,11 @@ export const CHANNELS = {
   forecastCandidates: 'forecast:candidates',
   forecastView: 'forecast:view',
   forecastCompile: 'forecast:compile',
+  progressSettingsGet: 'progress:settings:get',
+  progressSettingsSave: 'progress:settings:save',
+  progressCandidates: 'progress:candidates',
+  progressView: 'progress:view',
+  progressCompile: 'progress:compile',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -201,6 +209,17 @@ export type OctoApi = {
   forecastView(projectId: string, month: string): Promise<Result<ForecastView>>
   /** Writes a filled copy of the model for the month; the model itself is never touched. */
   compileForecast(projectId: string, month: string): Promise<Result<ForecastFile>>
+  progressSettings(projectId: string): Promise<Result<ProgressSettings>>
+  saveProgressSettings(
+    projectId: string,
+    settings: ProgressSettings,
+  ): Promise<Result<ProgressSettings>>
+  /** Spreadsheets of the project that look like the progress form of the client. */
+  progressCandidates(projectId: string): Promise<Result<string[]>>
+  /** The share of each order position after each request. */
+  progressView(projectId: string): Promise<Result<ProgressView>>
+  /** Writes the filled form of request `n`; the empty form is never touched. */
+  compileProgress(projectId: string, n: number): Promise<Result<ProgressFile>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

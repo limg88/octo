@@ -13,5 +13,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 07 | Cruscotto: bug aperti per fase, fermi oltre soglia, andamento su un periodo a scelta e requisiti poco chiari, calcolati dal codice da un'esportazione del tracker nella cartella | `bash demo/07-cruscotto/run.sh` | [COPIONE](07-cruscotto/COPIONE.md) |
 | 08 | Ore: le ore approvate dei timesheet confrontate con quelle segnate sul tracker, persona per persona, con quadratura, nomi diversi riconosciuti e assenze attese | `bash demo/08-ore/run.sh` | [COPIONE](08-ore/COPIONE.md) |
 | 09 | Previsionale: il modello Excel dell'amministrazione compilato dal codice, una riga per codice di progetto, con formule vive, dati mancanti dichiarati e originale intatto | `bash demo/09-previsionale/run.sh` | [COPIONE](09-previsionale/COPIONE.md) |
+| 10 | Avanzamento: le richieste di stato di avanzamento per posizione d'ordine, percentuali calcolate dal codice e scritte sul modulo Excel del cliente secondo una mappa delle celle | `bash demo/10-avanzamento/run.sh` | [COPIONE](10-avanzamento/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 09 nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 10 nella finestra vera, senza intervento.

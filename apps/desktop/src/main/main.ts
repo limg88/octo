@@ -13,6 +13,7 @@ import {
   createFeeds,
   createForecasts,
   createHours,
+  createProgress,
   createProjects,
   createSources,
   type Feeding,
@@ -32,6 +33,7 @@ import {
   createFsForecastSettings,
   createFsHoursSettings,
   createFsMemoryWriter,
+  createFsProgressSettings,
   createFsProjectFiles,
   createFsSourceSettings,
   createFsTrackerExports,
@@ -194,6 +196,7 @@ function start(): void {
     writer,
     clock,
   })
+  const sheets = createXlsxModel()
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, feeds, documents })
   const periodic = () => void feedAll(projects, feeding, window)
@@ -223,10 +226,11 @@ function start(): void {
     forecasts: createForecasts({
       settings: createFsForecastSettings(),
       files,
-      sheets: createXlsxModel(),
+      sheets,
       timesheet: (project) => hours.timesheet(project),
       writer,
     }),
+    progress: createProgress({ settings: createFsProgressSettings(), files, sheets, writer }),
     agent,
     projects,
     questions,

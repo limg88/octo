@@ -5,15 +5,18 @@ import type {
   ExportCandidates,
   ForecastSettingsStore,
   HoursSettingsStore,
+  ProgressSettingsStore,
   TrackerExports,
 } from '@octo/application'
 import {
   cleanDashboardSettings,
   cleanForecastSettings,
   cleanHoursSettings,
+  cleanProgressSettings,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
+  DEFAULT_PROGRESS_SETTINGS,
   DomainError,
   isDomainError,
   NO_DECISIONS,
@@ -138,6 +141,55 @@ export function createFsForecastSettings(): ForecastSettingsStore {
       const parsed = forecastSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       if (!parsed.success) throw new DomainError('forecast_settings_invalid', FORECAST_FILE)
       return cleanForecastSettings(parsed.data)
+    },
+    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const PROGRESS_FILE = 'progress.json'
+const progressSchema = z.object({
+  modelPath: z.string().default(DEFAULT_PROGRESS_SETTINGS.modelPath),
+  order: z.string().default(DEFAULT_PROGRESS_SETTINGS.order),
+  total: z.number().nullable().default(DEFAULT_PROGRESS_SETTINGS.total),
+  positions: z.array(z.object({ code: z.string(), amount: z.number() })).default([]),
+  requests: z
+    .array(
+      z.object({
+        n: z.number(),
+        from: z.string(),
+        to: z.string(),
+        amount: z.number(),
+        note: z.string().default(''),
+        positions: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  form: z
+    .object({
+      fields: z.array(z.object({ ref: z.string(), text: z.string() })).default([]),
+      table: z
+        .object({
+          firstRow: z.number(),
+          rows: z.number(),
+          position: z.string(),
+          previous: z.string(),
+          current: z.string(),
+          period: z.string(),
+        })
+        .nullable()
+        .default(null),
+    })
+    .default(DEFAULT_PROGRESS_SETTINGS.form),
+})
+
+export function createFsProgressSettings(): ProgressSettingsStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, PROGRESS_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = progressSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('progress_settings_invalid', PROGRESS_FILE)
+      return cleanProgressSettings(parsed.data)
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }

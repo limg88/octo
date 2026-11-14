@@ -11,6 +11,7 @@ import type {
   Feeds,
   Forecasts,
   Hours,
+  Progress,
   Projects,
   QuestionLog,
   Sources,
@@ -35,6 +36,7 @@ export type IpcDeps = {
   dashboard: Dashboard
   hours: Hours
   forecasts: Forecasts
+  progress: Progress
   folderDialogTitle: string
   letterheadDialogTitle: string
 }
@@ -191,6 +193,43 @@ const forecastSettingsInput = byProject.extend({
   }),
 })
 const forecastMonthInput = byProject.extend({ month: rule })
+
+const progressSettingsInput = byProject.extend({
+  settings: z.object({
+    modelPath: rule,
+    order: rule,
+    total: money,
+    positions: z.array(z.object({ code: rule, amount: z.number() })).max(MAX_RULES),
+    requests: z
+      .array(
+        z.object({
+          n: z.number(),
+          from: rule,
+          to: rule,
+          amount: z.number(),
+          note: z.string().max(MAX_INPUT_LENGTH),
+          positions: ruleList,
+        }),
+      )
+      .max(MAX_RULES),
+    form: z.object({
+      fields: z
+        .array(z.object({ ref: rule, text: z.string().max(MAX_INPUT_LENGTH) }))
+        .max(MAX_RULES),
+      table: z
+        .object({
+          firstRow: z.number(),
+          rows: z.number(),
+          position: rule,
+          previous: rule,
+          current: rule,
+          period: rule,
+        })
+        .nullable(),
+    }),
+  }),
+})
+const progressCompileInput = byProject.extend({ n: z.number().int().min(1) })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -433,6 +472,26 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.forecastCompile, forecastMonthInput, async (input) =>
     deps.forecasts.compile(await deps.projects.get(input.projectId), input.month),
+  )
+
+  handle(CHANNELS.progressSettingsGet, byProject, async ({ projectId }) =>
+    deps.progress.settings(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.progressSettingsSave, progressSettingsInput, async (input) =>
+    deps.progress.saveSettings(await deps.projects.get(input.projectId), input.settings),
+  )
+
+  handle(CHANNELS.progressCandidates, byProject, async ({ projectId }) =>
+    deps.progress.candidates(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.progressView, byProject, async ({ projectId }) =>
+    deps.progress.view(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.progressCompile, progressCompileInput, async (input) =>
+    deps.progress.compile(await deps.projects.get(input.projectId), input.n),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

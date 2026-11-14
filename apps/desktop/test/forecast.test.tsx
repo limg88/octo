@@ -110,6 +110,8 @@ describe('what the PM types', () => {
   it('reads amounts written the Italian way', () => {
     expect(amountOf('1.234,5')).toBe(1234.5)
     expect(amountOf(' 1234.5 € ')).toBe(1234.5)
+    expect(amountOf('120.000')).toBe(120000)
+    expect(amountOf('1.5')).toBe(1.5)
     expect(amountOf('')).toBeNull()
     expect(amountOf('abc')).toBeNull()
     expect(amountText(1234.5)).toBe('1234,5')

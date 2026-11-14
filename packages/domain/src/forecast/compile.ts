@@ -16,7 +16,7 @@ export type ForecastCell =
       /** Shown as a percentage even where the model's column holds days. */
       percent?: true
     }
-  | { kind: 'number'; value: number }
+  | { kind: 'number'; value: number; percent?: true }
   | { kind: 'text'; value: string }
   | { kind: 'empty' }
 

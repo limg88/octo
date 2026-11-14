@@ -115,7 +115,7 @@ class Looks {
 
   /** The look of a cell: its own, or the percentage twin when the cell asks for one. */
   of(base: string | undefined, cell: ForecastCell): string | undefined {
-    if (cell.kind !== 'formula' || !cell.percent) return base
+    if ((cell.kind !== 'formula' && cell.kind !== 'number') || !cell.percent) return base
     const index = Number(base ?? 0)
     const look = this.known[index]
     if (look === undefined) return base

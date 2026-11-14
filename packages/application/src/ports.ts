@@ -17,6 +17,7 @@ import type {
   HoursSettings,
   JiraFeedConfig,
   MailMessage,
+  ProgressSettings,
   Project,
   QuestionRecord,
   RedTeamReport,
@@ -283,4 +284,10 @@ export interface SpreadsheetModel {
   read(bytes: Uint8Array): SheetGrid
   /** A copy of the file with the cells written in its first sheet. */
   fill(bytes: Uint8Array, writes: readonly SheetWrite[]): Uint8Array
+}
+
+/** The order, the requests and the map of the client's form, kept with Octo's settings. */
+export interface ProgressSettingsStore {
+  load(projectFolder: string): Promise<ProgressSettings>
+  save(projectFolder: string, settings: ProgressSettings): Promise<void>
 }

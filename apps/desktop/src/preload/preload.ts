@@ -73,6 +73,12 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.forecastView, { projectId, month }),
   compileForecast: (projectId, month) =>
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
+  progressSettings: (projectId) => ipcRenderer.invoke(CHANNELS.progressSettingsGet, { projectId }),
+  saveProgressSettings: (projectId, settings) =>
+    ipcRenderer.invoke(CHANNELS.progressSettingsSave, { projectId, settings }),
+  progressCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.progressCandidates, { projectId }),
+  progressView: (projectId) => ipcRenderer.invoke(CHANNELS.progressView, { projectId }),
+  compileProgress: (projectId, n) => ipcRenderer.invoke(CHANNELS.progressCompile, { projectId, n }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>
