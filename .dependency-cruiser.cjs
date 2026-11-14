@@ -1,4 +1,4 @@
-/** Dependency rule: domain <- application <- infrastructure <- apps. */
+/** Dependency rule: domain <- application <- infrastructure <- apps; connectors know only domain. */
 module.exports = {
   forbidden: [
     {
@@ -12,6 +12,12 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/application/src' },
       to: { path: '^(packages/infrastructure|apps)/|^node:', pathNot: '^packages/application/src' },
+    },
+    {
+      name: 'connectors-depend-on-domain-only',
+      severity: 'error',
+      from: { path: '^packages/connectors/src' },
+      to: { path: '^(packages/(application|infrastructure)|apps)/' },
     },
     {
       name: 'infrastructure-does-not-know-apps',

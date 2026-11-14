@@ -90,6 +90,14 @@ const errors: Record<ErrorCode, string> = {
   mail_archive_unreadable:
     'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo.',
   mail_reader_missing: 'Su questo sistema la lettura della posta non è ancora disponibile.',
+  secret_value_invalid: 'La credenziale non è valida: controlla di averla copiata per intero.',
+  private_host_invalid: 'Il nome del server non è valido: serve un nome, non un indirizzo.',
+  private_host_unknown: 'Questo server non è fra quelli ammessi.',
+  private_host_duplicate: 'Questo server è già in elenco.',
+  private_hosts_too_many: 'Troppi server in elenco.',
+  private_host_ca_invalid: 'Il certificato dell’autorità non è leggibile.',
+  private_host_ca_too_long: 'Il certificato dell’autorità è troppo lungo.',
+  private_host_ca_not_verified: 'Il certificato del server non è stato verificato.',
   unexpected: 'Qualcosa non ha funzionato. Riprova.',
 }
 

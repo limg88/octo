@@ -13,6 +13,14 @@ export const DOMAIN_ERROR_CODES = [
   'source_busy',
   'mail_archive_unreadable',
   'mail_reader_missing',
+  'secret_value_invalid',
+  'private_host_invalid',
+  'private_host_unknown',
+  'private_host_duplicate',
+  'private_hosts_too_many',
+  'private_host_ca_invalid',
+  'private_host_ca_too_long',
+  'private_host_ca_not_verified',
 ] as const
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]

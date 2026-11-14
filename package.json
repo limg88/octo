@@ -10,6 +10,7 @@
     "dev": "pnpm --filter @octo/desktop dev",
     "build": "pnpm --filter @octo/desktop build",
     "dist": "pnpm --filter @octo/desktop dist",
+    "db:setup": "bash scripts/db-setup.sh",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && pnpm arch",
     "arch": "depcruise packages apps --config .dependency-cruiser.cjs",
