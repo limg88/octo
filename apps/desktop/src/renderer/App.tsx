@@ -3,6 +3,7 @@ import type { Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AskView } from './AskView.tsx'
+import { DocumentsSection } from './DocumentsSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { SourcesView } from './SourcesView.tsx'
 
@@ -115,7 +116,10 @@ export function App({ api }: Props) {
             {tab === 'ask' ? (
               <AskView api={api} project={selected} />
             ) : (
-              <SourcesView api={api} project={selected} />
+              <div className="sources-page">
+                <SourcesView api={api} project={selected} />
+                <DocumentsSection api={api} project={selected} />
+              </div>
             )}
           </>
         ) : (

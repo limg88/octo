@@ -56,7 +56,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | Fetta | Stato |
 |---|---|
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
-| F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Restano: file Office convertiti in testo, ADO, Jira, DWSI, posta su Windows |
+| F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Restano: ADO, Jira, DWSI, posta su Windows |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -86,3 +86,16 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Permesso su macOS**: leggere `~/Library/Mail` richiede «Accesso completo al disco» per Octo. Se manca, la pagina lo dice.
 - **Windows**: nessun lettore ancora; la pagina dice che la posta non è disponibile. Dipende da quale Outlook ha il pilota.
 - **Non verificato**: la lettura della posta reale (fatta solo su archivio finto, anche nella finestra vera).
+
+## Scelte prese durante F2 (documenti)
+- **Perché**: nel confronto con v0 due file Excel del vault erano invisibili a Chiedi, perché Claude in sola lettura apre solo testo.
+- **Estrazione portata da octobrief-new** (`packages/infrastructure/src/extract`): Word, Excel, PowerPoint (anche con macro) e PDF. Il formato si decide dall'estensione del file.
+- **Il testo sta accanto, non al posto**: per ogni file `percorso/file.ext` Octo scrive `_octo/testo/percorso/file.ext.md`. Gli originali non vengono toccati. La cartella non è nascosta, perché la ricerca di Claude salta le cartelle nascoste.
+- **Forma del testo**: in testa il file di origine, la sua data e dimensione e gli avvisi (file protetto, troncato, formato non letto); sotto, il testo diviso per pagina, slide o foglio. Le righe di un foglio sono `valore | valore`.
+- **Solo ciò che cambia**: un file già convertito e non modificato (stessa data e dimensione, stesso estrattore) non viene riletto. Il testo di un file eliminato viene tolto.
+- **Quando**: su richiesta («Converti ora») e ogni 15 minuti ad app aperta, dopo la posta. Nessuna configurazione.
+- **Un thread per file**, con 60 secondi di tempo: un foglio enorme non blocca l'app e un file che manda in stallo il lettore viene abbandonato con l'avviso `timeout`. Restano i limiti di octobrief-new contro i file gonfiati (100 MB decompressi, 12 MB di testo).
+- **Fuori**: file oltre 100 MB, cartelle nascoste, `node_modules`, i file di blocco di Office (`~$…`), i link.
+- **Claude lo sa**: il prompt di Chiedi dice dove sta il testo e di citare quel file.
+- **Non portato**: l'isolamento in un processo separato con limite di memoria. Su un server multiutente serviva; qui i file sono quelli del PM. Da rivedere quando la cartella sarà condivisa fra più persone.
+- **Non verificato**: la conversione su un vault reale (numero e peso dei file di DEEM).

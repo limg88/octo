@@ -19,7 +19,7 @@ pnpm dev          # compila e apre l'app
 packages/
   domain/          regole pure: risposta, citazioni e loro controllo, progetto
   application/     casi d'uso e porte: fare una domanda, gestire i progetti
-  infrastructure/  adattatori: Claude Code da riga di comando, lettura dei file citati, stato dell'app in JSON
+  infrastructure/  adattatori: Claude Code da riga di comando, archivio di Mail, estrazione del testo da Office e PDF, file del progetto, stato dell'app in JSON
 apps/
   desktop/         app Electron: processo principale (composition root), preload, interfaccia React
 demo/              una demo per ogni fetta (run.sh + COPIONE.md)
@@ -37,7 +37,8 @@ Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_
 
 ## Come Octo alimenta la memoria
 - **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `.octo/sources.json` nella cartella del progetto.
-- La lettura parte su richiesta e ogni 15 minuti ad app aperta.
+- **Documenti**: scrive in `_octo/testo/` il testo di Word, Excel, PowerPoint e PDF della cartella, con lo stesso percorso dell'originale, così Claude può cercarlo e citarlo. Riconverte solo ciò che cambia.
+- Posta e documenti partono su richiesta e ogni 15 minuti ad app aperta.
 
 ## Comandi
 | Comando | Cosa fa |

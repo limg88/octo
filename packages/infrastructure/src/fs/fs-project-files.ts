@@ -1,0 +1,78 @@
+import { readdir, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { join, relative, resolve, sep } from 'node:path'
+import type { ProjectFiles } from '@octo/application'
+import { DomainError, EXTRACTED_TEXT_FOLDER, type SourceFileStamp } from '@octo/domain'
+import { isMissing } from './json-file.ts'
+
+/** Folders never walked: hidden ones, Octo's own, and what package managers fill. */
+const SKIPPED_FOLDERS = new Set([EXTRACTED_TEXT_FOLDER.split('/')[0] ?? '', 'node_modules'])
+const HIDDEN_PREFIX = '.'
+/** The file Office keeps beside a document while it is open. */
+const OFFICE_LOCK_PREFIX = '~$'
+
+const portable = (path: string): string => path.split(sep).join('/')
+
+/** The real path of a place inside the project; a path or a link leading outside is refused. */
+async function inside(projectFolder: string, relativePath: string): Promise<string> {
+  const root = await realpath(projectFolder)
+  const target = await realpath(resolve(root, relativePath))
+  const fromRoot = relative(root, target)
+  if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || resolve(root, fromRoot) !== target) {
+    throw new DomainError('source_config_invalid', relativePath)
+  }
+  return target
+}
+
+/** Every file under a folder, links not followed, as paths from `base`. */
+async function walk(base: string, folder: string, skipFolders: boolean): Promise<string[]> {
+  const entries = await readdir(join(base, folder), { withFileTypes: true }).catch(
+    (error: unknown) => {
+      if (isMissing(error)) return []
+      throw error
+    },
+  )
+  const found: string[] = []
+  for (const entry of entries) {
+    const path = folder ? `${folder}/${entry.name}` : entry.name
+    if (entry.isFile()) found.push(path)
+    if (!entry.isDirectory()) continue
+    const skipped = entry.name.startsWith(HIDDEN_PREFIX) || SKIPPED_FOLDERS.has(entry.name)
+    if (!skipFolders || !skipped) found.push(...(await walk(base, path, skipFolders)))
+  }
+  return found
+}
+
+export function createFsProjectFiles(): ProjectFiles {
+  return {
+    async withExtensions(projectFolder, extensions): Promise<SourceFileStamp[]> {
+      const wanted = new Set(extensions)
+      const root = await realpath(projectFolder)
+      const stamps: SourceFileStamp[] = []
+      for (const path of await walk(root, '', true)) {
+        const name = path.split('/').at(-1) ?? ''
+        const extension = name.includes('.') ? (name.split('.').pop() ?? '').toLowerCase() : ''
+        if (!wanted.has(extension) || name.startsWith(OFFICE_LOCK_PREFIX)) continue
+        const info = await stat(join(root, path))
+        stamps.push({ path, size: info.size, modifiedAt: info.mtime.toISOString() })
+      }
+      return stamps.sort((a, b) => a.path.localeCompare(b.path))
+    },
+    read: async (projectFolder, relativePath) =>
+      readFile(await inside(projectFolder, relativePath)),
+    async readText(projectFolder, relativePath) {
+      try {
+        return await readFile(await inside(projectFolder, relativePath), 'utf8')
+      } catch (error) {
+        if (isMissing(error)) return null
+        throw error
+      }
+    },
+    async under(projectFolder, folder) {
+      const root = await realpath(projectFolder)
+      const files = await walk(root, portable(folder), false)
+      return files.sort()
+    },
+    remove: async (projectFolder, relativePath) =>
+      rm(await inside(projectFolder, relativePath), { force: true }),
+  }
+}

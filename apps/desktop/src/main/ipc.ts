@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import type {
   AgentRunner,
   AskQuestion,
+  Documents,
   EvidenceReader,
   Projects,
   QuestionLog,
@@ -20,6 +21,7 @@ export type IpcDeps = {
   evidence: EvidenceReader
   askQuestion: AskQuestion
   sources: Sources
+  documents: Documents
   folderDialogTitle: string
 }
 
@@ -104,6 +106,14 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.mailSync, byProject, async ({ projectId }) =>
     deps.sources.syncMail(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.documentsGet, byProject, async ({ projectId }) =>
+    deps.documents.state(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.documentsConvert, byProject, async ({ projectId }) =>
+    deps.documents.convert(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

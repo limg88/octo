@@ -1,5 +1,7 @@
 export * from './answer.ts'
 export * from './errors.ts'
+export * from './extracted-document.ts'
+export * from './extraction.ts'
 export * from './mail/document.ts'
 export * from './mail/match.ts'
 export * from './mail/message.ts'

@@ -14,6 +14,9 @@ execFileSync('bash', ['-c', `source "${root}demo/lib/project.sh" && make_demo_pr
 const fakeMail = (...extra) =>
   execFileSync('node', [`${root}demo/lib/fake-mail.ts`, `${work}/Mail`, ...extra])
 fakeMail()
+const fakeDocuments = (...extra) =>
+  execFileSync('node', [`${root}demo/lib/fake-documents.ts`, `${work}/Aurora`, ...extra])
+fakeDocuments()
 
 // OCTO_E2E_EXECUTABLE points the same steps at an installed or packaged app.
 const packaged = process.env.OCTO_E2E_EXECUTABLE
@@ -66,6 +69,20 @@ try {
   fakeMail('extra')
   await page.getByRole('button', { name: 'Leggi ora' }).click()
   await page.getByText('1 nuove, 2 già presenti').waitFor({ timeout: TIMEOUT_MS })
+
+  // Demo 03: Office files of the project become text beside them, again only when they change.
+  const convertNow = async (outcome) => {
+    const button = page.getByRole('button', { name: 'Converti ora' })
+    await button.click()
+    await page.getByText(outcome).waitFor({ timeout: TIMEOUT_MS })
+  }
+  await convertNow(/Ultima conversione .*: (2 aggiornati, 0|0 aggiornati, 2) già pronti/)
+  const sheet = readFileSync(`${work}/Aurora/_octo/testo/Documenti/Scenari.xlsx.md`, 'utf8')
+  assert.match(sheet, /## Foglio Giornate\n\nScenario base \| 120/)
+  fakeDocuments('changed')
+  await convertNow('1 aggiornati, 1 già pronti')
+  const offer = readFileSync(`${work}/Aurora/_octo/testo/Documenti/Offerta Aurora.docx.md`, 'utf8')
+  assert.match(offer, /canone annuo di manutenzione è di 15\.000 euro/)
   await page.screenshot({ path: `${work}/fonti.png` })
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 

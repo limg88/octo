@@ -23,6 +23,14 @@ await bundle({
   outfile: 'dist/main/main.mjs',
 })
 
+// The worker thread that extracts text from Office and PDF files, started once per file.
+await bundle({
+  ...shared,
+  entryPoints: ['../../packages/infrastructure/src/extract/worker.ts'],
+  format: 'esm',
+  outfile: 'dist/main/extract-worker.mjs',
+})
+
 // A sandboxed preload cannot be an ES module.
 await bundle({
   ...shared,

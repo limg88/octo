@@ -2,9 +2,11 @@ import type {
   ArchivedMail,
   DraftAnswer,
   Evidence,
+  Extraction,
   MailMessage,
   Project,
   QuestionRecord,
+  SourceFileStamp,
   SourceState,
   SourcesConfig,
 } from '@octo/domain'
@@ -87,11 +89,32 @@ export interface SourceSettings {
   suggestMailFolder(projectFolder: string): Promise<string>
 }
 
-export type SourceName = 'mail'
+export type SourceName = 'mail' | 'documents'
 
 /** What each source did last on this computer, and where its next reading starts. */
 export interface SourceStates {
   get(projectId: string, source: SourceName): Promise<SourceState>
   set(projectId: string, source: SourceName, state: SourceState): Promise<void>
   removeProject(projectId: string): Promise<void>
+}
+
+/** Text from the bytes of an Office or PDF file. Never throws: what fails is a warning. */
+export interface TextExtractor {
+  /** The extensions it reads, lower case and without the dot. */
+  readonly extensions: readonly string[]
+  /** The name and version written in every text, so a new version converts again. */
+  readonly version: string
+  extract(bytes: Uint8Array, fileName: string): Promise<Extraction>
+}
+
+/** The files of a project folder as the conversion needs them. Never leaves the folder. */
+export interface ProjectFiles {
+  /** Files with one of the extensions, outside Octo's own folders and hidden ones. */
+  withExtensions(projectFolder: string, extensions: readonly string[]): Promise<SourceFileStamp[]>
+  read(projectFolder: string, relativePath: string): Promise<Uint8Array>
+  /** The text of a file, or null when it does not exist. */
+  readText(projectFolder: string, relativePath: string): Promise<string | null>
+  /** Every file under a folder of the project, as paths from the project root. */
+  under(projectFolder: string, folder: string): Promise<string[]>
+  remove(projectFolder: string, relativePath: string): Promise<void>
 }

@@ -15,6 +15,8 @@ const api: OctoApi = {
   saveMailSource: (projectId, config) =>
     ipcRenderer.invoke(CHANNELS.mailSave, { projectId, config }),
   syncMail: (projectId) => ipcRenderer.invoke(CHANNELS.mailSync, { projectId }),
+  documentsState: (projectId) => ipcRenderer.invoke(CHANNELS.documentsGet, { projectId }),
+  convertDocuments: (projectId) => ipcRenderer.invoke(CHANNELS.documentsConvert, { projectId }),
   onSourcesChanged: (listener) => {
     const handler = (_event: unknown, projectId: string) => listener(projectId)
     ipcRenderer.on(CHANNELS.sourcesChanged, handler)

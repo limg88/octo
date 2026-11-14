@@ -50,6 +50,14 @@ export const messages = {
   mailLastFailed: (at: string) => `Ultima lettura ${at} non riuscita.`,
   mailStale: 'La posta non viene letta da più di un giorno.',
   mailNotConfigured: 'La posta di questo progetto non è ancora configurata.',
+  documentsTitle: 'Documenti',
+  documentsIntro:
+    'Octo scrive il testo di Word, Excel, PowerPoint e PDF della cartella in «_octo/testo», così Claude può cercarlo e citarlo. Gli originali non vengono toccati.',
+  documentsConvert: 'Converti ora',
+  documentsConverting: 'Sto leggendo i documenti…',
+  documentsNever: 'Mai convertiti.',
+  documentsLastRun: (at: string, written: number, unchanged: number) =>
+    `Ultima conversione ${at}: ${written} aggiornati, ${unchanged} già pronti.`,
   agentMissingTitle: 'Claude non è installato su questo computer',
   agentMissingBody:
     'Octo usa Claude Code con il tuo account. Installalo, accedi una volta dal terminale con «claude» e riapri Octo.',

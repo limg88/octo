@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { AgentProgress, AgentStatus, MailSourceView } from '@octo/application'
-import type { Project, QuestionRecord } from '@octo/domain'
+import type { Project, QuestionRecord, SourceRun, SourceState } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
@@ -53,6 +53,13 @@ const answered: QuestionRecord = {
 
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 
+const documentsRun: SourceRun = {
+  at: '2026-11-14T10:00:00.000Z',
+  written: 2,
+  unchanged: 5,
+  error: null,
+}
+
 const mailView: MailSourceView = {
   config: null,
   suggestedFolder: 'Posta',
@@ -80,6 +87,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
     ),
+    documentsState: vi.fn(async () => ok<SourceState>({ cursor: null, lastRun: null })),
+    convertDocuments: vi.fn(async () => ok(documentsRun)),
     onSourcesChanged: () => () => {},
     ...overrides,
   }
@@ -244,5 +253,44 @@ describe('project tabs', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: messages.ask }))
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
+  })
+})
+
+describe('documents of a project', () => {
+  it('shows when they were last converted and converts them on request', async () => {
+    const state = vi
+      .fn<OctoApi['documentsState']>()
+      .mockResolvedValueOnce(ok({ cursor: null, lastRun: null }))
+      .mockResolvedValue(ok({ cursor: documentsRun.at, lastRun: documentsRun }))
+    const { api } = fakeApi({ documentsState: state })
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+
+    expect(await screen.findByText(messages.documentsNever)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.documentsConvert }))
+
+    expect(await screen.findByText(/2 aggiornati, 5 già pronti/)).toBeTruthy()
+    expect(api.convertDocuments).toHaveBeenCalledWith('p-1')
+  })
+
+  it('explains a conversion that failed or could not start', async () => {
+    const failed = { ...documentsRun, error: 'source_config_invalid' as const }
+    const { api } = fakeApi({
+      documentsState: async () => ok({ cursor: null, lastRun: failed }),
+      convertDocuments: async () => ({ ok: false, code: 'source_busy' }),
+    })
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+
+    expect(await screen.findByText(/uno dei due non è valido/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.documentsConvert }))
+    expect(await screen.findByText('Una lettura è già in corso.')).toBeTruthy()
+  })
+
+  it('says so when the state cannot be loaded', async () => {
+    const { api } = fakeApi({ documentsState: async () => ({ ok: false, code: 'unexpected' }) })
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+    expect(await screen.findByText('Qualcosa non ha funzionato. Riprova.')).toBeTruthy()
   })
 })

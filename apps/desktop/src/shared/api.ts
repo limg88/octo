@@ -5,6 +5,7 @@ import type {
   Project,
   QuestionRecord,
   SourceRun,
+  SourceState,
 } from '@octo/domain'
 
 /** A failure that is not one of the expected ones: the detail is in the app's log. */
@@ -26,6 +27,8 @@ export const CHANNELS = {
   mailGet: 'sources:mail:get',
   mailSave: 'sources:mail:save',
   mailSync: 'sources:mail:sync',
+  documentsGet: 'sources:documents:get',
+  documentsConvert: 'sources:documents:convert',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -48,6 +51,9 @@ export type OctoApi = {
   ): Promise<Result<MailSourceView>>
   /** Reads the new mail now. A failure of the reading is in the run, not in the result. */
   syncMail(projectId: string): Promise<Result<SourceRun>>
+  documentsState(projectId: string): Promise<Result<SourceState>>
+  /** Writes the text of the Office and PDF files of the project beside them, now. */
+  convertDocuments(projectId: string): Promise<Result<SourceRun>>
   /** Returns the function that stops listening. */
   onProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Tells when a periodic reading has ended for a project. */
