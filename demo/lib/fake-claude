@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stands in for Claude Code in the demos: deterministic, no network, no seat used.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec node "$here/../../packages/infrastructure/test/fake-claude.mjs" "$@"

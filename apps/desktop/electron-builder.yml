@@ -1,0 +1,21 @@
+appId: it.octo.desktop
+productName: Octo
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+# Everything is bundled into dist/: no node_modules travel with the app.
+npmRebuild: false
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: true
+  perMachine: false

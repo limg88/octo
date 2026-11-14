@@ -1,0 +1,28 @@
+export const DOMAIN_ERROR_CODES = [
+  'empty_question',
+  'project_not_found',
+  'project_already_added',
+  'folder_not_readable',
+  'agent_not_installed',
+  'agent_not_signed_in',
+  'agent_failed',
+  'agent_output_invalid',
+  'agent_cancelled',
+] as const
+
+export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]
+
+/** An expected failure the interface can explain to the PM by its code. */
+export class DomainError extends Error {
+  readonly code: DomainErrorCode
+
+  constructor(code: DomainErrorCode, detail?: string) {
+    super(detail ? `${code}: ${detail}` : code)
+    this.name = 'DomainError'
+    this.code = code
+  }
+}
+
+export function isDomainError(error: unknown): error is DomainError {
+  return error instanceof DomainError
+}

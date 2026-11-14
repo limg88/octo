@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+dist/
+release/
+.tmp/
+*.tsbuildinfo
+
+# Secrets and local state: never committed.
+.env
+.env.*
+!.env.example
+private/
+
+.DS_Store
