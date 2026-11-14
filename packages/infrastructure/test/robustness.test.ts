@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import { extract as extractByName } from '../src/extract/extract.ts'
 import { MAX_LINES_OR_FRAGMENTS, MAX_TEXT_CHARS } from '../src/extract/limits.ts'
-import { docx, utf8, xlsx } from './support/files.ts'
+import { docx, xlsx } from './support/files.ts'
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

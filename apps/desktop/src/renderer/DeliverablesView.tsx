@@ -6,7 +6,7 @@ import {
   type Project,
   type RedTeamReport,
 } from '@octo/domain'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import { errorText, messages, progressText } from './messages.ts'
@@ -204,25 +204,26 @@ function KindForm({
       <h3>{kind.title}</h3>
       <p className="hint">{kind.summary}</p>
       <form className="source-form" onSubmit={submit}>
-        {kind.fields.map((field) => (
-          <label key={field.key}>
-            {field.label}
-            {field.kind === 'long' ? (
-              <textarea
-                rows={3}
-                value={inputs[field.key] ?? ''}
-                onChange={(event) => setInputs({ ...inputs, [field.key]: event.target.value })}
-              />
-            ) : (
-              <input
-                type="text"
-                value={inputs[field.key] ?? ''}
-                onChange={(event) => setInputs({ ...inputs, [field.key]: event.target.value })}
-              />
-            )}
-            {field.hint && <span className="hint">{field.hint}</span>}
-          </label>
-        ))}
+        {kind.fields.map((field) => {
+          const id = `deliverable-${kind.id}-${field.key}`
+          const control = {
+            id,
+            value: inputs[field.key] ?? '',
+            onChange: (event: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
+              setInputs({ ...inputs, [field.key]: event.target.value }),
+          }
+          return (
+            <label key={field.key} htmlFor={id}>
+              {field.label}
+              {field.kind === 'long' ? (
+                <textarea rows={3} {...control} />
+              ) : (
+                <input type="text" {...control} />
+              )}
+              {field.hint && <span className="hint">{field.hint}</span>}
+            </label>
+          )
+        })}
         <div className="actions">
           <button type="submit" disabled={busy || missing}>
             {messages.deliverableWrite}
