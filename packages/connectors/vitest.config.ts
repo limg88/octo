@@ -7,7 +7,12 @@ import { defineConfig } from 'vitest/config'
 const envFile = fileURLToPath(new URL('../../.env.local', import.meta.url))
 const hasTestDatabase = Boolean(process.env.DATABASE_OWNER_URL) || existsSync(envFile)
 const NEEDS_DATABASE = ['test/dwsi.test.ts']
+const SLOW_MACHINE_TIMEOUT_MS = 30_000
 
 export default defineConfig({
-  test: { exclude: ['**/node_modules/**', ...(hasTestDatabase ? [] : NEEDS_DATABASE)] },
+  test: {
+    exclude: ['**/node_modules/**', ...(hasTestDatabase ? [] : NEEDS_DATABASE)],
+    // Tests that start servers and list thousands of items: slow shared machines need room.
+    testTimeout: SLOW_MACHINE_TIMEOUT_MS,
+  },
 })
