@@ -11,6 +11,8 @@ import type {
   FeedIndex,
   FeedName,
   FeedStep,
+  ForecastCell,
+  ForecastSettings,
   HoursPeriod,
   HoursSettings,
   JiraFeedConfig,
@@ -18,6 +20,7 @@ import type {
   Project,
   QuestionRecord,
   RedTeamReport,
+  SheetGrid,
   SourceFileStamp,
   SourceState,
   SourcesConfig,
@@ -259,4 +262,25 @@ export interface TrackerHoursReader {
     period: HoursPeriod,
     signal: AbortSignal,
   ): Promise<TrackerHours[]>
+}
+
+/** How a project fills the monthly forecast, kept with Octo's settings of the project. */
+export interface ForecastSettingsStore {
+  load(projectFolder: string): Promise<ForecastSettings>
+  save(projectFolder: string, settings: ForecastSettings): Promise<void>
+}
+
+/** A cell to write in a sheet: where, and what. */
+export type SheetWrite = { ref: string; cell: ForecastCell }
+
+/**
+ * A spreadsheet somebody else designed, read and filled without redrawing it: only the cells
+ * named change, and their look stays the model's. Throws a DomainError `forecast_model_invalid`
+ * for a file that is not a spreadsheet it can read.
+ */
+export interface SpreadsheetModel {
+  /** The cells of the first sheet. */
+  read(bytes: Uint8Array): SheetGrid
+  /** A copy of the file with the cells written in its first sheet. */
+  fill(bytes: Uint8Array, writes: readonly SheetWrite[]): Uint8Array
 }

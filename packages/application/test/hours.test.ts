@@ -271,6 +271,12 @@ describe('hours', () => {
     await first
     expect(hours.asked).toEqual([])
   })
+
+  it('hands the timesheet rows to what else is computed from them, each once', async () => {
+    const rows = await setup({ timesheetPath: 'ore/Timesheets' }).timesheet(project)
+    expect(rows?.map((row) => row.id).sort()).toEqual(['1', '2', '3'])
+    expect(await setup().timesheet(project)).toBeNull()
+  })
 })
 
 /** Hours whose tracker answers only when told. */

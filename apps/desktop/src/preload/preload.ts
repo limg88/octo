@@ -65,6 +65,14 @@ const api: OctoApi = {
   hoursView: (projectId, period) => ipcRenderer.invoke(CHANNELS.hoursView, { projectId, period }),
   readTrackerHours: (projectId, period) =>
     ipcRenderer.invoke(CHANNELS.hoursReadTracker, { projectId, period }),
+  forecastSettings: (projectId) => ipcRenderer.invoke(CHANNELS.forecastSettingsGet, { projectId }),
+  saveForecastSettings: (projectId, settings) =>
+    ipcRenderer.invoke(CHANNELS.forecastSettingsSave, { projectId, settings }),
+  forecastCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.forecastCandidates, { projectId }),
+  forecastView: (projectId, month) =>
+    ipcRenderer.invoke(CHANNELS.forecastView, { projectId, month }),
+  compileForecast: (projectId, month) =>
+    ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>

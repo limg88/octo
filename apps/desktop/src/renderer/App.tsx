@@ -7,12 +7,13 @@ import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
+import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
 import { errorText, messages } from './messages.ts'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 
-type Tab = 'ask' | 'deliverables' | 'dashboard' | 'hours' | 'sources'
+type Tab = 'ask' | 'deliverables' | 'dashboard' | 'hours' | 'forecast' | 'sources'
 
 type Props = {
   api: OctoApi
@@ -128,6 +129,12 @@ export function App({ api }: Props) {
               <TabButton current={tab} tab="hours" label={messages.hoursTab} onSelect={setTab} />
               <TabButton
                 current={tab}
+                tab="forecast"
+                label={messages.forecastTab}
+                onSelect={setTab}
+              />
+              <TabButton
+                current={tab}
                 tab="sources"
                 label={messages.sourcesTab}
                 onSelect={setTab}
@@ -141,6 +148,8 @@ export function App({ api }: Props) {
               <DashboardView api={api} project={selected} />
             ) : tab === 'hours' ? (
               <HoursView api={api} project={selected} />
+            ) : tab === 'forecast' ? (
+              <ForecastView api={api} project={selected} />
             ) : (
               <div className="sources-page">
                 <SetupGuide api={api} project={selected} />

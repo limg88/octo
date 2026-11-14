@@ -91,6 +91,77 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  forecastTab: 'Previsionale',
+  forecast: {
+    loading: 'Preparo il previsionale…',
+    setupTitle: 'Il modello dell’amministrazione',
+    setupIntro:
+      'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. Costi interni e ricavi vengono dalle ore approvate dei timesheet e dai costi e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
+    modelPath: 'Modello: file Excel nella cartella del progetto',
+    hoursPerDay: 'Ore in una giornata',
+    rates:
+      'Costo e tariffa al giorno: una riga per persona, «nome; costo; tariffa» (senza tariffa: solo costo)',
+    ratesHint:
+      'Restano nelle impostazioni di Octo del progetto, in una cartella nascosta: non entrano nelle risposte né nei deliverable.',
+    save: 'Salva',
+    settings: 'Impostazioni del previsionale',
+    month: 'Mese',
+    columnCode: 'Codice',
+    columnInternal: 'Costi interni',
+    columnExternal: 'Costi esterni',
+    columnRevenue: 'Ricavi',
+    columnQuantity: 'Giorni o %',
+    columnMarginMonth: 'Margine del mese',
+    columnMarginEnd: 'Margine a fine progetto',
+    columnToInvoice: 'Da fatturare',
+    columnNote: 'Note',
+    noRows: 'Il modello non elenca codici di progetto.',
+    money: (value: number) =>
+      value.toLocaleString('it-IT', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: 'always',
+      }),
+    days: (value: number) => value.toLocaleString('it-IT', { maximumFractionDigits: 3 }),
+    share: (value: number | null) =>
+      value === null
+        ? '—'
+        : `${(value * 100).toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`,
+    hours: (value: number) => value.toLocaleString('it-IT', { maximumFractionDigits: 1 }),
+    gapsTitle: 'Dati che mancano',
+    gapsIntro: 'Dove manca un dato lascio la cella vuota o fuori dal calcolo: non stimo nulla.',
+    noGaps: 'Nessun dato mancante.',
+    gap: {
+      no_cost: (code: string, person: string, hours: string) =>
+        `${code}: manca il costo al giorno di ${person} (${hours} ore fuori dal calcolo)`,
+      no_rate: (code: string, person: string, hours: string) =>
+        `${code}: manca la tariffa al giorno di ${person} (${hours} ore a costo, senza ricavo)`,
+      no_total_costs: (code: string) =>
+        `${code}: mancano i costi totali previsti, il margine a fine progetto resta vuoto`,
+      no_ordered: (code: string) =>
+        `${code}: nel modello manca l’ordinato, i ricavi da avanzamento restano a zero`,
+    },
+    notApproved: (hours: string) =>
+      `${hours} ore del mese non ancora approvate: restano fuori dal previsionale`,
+    otherCodes: (codes: string) =>
+      `Nei timesheet del mese ci sono ore su codici che il modello non elenca: ${codes}`,
+    inputsTitle: (code: string) => `Dati del mese per ${code}`,
+    externals:
+      'Esterni senza timesheet: una riga per persona, «nome; giorni; costo al giorno; tariffa al giorno»',
+    toInvoice: 'Importo da fatturare nel mese',
+    revenue: 'Ricavi decisi da te (sostituiscono quelli calcolati)',
+    budgetCosts: 'A corpo: costi totali a budget (l’avanzamento è costi del mese su questi)',
+    totalCosts: 'Costi totali previsti del progetto (per il margine a fine progetto)',
+    totalCostsBeforeMonth:
+      'I costi totali si fermano al mese prima: aggiungi quelli di questo mese',
+    note: 'Nota da aggiungere',
+    saveInputs: 'Salva i dati del mese',
+    compile: 'Compila il modello',
+    compiling: 'Scrivo il file…',
+    compiled: (path: string) => `Modello compilato in ${path}. L’originale non è stato toccato.`,
+    open: 'Apri il file',
+    internal: 'Documento interno: costi e margini non vanno al cliente.',
+  },
   hoursTab: 'Ore',
   hours: {
     loading: 'Leggo le ore…',
@@ -439,6 +510,14 @@ const errors: Record<ErrorCode, string> = {
   hours_worklog_missing:
     'Non trovo esportazioni delle ore del tracker (file .csv) nel posto indicato.',
   hours_period_invalid: 'Il periodo non è valido.',
+  forecast_model_not_set: 'Indica il file Excel del modello.',
+  forecast_model_missing: 'Non trovo il file del modello nel posto indicato.',
+  forecast_model_invalid:
+    'Il file non è il modello del previsionale: non trovo le intestazioni attese (codice di progetto, ordinato, previsione costi e ricavi, marginalità, importo da fatturare, note).',
+  forecast_month_invalid: 'Il mese non è valido.',
+  forecast_settings_invalid:
+    'Le impostazioni del previsionale non sono valide: il modello deve stare nella cartella del progetto.',
+  forecast_timesheet_not_set: 'Indica prima, nella scheda «Ore», dove sono i timesheet.',
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',
   dashboard_settings_invalid: 'Le impostazioni del cruscotto sono rovinate: salvale di nuovo.',

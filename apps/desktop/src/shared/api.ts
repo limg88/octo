@@ -7,6 +7,8 @@ import type {
   FeedingStatus,
   FeedingStep,
   FeedView,
+  ForecastFile,
+  ForecastView,
   HoursCandidates,
   HoursView,
   MailSourceView,
@@ -20,6 +22,7 @@ import type {
   FeedChoices,
   FeedConfig,
   FeedName,
+  ForecastSettings,
   HoursPeriod,
   HoursSettings,
   MailPreview,
@@ -82,6 +85,11 @@ export const CHANNELS = {
   hoursCandidates: 'hours:candidates',
   hoursView: 'hours:view',
   hoursReadTracker: 'hours:tracker:read',
+  forecastSettingsGet: 'forecast:settings:get',
+  forecastSettingsSave: 'forecast:settings:save',
+  forecastCandidates: 'forecast:candidates',
+  forecastView: 'forecast:view',
+  forecastCompile: 'forecast:compile',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -182,6 +190,17 @@ export type OctoApi = {
   hoursView(projectId: string, period: HoursPeriod): Promise<Result<HoursView>>
   /** Reads the hours of the period from the tracker, with the credential of its feed. */
   readTrackerHours(projectId: string, period: HoursPeriod): Promise<Result<TrackerHoursRun>>
+  forecastSettings(projectId: string): Promise<Result<ForecastSettings>>
+  saveForecastSettings(
+    projectId: string,
+    settings: ForecastSettings,
+  ): Promise<Result<ForecastSettings>>
+  /** Spreadsheets of the project that look like the model of the administration. */
+  forecastCandidates(projectId: string): Promise<Result<string[]>>
+  /** What the model would hold for a month (`YYYY-MM`), computed and not written. */
+  forecastView(projectId: string, month: string): Promise<Result<ForecastView>>
+  /** Writes a filled copy of the model for the month; the model itself is never touched. */
+  compileForecast(projectId: string, month: string): Promise<Result<ForecastFile>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

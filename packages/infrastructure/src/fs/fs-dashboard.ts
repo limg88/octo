@@ -3,13 +3,16 @@ import { join } from 'node:path'
 import type {
   DashboardSettingsStore,
   ExportCandidates,
+  ForecastSettingsStore,
   HoursSettingsStore,
   TrackerExports,
 } from '@octo/application'
 import {
   cleanDashboardSettings,
+  cleanForecastSettings,
   cleanHoursSettings,
   DEFAULT_DASHBOARD_SETTINGS,
+  DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
   DomainError,
   isDomainError,
@@ -87,6 +90,54 @@ export function createFsHoursSettings(): HoursSettingsStore {
       const parsed = hoursSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       if (!parsed.success) throw new DomainError('hours_settings_invalid', HOURS_FILE)
       return cleanHoursSettings(parsed.data)
+    },
+    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const FORECAST_FILE = 'forecast.json'
+const amount = z.number().nullable().default(null)
+const forecastRowSchema = z.object({
+  externals: z
+    .array(
+      z.object({
+        name: z.string(),
+        days: z.number(),
+        costPerDay: z.number(),
+        ratePerDay: z.number(),
+      }),
+    )
+    .default([]),
+  toInvoice: amount,
+  revenue: amount,
+  budgetCosts: amount,
+  totalCosts: amount,
+  totalCostsBeforeMonth: z.boolean().default(false),
+  note: z.string().default(''),
+})
+const forecastSchema = z.object({
+  modelPath: z.string().default(DEFAULT_FORECAST_SETTINGS.modelPath),
+  hoursPerDay: z.number().default(DEFAULT_FORECAST_SETTINGS.hoursPerDay),
+  rates: z
+    .array(
+      z.object({ person: z.string(), costPerDay: z.number(), ratePerDay: z.number().nullable() }),
+    )
+    .default([]),
+  months: z.record(z.string(), z.record(z.string(), forecastRowSchema)).default({}),
+})
+
+/**
+ * Daily costs and rates are kept here, in Octo's hidden settings of the project: the agent's
+ * search does not look inside hidden folders, so they do not end in an answer or a deliverable.
+ */
+export function createFsForecastSettings(): ForecastSettingsStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, FORECAST_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = forecastSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('forecast_settings_invalid', FORECAST_FILE)
+      return cleanForecastSettings(parsed.data)
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }

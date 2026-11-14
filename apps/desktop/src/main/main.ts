@@ -11,6 +11,7 @@ import {
   createDocuments,
   createFeeding,
   createFeeds,
+  createForecasts,
   createHours,
   createProjects,
   createSources,
@@ -28,6 +29,7 @@ import {
   createFsDashboardSettings,
   createFsEvidenceReader,
   createFsFolderProbe,
+  createFsForecastSettings,
   createFsHoursSettings,
   createFsMemoryWriter,
   createFsProjectFiles,
@@ -40,6 +42,7 @@ import {
   createJsonSourceStates,
   createWordRenderer,
   createWorkerTextExtractor,
+  createXlsxModel,
   locateClaude,
   type SecretCipher,
 } from '@octo/infrastructure'
@@ -182,6 +185,15 @@ function start(): void {
     states: sourceStates,
     clock,
   })
+  const hours = createHours({
+    settings: createFsHoursSettings(),
+    files,
+    sources: settings,
+    secrets,
+    tracker: createJiraHoursReader({ devEndpoints }),
+    writer,
+    clock,
+  })
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, feeds, documents })
   const periodic = () => void feedAll(projects, feeding, window)
@@ -207,14 +219,13 @@ function start(): void {
       exports: createFsTrackerExports(),
       clock,
     }),
-    hours: createHours({
-      settings: createFsHoursSettings(),
+    hours,
+    forecasts: createForecasts({
+      settings: createFsForecastSettings(),
       files,
-      sources: settings,
-      secrets,
-      tracker: createJiraHoursReader({ devEndpoints }),
+      sheets: createXlsxModel(),
+      timesheet: (project) => hours.timesheet(project),
       writer,
-      clock,
     }),
     agent,
     projects,

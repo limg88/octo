@@ -16,7 +16,7 @@ import {
 } from './xml.ts'
 import { readZip } from './zip.ts'
 
-function sharedStrings(part: Uint8Array | undefined): string[] {
+export function sharedStrings(part: Uint8Array | undefined): string[] {
   if (!part) return []
   // Phonetic hints (`rPh`) are not part of the cell text.
   const xml = removeElements(decodeXml(part), 'rPh')
@@ -26,7 +26,7 @@ function sharedStrings(part: Uint8Array | undefined): string[] {
 const CELL_REF = /^[A-Z]+[1-9][0-9]*$/
 
 /** `$B$2` and `b2` are B2; anything that is not a cell reference is `undefined`. */
-function normalizeRef(declared: string | undefined): string | undefined {
+export function normalizeRef(declared: string | undefined): string | undefined {
   const ref = declared?.replaceAll('$', '').toUpperCase()
   return ref !== undefined && CELL_REF.test(ref) ? ref : undefined
 }
@@ -39,7 +39,7 @@ function columnName(index: number): string {
   return name
 }
 
-function columnIndex(ref: string): number {
+export function columnIndex(ref: string): number {
   const letters = /^[A-Z]+/.exec(ref)?.[0] ?? 'A'
   return [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1
 }
@@ -114,7 +114,7 @@ export function extractXlsx(bytes: Uint8Array): Extraction {
   })
 }
 
-function cellValue(cell: { attrs: string; body: string }, strings: string[]): string {
+export function cellValue(cell: { attrs: string; body: string }, strings: string[]): string {
   const type = attr(cell.attrs, 't')
   const raw = elements(cell.body, 'v')[0]?.body
   switch (type) {

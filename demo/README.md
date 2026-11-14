@@ -12,5 +12,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 06 | Deliverable: un'email al cliente dalla richiesta al file Word approvato, con fonti controllate, rilettura critica, modifiche a parole e conteggio di tempi e giri | `bash demo/06-deliverable/run.sh` | [COPIONE](06-deliverable/COPIONE.md) |
 | 07 | Cruscotto: bug aperti per fase, fermi oltre soglia, andamento su un periodo a scelta e requisiti poco chiari, calcolati dal codice da un'esportazione del tracker nella cartella | `bash demo/07-cruscotto/run.sh` | [COPIONE](07-cruscotto/COPIONE.md) |
 | 08 | Ore: le ore approvate dei timesheet confrontate con quelle segnate sul tracker, persona per persona, con quadratura, nomi diversi riconosciuti e assenze attese | `bash demo/08-ore/run.sh` | [COPIONE](08-ore/COPIONE.md) |
+| 09 | Previsionale: il modello Excel dell'amministrazione compilato dal codice, una riga per codice di progetto, con formule vive, dati mancanti dichiarati e originale intatto | `bash demo/09-previsionale/run.sh` | [COPIONE](09-previsionale/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 08 nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 09 nella finestra vera, senza intervento.

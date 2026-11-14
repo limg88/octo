@@ -9,6 +9,7 @@ import type {
   EvidenceReader,
   Feeding,
   Feeds,
+  Forecasts,
   Hours,
   Projects,
   QuestionLog,
@@ -33,6 +34,7 @@ export type IpcDeps = {
   deliverables: Deliverables
   dashboard: Dashboard
   hours: Hours
+  forecasts: Forecasts
   folderDialogTitle: string
   letterheadDialogTitle: string
 }
@@ -150,6 +152,45 @@ const hoursSettingsInput = byProject.extend({
   }),
 })
 const hoursViewInput = byProject.extend({ period: z.object({ from: rule, to: rule }) })
+
+const MAX_FORECAST_MONTHS = 240
+const money = z.number().nullable()
+const forecastSettingsInput = byProject.extend({
+  settings: z.object({
+    modelPath: rule,
+    hoursPerDay: z.number(),
+    rates: z
+      .array(z.object({ person: rule, costPerDay: z.number(), ratePerDay: money }))
+      .max(MAX_RULES),
+    months: z
+      .record(
+        rule,
+        z.record(
+          rule,
+          z.object({
+            externals: z
+              .array(
+                z.object({
+                  name: rule,
+                  days: z.number(),
+                  costPerDay: z.number(),
+                  ratePerDay: z.number(),
+                }),
+              )
+              .max(MAX_RULES),
+            toInvoice: money,
+            revenue: money,
+            budgetCosts: money,
+            totalCosts: money,
+            totalCostsBeforeMonth: z.boolean(),
+            note: z.string().max(MAX_INPUT_LENGTH),
+          }),
+        ),
+      )
+      .refine((months) => Object.keys(months).length <= MAX_FORECAST_MONTHS),
+  }),
+})
+const forecastMonthInput = byProject.extend({ month: rule })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -372,6 +413,26 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.hoursReadTracker, hoursViewInput, async (input) =>
     deps.hours.readFromTracker(await deps.projects.get(input.projectId), input.period),
+  )
+
+  handle(CHANNELS.forecastSettingsGet, byProject, async ({ projectId }) =>
+    deps.forecasts.settings(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.forecastSettingsSave, forecastSettingsInput, async (input) =>
+    deps.forecasts.saveSettings(await deps.projects.get(input.projectId), input.settings),
+  )
+
+  handle(CHANNELS.forecastCandidates, byProject, async ({ projectId }) =>
+    deps.forecasts.candidates(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.forecastView, forecastMonthInput, async (input) =>
+    deps.forecasts.view(await deps.projects.get(input.projectId), input.month),
+  )
+
+  handle(CHANNELS.forecastCompile, forecastMonthInput, async (input) =>
+    deps.forecasts.compile(await deps.projects.get(input.projectId), input.month),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

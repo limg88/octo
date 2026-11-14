@@ -9,6 +9,7 @@ import type {
 } from '@octo/application'
 import {
   DEFAULT_DASHBOARD_SETTINGS,
+  DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
   type Deliverable,
   type DeliverableKind,
@@ -138,6 +139,17 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
+    forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
+    saveForecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
+    forecastCandidates: vi.fn(async () => ok<string[]>([])),
+    forecastView: vi.fn(async () => ({
+      ok: false as const,
+      code: 'forecast_model_not_set' as const,
+    })),
+    compileForecast: vi.fn(async () => ({
+      ok: false as const,
+      code: 'forecast_model_not_set' as const,
+    })),
     hoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
     saveHoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
     hoursCandidates: vi.fn(async () => ok({ timesheets: [], worklogs: [] })),

@@ -75,6 +75,11 @@ export type Hours = {
    * reads those. One reading per project at a time.
    */
   readFromTracker(project: Project, period: HoursPeriod): Promise<TrackerHoursRun>
+  /**
+   * Every row of the timesheets of the project, each one once; null when the PM has not said
+   * where they are. For what else is computed from the same hours.
+   */
+  timesheet(project: Project): Promise<HoursEntry[] | null>
 }
 
 const TIMESHEET_EXTENSION = 'json'
@@ -142,8 +147,38 @@ export function createHours(deps: HoursDeps): Hours {
     return entries
   }
 
+  async function timesheetRows(
+    project: Project,
+    files: readonly string[],
+    unreadable: string[],
+  ): Promise<HoursEntry[]> {
+    const json = (content: string): HoursEntry[] | null => {
+      try {
+        return parseTimesheetExport(JSON.parse(content))
+      } catch {
+        return null
+      }
+    }
+    const rows = await read(project, files, json, unreadable)
+    // A month is often kept twice, split and merged: a row with the same id counts once.
+    const seen = new Set<string>()
+    return rows.filter((row) => {
+      if (row.id === null) return true
+      if (seen.has(row.id)) return false
+      seen.add(row.id)
+      return true
+    })
+  }
+
   return {
     settings: (project) => deps.settings.load(project.folder),
+
+    async timesheet(project) {
+      const settings = await deps.settings.load(project.folder)
+      if (settings.timesheetPath === '') return null
+      const files = await filesAt(project, settings.timesheetPath, TIMESHEET_EXTENSION)
+      return timesheetRows(project, files, [])
+    },
 
     async saveSettings(project, settings) {
       const clean = cleanHoursSettings(settings)
@@ -181,22 +216,7 @@ export function createHours(deps: HoursDeps): Hours {
       if (worklogFiles.length === 0) throw new DomainError('hours_worklog_missing')
 
       const unreadable: string[] = []
-      const json = (content: string): HoursEntry[] | null => {
-        try {
-          return parseTimesheetExport(JSON.parse(content))
-        } catch {
-          return null
-        }
-      }
-      const rows = await read(project, timesheetFiles, json, unreadable)
-      // A month is often kept twice, split and merged: a row with the same id counts once.
-      const seen = new Set<string>()
-      const timesheet = rows.filter((row) => {
-        if (row.id === null) return true
-        if (seen.has(row.id)) return false
-        seen.add(row.id)
-        return true
-      })
+      const timesheet = await timesheetRows(project, timesheetFiles, unreadable)
       const worklog = await read(project, worklogFiles, parseWorklogExport, unreadable)
       const codes = new Set<string>()
       for (const row of timesheet) {

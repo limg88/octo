@@ -323,6 +323,50 @@ try {
   await hoursRow('Costa Elena').getByText('Torna').waitFor()
   assert.ok(!jira.server.received.some((request) => request.method !== 'GET'))
 
+  // Demo 09: the monthly forecast filled on the spreadsheet of the administration.
+  execFileSync('node', [`${root}demo/lib/fake-forecast.ts`, `${work}/Aurora`])
+  const modelFile = `${work}/Aurora/Amministrazione/Previsionale avanzamenti.xlsx`
+  const modelBefore = readFileSync(modelFile)
+  await page.getByRole('tab', { name: 'Previsionale' }).click()
+  const setup09 = page.getByRole('region', { name: 'Il modello dell’amministrazione' })
+  await setup09.waitFor({ timeout: TIMEOUT_MS })
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.settings-form input')?.value ===
+      'Amministrazione/Previsionale avanzamenti.xlsx',
+  )
+  await setup09.getByRole('button', { name: 'Salva' }).click()
+  const forecastRow = (code) => page.locator('table.data tbody tr', { hasText: code })
+  await forecastRow('PRJ000101').getByText('13.160,00').waitFor({ timeout: TIMEOUT_MS })
+  await forecastRow('PRJ000101').getByText('27.200,00').waitFor()
+  await forecastRow('PRJ000303').getByText('nessuna attività nel mese').waitFor()
+  await page.getByText(/manca il costo al giorno di Costa Elena \(120 ore/).waitFor()
+  await page.getByText(/^16 ore del mese non ancora approvate/).waitFor()
+  await page.getByText(/codici che il modello non elenca: PRJ000999/).waitFor()
+  await page.getByText('Impostazioni del previsionale').click()
+  const rates = page.getByLabel(/^Costo e tariffa al giorno/)
+  await rates.fill(`${await rates.inputValue()}\nCosta Elena; 190; 400`)
+  await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
+  await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
+  await forecastRow('PRJ000101').getByText('51,78%').waitFor()
+  await page.getByText('Dati del mese per PRJ000202').click()
+  const inputs202 = page.getByRole('form', { name: 'Dati del mese per PRJ000202' })
+  await inputs202.getByLabel(/^Esterni senza timesheet/).fill('Studio Blu; 5; 300; 500')
+  await inputs202.getByLabel(/^A corpo/).fill('20000')
+  await inputs202.getByRole('button', { name: 'Salva i dati del mese' }).click()
+  await forecastRow('PRJ000202').getByText('7,5%', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
+  await forecastRow('PRJ000202').getByText('3.000,00').waitFor()
+  await page.getByRole('button', { name: 'Compila il modello' }).click()
+  await page
+    .getByText(/^Modello compilato in _octo\/previsionale\//)
+    .waitFor({ timeout: TIMEOUT_MS })
+  const compiledFolder = `${work}/Aurora/_octo/previsionale`
+  const [compiledMonth] = readdirSync(compiledFolder)
+  const compiled = readFileSync(`${compiledFolder}/${compiledMonth}/Previsionale avanzamenti.xlsx`)
+  assert.ok(compiled.length > 0 && !compiled.equals(modelBefore))
+  assert.ok(readFileSync(modelFile).equals(modelBefore))
+  await page.screenshot({ path: `${work}/previsionale.png` })
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.
