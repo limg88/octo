@@ -224,6 +224,13 @@ export interface DocumentRenderer {
   word(title: string, markdown: string, letterhead?: Uint8Array): Promise<Uint8Array>
   /** Throws a DomainError `letterhead_invalid` when the bytes are not a usable Word document. */
   checkLetterhead(bytes: Uint8Array): Promise<void>
+  /**
+   * The bytes of a presentation with this Markdown as slides, one per section, on the deck given:
+   * its cover, its closing slide, its layouts and the look of its tables are kept.
+   */
+  deck(title: string, markdown: string, model: Uint8Array): Promise<Uint8Array>
+  /** Throws a DomainError `deck_model_invalid` when slides cannot be written on these bytes. */
+  checkDeckModel(bytes: Uint8Array): Promise<void>
 }
 
 /** How a project reads its tracker for the dashboard, kept with Octo's settings of the project. */

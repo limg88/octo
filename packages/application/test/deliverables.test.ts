@@ -45,6 +45,10 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
       checkLetterhead: async (bytes) => {
         if (bytes.length === 0) throw new DomainError('letterhead_invalid')
       },
+      deck: async (title, _markdown, model) => new Uint8Array(title.length + model.length),
+      checkDeckModel: async (bytes) => {
+        if (bytes.length === 0) throw new DomainError('deck_model_invalid')
+      },
     },
     evidence: evidenceFrom({
       'posta/a.md': {
@@ -262,6 +266,30 @@ describe('approving a deliverable', () => {
 
     await service.setLetterhead(project, null)
     expect(await service.hasLetterhead(project)).toBe(false)
+  })
+
+  it('also writes slides for a kind that is shown, once the PM chose a deck', async () => {
+    const { service, memory } = setup()
+    const report = { periodo: 'Sprint 28' }
+    expect(await service.hasDeckModel(project)).toBe(false)
+    const plain = await service.start(project, { kindId: 'stato-avanzamento', inputs: report })
+    expect((await service.approve(project, plain.id)).files).toHaveLength(2)
+    await expect(service.setDeckModel(project, new Uint8Array())).rejects.toMatchObject({
+      code: 'deck_model_invalid',
+    })
+
+    await service.setDeckModel(project, new Uint8Array([7, 7, 7]))
+    expect(await service.hasDeckModel(project)).toBe(true)
+    const shown = await service.start(project, { kindId: 'stato-avanzamento', inputs: report })
+    const approved = await service.approve(project, shown.id)
+    expect(approved.files[2]).toMatch(/^_octo\/deliverable\/approvati\/.*sprint-28.*\.pptx$/)
+    expect(memory.files.get(approved.files[2] ?? '')).toMatch(/^<\d+ bytes>$/)
+    // An email is not shown to an audience: no slides, deck or not.
+    const email = await service.start(project, { kindId: 'email-cliente', inputs })
+    expect((await service.approve(project, email.id)).files).toHaveLength(2)
+
+    await service.setDeckModel(project, null)
+    expect(await service.hasDeckModel(project)).toBe(false)
   })
 
   it('keeps the register of the project up to date at every approval', async () => {

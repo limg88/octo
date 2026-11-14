@@ -61,6 +61,7 @@ const statusReport: DeliverableKind = {
   summary:
     'Il report di periodo per il cliente: avanzamento, fatto, prossimi passi, rischi, decisioni.',
   audience: 'client',
+  deck: true,
   fields: [
     {
       key: 'periodo',
@@ -88,6 +89,9 @@ ${CLIENT_RULES}
   document.
 - If the project says how old the tracker data may be and they are older, give no numbers from the
   tracker: write a qualitative report, say so in the summary, and list in "missing" what is needed.
+- The report is also shown as slides, one per section: give each section a second-level heading,
+  keep a section to a few short lines or one table, and put in a table what is a list of items
+  with the same attributes (objectives, risks, decisions).
 - Look at the previous report, if the project has one: a number that changed is declared as a
   change, and nothing of the previous period is left as if it were new.`,
   checklist: [

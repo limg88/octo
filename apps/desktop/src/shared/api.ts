@@ -74,6 +74,9 @@ export const CHANNELS = {
   letterheadGet: 'deliverables:letterhead:get',
   letterheadChoose: 'deliverables:letterhead:choose',
   letterheadRemove: 'deliverables:letterhead:remove',
+  deckModelGet: 'deliverables:deck:get',
+  deckModelChoose: 'deliverables:deck:choose',
+  deckModelRemove: 'deliverables:deck:remove',
   feedGet: 'sources:feed:get',
   feedSave: 'sources:feed:save',
   feedSync: 'sources:feed:sync',
@@ -181,6 +184,11 @@ export type OctoApi = {
   /** Lets the PM choose a Word document as letterhead; false when the PM closes the dialog. */
   chooseLetterhead(projectId: string): Promise<Result<boolean>>
   removeLetterhead(projectId: string): Promise<Result<null>>
+  /** Whether the project has a deck its slides are written on. */
+  hasDeckModel(projectId: string): Promise<Result<boolean>>
+  /** Lets the PM choose a presentation as deck; false when the PM closes the dialog. */
+  chooseDeckModel(projectId: string): Promise<Result<boolean>>
+  removeDeckModel(projectId: string): Promise<Result<null>>
   dashboardSettings(projectId: string): Promise<Result<DashboardSettings>>
   saveDashboardSettings(
     projectId: string,

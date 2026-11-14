@@ -39,6 +39,7 @@ export type IpcDeps = {
   progress: Progress
   folderDialogTitle: string
   letterheadDialogTitle: string
+  deckModelDialogTitle: string
 }
 
 const MAX_QUESTION_LENGTH = 4000
@@ -93,6 +94,8 @@ const feedSaveInput = z.discriminatedUnion('feed', [
 
 /** A letterhead larger than this is not one: it would travel in every Word file. */
 const MAX_LETTERHEAD_BYTES = 20 * 1024 * 1024
+/** A deck carries its pictures and layouts; one larger than this is not a model to write on. */
+const MAX_DECK_MODEL_BYTES = 80 * 1024 * 1024
 const MAX_INPUT_LENGTH = 4000
 const MAX_INSTRUCTIONS_LENGTH = 20_000
 /** An id Octo made, used in a file name: letters, digits and dashes only. */
@@ -415,6 +418,30 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.letterheadRemove, byProject, async ({ projectId }) => {
     await deps.deliverables.setLetterhead(await deps.projects.get(projectId), null)
+    return null
+  })
+
+  handle(CHANNELS.deckModelGet, byProject, async ({ projectId }) =>
+    deps.deliverables.hasDeckModel(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.deckModelChoose, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.deckModelDialogTitle,
+      properties: ['openFile'],
+      filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
+    })
+    const file = choice.filePaths[0]
+    if (choice.canceled || !file) return false
+    const info = await stat(file)
+    if (info.size > MAX_DECK_MODEL_BYTES) throw new DomainError('deck_model_invalid')
+    await deps.deliverables.setDeckModel(project, new Uint8Array(await readFile(file)))
+    return true
+  })
+
+  handle(CHANNELS.deckModelRemove, byProject, async ({ projectId }) => {
+    await deps.deliverables.setDeckModel(await deps.projects.get(projectId), null)
     return null
   })
 

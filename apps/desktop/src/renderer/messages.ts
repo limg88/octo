@@ -416,6 +416,12 @@ export const messages = {
     'Scegli un documento Word con intestazione e piè di pagina. Octo ne tiene una copia nel progetto e ci scrive dentro solo il testo.',
   letterheadChoose: 'Scegli un documento Word',
   letterheadRemove: 'Togli',
+  deckModelTitle: 'Modello delle presentazioni',
+  deckModelNone: 'Nessuno: lo stato di avanzamento esce solo come testo e Word.',
+  deckModelSet: 'Impostato: lo stato di avanzamento approvato esce anche come presentazione.',
+  deckModelHint:
+    'Scegli una presentazione già fatta per questo cliente, per esempio quella del periodo scorso. Octo ne tiene una copia nel progetto: restano la copertina e la slide finale, le slide in mezzo sono riscritte una per sezione, con lo stesso layout e lo stesso aspetto delle tabelle. La copertina, se non ha un titolo da riempire, va aggiornata a mano.',
+  deckModelChoose: 'Scegli una presentazione',
   deliverableRegister: 'Registro',
   deliverableRegisterIntro:
     'Che cosa è costato ogni deliverable: minuti di scrittura, minuti di revisione e giri. Una pausa oltre 20 minuti non conta come revisione.',
@@ -599,6 +605,8 @@ const errors: Record<ErrorCode, string> = {
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',
   dashboard_settings_invalid: 'Le impostazioni del cruscotto sono rovinate: salvale di nuovo.',
+  deck_model_invalid:
+    'Questo file non è una presentazione che posso usare come modello: serve almeno una slide, dopo la copertina, con un titolo.',
   letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',
   unexpected: 'Qualcosa non ha funzionato. Riprova.',
 }

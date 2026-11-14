@@ -46,6 +46,32 @@ if (args.join(' ').includes('You attack the content of a deliverable')) {
   process.exit(0)
 }
 
+// A run of the writer of a status report: sections with headings, some lines and tables.
+if (args.join(' ').includes('Write the status report of the period')) {
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: [
+        '# Stato di avanzamento — Aurora',
+        '## Periodo e sintesi',
+        'Il periodo si chiude **in linea** con il piano: la consegna del modulo ordini resta fissata al 12 dicembre 2026 [1].',
+        '## Avanzamento per obiettivo',
+        '| Obiettivo | Stato | Prossima scadenza |\n|---|---|---|\n| Modulo ordini | In corso | 12 dicembre 2026 |\n| Integrazione magazzino | Da avviare | Da pianificare |',
+        '## Prossimi passi',
+        '- Collaudo del modulo ordini con il cliente\n- Pianificazione dell’integrazione con il magazzino',
+        '## Rischi e blocchi',
+        '| Rischio | Responsabile |\n|---|---|\n| Ambiente di prova non ancora disponibile | Cliente |',
+        '## Decisioni richieste',
+        '1. Conferma della data di collaudo, entro il 20 novembre 2026',
+      ].join('\n\n'),
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: [],
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the writer of an estimate: it gives the lines, never the totals.
 if (args.join(' ').includes('Write an estimate of effort in days')) {
   emit({

@@ -14,5 +14,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 08 | Ore: le ore approvate dei timesheet confrontate con quelle segnate sul tracker, persona per persona, con quadratura, nomi diversi riconosciuti e assenze attese | `bash demo/08-ore/run.sh` | [COPIONE](08-ore/COPIONE.md) |
 | 09 | Previsionale: il modello Excel dell'amministrazione compilato dal codice, una riga per codice di progetto, con formule vive, dati mancanti dichiarati e originale intatto | `bash demo/09-previsionale/run.sh` | [COPIONE](09-previsionale/COPIONE.md) |
 | 10 | Avanzamento: le richieste di stato di avanzamento per posizione d'ordine, percentuali calcolate dal codice e scritte sul modulo Excel del cliente secondo una mappa delle celle | `bash demo/10-avanzamento/run.sh` | [COPIONE](10-avanzamento/COPIONE.md) |
+| 11 | Presentazione: lo stato di avanzamento approvato reso come slide PowerPoint sulla presentazione del periodo scorso, con la sua copertina, il suo layout e le sue tabelle | `bash demo/11-presentazione/run.sh` | [COPIONE](11-presentazione/COPIONE.md) |
 
-`pnpm e2e` segue gli stessi passi delle demo da 01 a 10 nella finestra vera, senza intervento.
+`pnpm e2e` segue gli stessi passi delle demo da 01 a 11 (nella 11 il modello è già scelto: la finestra di scelta del file è del sistema) nella finestra vera, senza intervento.

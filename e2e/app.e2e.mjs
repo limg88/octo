@@ -416,6 +416,27 @@ try {
   assert.ok(readFileSync(formFile).equals(formBefore))
   await page.screenshot({ path: `${work}/avanzamento.png` })
 
+  // Demo 11: an approved status report as slides on the deck of the PM.
+  execFileSync('node', [`${root}demo/lib/fake-deck.ts`, `${work}/Aurora`, 'chosen'])
+  await page.getByRole('tab', { name: 'Deliverable' }).click()
+  const work11 = page.getByRole('region', { name: 'Deliverable' })
+  await work11.getByRole('button', { name: 'Nuovo deliverable' }).click()
+  await work11
+    .getByText('Impostato: lo stato di avanzamento approvato esce anche come presentazione.')
+    .waitFor({ timeout: TIMEOUT_MS })
+  await work11.getByRole('button', { name: /Stato di avanzamento/ }).click()
+  await work11.getByLabel(/^Periodo/).fill('Sprint 28')
+  await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
+  await work11.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
+  await page.screenshot({ path: `${work}/presentazione-bozza.png` })
+  await work11.getByRole('button', { name: 'Approva', exact: true }).click()
+  await assertEventually(() =>
+    readdirSync(`${work}/Aurora/_octo/deliverable/approvati`).some((name) =>
+      /stato-avanzamento.*\.pptx$/.test(name),
+    ),
+  )
+  await page.screenshot({ path: `${work}/presentazione.png` })
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

@@ -135,7 +135,20 @@ export function DeliverablesView({ api, project }: Props) {
                 void changeCatalog(() => api.removeDeliverableKind(project.id, kindId))
               }
             />
-            <Letterhead api={api} project={project} />
+            <ModelFile
+              key={`letterhead-${project.id}`}
+              text={LETTERHEAD_TEXT}
+              has={() => api.hasLetterhead(project.id)}
+              choose={() => api.chooseLetterhead(project.id)}
+              remove={() => api.removeLetterhead(project.id)}
+            />
+            <ModelFile
+              key={`deck-${project.id}`}
+              text={DECK_MODEL_TEXT}
+              has={() => api.hasDeckModel(project.id)}
+              choose={() => api.chooseDeckModel(project.id)}
+              remove={() => api.removeDeckModel(project.id)}
+            />
           </>
         )}
         {shown.view === 'register' && (
@@ -489,52 +502,69 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
   )
 }
 
-/** The Word document the deliverables of the project are written on, chosen once by the PM. */
-function Letterhead({ api, project }: Props) {
+type ModelText = { title: string; none: string; set: string; hint: string; choose: string }
+const LETTERHEAD_TEXT: ModelText = {
+  title: messages.letterheadTitle,
+  none: messages.letterheadNone,
+  set: messages.letterheadSet,
+  hint: messages.letterheadHint,
+  choose: messages.letterheadChoose,
+}
+const DECK_MODEL_TEXT: ModelText = {
+  title: messages.deckModelTitle,
+  none: messages.deckModelNone,
+  set: messages.deckModelSet,
+  hint: messages.deckModelHint,
+  choose: messages.deckModelChoose,
+}
+
+/** A file of the PM the deliverables of the project are written on, chosen once. */
+function ModelFile({
+  text,
+  has,
+  choose,
+  remove,
+}: {
+  text: ModelText
+  has: () => Promise<Result<boolean>>
+  choose: () => Promise<Result<unknown>>
+  remove: () => Promise<Result<unknown>>
+}) {
   const [present, setPresent] = useState<boolean | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
 
-  const reload = useCallback(async () => {
-    const result = await api.hasLetterhead(project.id)
-    if (result.ok) setPresent(result.value)
-  }, [api, project.id])
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the readers are made anew at each render; the file is read once.
   useEffect(() => {
-    setPresent(null)
-    setError(null)
-    void reload()
-  }, [reload])
+    void has().then((result) => {
+      if (result.ok) setPresent(result.value)
+    })
+  }, [])
 
   async function change(step: () => Promise<Result<unknown>>) {
     setError(null)
     const result = await step()
     if (!result.ok) setError(result.code)
-    await reload()
+    const now = await has()
+    if (now.ok) setPresent(now.value)
   }
 
   if (present === null) return null
   return (
-    <section className="letterhead" aria-label={messages.letterheadTitle}>
-      <h4>{messages.letterheadTitle}</h4>
-      <p className={present ? 'badge badge-ok' : 'badge'}>
-        {present ? messages.letterheadSet : messages.letterheadNone}
-      </p>
-      <p className="hint">{messages.letterheadHint}</p>
+    <section className="letterhead" aria-label={text.title}>
+      <h4>{text.title}</h4>
+      <p className={present ? 'badge badge-ok' : 'badge'}>{present ? text.set : text.none}</p>
+      <p className="hint">{text.hint}</p>
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}
         </p>
       )}
       <div className="actions">
-        <button type="button" onClick={() => void change(() => api.chooseLetterhead(project.id))}>
-          {messages.letterheadChoose}
+        <button type="button" onClick={() => void change(choose)}>
+          {text.choose}
         </button>
         {present && (
-          <button
-            type="button"
-            className="quiet"
-            onClick={() => void change(() => api.removeLetterhead(project.id))}
-          >
+          <button type="button" className="quiet" onClick={() => void change(remove)}>
             {messages.letterheadRemove}
           </button>
         )}

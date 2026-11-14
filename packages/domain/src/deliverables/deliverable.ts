@@ -32,6 +32,8 @@ export type DeliverableKind = {
   checklist: string[]
   /** The numbers this kind needs that only the code may compute. */
   calculation?: 'pert'
+  /** Shown to an audience: once approved it is also written as slides, on the PM's deck. */
+  deck?: true
 }
 
 /** What the writer gives back: the text and, for a kind with numbers, the lines to compute. */
@@ -107,6 +109,8 @@ export const PROJECT_INSTRUCTIONS_FOLDER = `${OCTO_FOLDER}/.istruzioni`
 
 /** The Word document a project's deliverables are written on, when the PM chose one. */
 export const LETTERHEAD_PATH = `${OCTO_FOLDER}/.modelli/carta-intestata.docx`
+/** The presentation the slides of a project are written on, when the PM chose one. */
+export const DECK_MODEL_PATH = `${OCTO_FOLDER}/.modelli/presentazione.pptx`
 
 export const jobPath = (id: string): string => `${JOBS_FOLDER}/${id}.json`
 export const projectInstructionsPath = (kindId: string): string =>

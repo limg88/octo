@@ -55,6 +55,7 @@ import { registerIpc } from './ipc.ts'
 const WINDOW_SIZE = { width: 1280, height: 860, minWidth: 900, minHeight: 600 }
 const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 const LETTERHEAD_DIALOG_TITLE = 'Scegli il documento Word da usare come carta intestata'
+const DECK_MODEL_DIALOG_TITLE = 'Scegli la presentazione da usare come modello'
 /** Lets a demo or a test keep its state apart from the PM's real one. */
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 /** Points the mail reader at another Mail folder: a demo's fake archive. */
@@ -238,6 +239,7 @@ function start(): void {
     askQuestion: createAskQuestion({ agent, evidence, questions, clock, ids }),
     folderDialogTitle: FOLDER_DIALOG_TITLE,
     letterheadDialogTitle: LETTERHEAD_DIALOG_TITLE,
+    deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
   })
 }
 

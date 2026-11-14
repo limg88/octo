@@ -4,6 +4,7 @@ import {
   type CheckedAnswer,
   checkAnswer,
   cleanInputs,
+  DECK_MODEL_PATH,
   DELIVERABLE_CATALOG,
   type Deliverable,
   type DeliverableKind,
@@ -83,11 +84,16 @@ export type Deliverables = {
   hasLetterhead(project: Project): Promise<boolean>
   /** Keeps a Word document as the letterhead of the project; null goes back to plain files. */
   setLetterhead(project: Project, bytes: Uint8Array | null): Promise<void>
+  /** Whether the project has a deck its slides are written on. */
+  hasDeckModel(project: Project): Promise<boolean>
+  /** Keeps a presentation as the deck of the project; null: no slides are written. */
+  setDeckModel(project: Project, bytes: Uint8Array | null): Promise<void>
 }
 
 const TITLE_FIELDS = ['tema', 'periodo', 'riunione'] as const
 const MARKDOWN = 'md'
 const WORD = 'docx'
+const DECK = 'pptx'
 
 export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   const running = new Set<string>()
@@ -275,7 +281,18 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       word,
       await deps.renderer.word(approved.title, text, letterhead),
     )
-    const done = { ...approved, files: [markdown, word] }
+    const files = [markdown, word]
+    if ((await kindOf(project, approved.kindId)).deck && (await hasDeckModel(project))) {
+      const deck = `${APPROVED_FOLDER}/${approvedFileName(approved, DECK)}`
+      const model = await deps.files.read(project.folder, DECK_MODEL_PATH)
+      await deps.memory.writeBytes(
+        project.folder,
+        deck,
+        await deps.renderer.deck(approved.title, text, model),
+      )
+      files.push(deck)
+    }
+    const done = { ...approved, files }
     await save(project, done)
     await deps.memory.write(
       project.folder,
@@ -285,9 +302,18 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     return done
   }
 
-  async function hasLetterhead(project: Project): Promise<boolean> {
-    const folder = LETTERHEAD_PATH.slice(0, LETTERHEAD_PATH.lastIndexOf('/'))
-    return (await deps.files.under(project.folder, folder)).includes(LETTERHEAD_PATH)
+  async function hasModel(project: Project, path: string): Promise<boolean> {
+    const folder = path.slice(0, path.lastIndexOf('/'))
+    return (await deps.files.under(project.folder, folder)).includes(path)
+  }
+  const hasLetterhead = (project: Project) => hasModel(project, LETTERHEAD_PATH)
+  const hasDeckModel = (project: Project) => hasModel(project, DECK_MODEL_PATH)
+
+  async function setDeckModel(project: Project, bytes: Uint8Array | null): Promise<void> {
+    if (bytes === null) return deps.files.remove(project.folder, DECK_MODEL_PATH)
+    await deps.renderer.checkDeckModel(bytes)
+    await deps.memory.claim(project.folder)
+    await deps.memory.writeBytes(project.folder, DECK_MODEL_PATH, bytes)
   }
 
   async function setLetterhead(project: Project, bytes: Uint8Array | null): Promise<void> {
@@ -317,6 +343,8 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     instructions,
     hasLetterhead,
     setLetterhead,
+    hasDeckModel,
+    setDeckModel,
     saveInstructions: async (project, kindId, text) => {
       const path = projectInstructionsPath((await kindOf(project, kindId)).id)
       await deps.memory.claim(project.folder)

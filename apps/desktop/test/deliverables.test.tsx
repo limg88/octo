@@ -100,6 +100,9 @@ type DeliverablesApi = Pick<
   | 'hasLetterhead'
   | 'chooseLetterhead'
   | 'removeLetterhead'
+  | 'hasDeckModel'
+  | 'chooseDeckModel'
+  | 'removeDeckModel'
   | 'openEvidence'
 >
 
@@ -122,6 +125,9 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
+    hasDeckModel: vi.fn(async () => ok(false)),
+    chooseDeckModel: vi.fn(async () => ok(true)),
+    removeDeckModel: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
@@ -240,6 +246,35 @@ describe('DeliverablesView', () => {
     fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
     expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
     expect(api.removeLetterhead).toHaveBeenCalledWith('p-1')
+  })
+
+  it('lets the PM choose a deck for the slides, and take it away', async () => {
+    const has = vi
+      .fn<OctoApi['hasDeckModel']>()
+      .mockResolvedValueOnce(ok(false))
+      .mockResolvedValueOnce(ok(true))
+      .mockResolvedValue(ok(false))
+    const { api } = fakeApi({ hasDeckModel: has })
+    render(<DeliverablesView api={api} project={project} />)
+
+    expect(await screen.findByText(messages.deckModelNone)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.deckModelChoose }))
+    expect(await screen.findByText(messages.deckModelSet)).toBeTruthy()
+    expect(api.chooseDeckModel).toHaveBeenCalledWith('p-1')
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
+    expect(await screen.findByText(messages.deckModelNone)).toBeTruthy()
+    expect(api.removeDeckModel).toHaveBeenCalledWith('p-1')
+  })
+
+  it('explains a file that is not a deck', async () => {
+    const { api } = fakeApi({
+      chooseDeckModel: vi.fn(
+        async () => ({ ok: false, code: 'deck_model_invalid' }) as Result<boolean>,
+      ),
+    })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.deckModelChoose }))
+    expect(await screen.findByText(/non è una presentazione che posso usare/)).toBeTruthy()
   })
 
   it('explains a file that is not a letterhead', async () => {
