@@ -2,6 +2,7 @@ import type { AgentStatus } from '@octo/application'
 import { FEED_NAMES, type Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { AlignmentView } from './AlignmentView.tsx'
 import { AskView } from './AskView.tsx'
 import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
@@ -14,7 +15,15 @@ import { ProgressView } from './ProgressView.tsx'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 
-type Tab = 'ask' | 'deliverables' | 'dashboard' | 'hours' | 'forecast' | 'progress' | 'sources'
+type Tab =
+  | 'ask'
+  | 'deliverables'
+  | 'dashboard'
+  | 'hours'
+  | 'forecast'
+  | 'progress'
+  | 'alignment'
+  | 'sources'
 
 type Props = {
   api: OctoApi
@@ -142,6 +151,12 @@ export function App({ api }: Props) {
               />
               <TabButton
                 current={tab}
+                tab="alignment"
+                label={messages.alignmentTab}
+                onSelect={setTab}
+              />
+              <TabButton
+                current={tab}
                 tab="sources"
                 label={messages.sourcesTab}
                 onSelect={setTab}
@@ -159,6 +174,8 @@ export function App({ api }: Props) {
               <ForecastView api={api} project={selected} />
             ) : tab === 'progress' ? (
               <ProgressView api={api} project={selected} />
+            ) : tab === 'alignment' ? (
+              <AlignmentView api={api} project={selected} />
             ) : (
               <div className="sources-page">
                 <SetupGuide api={api} project={selected} />

@@ -1,4 +1,5 @@
 import type {
+  AlignmentSettings,
   ArchivedMail,
   DashboardSettings,
   DeliverableDraft,
@@ -297,4 +298,19 @@ export interface SpreadsheetModel {
 export interface ProgressSettingsStore {
   load(projectFolder: string): Promise<ProgressSettings>
   save(projectFolder: string, settings: ProgressSettings): Promise<void>
+}
+
+/** How a project compares the two trackers, kept with Octo's settings of the project. */
+export interface AlignmentSettingsStore {
+  load(projectFolder: string): Promise<AlignmentSettings>
+  save(projectFolder: string, settings: AlignmentSettings): Promise<void>
+}
+
+/** An item a feed wrote in the project: its title and its fields as the system gives them. */
+export type FeedRecord = { title: string; record: Record<string, unknown> }
+
+/** Reads back the items the feeds wrote in a folder of the project, one file each. */
+export interface FeedRecords {
+  /** Every item under the folder; files that are not items of a feed are skipped. */
+  under(projectFolder: string, folder: string): Promise<FeedRecord[]>
 }

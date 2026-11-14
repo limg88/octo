@@ -1,6 +1,8 @@
 import type {
   AgentProgress,
   AgentStatus,
+  AlignmentFile,
+  AlignmentView,
   DashboardRange,
   DashboardView,
   ExportCandidates,
@@ -17,6 +19,7 @@ import type {
   TrackerHoursRun,
 } from '@octo/application'
 import type {
+  AlignmentSettings,
   DashboardSettings,
   Deliverable,
   DeliverableKind,
@@ -101,6 +104,10 @@ export const CHANNELS = {
   progressCandidates: 'progress:candidates',
   progressView: 'progress:view',
   progressCompile: 'progress:compile',
+  alignmentSettingsGet: 'alignment:settings:get',
+  alignmentSettingsSave: 'alignment:settings:save',
+  alignmentView: 'alignment:view',
+  alignmentExport: 'alignment:export',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -228,6 +235,15 @@ export type OctoApi = {
   progressView(projectId: string): Promise<Result<ProgressView>>
   /** Writes the filled form of request `n`; the empty form is never touched. */
   compileProgress(projectId: string, n: number): Promise<Result<ProgressFile>>
+  alignmentSettings(projectId: string): Promise<Result<AlignmentSettings>>
+  saveAlignmentSettings(
+    projectId: string,
+    settings: AlignmentSettings,
+  ): Promise<Result<AlignmentSettings>>
+  /** The client's items of the sprint against the supplier's tickets. */
+  alignmentView(projectId: string): Promise<Result<AlignmentView>>
+  /** Writes the missing items as a file the supplier's tracker imports. */
+  exportMissingTickets(projectId: string): Promise<Result<AlignmentFile>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

@@ -1,3 +1,5 @@
+export * from './alignment/align.ts'
+export * from './alignment/model.ts'
 export * from './answer.ts'
 export * from './deliverables/catalog.ts'
 export * from './deliverables/client-filter.ts'

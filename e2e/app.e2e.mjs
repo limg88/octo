@@ -463,6 +463,49 @@ try {
     .waitFor()
   await page.screenshot({ path: `${work}/tipi-di-testo.png` })
 
+  // Demo 13: the client's tracker against the supplier's tickets, sprint by sprint.
+  execFileSync('node', [`${root}demo/lib/fake-alignment.ts`, `${work}/Aurora`])
+  await page.getByRole('tab', { name: 'Allineamento' }).click()
+  const setup13 = page.getByRole('region', { name: 'Che cosa confronto' })
+  await setup13.waitFor({ timeout: TIMEOUT_MS })
+  await setup13.getByLabel(/^Sprint, come/).fill('Sprint 28')
+  await setup13.getByLabel(/^Tag delle voci/).fill('Squadra')
+  await setup13.getByRole('button', { name: 'Salva' }).click()
+  await page
+    .getByText(
+      '6 voci del cliente nello sprint: 3 con il ticket nello sprint, 1 con il ticket altrove, 2 senza ticket.',
+    )
+    .waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('Quadratura: ogni voce è in una sola delle tre liste.').waitFor()
+  const list13 = (name) => page.getByRole('region', { name, exact: true })
+  await list13('Ticket da spostare nello sprint').getByText('Sprint 27', { exact: true }).waitFor()
+  await list13('Voci con più di un ticket').getByText('AUR-4, AUR-5').waitFor()
+  await list13('Ticket che nominano una voce che non c’è').getByText('999', { exact: true }).waitFor()
+  await list13('Forse sono la stessa cosa')
+    .getByText(/^AUR-6 · /)
+    .waitFor()
+  await page.getByText('Che cosa confronto').click()
+  await page
+    .getByLabel(/^Stati che vogliono dire/)
+    .fill(
+      'da fare: New = Da completare\nin corso: In Progress = In corso\nchiuso: Closed = Completata',
+    )
+  await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
+  await list13('Collegate').getByText('Diversi', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Scrivi il file di import dei ticket mancanti' }).click()
+  await page
+    .getByText(/^Scritto _octo\/allineamento\/mancanti_sprint-28\.csv con 2 ticket/)
+    .waitFor({
+      timeout: TIMEOUT_MS,
+    })
+  const importFile = readFileSync(
+    `${work}/Aurora/_octo/allineamento/mancanti_sprint-28.csv`,
+    'utf8',
+  )
+  assert.match(importFile, /\[AZDO 105\] Ricerca ordini per cliente,Story,,Mario Rossi,,Sprint 28/)
+  assert.match(importFile, /Il listino arriva in Excel\.\nUna riga per articolo/)
+  await page.screenshot({ path: `${work}/allineamento.png` })
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   AgentRunner,
+  Alignments,
   AskQuestion,
   Dashboard,
   Deliverables,
@@ -37,6 +38,7 @@ export type IpcDeps = {
   hours: Hours
   forecasts: Forecasts
   progress: Progress
+  alignments: Alignments
   folderDialogTitle: string
   letterheadDialogTitle: string
   deckModelDialogTitle: string
@@ -233,6 +235,19 @@ const progressSettingsInput = byProject.extend({
   }),
 })
 const progressCompileInput = byProject.extend({ n: z.number().int().min(1) })
+
+const alignmentSettingsInput = byProject.extend({
+  settings: z.object({
+    sprint: rule,
+    period: rule,
+    tags: ruleList,
+    exportPath: rule,
+    ticketFolder: rule,
+    referencePrefixes: ruleList,
+    stateGroups: z.array(z.object({ name: rule, item: ruleList, ticket: ruleList })).max(MAX_RULES),
+    typeMap: z.array(z.object({ item: rule, ticket: rule })).max(MAX_RULES),
+  }),
+})
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -519,6 +534,22 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.progressCompile, progressCompileInput, async (input) =>
     deps.progress.compile(await deps.projects.get(input.projectId), input.n),
+  )
+
+  handle(CHANNELS.alignmentSettingsGet, byProject, async ({ projectId }) =>
+    deps.alignments.settings(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.alignmentSettingsSave, alignmentSettingsInput, async (input) =>
+    deps.alignments.saveSettings(await deps.projects.get(input.projectId), input.settings),
+  )
+
+  handle(CHANNELS.alignmentView, byProject, async ({ projectId }) =>
+    deps.alignments.view(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.alignmentExport, byProject, async ({ projectId }) =>
+    deps.alignments.exportMissing(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

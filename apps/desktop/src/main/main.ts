@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  createAlignments,
   createAskQuestion,
   createDashboard,
   createDeliverables,
@@ -26,7 +27,9 @@ import {
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
   createConnectorFeedReader,
+  createFeedRecords,
   createFileVault,
+  createFsAlignmentSettings,
   createFsDashboardSettings,
   createFsEvidenceReader,
   createFsFolderProbe,
@@ -198,6 +201,8 @@ function start(): void {
     clock,
   })
   const sheets = createXlsxModel()
+  const dashboardSettings = createFsDashboardSettings()
+  const trackerExports = createFsTrackerExports()
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, feeds, documents })
   const periodic = () => void feedAll(projects, feeding, window)
@@ -218,10 +223,14 @@ function start(): void {
       clock,
       ids,
     }),
-    dashboard: createDashboard({
-      settings: createFsDashboardSettings(),
-      exports: createFsTrackerExports(),
-      clock,
+    dashboard: createDashboard({ settings: dashboardSettings, exports: trackerExports, clock }),
+    alignments: createAlignments({
+      settings: createFsAlignmentSettings(),
+      dashboard: dashboardSettings,
+      exports: trackerExports,
+      sources: settings,
+      records: createFeedRecords(files),
+      writer,
     }),
     hours,
     forecasts: createForecasts({

@@ -91,6 +91,65 @@ export const messages = {
     unverified: 'Cifrata, certificato non verificato',
     plaintext: 'Non cifrata (solo rete interna)',
   },
+  alignmentTab: 'Allineamento',
+  alignment: {
+    loading: 'Confronto i due tracker…',
+    intro:
+      'Confronto le voci del tracker del cliente in uno sprint con i ticket del tuo tracker. Una voce e un ticket sono collegati quando la voce porta fra i tag la chiave del ticket, oppure il titolo del ticket nomina l’id della voce, per esempio «[AZDO 123]». Leggo l’esportazione usata dal cruscotto e i ticket che Octo ha già letto: non scrivo in nessuno dei due tracker.',
+    settings: 'Che cosa confronto',
+    sprint: 'Sprint, come lo chiamano i due tracker',
+    period: 'Periodo di pianificazione delle voci del cliente (vuoto: qualunque)',
+    tags: 'Tag delle voci che sono della tua squadra (separati da virgola; vuoto: tutte)',
+    exportPath:
+      'Esportazione del tracker del cliente: file nel progetto (vuoto: quella del cruscotto)',
+    ticketFolder: 'Cartella dei ticket nel progetto (vuoto: quella della fonte Jira)',
+    referencePrefixes:
+      'Che cosa precede l’id della voce nel titolo del ticket (separati da virgola), per esempio AZDO',
+    stateGroups:
+      'Stati che vogliono dire la stessa cosa: una riga per gruppo, «nome: stati del cliente = stati dei ticket»',
+    stateGroupsHint:
+      'Per esempio «in corso: In Progress, Active = In corso». Senza gruppi collego le voci ma non giudico gli stati.',
+    save: 'Salva',
+    summary: (total: number, linked: number, needsUpdate: number, missing: number) =>
+      `${total} voci del cliente nello sprint: ${linked} con il ticket nello sprint, ${needsUpdate} con il ticket altrove, ${missing} senza ticket.`,
+    adds: 'Quadratura: ogni voce è in una sola delle tre liste.',
+    doesNotAdd: 'Le tre liste non sommano al totale: non usare questi numeri e segnalalo.',
+    data: (exported: string, tickets: number) =>
+      `Tracker del cliente letto il ${exported}; ${tickets} ticket letti dal tuo tracker.`,
+    noDate: 'data non dichiarata',
+    linkedTitle: 'Collegate',
+    needsUpdateTitle: 'Ticket da spostare nello sprint',
+    missingTitle: 'Senza ticket',
+    duplicatesTitle: 'Voci con più di un ticket',
+    orphansTitle: 'Ticket che nominano una voce che non c’è',
+    suggestionsTitle: 'Forse sono la stessa cosa',
+    suggestionsIntro:
+      'Titoli che si somigliano fra voci senza ticket e ticket senza riferimento. Non li collego da solo: se è così, aggiungi l’id della voce al titolo del ticket.',
+    unreferencedTitle: 'Ticket dello sprint senza riferimento a una voce',
+    columnItem: 'Voce',
+    columnTitle: 'Titolo',
+    columnTicket: 'Ticket',
+    columnStates: 'Stato cliente → stato ticket',
+    columnCoherent: 'Stati',
+    columnTicketSprint: 'Sprint del ticket',
+    columnType: 'Tipo',
+    columnState: 'Stato',
+    columnIds: 'Voci nominate',
+    columnReason: 'Perché',
+    columnScore: 'Somiglianza',
+    coherent: { yes: 'Coerenti', no: 'Diversi', unknown: '—' },
+    noSprint: 'nessuno',
+    reason: {
+      unknown: 'Il tracker del cliente non ha questa voce',
+      out_of_scope: 'La voce esiste, ma fuori dallo sprint o dai tag indicati',
+    },
+    confidence: { high: 'alta', medium: 'media' },
+    none: 'Nessuna.',
+    exportMissing: 'Scrivi il file di import dei ticket mancanti',
+    exported: (rows: number, path: string) =>
+      `Scritto ${path} con ${rows} ticket da creare. L’import lo fai tu dal tuo tracker.`,
+    open: 'Apri il file',
+  },
   progressTab: 'Avanzamento',
   progress: {
     loading: 'Preparo l’avanzamento…',
@@ -596,6 +655,13 @@ const errors: Record<ErrorCode, string> = {
   forecast_month_invalid: 'Il mese non è valido.',
   forecast_settings_invalid:
     'Le impostazioni del previsionale non sono valide: il modello deve stare nella cartella del progetto.',
+  alignment_sprint_not_set: 'Indica lo sprint da confrontare.',
+  alignment_items_missing:
+    'Indica il file di esportazione del tracker del cliente, qui o nella scheda «Cruscotto».',
+  alignment_tickets_missing:
+    'Non trovo ticket da confrontare: configura Jira in «Fonti» e leggi i ticket, oppure indica la cartella dove sono.',
+  alignment_settings_invalid:
+    'Le impostazioni dell’allineamento non sono valide: la cartella dei ticket deve stare nel progetto.',
   progress_model_not_set: 'Indica il file Excel del modulo vuoto.',
   progress_model_missing: 'Non trovo il file del modulo nel posto indicato.',
   progress_model_invalid:

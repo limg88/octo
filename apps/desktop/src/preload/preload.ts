@@ -82,6 +82,12 @@ const api: OctoApi = {
   progressCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.progressCandidates, { projectId }),
   progressView: (projectId) => ipcRenderer.invoke(CHANNELS.progressView, { projectId }),
   compileProgress: (projectId, n) => ipcRenderer.invoke(CHANNELS.progressCompile, { projectId, n }),
+  alignmentSettings: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.alignmentSettingsGet, { projectId }),
+  saveAlignmentSettings: (projectId, settings) =>
+    ipcRenderer.invoke(CHANNELS.alignmentSettingsSave, { projectId, settings }),
+  alignmentView: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentView, { projectId }),
+  exportMissingTickets: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentExport, { projectId }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>

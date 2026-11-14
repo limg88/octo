@@ -8,6 +8,7 @@ import type {
   MailSourceView,
 } from '@octo/application'
 import {
+  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
@@ -143,6 +144,16 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     hasDeckModel: vi.fn(async () => ok(false)),
     chooseDeckModel: vi.fn(async () => ok(true)),
     removeDeckModel: vi.fn(async () => ok(null)),
+    alignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
+    saveAlignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
+    alignmentView: vi.fn(async () => ({
+      ok: false as const,
+      code: 'alignment_sprint_not_set' as const,
+    })),
+    exportMissingTickets: vi.fn(async () => ({
+      ok: false as const,
+      code: 'alignment_sprint_not_set' as const,
+    })),
     progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
     saveProgressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
     progressCandidates: vi.fn(async () => ok<string[]>([])),

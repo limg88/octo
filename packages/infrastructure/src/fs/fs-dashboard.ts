@@ -1,6 +1,7 @@
 import { open, readFile, realpath, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
+  AlignmentSettingsStore,
   DashboardSettingsStore,
   ExportCandidates,
   ForecastSettingsStore,
@@ -9,10 +10,12 @@ import type {
   TrackerExports,
 } from '@octo/application'
 import {
+  cleanAlignmentSettings,
   cleanDashboardSettings,
   cleanForecastSettings,
   cleanHoursSettings,
   cleanProgressSettings,
+  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
@@ -190,6 +193,35 @@ export function createFsProgressSettings(): ProgressSettingsStore {
       const parsed = progressSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       if (!parsed.success) throw new DomainError('progress_settings_invalid', PROGRESS_FILE)
       return cleanProgressSettings(parsed.data)
+    },
+    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const ALIGNMENT_FILE = 'alignment.json'
+const alignmentSchema = z.object({
+  sprint: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.sprint),
+  period: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.period),
+  tags: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.tags),
+  exportPath: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.exportPath),
+  ticketFolder: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.ticketFolder),
+  referencePrefixes: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.referencePrefixes),
+  stateGroups: z
+    .array(z.object({ name: z.string(), item: z.array(z.string()), ticket: z.array(z.string()) }))
+    .default(DEFAULT_ALIGNMENT_SETTINGS.stateGroups),
+  typeMap: z
+    .array(z.object({ item: z.string(), ticket: z.string() }))
+    .default(DEFAULT_ALIGNMENT_SETTINGS.typeMap),
+})
+
+export function createFsAlignmentSettings(): AlignmentSettingsStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, ALIGNMENT_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = alignmentSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('alignment_settings_invalid', ALIGNMENT_FILE)
+      return cleanAlignmentSettings(parsed.data)
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }

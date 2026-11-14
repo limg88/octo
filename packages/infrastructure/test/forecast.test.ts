@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SheetWrite } from '@octo/application'
 import {
+  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_PROGRESS_SETTINGS,
   NO_ROW_INPUTS,
@@ -11,8 +12,11 @@ import {
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  createFeedRecords,
+  createFsAlignmentSettings,
   createFsForecastSettings,
   createFsProgressSettings,
+  createFsProjectFiles,
   createXlsxModel,
 } from '../src/index.ts'
 import { forecastModelXlsx } from './support/forecast-xlsx.ts'
@@ -170,5 +174,53 @@ describe('the settings of the forecast on disk', () => {
     const { writeFile } = await import('node:fs/promises')
     await writeFile(join(folder, '_octo', '.impostazioni', 'progress.json'), '{"positions":1}')
     await expect(store.load(folder)).rejects.toThrow('progress_settings_invalid')
+  })
+
+  it('keep how the two trackers are compared', async () => {
+    const store = createFsAlignmentSettings()
+    expect(await store.load(folder)).toEqual(DEFAULT_ALIGNMENT_SETTINGS)
+    const settings = {
+      ...DEFAULT_ALIGNMENT_SETTINGS,
+      sprint: 'Sprint 28',
+      stateGroups: [{ name: 'in corso', item: ['In Progress'], ticket: ['In corso'] }],
+    }
+    await store.save(folder, settings)
+    expect(await store.load(folder)).toEqual(settings)
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(folder, '_octo', '.impostazioni', 'alignment.json'), '{"tags":1}')
+    await expect(store.load(folder)).rejects.toThrow('alignment_settings_invalid')
+  })
+
+  it('read back the items a feed wrote, and only those', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    const tickets = join(folder, 'ticket')
+    await mkdir(tickets, { recursive: true })
+    const header = (title: string, record: object) =>
+      [
+        '---',
+        'octobrief: 1',
+        'system: "jira"',
+        'type: "record"',
+        'externalId: "10001"',
+        'version: "1"',
+        `title: ${JSON.stringify(title)}`,
+        'originAt: "2026-11-09T21:58:59.244Z"',
+        'url: null',
+        'people: []',
+        `record: ${JSON.stringify(record)}`,
+        '---',
+        `# ${title}`,
+        '',
+      ].join('\n')
+    await writeFile(
+      join(tickets, 'aur-1.md'),
+      header('[AZDO 101] Esportazione', { key: 'AUR-1', status: 'In corso' }),
+    )
+    await writeFile(join(tickets, '_lettura.md'), '# Nota sulla lettura\n')
+    await writeFile(join(tickets, 'altro.txt'), 'non è un ticket')
+    const records = await createFeedRecords(createFsProjectFiles()).under(folder, 'ticket')
+    expect(records).toEqual([
+      { title: '[AZDO 101] Esportazione', record: { key: 'AUR-1', status: 'In corso' } },
+    ])
   })
 })
