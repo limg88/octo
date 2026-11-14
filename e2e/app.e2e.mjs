@@ -87,9 +87,9 @@ try {
   // The periodic reading may have run just before the click: either way two mails are there.
   await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
   const month = new Date(Date.now() - 30 * 3600 * 1000).toISOString().slice(0, 7)
-  const written = readdirSync(`${work}/Aurora/Posta/${month}`)
+  const written = readdirSync(`${work}/Aurora/_octo/posta/${month}`)
   assert.equal(written.length, 2)
-  const first = readFileSync(`${work}/Aurora/Posta/${month}/${written[0]}`, 'utf8')
+  const first = readFileSync(`${work}/Aurora/_octo/posta/${month}/${written[0]}`, 'utf8')
   assert.match(first, /oggetto: "Aurora: data del collaudo"/)
   assert.match(first, /spostato a giovedì 17 dicembre 2026/)
   fakeMail('extra')
@@ -134,19 +134,24 @@ try {
     .waitFor({ timeout: TIMEOUT_MS })
   await saveAdo()
   await adoSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
-  assert.doesNotMatch(readFileSync(`${work}/Aurora/.octo/sources.json`, 'utf8'), /demo-pat/)
+  assert.doesNotMatch(
+    readFileSync(`${work}/Aurora/_octo/impostazioni/sources.json`, 'utf8'),
+    /demo-pat/,
+  )
   await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
   await adoSection
     .getByText(/Ultima lettura .* aggiornati, \d+ invariati/)
     .waitFor({ timeout: TIMEOUT_MS })
   const workItems = () =>
-    readdirSync(`${work}/Aurora/Fonti/ADO`).filter((name) => /^\d+-[0-9a-f]{8}\.md$/.test(name))
+    readdirSync(`${work}/Aurora/_octo/fonti/ADO`).filter((name) =>
+      /^\d+-[0-9a-f]{8}\.md$/.test(name),
+    )
   assert.deepEqual(
     workItems().map((name) => name.split('-')[0]),
     ['101', '102', '103'],
   )
   assert.match(
-    readFileSync(`${work}/Aurora/Fonti/ADO/_lettura.md`, 'utf8'),
+    readFileSync(`${work}/Aurora/_octo/fonti/ADO/_lettura.md`, 'utf8'),
     /fonte: "Azure DevOps"/,
   )
   ado.options.items.push(extraItem())

@@ -15,7 +15,7 @@ Durata: 4 minuti. Mostra che Octo legge un sistema con la credenziale di sola le
    Atteso: il terminale stampa l'indirizzo dell'Azure DevOps finto e si apre Octo sul progetto «Aurora».
 
 2. **Apri «Fonti»** e scorri fino ad «Azure DevOps».
-   Atteso: «Non collegato.» «Cartella nel progetto» propone `Fonti/ADO`.
+   Atteso: «Non collegato.» «Cartella nel progetto» propone `_octo/fonti/ADO`.
 
 3. **Prova un token sbagliato.** Organizzazione `contoso`, Progetto `Aurora`, Personal Access Token `sbagliato`. Premi «Prova e salva».
    Atteso: «Il sistema ha rifiutato la credenziale…». Resta «Non collegato.»
@@ -23,15 +23,15 @@ Durata: 4 minuti. Mostra che Octo legge un sistema con la credenziale di sola le
 
 4. **Collega.** Token `demo-pat`, poi «Prova e salva».
    Atteso: «Collegamento riuscito e salvato.» Il campo del token si svuota e dice «Già salvata su questo computer».
-   Dimostra: la credenziale non torna più a schermo e non finisce nella cartella del progetto: `.octo/sources.json` contiene organizzazione e progetto, non il token.
+   Dimostra: la credenziale non torna più a schermo e non finisce nella cartella del progetto: `_octo/impostazioni/sources.json` contiene organizzazione e progetto, non il token.
 
 5. **Leggi.** Premi «Leggi ora».
    Atteso: «Ultima lettura …: N aggiornati, 0 invariati.»
 
 6. **Guarda i file.** Nel terminale:
    ```bash
-   ls .tmp/demo-04/Aurora/Fonti/ADO
-   cat .tmp/demo-04/Aurora/Fonti/ADO/_lettura.md
+   ls .tmp/demo-04/Aurora/_octo/fonti/ADO
+   cat .tmp/demo-04/Aurora/_octo/fonti/ADO/_lettura.md
    ```
    Atteso: un file per work item (`101-….md`, `102-….md`, `103-….md`) e la nota `_lettura.md` con la data della lettura e fino a quando arrivano i dati.
    Dimostra: lo stato del tracker è nella memoria del progetto, e l'età dei dati è scritta dove Claude la può citare.

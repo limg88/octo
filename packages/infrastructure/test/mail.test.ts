@@ -183,21 +183,39 @@ describe('files of a project', () => {
     const settings = createFsSourceSettings()
 
     expect(await settings.load(project)).toEqual(NO_SOURCES)
-    expect(await settings.suggestMailFolder(project)).toBe('Posta')
+    // Octo's own folder, also in a vault that keeps its inbox under `raw/`.
     await mkdir(join(project, 'raw'))
-    expect(await settings.suggestMailFolder(project)).toBe('raw/Mail')
+    expect(await settings.suggestMailFolder(project)).toBe('_octo/posta')
+    expect(await settings.suggestFeedFolder(project, 'ado')).toBe('_octo/fonti/ADO')
 
     await settings.save(project, { ...NO_SOURCES, mail })
     expect(await createFsSourceSettings().load(project)).toEqual({ ...NO_SOURCES, mail })
-    expect(JSON.parse(await readFile(join(project, '.octo', 'sources.json'), 'utf8'))).toEqual({
+    expect(
+      JSON.parse(await readFile(join(project, '_octo', 'impostazioni', 'sources.json'), 'utf8')),
+    ).toEqual({
       ...NO_SOURCES,
       mail,
     })
 
-    await writeFile(join(project, '.octo', 'sources.json'), '{"mail": {"since": 3}}')
+    await writeFile(
+      join(project, '_octo', 'impostazioni', 'sources.json'),
+      '{"mail": {"since": 3}}',
+    )
     await expect(settings.load(project)).rejects.toMatchObject({ code: 'source_config_invalid' })
-    await writeFile(join(project, '.octo', 'sources.json'), '{ rotto')
+    await writeFile(join(project, '_octo', 'impostazioni', 'sources.json'), '{ rotto')
     await expect(settings.load(project)).rejects.toThrow()
+  })
+
+  it('marks its own folder so git leaves it out and the search still looks inside', async () => {
+    const project = join(root, 'versionato')
+    await mkdir(project)
+    const writer = createFsMemoryWriter()
+
+    await writer.claim(project)
+    await writer.claim(project)
+
+    expect(await readFile(join(project, '_octo', '.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(project, '_octo', '.ignore'), 'utf8')).toBe('!*\n')
   })
 
   it('keeps what each source did on this computer', async () => {

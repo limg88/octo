@@ -33,8 +33,8 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | **F1. App e Chiedi** | installatore Mac e Windows; un progetto è una cartella; Chiedi con citazioni controllate | domande su DEEM dall'app, sul vault v0; l'app si installa e trova il seat sul PC Windows del pilota |
 | **F2. Alimentazione** | posta e file locali, ADO, Jira, DWSI; lettura periodica; pagina Fonti con freschezza | tre giorni senza alimentare DEEM a mano; posta e file letti anche su Windows |
 | **F3. Configurazione guidata** | nuovo progetto: l'app propone cartelle, progetti ADO/Jira e codici PRJ; primo riempimento automatico | il pilota collega un suo progetto in meno di 30 minuti, senza aiuto |
-| **F4. Deliverable, parte 1** | mail, SAL economico, SAL di progetto; istruzioni modificabili a parole; controllo interno/cliente; approvazione | i tre deliverable di DEEM del ciclo escono dall'app |
-| **F5. Deliverable, parte 2** | stime, dashboard bug e requisiti, technical proposal | la Suite v0 non serve più per DEEM; il pilota produce un deliverable reale |
+| **F4. Deliverable** | catalogo dentro l'app (email al cliente, stato avanzamento, verbale, stima); bozza in Markdown scritta da Claude nella cartella di lavoro; controlli del codice e red-team; revisione a parole; approvazione; esportazione in Word; registro dei tempi e dei giri | due deliverable reali del ciclo escono da Octo, con il tempo di correzione registrato |
+| **F5. Deliverable del progetto** | deliverable definiti nel progetto (modelli e istruzioni propri, come il modulo economico o la dashboard); connettori del PM in Chiedi; cartella di un progetto nuovo creata da un modello | la Suite v0 non serve più per il lavoro quotidiano; la collega produce un deliverable reale |
 
 ## Dopo T0
 
@@ -131,3 +131,37 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Un solo pulsante**: «Riempi la memoria ora» legge posta, sistemi collegati e documenti, uno dopo l'altro, e dice l'esito di ciascuno man mano. Una fonte che fallisce non ferma le altre. È lo stesso caso d'uso della lettura periodica.
 - **La guida segue ciò che cambia**: ogni salvataggio di una fonte avvisa l'interfaccia. Trovato dalla prova nella finestra vera: prima la guida si aggiornava solo alla lettura successiva.
 - **Non fatto**: creare la cartella di un progetto nuovo da un modello (oggi il PM sceglie o crea la cartella dalla finestra di sistema); rilevare da soli organizzazione ADO o sito Jira.
+
+## Lettura del vault reale (14/11/2026) e cosa cambia
+Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenuto del vault è riportato qui: solo ciò che cambia le scelte di Octo.
+
+**Come lavora davvero v0**
+- È Claude Code senza restrizioni: legge, scrive, esegue script, usa connettori in tempo reale. La posta non viene salvata: è letta al momento.
+- I deliverable sono skill con script e file Office modificati dall'interno, contratti di output, esempi validati e un red-team obbligatorio. Quasi tutte le skill stanno nell'account del PM, non nella cartella.
+- Il tracker del cliente non è raggiungibile dal PC del PM: un export da un'altra macchina produce uno snapshot unico, pubblicato una volta al giorno. Tutto legge quello.
+- La cartella è un repository git condiviso fra due persone, con regole precise. `raw/` è la casella del PM: l'agente non ci scrive.
+- Il lavoro è iterativo: lo stesso deliverable passa per 2-6 giri di revisione. L'errore più frequente è sul dato, non sul formato. I minuti di correzione non sono quasi mai stati annotati.
+
+**Decisioni del PM (14/11)**
+- Octo dev'essere indipendente: l'esperienza sta tutta dentro Octo, senza dipendere da skill dell'account né dal terminale.
+- Octo resta fuori da git.
+- Il pilota su Windows è la collega che lavora sullo stesso vault.
+
+**Cosa ho cambiato subito**
+- **Tutto ciò che Octo scrive sta sotto `_octo/`**: posta (`_octo/posta`), sistemi (`_octo/fonti/…`), testi estratti (`_octo/testo`), impostazioni (`_octo/impostazioni`). Octo non propone più cartelle sotto `raw/`.
+- **`_octo/` si esclude da git da sola** (un suo `.gitignore`), senza toccare i file del progetto.
+- **La ricerca di Claude salta ciò che git ignora**: verificato, una cartella ignorata diventava invisibile a Chiedi. Un file `.ignore` nella stessa cartella la riammette alla ricerca e lascia git com'è.
+- Chiedi legge per primo anche il manifest delle fonti, se il progetto ne ha uno.
+
+**Conseguenza accettata**: su un vault condiviso via git, posta e testi estratti restano sul computer di chi li genera. Ogni persona alimenta la propria copia.
+
+## Disegno di F4 (deliverable)
+- **Catalogo dentro l'app**: ogni deliverable è una cartella (istruzioni, contratto di output, modello) distribuita con Octo. Punto di partenza: le skill generalizzate di `second-brain-starter` (stato avanzamento, email al cliente, stima, verbale).
+- **Claude scrive solo nella cartella di lavoro**: verificato che, in modalità ristretta, gli si può permettere di scrivere in una sola sottocartella (`_octo/lavori/<id>/`) e in nessun altro posto, senza eseguire comandi.
+- **Prima il Markdown, poi il file**: la bozza è Markdown, rivista dentro Octo; solo dopo l'approvazione Octo produce Word. È la regola che il vault si era già dato.
+- **Niente script nel progetto e niente Python sul PC**: ciò che deve dare sempre lo stesso risultato (conti, controlli, impaginazione) lo fa il codice di Octo.
+- **Controlli**: citazioni verificate come in Chiedi; red-team come seconda lettura indipendente, in sola lettura; dati interni fuori dai documenti per il cliente.
+- **Revisione a parole, a giri**: ogni richiesta del PM è un giro; Octo li conta e misura i tempi.
+- **Registro automatico**: per ogni deliverable, minuti di bozza, giri e minuti di revisione. È la misura del ritorno che a mano non veniva compilata.
+- **Istruzioni del progetto**: il PM corregge a parole le istruzioni di un deliverable per il suo progetto; Octo le tiene in `_octo/deliverable/` e le applica ai cicli successivi.
+- **Fuori da F4**: PowerPoint e Excel su modelli del cliente, e i deliverable specifici di un cliente (modulo economico, dashboard). Sono F5.

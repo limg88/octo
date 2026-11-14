@@ -26,8 +26,8 @@ export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'] as const
 
 export const ASK_SYSTEM_PROMPT = `You answer a Project Manager's question about one project.
 The project is the current folder: read as many files as you need, with no fixed limit.
-If the folder has an index (for example wiki/indice.md), read it first: it tells how this memory is
-organised and which sources to prefer.
+If the folder has an index or a manifest (for example wiki/indice.md, raw/_MANIFEST.md), read it
+first: it tells how this memory is organised and which file answers which question.
 
 How to look:
 - A folder fed from a system of record (Azure DevOps, Jira, NetSuite) has a \`${FEED_NOTE_FILE}\` note:

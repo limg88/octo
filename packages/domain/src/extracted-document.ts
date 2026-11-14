@@ -1,7 +1,12 @@
 import type { Extraction, Locator, TextChunk } from './extraction.ts'
 
 /** Where the text of the Office and PDF files of a project is kept, inside the project folder. */
-export const EXTRACTED_TEXT_FOLDER = '_octo/testo'
+/**
+ * Octo's own folder inside a project: everything Octo writes lives under it, so nothing of the
+ * PM's is ever touched and a versioned project can leave the whole folder out.
+ */
+export const OCTO_FOLDER = '_octo'
+export const EXTRACTED_TEXT_FOLDER = `${OCTO_FOLDER}/testo`
 const TEXT_SUFFIX = '.md'
 
 /** A file of the project as it is now: enough to tell whether its text is still current. */

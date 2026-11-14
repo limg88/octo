@@ -1,10 +1,11 @@
 import { type FeedName, isDomainError, type Project, type SourceRun } from '@octo/domain'
 import type { Documents } from './documents.ts'
 import type { Feeds } from './feeds.ts'
-import type { SourceName } from './ports.ts'
+import type { MemoryWriter, SourceName } from './ports.ts'
 import type { Sources } from './sources.ts'
 
 export type FeedingDeps = {
+  writer: Pick<MemoryWriter, 'claim'>
   sources: Sources
   feeds: Feeds
   documents: Documents
@@ -55,6 +56,7 @@ export function createFeeding(deps: FeedingDeps): Feeding {
     project: Project,
     onStep: (step: FeedingStep) => void = () => {},
   ): Promise<FeedingStep[]> {
+    await deps.writer.claim(project.folder)
     const { mail, feeds } = await status(project)
     const plan: Array<[SourceName, () => Promise<SourceRun>]> = [
       ...(mail

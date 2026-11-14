@@ -37,7 +37,9 @@ Le dipendenze puntano solo verso l'interno: `domain` ← `application` ← `infr
 Variabili facoltative: `OCTO_CLAUDE_PATH` (percorso di Claude Code), `OCTO_DATA_DIR` (cartella dello stato dell'app), `OCTO_MAIL_ROOT` (un'altra cartella di Mail, per le demo). Solo per demo e test: `OCTO_DEV_ADO_URL`, `OCTO_DEV_JIRA_URL` (sistemi finti) e `OCTO_DEMO_PLAIN_SECRETS=1` (credenziali senza il Portachiavi).
 
 ## Come Octo alimenta la memoria
-- **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `.octo/sources.json` nella cartella del progetto.
+Tutto ciò che Octo scrive in un progetto sta sotto `_octo/`: la cartella si esclude da git da sola e resta visibile alla ricerca di Claude. Octo non scrive mai nelle cartelle del PM.
+
+- **Posta** (Mac): legge l'archivio di Mail sul computer e scrive nel progetto le mail che lo riguardano, una per file. Le regole si impostano nella scheda «Fonti» e stanno in `_octo/impostazioni/sources.json` nella cartella del progetto.
 - **Documenti**: scrive in `_octo/testo/` il testo di Word, Excel, PowerPoint e PDF della cartella, con lo stesso percorso dell'originale, così Claude può cercarlo e citarlo. Riconverte solo ciò che cambia.
 - **Azure DevOps, Jira, NetSuite (DWSI)**: legge work item, issue e viste del warehouse con la credenziale di sola lettura del PM e ne scrive un file per elemento, più una nota (`_lettura.md`) sull'età dei dati. La credenziale resta sul computer, cifrata dal sistema.
 - Tutte le fonti partono su richiesta e ogni 15 minuti ad app aperta.

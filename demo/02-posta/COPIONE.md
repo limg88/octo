@@ -15,11 +15,11 @@ Durata: 4 minuti. Mostra che Octo legge la posta che Mail tiene sul computer, sc
    Atteso: si apre Octo sul progetto «Aurora». Il terminale stampa il percorso dell'archivio finto: 6 mail, di cui 2 del progetto.
 
 2. **Apri «Fonti».** Fai clic sulla scheda «Fonti».
-   Atteso: «La posta di questo progetto non è ancora configurata.» Il campo «Cartella nel progetto» propone `Posta`; «Dal giorno» propone 30 giorni fa. «Leggi ora» è spento.
+   Atteso: «La posta di questo progetto non è ancora configurata.» Il campo «Cartella nel progetto» propone `_octo/posta`; «Dal giorno» propone 30 giorni fa. «Leggi ora» è spento.
 
 3. **Configura.** In «Parole chiave» scrivi `Aurora`. In «Mittenti da escludere» scrivi `avvisi@monitor.example`. Premi «Salva».
    Atteso: «Salvato. La prossima lettura riparte dal giorno indicato.» e l'etichetta «Mai letta.»
-   Dimostra: le regole stanno nella cartella del progetto (`.octo/sources.json`), quindi viaggiano con lei.
+   Dimostra: le regole stanno nella cartella del progetto (`_octo/impostazioni/sources.json`), quindi viaggiano con lei.
 
 4. **Leggi.** Premi «Leggi ora».
    Atteso: «Ultima lettura …: 2 nuove, 0 già presenti.»
@@ -27,9 +27,9 @@ Durata: 4 minuti. Mostra che Octo legge la posta che Mail tiene sul computer, sc
 
 5. **Guarda i file.** Nel terminale:
    ```bash
-   find .tmp/demo-02/Aurora/Posta -name '*.md'
+   find .tmp/demo-02/Aurora/_octo/posta -name '*.md'
    ```
-   Atteso: due file sotto `Posta/<anno-mese>/`, con giorno, ora e oggetto nel nome. Aprine uno: in testa mittente, destinatari, data, cartella di posta; sotto, il testo senza HTML.
+   Atteso: due file sotto `_octo/posta/<anno-mese>/`, con giorno, ora e oggetto nel nome. Aprine uno: in testa mittente, destinatari, data, cartella di posta; sotto, il testo senza HTML.
 
 6. **Arriva una mail nuova.** In un altro terminale:
    ```bash

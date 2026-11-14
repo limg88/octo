@@ -84,6 +84,11 @@ export type WriteOutcome = 'written' | 'unchanged'
 /** Writes a file of the memory inside the project folder, and nowhere else. */
 export interface MemoryWriter {
   write(projectFolder: string, relativePath: string, content: string): Promise<WriteOutcome>
+  /**
+   * Marks Octo's own folder of the project so that a versioned project leaves it out and the
+   * agent's search still looks inside it. Safe to call at every start.
+   */
+  claim(projectFolder: string): Promise<void>
 }
 
 /** The sources of a project, kept in the project folder so they travel with it. */

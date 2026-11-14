@@ -175,7 +175,7 @@ function start(): void {
     clock,
   })
   const window = createWindow()
-  const feeding = createFeeding({ sources, feeds, documents })
+  const feeding = createFeeding({ writer, sources, feeds, documents })
   const periodic = () => void feedAll(projects, feeding, window)
   setTimeout(periodic, FIRST_SYNC_DELAY_MS)
   setInterval(periodic, SYNC_INTERVAL_MS)

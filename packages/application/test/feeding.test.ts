@@ -21,6 +21,7 @@ function feeding(options: {
 }) {
   const calls: string[] = []
   const service = createFeeding({
+    writer: { claim: async () => void calls.push('claim') },
     sources: {
       mail: never,
       saveMail: never,
@@ -61,7 +62,7 @@ describe('filling a project from all its sources', () => {
 
     const steps = await service.fill(project, (step) => told.push(step))
 
-    expect(calls).toEqual(['mail', 'ado', 'jira', 'documents'])
+    expect(calls).toEqual(['claim', 'mail', 'ado', 'jira', 'documents'])
     expect(steps.map((step) => [step.source, step.run?.written])).toEqual([
       ['mail', 2],
       ['ado', 5],
@@ -75,14 +76,14 @@ describe('filling a project from all its sources', () => {
   it('converts the documents even when nothing else is set up', async () => {
     const { service, calls } = feeding({ mail: false, feeds: [] })
     await service.fill(project)
-    expect(calls).toEqual(['documents'])
+    expect(calls).toEqual(['claim', 'documents'])
   })
 
   it('goes on when a source cannot start, and stops on an unexpected error', async () => {
     const busy = feeding({ mail: true, feeds: [], busy: true })
     const steps = await busy.service.fill(project)
     expect(steps[0]).toEqual({ source: 'mail', run: null, error: 'source_busy' })
-    expect(busy.calls).toEqual(['mail', 'documents'])
+    expect(busy.calls).toEqual(['claim', 'mail', 'documents'])
 
     const broken = feeding({ mail: false, feeds: ['ado'], broken: true })
     await expect(broken.service.fill(project)).rejects.toThrow('disk full')

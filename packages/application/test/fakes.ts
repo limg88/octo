@@ -140,6 +140,7 @@ export function memoryWriter(): MemoryWriter & { files: Map<string, string> } {
       files.set(path, content)
       return 'written'
     },
+    claim: async () => {},
   }
 }
 

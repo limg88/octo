@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, realpath, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { FeedIndexes, MemoryWriter, SourceSettings, SourceStates } from '@octo/application'
 import {
@@ -9,6 +9,7 @@ import {
   type FeedName,
   NEVER_READ,
   NO_SOURCES,
+  OCTO_FOLDER,
   type SourceState,
   type SourcesConfig,
   WAREHOUSE_TLS_MODES,
@@ -76,21 +77,25 @@ const stateSchema = z.object({
 
 const statesSchema = z.record(z.string(), stateSchema)
 
-/** Octo's own files inside a project folder: what must travel with the project. */
-export const PROJECT_SETTINGS_FOLDER = '.octo'
+/** Octo's settings of a project: with the rest of what Octo writes, under its own folder. */
+export const PROJECT_SETTINGS_FOLDER = `${OCTO_FOLDER}/impostazioni`
 const SOURCES_FILE = 'sources.json'
 const STATES_FOLDER = 'sources'
-/** A vault of the Suite keeps what arrives under `raw/`: the mail goes beside it. */
-const VAULT_INBOX = 'raw'
-const MAIL_FOLDER_IN_VAULT = 'raw/Mail'
-const MAIL_FOLDER = 'Posta'
-const FEEDS_FOLDER = 'Fonti'
+const MAIL_FOLDER = `${OCTO_FOLDER}/posta`
+const FEEDS_FOLDER = `${OCTO_FOLDER}/fonti`
 const FEED_FOLDERS: Readonly<Record<FeedName, string>> = {
   ado: 'ADO',
   jira: 'Jira',
   dwsi: 'NetSuite',
 }
 const INDEXES_FOLDER = 'feeds'
+/** Tells git to leave Octo's folder alone: a versioned project is never dirtied by Octo. */
+const GIT_IGNORE = { name: '.gitignore', content: '*\n' }
+/**
+ * Tells the search tools to look inside it all the same: they skip what git ignores, and the
+ * agent would not find the mail and the texts Octo writes.
+ */
+const SEARCH_ALLOW = { name: '.ignore', content: '!*\n' }
 const PRIVATE_FILE_MODE = 0o600
 
 /**
@@ -120,12 +125,16 @@ export function createFsMemoryWriter(): MemoryWriter {
       await writeAtomic(target, content)
       return 'written'
     },
+    async claim(projectFolder) {
+      const folder = join(await realpath(projectFolder), OCTO_FOLDER)
+      await mkdir(folder, { recursive: true })
+      for (const marker of [GIT_IGNORE, SEARCH_ALLOW]) {
+        const file = join(folder, marker.name)
+        const current = await readFile(file, 'utf8').catch(() => null)
+        if (current !== marker.content) await writeAtomic(file, marker.content)
+      }
+    },
   }
-}
-
-async function hasVaultInbox(projectFolder: string): Promise<boolean> {
-  const inbox = await stat(join(projectFolder, VAULT_INBOX)).catch(() => null)
-  return inbox?.isDirectory() === true
 }
 
 export function createFsSourceSettings(): SourceSettings {
@@ -144,13 +153,9 @@ export function createFsSourceSettings(): SourceSettings {
       }
     },
     save: (projectFolder, config) => writeJson(fileOf(projectFolder), config),
-    async suggestMailFolder(projectFolder) {
-      return (await hasVaultInbox(projectFolder)) ? MAIL_FOLDER_IN_VAULT : MAIL_FOLDER
-    },
-    async suggestFeedFolder(projectFolder, feed) {
-      const base = (await hasVaultInbox(projectFolder)) ? VAULT_INBOX : FEEDS_FOLDER
-      return `${base}/${FEED_FOLDERS[feed]}`
-    },
+    // Never under the PM's own folders: a vault's `raw/` is its owner's inbox, not Octo's.
+    suggestMailFolder: async () => MAIL_FOLDER,
+    suggestFeedFolder: async (_projectFolder, feed) => `${FEEDS_FOLDER}/${FEED_FOLDERS[feed]}`,
   }
 }
 

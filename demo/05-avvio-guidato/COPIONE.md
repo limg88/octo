@@ -39,7 +39,7 @@ Durata: 5 minuti. Mostra che un PM porta un progetto da zero a una memoria piena
    ```bash
    find .tmp/demo-05/Aurora -name '*.md' | sort
    ```
-   Atteso: le mail sotto `Posta/`, i work item sotto `Fonti/ADO/` con la nota `_lettura.md`, i testi dei documenti sotto `_octo/testo/`.
+   Atteso: le mail sotto `_octo/posta/`, i work item sotto `_octo/fonti/ADO/` con la nota `_lettura.md`, i testi dei documenti sotto `_octo/testo/`.
 
 ## Con Claude vero
 ```bash
