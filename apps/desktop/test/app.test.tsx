@@ -142,6 +142,10 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     saveHoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
     hoursCandidates: vi.fn(async () => ok({ timesheets: [], worklogs: [] })),
     hoursView: vi.fn(async () => ({ ok: false as const, code: 'hours_sources_not_set' as const })),
+    readTrackerHours: vi.fn(async () => ({
+      ok: false as const,
+      code: 'source_not_configured' as const,
+    })),
     dashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     saveDashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),

@@ -74,7 +74,10 @@ const view: View = {
   projectCodes: ['P1', 'P9'],
 }
 
-type Api = Pick<OctoApi, 'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView'>
+type Api = Pick<
+  OctoApi,
+  'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView' | 'readTrackerHours'
+>
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
@@ -84,6 +87,14 @@ function fakeApi(overrides: Partial<Api> = {}) {
       ok({ timesheets: ['ore/Timesheets'], worklogs: ['ore/jira/w.csv'] }),
     ),
     hoursView: vi.fn(async () => ok(view)),
+    readTrackerHours: vi.fn(async () =>
+      ok({
+        at: '2026-07-10T10:00:00.000Z',
+        entries: 42,
+        months: ['2026-06'],
+        folder: '_octo/ore/jira',
+      }),
+    ),
     ...overrides,
   }
   return api
@@ -175,6 +186,31 @@ describe('hours', () => {
       aliases: [{ worklog: 'anna.b', timesheet: 'Bianchi Anna' }],
     })
     expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+  })
+
+  it('reads the hours from Jira when asked and compares again from what it read', async () => {
+    const fromJira = { ...configured, worklogPath: '_octo/ore/jira' }
+    const settings = vi
+      .fn<Api['hoursSettings']>()
+      .mockResolvedValueOnce(ok({ ...DEFAULT_HOURS_SETTINGS, timesheetPath: 'ore/Timesheets' }))
+      .mockResolvedValue(ok(fromJira))
+    const api = fakeApi({ hoursSettings: settings })
+    render(<HoursView api={api} project={project} now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.readTracker }))
+    expect(await screen.findByText(/^Lette 42 registrazioni di ore \(2026-06\)/)).toBeTruthy()
+    expect(api.readTrackerHours).toHaveBeenCalledWith('p-1', JUNE)
+    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+    cleanup()
+    const refused = fakeApi({
+      readTrackerHours: vi.fn(async () => ({
+        ok: false as const,
+        code: 'source_not_configured' as const,
+      })),
+    })
+    render(<HoursView api={refused} project={project} now={now} />)
+    await screen.findByText('Bianchi Anna')
+    fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
+    expect((await screen.findByRole('alert')).textContent).toBeTruthy()
   })
 
   it('says when the numbers cannot be used and explains a failure', async () => {

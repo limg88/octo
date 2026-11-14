@@ -33,6 +33,7 @@ import {
   createFsProjectFiles,
   createFsSourceSettings,
   createFsTrackerExports,
+  createJiraHoursReader,
   createJsonFeedIndexes,
   createJsonProjectRegistry,
   createJsonQuestionLog,
@@ -162,17 +163,14 @@ function start(): void {
     clock,
   })
   const files = createFsProjectFiles()
+  const secrets = createFileVault(dataFolder, secretCipher())
+  const devEndpoints = { jira: process.env[DEV_JIRA_VARIABLE], ado: process.env[DEV_ADO_VARIABLE] }
   const feeds = createFeeds({
     settings,
     states: sourceStates,
     indexes: createJsonFeedIndexes(dataFolder),
-    secrets: createFileVault(dataFolder, secretCipher()),
-    reader: createConnectorFeedReader({
-      devEndpoints: {
-        jira: process.env[DEV_JIRA_VARIABLE],
-        ado: process.env[DEV_ADO_VARIABLE],
-      },
-    }),
+    secrets,
+    reader: createConnectorFeedReader({ devEndpoints }),
     writer,
     files,
     clock,
@@ -209,7 +207,15 @@ function start(): void {
       exports: createFsTrackerExports(),
       clock,
     }),
-    hours: createHours({ settings: createFsHoursSettings(), files }),
+    hours: createHours({
+      settings: createFsHoursSettings(),
+      files,
+      sources: settings,
+      secrets,
+      tracker: createJiraHoursReader({ devEndpoints }),
+      writer,
+      clock,
+    }),
     agent,
     projects,
     questions,

@@ -2,7 +2,8 @@ import { MAX_ITEMS_PER_DELIVERY, type PullSourceKind } from '@octo/domain'
 import { createAdoConnector } from './ado/connector.ts'
 import { type ConnectorDelivery, toDelivery } from './delivery.ts'
 import { ConnectorError } from './errors.ts'
-import { createJiraConnector } from './jira/connector.ts'
+import { createJiraConnector, type JiraConnector } from './jira/connector.ts'
+import type { JiraWorklog, WorklogPeriod } from './jira/worklogs.ts'
 import { createNetGuard } from './net-guard.ts'
 import type { AnyConnector, ConnectorContext, Json, PerimeterOption, SyncBatch } from './port.ts'
 import { createSafeHttp } from './safe-http.ts'
@@ -50,6 +51,12 @@ export interface ConnectorReader {
   entries(kind: PullSourceKind, rawConfig: unknown, secret: string): Promise<PerimeterOption[]>
   /** The next batch after `cursor` (null: from the beginning). */
   pull(source: ReadableSource, cursor: unknown, signal: AbortSignal): Promise<ConnectorDelivery>
+  /** The hours logged on a Jira source over a period: read only when the PM asks for them. */
+  worklogs(
+    source: Omit<ReadableSource, 'kind'>,
+    period: WorklogPeriod,
+    signal: AbortSignal,
+  ): Promise<JiraWorklog[]>
 }
 
 function connectorsOf(options: ConnectorReaderOptions): Record<PullSourceKind, AnyConnector> {
@@ -188,6 +195,13 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
         config: config as Record<string, unknown>,
         perimeter: entries.map((entry) => entry.id),
       }
+    },
+
+    async worklogs(source, period, signal) {
+      const config = connectors.jira.parseConfig(source.config)
+      return withContext('jira', { ...source, config }, signal, (connector, ctx) =>
+        (connector as unknown as JiraConnector).worklogs(ctx as never, period),
+      )
     },
 
     async pull(source, cursor, signal) {

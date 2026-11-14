@@ -1,12 +1,12 @@
-import type { HoursCandidates, HoursView as View } from '@octo/application'
+import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/application'
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { dateText, errorText, messages } from './messages.ts'
+import { dateText, dateTimeText, errorText, messages } from './messages.ts'
 
 type HoursApi = Pick<
   OctoApi,
-  'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView'
+  'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView' | 'readTrackerHours'
 >
 
 type Props = {
@@ -47,6 +47,8 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
   const [view, setView] = useState<View | null>(null)
   const [period, setPeriod] = useState<HoursPeriod>(() => previousMonth(now()))
   const [error, setError] = useState<ErrorCode | null>(null)
+  const [reading, setReading] = useState(false)
+  const [run, setRun] = useState<TrackerHoursRun | null>(null)
 
   const ready = (candidate: HoursSettings) =>
     candidate.timesheetPath !== '' && candidate.worklogPath !== ''
@@ -83,6 +85,43 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
     if (ready(result.value)) await loadView(period)
   }
 
+  async function readTracker() {
+    setReading(true)
+    setError(null)
+    setRun(null)
+    const result = await api.readTrackerHours(project.id, period)
+    setReading(false)
+    if (!result.ok) return setError(result.code)
+    setRun(result.value)
+    // The reading points the comparison at the hours it wrote: the settings are read again.
+    const saved = await api.hoursSettings(project.id)
+    if (!saved.ok) return setError(saved.code)
+    setSettings(saved.value)
+    if (ready(saved.value)) await loadView(period)
+  }
+
+  const tracker = (
+    <section aria-label={text.trackerTitle}>
+      <h3>{text.trackerTitle}</h3>
+      <p className="hint">{text.trackerIntro}</p>
+      {reading && (
+        <p className="progress" role="status">
+          {text.readingTracker}
+        </p>
+      )}
+      {run && (
+        <p className="badge badge-ok">
+          {text.trackerRead(run.entries, run.months.join(', '), dateTimeText(run.at))}
+        </p>
+      )}
+      <div className="actions">
+        <button type="button" disabled={reading} onClick={() => void readTracker()}>
+          {text.readTracker}
+        </button>
+      </div>
+    </section>
+  )
+
   function changePeriod(next: HoursPeriod) {
     setPeriod(next)
     if (next.from !== '' && next.to !== '') void loadView(next)
@@ -101,6 +140,7 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
           <p className="hint">{text.setupIntro}</p>
           <SettingsForm settings={settings} candidates={candidates} codes={[]} onSave={save} />
         </section>
+        {tracker}
       </div>
     )
   }
@@ -145,6 +185,7 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
         </label>
       </div>
       {view && <Comparison view={view} onExpect={expect} />}
+      {tracker}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
         <SettingsForm

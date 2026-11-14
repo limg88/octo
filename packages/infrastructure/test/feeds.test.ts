@@ -15,6 +15,7 @@ import {
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
+  createJiraHoursReader,
   createJsonFeedIndexes,
   createJsonSourceStates,
   jiraSite,
@@ -190,6 +191,49 @@ describe('Jira as files of the project', () => {
     expect(issue).toBeDefined()
     expect(files.some((name) => name.startsWith('zef-'))).toBe(false)
     expect(await text(`Fonti/Jira/${issue}`)).toContain('Bug sul login')
+  })
+
+  it('reads the hours logged on the issues of the projects named, when asked', async () => {
+    const issue = jiraIssue(1, 'AUR-1', aurora, { updated: '2026-06-04T10:00:00.000+0000' })
+    issue.fields.worklog = {
+      worklogs: [
+        {
+          started: '2026-06-03T09:00:00.000+0200',
+          timeSpentSeconds: 5400,
+          author: { displayName: 'Mario Rossi' },
+        },
+        {
+          started: '2026-07-01T09:00:00.000+0200',
+          timeSpentSeconds: 3600,
+          author: { displayName: 'Mario Rossi' },
+        },
+      ],
+    }
+    const other = jiraIssue(2, 'ZEF-1', zefiro, { updated: '2026-06-04T10:00:00.000+0000' })
+    other.fields.worklog = {
+      worklogs: [
+        {
+          started: '2026-06-03T09:00:00.000+0200',
+          timeSpentSeconds: 3600,
+          author: { displayName: 'Altro' },
+        },
+      ],
+    }
+    fake = await startFakeJira({
+      email: config.email,
+      token: PAT,
+      projects: [aurora, zefiro],
+      issues: [issue, other],
+    })
+    const reader = createJiraHoursReader({ devEndpoints: { jira: fake.server.origin } })
+    const june = { from: '2026-06-01', to: '2026-06-30' }
+    const signal = new AbortController().signal
+    expect(await reader.read(config, PAT, june, signal)).toEqual([
+      { person: 'Mario Rossi', day: '2026-06-03', hours: 1.5, issue: 'AUR-1' },
+    ])
+    await expect(reader.read(config, 'wrong', june, signal)).rejects.toMatchObject({
+      code: 'feed_credential_refused',
+    })
   })
 
   it('lists the projects of the account by their key', async () => {

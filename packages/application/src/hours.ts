@@ -4,18 +4,45 @@ import {
   type HoursEntry,
   type HoursPeriod,
   type HoursSettings,
+  monthsOf,
+  OCTO_FOLDER,
   type Project,
   parseTimesheetExport,
   parseWorklogExport,
   type Reconciliation,
   reconcileHours,
+  worklogCsv,
 } from '@octo/domain'
-import type { HoursSettingsStore, ProjectFiles } from './ports.ts'
+import { secretKey } from './feeds.ts'
+import type {
+  Clock,
+  HoursSettingsStore,
+  MemoryWriter,
+  ProjectFiles,
+  SecretVault,
+  SourceSettings,
+  TrackerHoursReader,
+} from './ports.ts'
 
 export type HoursDeps = {
   settings: HoursSettingsStore
   files: ProjectFiles
+  /** Where the tracker of the project and its credential are set: the same the feeds use. */
+  sources: SourceSettings
+  secrets: SecretVault
+  tracker: TrackerHoursReader
+  writer: MemoryWriter
+  clock: Clock
 }
+
+/** What a reading of the hours from the tracker brought. */
+export type TrackerHoursRun = { at: string; entries: number; months: string[]; folder: string }
+
+/** Where Octo keeps the hours it read from the tracker, one file per month. */
+export const TRACKER_HOURS_FOLDER = `${OCTO_FOLDER}/ore/jira`
+/** Months read in one go at most: a longer period is asked in pieces. */
+export const MAX_MONTHS_READ = 12
+const worklogFile = (month: string): string => `${TRACKER_HOURS_FOLDER}/worklog_${month}.csv`
 
 /** Where the hours of a project seem to be kept, to propose to the PM. */
 export type HoursCandidates = { timesheets: string[]; worklogs: string[] }
@@ -42,6 +69,12 @@ export type Hours = {
   saveSettings(project: Project, settings: HoursSettings): Promise<HoursSettings>
   candidates(project: Project): Promise<HoursCandidates>
   view(project: Project, period: HoursPeriod): Promise<HoursView>
+  /**
+   * Reads from the tracker the hours of every month the period touches and keeps them in the
+   * project as exports, whole months so a file is never partial. From then on the comparison
+   * reads those. One reading per project at a time.
+   */
+  readFromTracker(project: Project, period: HoursPeriod): Promise<TrackerHoursRun>
 }
 
 const TIMESHEET_EXTENSION = 'json'
@@ -79,7 +112,12 @@ const lastDay = (entries: readonly HoursEntry[], period: HoursPeriod): string | 
       null,
     )
 
+const validPeriod = (period: HoursPeriod): boolean =>
+  DAY.test(period.from) && DAY.test(period.to) && period.from <= period.to
+
 export function createHours(deps: HoursDeps): Hours {
+  const reading = new Map<string, AbortController>()
+
   /** The files of a place: the file itself, or those with the extension under the folder. */
   async function filesAt(project: Project, place: string, extension: string): Promise<string[]> {
     const path = checkedPath(place)
@@ -132,9 +170,7 @@ export function createHours(deps: HoursDeps): Hours {
     },
 
     async view(project, period) {
-      if (!DAY.test(period.from) || !DAY.test(period.to) || period.from > period.to) {
-        throw new DomainError('hours_period_invalid')
-      }
+      if (!validPeriod(period)) throw new DomainError('hours_period_invalid')
       const settings = await deps.settings.load(project.folder)
       if (settings.timesheetPath === '' || settings.worklogPath === '') {
         throw new DomainError('hours_sources_not_set')
@@ -179,6 +215,45 @@ export function createHours(deps: HoursDeps): Hours {
           lastWorklogDay: lastDay(worklog, period),
         },
         projectCodes: [...codes].sort(),
+      }
+    },
+
+    async readFromTracker(project, period) {
+      if (!validPeriod(period)) throw new DomainError('hours_period_invalid')
+      const months = monthsOf(period)
+      if (months.length === 0 || months.length > MAX_MONTHS_READ) {
+        throw new DomainError('hours_period_invalid')
+      }
+      const config = (await deps.sources.load(project.folder)).jira
+      if (config === null) throw new DomainError('source_not_configured')
+      const secret = await deps.secrets.get(secretKey(project, 'jira'))
+      if (secret === null) throw new DomainError('secret_missing')
+      if (reading.has(project.id)) throw new DomainError('source_busy')
+      const abort = new AbortController()
+      reading.set(project.id, abort)
+      try {
+        const whole = { from: months[0]?.from ?? period.from, to: months.at(-1)?.to ?? period.to }
+        const entries = await deps.tracker.read(config, secret, whole, abort.signal)
+        await deps.writer.claim(project.folder)
+        for (const { month } of months) {
+          const ofMonth = entries.filter((entry) => entry.day.startsWith(month))
+          await deps.writer.write(project.folder, worklogFile(month), worklogCsv(ofMonth))
+        }
+        const settings = await deps.settings.load(project.folder)
+        if (settings.worklogPath !== TRACKER_HOURS_FOLDER) {
+          await deps.settings.save(project.folder, {
+            ...settings,
+            worklogPath: TRACKER_HOURS_FOLDER,
+          })
+        }
+        return {
+          at: deps.clock.now().toISOString(),
+          entries: entries.length,
+          months: months.map(({ month }) => month),
+          folder: TRACKER_HOURS_FOLDER,
+        }
+      } finally {
+        reading.delete(project.id)
       }
     },
   }

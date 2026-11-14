@@ -76,7 +76,8 @@ export type Feeds = {
   configured(project: Project): Promise<FeedName[]>
 }
 
-const secretKey = (project: Project, feed: FeedName): string => `${project.id}/${feed}`
+/** Where the credential of a feed of a project is kept in the vault. */
+export const secretKey = (project: Project, feed: FeedName): string => `${project.id}/${feed}`
 
 export function createFeeds(deps: FeedsDeps): Feeds {
   const running = new Set<string>()

@@ -150,6 +150,13 @@ export const messages = {
     possibleDuplicate: (hours: string, first: string, second: string) =>
       `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
     codesFound: 'Codici trovati nel periodo',
+    trackerTitle: 'Ore da Jira',
+    trackerIntro:
+      'Leggo le ore segnate sulle issue dei progetti Jira indicati in «Fonti», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e issue.',
+    readTracker: 'Leggi le ore da Jira',
+    readingTracker: 'Leggo le ore da Jira…',
+    trackerRead: (entries: number, months: string, when: string) =>
+      `Lette ${entries} registrazioni di ore (${months}) alle ${when}`,
   },
   dashboardTab: 'Cruscotto',
   dashboard: {

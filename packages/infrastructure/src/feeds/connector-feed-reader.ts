@@ -1,4 +1,4 @@
-import type { FeedReader } from '@octo/application'
+import type { FeedReader, TrackerHoursReader } from '@octo/application'
 import {
   ConnectorError,
   type ConnectorReader,
@@ -332,6 +332,35 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
         yield* feed === 'dwsi'
           ? readWarehouse(config as WarehouseFeedConfig, secret)
           : readTracker(feed, config, secret, cursor, signal)
+      } catch (error) {
+        throw failure(error)
+      }
+    },
+  }
+}
+
+const SECONDS_PER_HOUR = 3600
+
+/**
+ * The hours logged on Jira, through the same read-only connector the feed uses and with the same
+ * credential. Nothing but who, which day, how long and on which issue leaves the connector.
+ */
+export function createJiraHoursReader(options: ConnectorFeedOptions = {}): TrackerHoursReader {
+  const trackers = createConnectorReader(
+    options.devEndpoints ? { devEndpoints: options.devEndpoints } : {},
+  )
+  return {
+    async read(config, secret, period, signal) {
+      try {
+        const { config: raw, scope } = trackerOf.jira(config)
+        const source = await trackers.connect('jira', raw, secret, scope)
+        const worklogs = await trackers.worklogs({ ...source, secret }, period, signal)
+        return worklogs.map((worklog) => ({
+          person: worklog.person,
+          day: worklog.day,
+          hours: worklog.seconds / SECONDS_PER_HOUR,
+          issue: worklog.issueKey,
+        }))
       } catch (error) {
         throw failure(error)
       }

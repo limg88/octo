@@ -46,6 +46,8 @@ export interface FakeJiraOptions {
   issues: FakeIssue[]
   /** Projects per page of the list. */
   projectPageSize?: number
+  /** Worklogs per page of an issue, whatever is asked. */
+  worklogPageSize?: number
 }
 
 export interface FakeJira {
@@ -79,6 +81,14 @@ export interface FakeJira {
 const API = '/rest/api/3'
 
 /** The instant a relative JQL date (`-Nm`) means at Jira's clock: N minutes before it. */
+type FakeWorklog = { started: string; timeSpentSeconds: number; author?: { displayName?: string } }
+
+/** The worklogs an issue carries in its fields. */
+function worklogsOf(issue: FakeIssue): FakeWorklog[] {
+  const worklog = issue.fields.worklog as { worklogs?: FakeWorklog[] } | undefined
+  return (worklog?.worklogs ?? []).filter((w) => typeof w.started === 'string')
+}
+
 export function jqlInstant(relative: string, now: Date): number {
   const m = /^-(\d+)m$/.exec(relative)
   if (!m) throw new Error(`bad JQL date ${relative}`)
@@ -173,7 +183,16 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
       return
     }
     const projectId = (i: FakeIssue) => (i.fields.project as { id: string }).id
+    const loggedFrom = /worklogDate >= "([^"]+)"/.exec(jql)?.[1]
+    const loggedTo = /worklogDate <= "([^"]+)"/.exec(jql)?.[1]
+    const loggedIn = (i: FakeIssue) =>
+      loggedFrom === undefined ||
+      loggedTo === undefined ||
+      worklogsOf(i).some(
+        (w) => w.started.slice(0, 10) >= loggedFrom && w.started.slice(0, 10) <= loggedTo,
+      )
     const matches = options.issues
+      .filter(loggedIn)
       .filter((i) => !fake.unindexed.has(i.id))
       .filter((i) => fake.leakPerimeter || (inProjects ?? []).includes(projectId(i)))
       .filter((i) => from === null || updatedOf(i) >= from)
@@ -274,6 +293,32 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
       const max = Number(url.searchParams.get('maxResults') ?? '5000')
       const page = ordered.slice(0, max)
       json(res, 200, { startAt: 0, maxResults: max, total: all.length, comments: page })
+      return
+    }
+    const worklogPath = new RegExp(`^${API}/issue/(\\d+)/worklog$`).exec(path)
+    if (worklogPath) {
+      const issue = options.issues.find((i) => i.id === worklogPath[1])
+      if (!issue) {
+        json(res, 404, { errorMessages: ['Issue does not exist.'] })
+        return
+      }
+      const after = Number(url.searchParams.get('startedAfter') ?? '-Infinity')
+      const before = Number(url.searchParams.get('startedBefore') ?? 'Infinity')
+      const all = worklogsOf(issue).filter((w) => {
+        const at = Date.parse(w.started)
+        return at >= after && at <= before
+      })
+      const startAt = Number(url.searchParams.get('startAt') ?? '0')
+      const size = Math.min(
+        Number(url.searchParams.get('maxResults') ?? '5000'),
+        options.worklogPageSize ?? 5000,
+      )
+      json(res, 200, {
+        startAt,
+        maxResults: size,
+        total: all.length,
+        worklogs: all.slice(startAt, startAt + size),
+      })
       return
     }
     json(res, 404, { errorMessages: ['not found'] })

@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import { DEMO_ADO, extraItem, startDemoAdo } from '../demo/lib/fake-ado.ts'
+import { DEMO_JIRA, startDemoJira } from '../demo/lib/fake-jira.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const work = `${root}.tmp/e2e`
@@ -22,6 +23,7 @@ execFileSync('node', [`${root}demo/lib/fake-tracker.ts`, `${work}/Aurora`])
 execFileSync('node', [`${root}demo/lib/fake-hours.ts`, `${work}/Aurora`])
 
 const ado = await startDemoAdo()
+const jira = await startDemoJira()
 
 // OCTO_E2E_EXECUTABLE points the same steps at an installed or packaged app.
 const packaged = process.env.OCTO_E2E_EXECUTABLE
@@ -51,6 +53,7 @@ const launch = () =>
       OCTO_CLAUDE_PATH: `${root}demo/lib/fake-claude`,
       OCTO_MAIL_ROOT: `${work}/Mail`,
       OCTO_DEV_ADO_URL: ado.server.origin,
+      OCTO_DEV_JIRA_URL: jira.server.origin,
       OCTO_DEMO_PLAIN_SECRETS: '1',
     },
   })
@@ -298,6 +301,27 @@ try {
   await hoursRow('Costa Elena').getByText('Torna').waitFor({ timeout: TIMEOUT_MS })
   assert.equal(await hoursRow('E. Costa').count(), 0)
   await page.screenshot({ path: `${work}/ore.png` })
+  // The same hours read from Jira itself, with the token of its feed.
+  await page.getByRole('tab', { name: 'Fonti' }).click()
+  const jiraSection = page.getByRole('region', { name: 'Jira', exact: true })
+  await jiraSection.getByLabel(/^Sito/).fill(DEMO_JIRA.site)
+  await jiraSection.getByLabel('La tua email su Jira').fill(DEMO_JIRA.email)
+  await jiraSection.getByLabel(/^API token/).fill(DEMO_JIRA.token)
+  await jiraSection.getByLabel(/^Progetti/).fill(DEMO_JIRA.key)
+  await jiraSection.getByRole('button', { name: 'Prova e salva' }).click()
+  await jiraSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('tab', { name: 'Ore' }).click()
+  await page.getByText('Quadratura: 664 ore approvate, tutte nel confronto').waitFor({
+    timeout: TIMEOUT_MS,
+  })
+  await page.getByRole('button', { name: 'Leggi le ore da Jira' }).click()
+  await page.getByText(/^Lette 100 registrazioni di ore/).waitFor({ timeout: TIMEOUT_MS })
+  const fromJira = readdirSync(`${work}/Aurora/_octo/ore/jira`)
+  assert.equal(fromJira.length, 1)
+  assert.match(fromJira[0], /^worklog_\d{4}-\d{2}\.csv$/)
+  await page.locator('table.data tfoot').getByText('630').waitFor({ timeout: TIMEOUT_MS })
+  await hoursRow('Costa Elena').getByText('Torna').waitFor()
+  assert.ok(!jira.server.received.some((request) => request.method !== 'GET'))
 
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
@@ -310,4 +334,5 @@ try {
 } finally {
   await app.close()
   ado.server.close()
+  jira.server.close()
 }

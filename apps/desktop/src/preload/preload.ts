@@ -63,6 +63,8 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.hoursSettingsSave, { projectId, settings }),
   hoursCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.hoursCandidates, { projectId }),
   hoursView: (projectId, period) => ipcRenderer.invoke(CHANNELS.hoursView, { projectId, period }),
+  readTrackerHours: (projectId, period) =>
+    ipcRenderer.invoke(CHANNELS.hoursReadTracker, { projectId, period }),
   dashboardSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardSettingsGet, { projectId }),
   saveDashboardSettings: (projectId, settings) =>

@@ -7,11 +7,13 @@ import {
   deltaPct,
   type HoursEntry,
   type HoursSettings,
+  monthsOf,
   parseSeparated,
   parseTimesheetExport,
   parseWorklogExport,
   personKey,
   reconcileHours,
+  worklogCsv,
 } from '../src/index.ts'
 
 const entry = (
@@ -262,6 +264,33 @@ describe('sources of hours', () => {
     expect(parseWorklogExport('Utente;Data;Secondi\nMario Rossi;03/06/2026;')).toEqual([])
     expect(parseWorklogExport('a,b\n1,2')).toBeNull()
     expect(parseWorklogExport('')).toBeNull()
+  })
+
+  it('names the months a period touches', () => {
+    expect(monthsOf({ from: '2025-12-15', to: '2026-02-03' })).toEqual([
+      { month: '2025-12', from: '2025-12-01', to: '2025-12-31' },
+      { month: '2026-01', from: '2026-01-01', to: '2026-01-31' },
+      { month: '2026-02', from: '2026-02-01', to: '2026-02-28' },
+    ])
+    expect(monthsOf({ from: 'June', to: '2026-02-03' })).toEqual([])
+  })
+
+  it('writes the hours it read as an export it can read back', () => {
+    const csv = worklogCsv([
+      { person: 'Rossi; Mario', day: '2026-06-04', hours: 0.33333, issue: 'A-2' },
+      { person: 'Anna "B"', day: '2026-06-03', hours: 2, issue: 'A-1' },
+    ])
+    expect(parseWorklogExport(csv)).toEqual([
+      { person: 'Anna "B"', day: '2026-06-03', hours: 2, project: null, approved: true, id: null },
+      {
+        person: 'Rossi; Mario',
+        day: '2026-06-04',
+        hours: 0.3333,
+        project: null,
+        approved: true,
+        id: null,
+      },
+    ])
   })
 
   it('tidies the settings the PM typed', () => {

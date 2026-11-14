@@ -33,6 +33,16 @@ import {
   recordOf,
 } from './issues.ts'
 import { jqlSince, listJql, syncJql } from './jql.ts'
+import {
+  type JiraWorklog,
+  MAX_WORKLOG_ISSUES,
+  MAX_WORKLOG_PAGES,
+  WORKLOG_PAGE_SIZE,
+  type WorklogPeriod,
+  worklogJql,
+  worklogPageOf,
+  worklogWindow,
+} from './worklogs.ts'
 
 /**
  * Where a sync is in the order of the search: the update instant of the last issue read and
@@ -114,15 +124,23 @@ function projectsOf(json: unknown): { projects: Project[]; isLast: boolean } {
  * The read-only Jira Cloud connector. A source is a site; the PM chooses projects from its list
  * (ids, which stay when a key is renamed). A sync searches the issues of the chosen projects
  * changed since the cursor, oldest change first, page by page with `nextPageToken`, reading the
- * declared fields only (never worklog nor time tracking) and the last 50 comments, and gives one
+ * declared fields only (never worklog nor time tracking: hours are read apart, by `worklogs`,
+ * only when the PM asks) and the last 50 comments, and gives one
  * tracker record per issue plus, when it read any, an «Export Jira del gg/mm hh:mm» of them (a
  * backlog export, system data). What the system returns outside the perimeter is read past and
  * dropped. What changed in the last `SETTLE_MS` is left to the next sync (the search index is
  * eventually consistent), and the data is said to be as of the start of that window.
  */
-export function createJiraConnector(
-  options: JiraConnectorOptions = {},
-): Connector<JiraConfig, JiraCursor> {
+export interface JiraConnector extends Connector<JiraConfig, JiraCursor> {
+  /**
+   * The hours logged on the issues of the chosen projects over a period. A reading apart from
+   * the sync, made only when the PM asks for it: of each worklog it keeps who, which day, how
+   * long and on which issue. More than it can read fails, never a list cut short.
+   */
+  worklogs(ctx: ConnectorContext<JiraConfig>, period: WorklogPeriod): Promise<JiraWorklog[]>
+}
+
+export function createJiraConnector(options: JiraConnectorOptions = {}): JiraConnector {
   const endpointOf = options.endpoint ?? publicEndpoint
 
   /** The projects of a project search, page by page; more pages than are read fail. */
@@ -198,8 +216,91 @@ export function createJiraConnector(
     return { ...issue, comments: lastComments(json.comments.slice(0, MAX_COMMENTS)) }
   }
 
+  /** Id and key of the issues a query finds, page by page. */
+  async function issueKeys(
+    ctx: ConnectorContext<JiraConfig>,
+    jql: string,
+  ): Promise<Array<{ id: string; key: string }>> {
+    const found: Array<{ id: string; key: string }> = []
+    let token: string | null = null
+    for (let page = 0; page <= MAX_WORKLOG_ISSUES / PAGE_SIZE; page += 1) {
+      const json: unknown = await getJson(
+        ctx,
+        apiUrl(
+          endpointOf(ctx.config),
+          ['search', 'jql'],
+          [
+            ['jql', jql],
+            ['fields', 'key'],
+            ['maxResults', String(PAGE_SIZE)],
+            ...(token !== null ? [['nextPageToken', token] as [string, string]] : []),
+          ],
+        ),
+      )
+      if (!isRecord(json) || !Array.isArray(json.issues) || json.issues.length > PAGE_SIZE) {
+        return bad()
+      }
+      for (const raw of json.issues) {
+        if (
+          !isRecord(raw) ||
+          typeof raw.id !== 'string' ||
+          !/^\d{1,18}$/.test(raw.id) ||
+          typeof raw.key !== 'string'
+        ) {
+          return bad()
+        }
+        found.push({ id: raw.id, key: raw.key })
+      }
+      if (found.length > MAX_WORKLOG_ISSUES) throw new ConnectorError('response_too_large')
+      const next = typeof json.nextPageToken === 'string' ? json.nextPageToken : ''
+      if (json.isLast === true || (json.isLast === undefined && next === '')) return found
+      if (next === '') return bad()
+      token = next
+    }
+    throw new ConnectorError('response_too_large')
+  }
+
+  async function worklogsOf(
+    ctx: ConnectorContext<JiraConfig>,
+    issue: { id: string; key: string },
+    period: WorklogPeriod,
+  ): Promise<JiraWorklog[]> {
+    const { after, before } = worklogWindow(period)
+    const kept: JiraWorklog[] = []
+    let startAt = 0
+    for (let page = 0; page < MAX_WORKLOG_PAGES; page += 1) {
+      const json = await getJson(
+        ctx,
+        apiUrl(
+          endpointOf(ctx.config),
+          ['issue', issue.id, 'worklog'],
+          [
+            ['startAt', String(startAt)],
+            ['maxResults', String(WORKLOG_PAGE_SIZE)],
+            ['startedAfter', String(after)],
+            ['startedBefore', String(before)],
+          ],
+        ),
+      )
+      const read = worklogPageOf(json, issue.key, period)
+      kept.push(...read.worklogs)
+      startAt += read.read
+      if (read.read === 0 || startAt >= read.total) return kept
+    }
+    throw new ConnectorError('response_too_large')
+  }
+
   return {
     kind: 'jira',
+
+    async worklogs(ctx, period) {
+      const projects = await chosenProjects(ctx)
+      const issues = await issueKeys(ctx, worklogJql([...projects.keys()].sort(), period))
+      const all: JiraWorklog[] = []
+      for (const issue of issues) all.push(...(await worklogsOf(ctx, issue, period)))
+      return all
+    },
+
     parseConfig: parseJiraConfig,
     parseCursor,
     rules: (config) => jiraRules(endpointOf(config)),

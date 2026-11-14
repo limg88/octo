@@ -103,7 +103,8 @@ const lit = (...names: readonly string[]): PathPart[] => names.map((literal) => 
 
 /**
  * The calls of the connector, all GET: the account (connection test), the project
- * list, the issue search and the comments of one issue (its id in the path). Nothing else, and
+ * list, the issue search, and the comments and the worklogs of one issue (its id in the path).
+ * The worklogs are read only when the PM asks for the hours. Nothing else, and
  * never a POST: the project ids travel in the query string of the search.
  */
 export function jiraRules(endpoint: JiraEndpoint): HttpRule[] {
@@ -117,6 +118,7 @@ export function jiraRules(endpoint: JiraEndpoint): HttpRule[] {
     { method: 'GET', host, path: api(...lit('project', 'search')) },
     { method: 'GET', host, path: api(...lit('search', 'jql')) },
     { method: 'GET', host, path: api(...lit('issue'), 'segment', ...lit('comment')) },
+    { method: 'GET', host, path: api(...lit('issue'), 'segment', ...lit('worklog')) },
   ]
 }
 

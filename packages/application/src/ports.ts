@@ -11,7 +11,9 @@ import type {
   FeedIndex,
   FeedName,
   FeedStep,
+  HoursPeriod,
   HoursSettings,
+  JiraFeedConfig,
   MailMessage,
   Project,
   QuestionRecord,
@@ -19,6 +21,7 @@ import type {
   SourceFileStamp,
   SourceState,
   SourcesConfig,
+  TrackerHours,
 } from '@octo/domain'
 
 /** What the agent is doing right now, in terms a PM can read. */
@@ -243,4 +246,17 @@ export interface TrackerExports {
 export interface HoursSettingsStore {
   load(projectFolder: string): Promise<HoursSettings>
   save(projectFolder: string, settings: HoursSettings): Promise<void>
+}
+
+/**
+ * Reads the hours logged on the tracker with the PM's own read-only credential, only when the PM
+ * asks. Never writes to the tracker. Failures are DomainErrors with a `feed_*` code.
+ */
+export interface TrackerHoursReader {
+  read(
+    config: JiraFeedConfig,
+    secret: string,
+    period: HoursPeriod,
+    signal: AbortSignal,
+  ): Promise<TrackerHours[]>
 }

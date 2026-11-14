@@ -10,6 +10,7 @@ import type {
   HoursCandidates,
   HoursView,
   MailSourceView,
+  TrackerHoursRun,
 } from '@octo/application'
 import type {
   DashboardSettings,
@@ -80,6 +81,7 @@ export const CHANNELS = {
   hoursSettingsSave: 'hours:settings:save',
   hoursCandidates: 'hours:candidates',
   hoursView: 'hours:view',
+  hoursReadTracker: 'hours:tracker:read',
   sourcesChanged: 'sources:changed',
 } as const
 
@@ -178,6 +180,8 @@ export type OctoApi = {
   hoursCandidates(projectId: string): Promise<Result<HoursCandidates>>
   /** Timesheet hours against tracker hours over a period, person by person. */
   hoursView(projectId: string, period: HoursPeriod): Promise<Result<HoursView>>
+  /** Reads the hours of the period from the tracker, with the credential of its feed. */
+  readTrackerHours(projectId: string, period: HoursPeriod): Promise<Result<TrackerHoursRun>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

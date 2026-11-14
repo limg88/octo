@@ -33,6 +33,7 @@ export {
   type JiraCursor,
   jiraConnector,
 } from './jira/connector.ts'
+export type { JiraWorklog, WorklogPeriod } from './jira/worklogs.ts'
 export {
   createNetGuard,
   type NetGuard,

@@ -200,7 +200,7 @@ describe('the Jira configuration', () => {
     ).toBe(true)
   })
 
-  it('reads only: GET on the account, the projects, the search and the comments of an issue', () => {
+  it('reads only: GET on the account, the projects, the search, the comments and the worklogs of an issue', () => {
     const shown = connector
       .rules(connector.parseConfig(valid))
       .map((r) => `${r.method} ${r.path.map((p) => (p === 'segment' ? '*' : p.literal)).join('/')}`)
@@ -210,6 +210,7 @@ describe('the Jira configuration', () => {
         'GET rest/api/3/project/search',
         'GET rest/api/3/search/jql',
         'GET rest/api/3/issue/*/comment',
+        'GET rest/api/3/issue/*/worklog',
       ].sort(),
     )
   })
@@ -687,7 +688,7 @@ describe('a sync', () => {
     expect(records(batch)).toHaveLength(1)
   })
 
-  it('never writes nor reads worklogs: such calls are refused before the network', async () => {
+  it('never writes, worklogs included: such calls are refused before the network', async () => {
     const s = await setup([])
     const http = s.ctx([]).http
     const base = `${s.fake.server.origin}/rest/api/3`
@@ -699,7 +700,7 @@ describe('a sync', () => {
       { method: 'POST', url: `${base}/issue/10042/comment` },
       { method: 'POST', url: `${base}/search/jql` },
       { method: 'POST', url: `${base}/issue/10042/transitions` },
-      { method: 'GET', url: `${base}/issue/10042/worklog` },
+      { method: 'POST', url: `${base}/issue/10042/worklog` },
       { method: 'GET', url: `${base}/issue/10042` },
     ]
     for (const a of attempts) {
@@ -713,7 +714,7 @@ describe('a sync', () => {
       'method_not_allowed',
       'method_not_allowed',
       'path_not_allowed',
-      'path_not_allowed',
+      'method_not_allowed',
       'path_not_allowed',
     ])
     expect(s.fake.server.received).toEqual([])
@@ -766,5 +767,72 @@ describe('the listing of a reconciliation', () => {
     const s = await setup(issues)
     const listing = s.connector.listIds?.(s.ctx(APO)) as Promise<unknown>
     expect(await codeOf(listing)).toBe('response_too_large')
+  })
+})
+
+describe('the hours logged on Jira, read when the PM asks', () => {
+  const logged = (started: string, seconds: number, person = 'Mario Rossi') => ({
+    id: started,
+    started,
+    timeSpentSeconds: seconds,
+    timeSpent: 'not read',
+    comment: 'not read either',
+    author: { displayName: person, emailAddress: 'never@kept.test', accountId: 'acc-1' },
+  })
+  const withHours = (n: number, key: string, project: FakeProject, worklogs: unknown[]) => {
+    const issue = jiraIssue(n, key, project, { updated: at(0) })
+    issue.fields.worklog = { total: worklogs.length, worklogs }
+    return issue
+  }
+  const JUNE = { from: '2026-06-01', to: '2026-06-30' }
+
+  it('gives who, which day and how long, for the chosen projects and the period only', async () => {
+    const s = await setup([
+      withHours(1, 'APO-1', APOLLO, [
+        logged('2026-06-03T09:00:00.000+0200', 5400),
+        logged('2026-05-31T23:30:00.000+0200', 3600),
+        logged('2026-06-30T18:00:00.000+0200', 7200, 'Anna Bianchi'),
+        logged('2026-07-01T08:00:00.000+0200', 3600),
+      ]),
+      withHours(2, 'APO-2', APOLLO, [logged('2026-04-10T09:00:00.000+0200', 3600)]),
+      withHours(3, 'BOR-1', BOREA, [logged('2026-06-10T09:00:00.000+0200', 3600)]),
+    ])
+    const worklogs = await s.connector.worklogs(s.ctx(APO), JUNE)
+    expect(worklogs).toEqual([
+      { person: 'Mario Rossi', day: '2026-06-03', seconds: 5400, issueKey: 'APO-1' },
+      { person: 'Anna Bianchi', day: '2026-06-30', seconds: 7200, issueKey: 'APO-1' },
+    ])
+    expect(JSON.stringify(worklogs)).not.toContain('never@kept.test')
+    // The issue without hours in the period is not even asked for its worklogs.
+    const asked = s.fake.server.received.filter((r) => r.url.includes('/worklog'))
+    expect(asked.map((r) => r.url.split('?')[0])).toEqual(['/rest/api/3/issue/1/worklog'])
+    expect(s.blocked).toEqual([])
+  })
+
+  it('reads every page of an issue with many worklogs', async () => {
+    const many = Array.from({ length: 7 }, (_, i) =>
+      logged(`2026-06-${String(i + 1).padStart(2, '0')}T09:00:00.000+0200`, 3600),
+    )
+    const s = await setup([withHours(1, 'APO-1', APOLLO, many)], { worklogPageSize: 3 })
+    const worklogs = await s.connector.worklogs(s.ctx(APO), JUNE)
+    expect(worklogs).toHaveLength(7)
+    expect(worklogs.reduce((sum, w) => sum + w.seconds, 0)).toBe(7 * 3600)
+  })
+
+  it('refuses a period that is not one and an answer it does not understand', async () => {
+    const s = await setup([
+      withHours(1, 'APO-1', APOLLO, [
+        { started: '2026-06-03T09:00:00.000+0200', timeSpentSeconds: 'x' },
+      ]),
+    ])
+    await expect(
+      s.connector.worklogs(s.ctx(APO), { from: '2026-07-01', to: '2026-06-01' }),
+    ).rejects.toThrow(TypeError)
+    await expect(
+      s.connector.worklogs(s.ctx(APO), { from: 'June', to: '2026-06-01' }),
+    ).rejects.toThrow(TypeError)
+    await expect(s.connector.worklogs(s.ctx(APO), JUNE)).rejects.toMatchObject({
+      code: 'source_bad_response',
+    })
   })
 })

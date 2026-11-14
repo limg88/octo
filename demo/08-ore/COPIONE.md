@@ -4,7 +4,7 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
 
 ## Prerequisiti
 - Node 24, pnpm 12.
-- Nessun accesso a Claude, al sistema dei timesheet o al tracker: le esportazioni sono finte (sei persone, venti giorni lavorativi del mese scorso).
+- Nessun accesso a Claude, al sistema dei timesheet o al tracker: le esportazioni sono finte (sei persone, venti giorni lavorativi del mese scorso) e Jira è un servizio finto su questo computer.
 
 ## Passi
 
@@ -40,7 +40,16 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
 8. **Cambia periodo.** Scegli un altro mese o due date in «Dal» e «Al».
    Atteso: la tabella segue il periodo; un mese senza ore dice «Nessuna ora nel periodo».
 
-9. **Controlla dove sono le scelte.** Nel terminale:
+9. **Leggi le ore direttamente da Jira.** Apri «Fonti», nella sezione «Jira» scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».
+   Atteso: «Lette 100 registrazioni di ore (<mese>)…» e la stessa tabella di prima: 664 ore contro 630.
+   Nel terminale:
+   ```bash
+   ls .tmp/demo-08/Aurora/_octo/ore/jira
+   ```
+   Atteso: `worklog_<mese>.csv`. In «Impostazioni delle ore» il percorso delle ore del tracker è diventato `_octo/ore/jira`.
+   Dimostra: non serve più esportare a mano; Octo legge con il tuo token di sola lettura, tiene solo persona, giorno, ore e issue, e non scrive su Jira.
+
+10. **Controlla dove sono le scelte.** Nel terminale:
    ```bash
    cat .tmp/demo-08/Aurora/_octo/.impostazioni/hours.json
    ```

@@ -8,7 +8,8 @@ import type { JiraConfig } from './config.ts'
 /**
  * The fields asked of every issue: nothing else, never `*all`. Worklog and time tracking
  * (`worklog`, `timetracking`, `timespent`, `timeoriginalestimate`, `timeestimate` and their
- * `aggregate…` sums) are never asked and never read: hours come from DWSI or uploaded exports.
+ * `aggregate…` sums) are never asked and never read with an issue: hours come from DWSI, from
+ * uploaded exports or from the reading of the worklogs the PM asks for (`worklogs.ts`).
  */
 export const ISSUE_FIELDS = [
   'summary',

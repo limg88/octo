@@ -370,6 +370,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps.hours.view(await deps.projects.get(input.projectId), input.period),
   )
 
+  handle(CHANNELS.hoursReadTracker, hoursViewInput, async (input) =>
+    deps.hours.readFromTracker(await deps.projects.get(input.projectId), input.period),
+  )
+
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {
     const project = await deps.projects.get(projectId)
     // Only a file the reader accepts as part of the project is handed to the system.

@@ -8,30 +8,10 @@ import { join } from 'node:path'
 const [project] = process.argv.slice(2)
 if (!project) throw new Error('usage: fake-hours.ts <project folder>')
 
-const today = new Date()
-const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1))
-const month = first.toISOString().slice(0, 7)
-const WORKING_DAYS = 20
-const days: string[] = []
-for (
-  const day = new Date(first);
-  days.length < WORKING_DAYS;
-  day.setUTCDate(day.getUTCDate() + 1)
-) {
-  if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) days.push(day.toISOString().slice(0, 10))
-}
+import { days, month, PEOPLE, today, WORKING_DAYS } from './hours-data.ts'
 
 const PROJECT_CODE = 'PRJ000101'
 const OTHER_CODE = 'PRJ000999'
-/** Who worked, the hours a day on the timesheet and on the tracker, and the name the tracker uses. */
-const PEOPLE: Array<{ name: string; timesheet: number; tracker: number; trackerName: string }> = [
-  { name: 'Rossi Mario', timesheet: 8, tracker: 8, trackerName: 'Mario Rossi' },
-  { name: 'Bianchi Anna', timesheet: 8, tracker: 4, trackerName: 'Anna Bianchi' },
-  { name: 'Verdi Luca', timesheet: 8, tracker: 7.5, trackerName: 'luca.verdi' },
-  { name: 'Neri Sara', timesheet: 4, tracker: 0, trackerName: '' },
-  { name: '', timesheet: 0, tracker: 6, trackerName: 'Ugo Gialli' },
-  { name: 'Costa Elena', timesheet: 6, tracker: 6, trackerName: 'E. Costa' },
-]
 
 let id = 5000
 const rows: object[] = []

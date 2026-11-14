@@ -140,3 +140,53 @@ export function parseWorklogExport(content: string): HoursEntry[] | null {
     return [{ person: name, day: date, hours: amount, project: null, approved: true, id: null }]
   })
 }
+
+/** Hours read from the tracker itself, before they are written as an export of the project. */
+export type TrackerHours = { person: string; day: string; hours: number; issue: string }
+
+export const WORKLOG_CSV_HEADER = 'Issue Key;Work date;Hours;Full name'
+const HOURS_PRECISION = 10_000
+
+const quoted = (value: string): string => `"${value.replaceAll('"', '""')}"`
+
+/** The export Octo writes of the hours it read: the same file a time-tracking tool would give. */
+export function worklogCsv(entries: readonly TrackerHours[]): string {
+  const rows = [...entries]
+    .sort(
+      (a, b) =>
+        a.day.localeCompare(b.day) ||
+        a.person.localeCompare(b.person) ||
+        a.issue.localeCompare(b.issue),
+    )
+    .map((entry) => {
+      const hours = Math.round(entry.hours * HOURS_PRECISION) / HOURS_PRECISION
+      return [quoted(entry.issue), entry.day, String(hours), quoted(entry.person)].join(';')
+    })
+  return `${[WORKLOG_CSV_HEADER, ...rows].join('\n')}\n`
+}
+
+const MONTH = /^(\d{4})-(\d{2})/
+
+/** Every month a period touches, each with its first and last day: `2026-06` and so on. */
+export function monthsOf(period: {
+  from: string
+  to: string
+}): Array<{ month: string; from: string; to: string }> {
+  const start = MONTH.exec(period.from)
+  const end = MONTH.exec(period.to)
+  if (!start || !end) return []
+  const months: Array<{ month: string; from: string; to: string }> = []
+  let year = Number(start[1])
+  let month = Number(start[2])
+  while (year < Number(end[1]) || (year === Number(end[1]) && month <= Number(end[2]))) {
+    const name = `${year}-${String(month).padStart(2, '0')}`
+    const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    months.push({ month: name, from: `${name}-01`, to: `${name}-${String(last).padStart(2, '0')}` })
+    month += 1
+    if (month > 12) {
+      month = 1
+      year += 1
+    }
+  }
+  return months
+}
