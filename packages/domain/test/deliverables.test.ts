@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   approvedFileName,
   cleanInputs,
+  clientFilter,
   costOf,
   DELIVERABLE_CATALOG,
   type Deliverable,
@@ -267,5 +268,41 @@ describe('a kind the PM defines in words', () => {
       'Quale versione *',
       'Che cosa mettere in evidenza',
     ])
+  })
+})
+
+describe('the filter on what goes to the client', () => {
+  it('points at days of effort and amounts of money, with the words around', () => {
+    const found = clientFilter(
+      'La migrazione vale 12 gg (circa 1,5 FTE) e 45 giornate uomo, cioè 18.500,00 euro; ' +
+        'la tariffa è € 450 al giorno, 3 MD di collaudo, 20k€ di licenze e 2 milioni di euro di valore.',
+    )
+    expect(found.map((finding) => [finding.kind, finding.match])).toEqual([
+      ['effort', '12 gg'],
+      ['effort', '1,5 FTE'],
+      ['effort', '45 giornate uomo'],
+      ['effort', '3 MD'],
+      ['money', '18.500,00 euro'],
+      ['money', '€ 450'],
+      ['money', '20k€'],
+      ['money', '2 milioni di euro'],
+    ])
+    expect(found[0]?.excerpt).toContain('La migrazione vale 12 gg (circa')
+  })
+
+  it('leaves dates, deadlines, percentages and identifiers alone', () => {
+    const clean =
+      'Il collaudo è il 12 dicembre 2026, entro 5 giorni dalla consegna e non oltre 48 ore. ' +
+      'Avanzamento al 91,23%, voce AB-1234, versione 2.4, 3 ambienti, 12 ggiorni, 2 mdx, 5 europei.'
+    expect(clientFilter(clean)).toEqual([])
+    expect(clientFilter('')).toEqual([])
+  })
+
+  it('reports once a figure repeated with the same words around', () => {
+    expect(clientFilter('Costo: 10 gg.\n\nCosto: 10 gg.')).toHaveLength(1)
+    expect(clientFilter('10 gg')).toEqual([{ kind: 'effort', match: '10 gg', excerpt: '10 gg' }])
+    expect(clientFilter('| Fase | gg |\n|---|---|\n| **Totale** | 9,0 gg |')[0]?.excerpt).toBe(
+      'Fase gg Totale 9,0 gg',
+    )
   })
 })

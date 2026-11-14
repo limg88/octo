@@ -454,6 +454,10 @@ export const messages = {
     'Valgono per tutte le prossime volte: per esempio a chi dare del lei, che cosa non dire mai, come chiudere.',
   deliverableInstructionsSave: 'Salva le istruzioni',
   deliverableInstructionsSaved: 'Istruzioni salvate.',
+  deliverableClientFilter: 'Cifre da controllare prima che esca',
+  deliverableClientFilterIntro:
+    'Questo testo va al cliente. Il codice ha trovato giornate di lavoro o importi: controlla che siano già concordati con il cliente e non dati interni. Non tolgo nulla da solo.',
+  deliverableClientFilterKind: { effort: 'Giornate', money: 'Importo' },
   deliverableRedTeam: 'Rilettura critica',
   deliverableRedTeamOk: 'Può uscire: nessun punto contestabile trovato.',
   deliverableRedTeamFix: 'Da correggere prima di farlo uscire.',

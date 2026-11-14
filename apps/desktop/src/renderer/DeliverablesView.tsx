@@ -1,5 +1,6 @@
 import type { AgentProgress } from '@octo/application'
 import {
+  clientFilter,
   costOf,
   type Deliverable,
   type DeliverableKind,
@@ -389,6 +390,9 @@ function Review({
           {inReview && <p className="hint">{messages.deliverableSourcesNote}</p>}
         </div>
       )}
+      {kind?.audience === 'client' && deliverable.draft && (
+        <ClientFilter text={deliverable.draft.text} />
+      )}
       {deliverable.redTeam && <RedTeam report={deliverable.redTeam} />}
       {inReview && kind && (
         <section aria-label={messages.deliverableChecklist}>
@@ -421,6 +425,29 @@ function Review({
         </form>
       )}
     </>
+  )
+}
+
+/** Days of effort and amounts found by the code in a text that goes to the client. */
+function ClientFilter({ text }: { text: string }) {
+  const found = clientFilter(text)
+  if (found.length === 0) return null
+  return (
+    <section className="red-team" aria-label={messages.deliverableClientFilter}>
+      <h4>{messages.deliverableClientFilter}</h4>
+      <p className="hint">{messages.deliverableClientFilterIntro}</p>
+      <ul className="findings">
+        {found.map((finding) => (
+          <li key={`${finding.kind}-${finding.excerpt}`}>
+            <span className="status status-warning">
+              {messages.deliverableClientFilterKind[finding.kind]}
+            </span>
+            <strong>{finding.match}</strong>
+            <blockquote>{finding.excerpt}</blockquote>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

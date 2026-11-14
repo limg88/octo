@@ -1,5 +1,6 @@
 export * from './answer.ts'
 export * from './deliverables/catalog.ts'
+export * from './deliverables/client-filter.ts'
 export * from './deliverables/deliverable.ts'
 export * from './deliverables/own-kinds.ts'
 export * from './deliverables/pert.ts'

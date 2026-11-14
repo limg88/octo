@@ -195,6 +195,11 @@ try {
   await work06.getByRole('button', { name: 'Chiedi modifica' }).click()
   await work06.getByText('Da correggere prima di farlo uscire.').waitFor({ timeout: TIMEOUT_MS })
   await work06.getByText('Il budget non ha una fonte').waitFor()
+  // The code points at the amount by itself: the text goes to the client.
+  await work06
+    .getByRole('region', { name: 'Cifre da controllare prima che esca' })
+    .getByText('99.000 euro', { exact: true })
+    .waitFor()
   await work06.getByText(/2 giri/).waitFor()
   await page.screenshot({ path: `${work}/deliverable.png` })
   await work06.getByRole('button', { name: 'Approva' }).click()

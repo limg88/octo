@@ -244,7 +244,7 @@ Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un a
 **Entra anche**: l'allineamento fra due tracker (uno del cliente, uno interno), perché è frequente fra i PM; le regole di corrispondenza vanno in configurazione.
 
 **Regole trasversali da portare in codice**
-- Filtro per il cliente: cifre seguite da unità di sforzo o di costo nei testi destinati al cliente, come controllo del codice su ogni deliverable per il cliente.
+- Filtro per il cliente: cifre seguite da unità di sforzo o di costo nei testi destinati al cliente, come controllo del codice su ogni deliverable per il cliente. **Fatto** (passo 4 della demo 06): nella revisione di ogni deliverable destinato al cliente il codice elenca le giornate di lavoro (gg, giornate, GU, MD, FTE…) e gli importi che trova, con le parole intorno. Non toglie nulla e non blocca l'approvazione: non sa se un importo è un prezzo già concordato. Scadenze in giorni o ore, date e percentuali non sono segnalate. Restano fuori le parole senza cifra (margine, tariffa) e il testo dentro le immagini.
 - Calendario e squadra del progetto: periodi, sprint, persone con date di ingresso e uscita.
 - Domande pronte in Chiedi: stato del periodo, blocchi e rischi, triage delle mail, dopo la riunione.
 - Stima: confidenza per voce, nuovo distinto dal residuo, vista per il cliente.

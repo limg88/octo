@@ -6,7 +6,7 @@ import {
   type DeliverableKind,
   type Project,
 } from '@octo/domain'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
 import { messages } from '../src/renderer/messages.ts'
@@ -173,6 +173,10 @@ describe('DeliverablesView', () => {
     expect(await screen.findByText(messages.toCheck(1))).toBeTruthy()
     expect(screen.getByText(messages.deliverableRedTeamFix)).toBeTruthy()
     expect(screen.getByText('Il budget non ha una fonte')).toBeTruthy()
+    // The code points at the amount in a text that goes to the client.
+    const filter = screen.getByRole('region', { name: messages.deliverableClientFilter })
+    expect(within(filter).getByText('99.000 euro')).toBeTruthy()
+    expect(within(filter).getByText(messages.deliverableClientFilterKind.money)).toBeTruthy()
     expect(screen.getByText(/La data regge\./)).toBeTruthy()
     expect(screen.getByText('Chi firma il verbale')).toBeTruthy()
     expect(screen.getByText(DELIVERABLE_CATALOG[0]?.checklist[0] ?? '')).toBeTruthy()
@@ -223,7 +227,11 @@ describe('DeliverablesView', () => {
     expect(await screen.findByRole('heading', { name: 'Stima' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Fase' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: '7,0' })).toBeTruthy()
-    expect(screen.getByText('9,0 gg').tagName).toBe('STRONG')
+    // In the text and, since the email goes to the client, among the figures to check.
+    expect(screen.getAllByText('9,0 gg').map((found) => found.tagName)).toEqual([
+      'STRONG',
+      'STRONG',
+    ])
     const greeting = screen.getByText(/Gentile Carla,/)
     expect(greeting.querySelector('br')).not.toBeNull()
     expect(screen.queryByText(/\|---\|/)).toBeNull()

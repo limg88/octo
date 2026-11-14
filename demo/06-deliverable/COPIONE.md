@@ -24,6 +24,7 @@ Durata: 4 minuti. Mostra un deliverable dalla richiesta del PM al file approvato
 4. **Chiedi una modifica che introduce un dato senza fonte.** In «Che cosa vuoi cambiare?» scrivi `Aggiungi il budget #inventa` e premi «Chiedi modifica».
    Atteso: «1 punto da controllare», la seconda fonte marcata «La frase non è nel file» e la rilettura critica che dice «Da correggere prima di farlo uscire», con il rilievo «Il budget non ha una fonte».
    Dimostra: un dato inventato viene segnalato due volte, dal codice e dalla rilettura. In alto il conteggio passa a «2 giri».
+   Atteso anche: il riquadro «Cifre da controllare prima che esca» con «Importo — 99.000 euro». Il codice segnala da solo giornate di lavoro e importi nei testi destinati al cliente, senza togliere nulla: decidi tu se sono cifre già concordate o dati interni.
 
 5. **Approva.** Premi «Approva».
    Atteso: «File pronti» con due file, `.md` e `.docx`. Un clic li apre.
