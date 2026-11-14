@@ -28,6 +28,7 @@ export const DOMAIN_ERROR_CODES = [
   'deliverable_not_ready',
   'deliverable_busy',
   'request_empty',
+  'letterhead_invalid',
   'secret_value_invalid',
   'private_host_invalid',
   'private_host_unknown',

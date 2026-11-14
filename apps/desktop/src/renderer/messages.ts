@@ -93,6 +93,13 @@ export const messages = {
   },
   deliverablesTab: 'Deliverable',
   deliverableNew: 'Nuovo deliverable',
+  letterheadTitle: 'Carta intestata',
+  letterheadNone: 'Nessuna: i file Word escono su pagina bianca.',
+  letterheadSet: 'Impostata: i file Word escono sulla tua carta intestata.',
+  letterheadHint:
+    'Scegli un documento Word con intestazione e piè di pagina. Octo ne tiene una copia nel progetto e ci scrive dentro solo il testo.',
+  letterheadChoose: 'Scegli un documento Word',
+  letterheadRemove: 'Togli',
   deliverableRegister: 'Registro',
   deliverableRegisterIntro:
     'Che cosa è costato ogni deliverable: minuti di scrittura, minuti di revisione e giri. Una pausa oltre 20 minuti non conta come revisione.',
@@ -246,6 +253,7 @@ const errors: Record<ErrorCode, string> = {
   deliverable_not_ready: 'Questo deliverable non è in revisione.',
   deliverable_busy: 'Sto già scrivendo questo deliverable.',
   request_empty: 'Scrivi che cosa vuoi cambiare.',
+  letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',
   unexpected: 'Qualcosa non ha funzionato. Riprova.',
 }
 

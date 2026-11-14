@@ -111,11 +111,14 @@ export function DeliverablesView({ api, project }: Props) {
           </p>
         )}
         {shown.view === 'catalog' && (
-          <Catalog
-            catalog={catalog}
-            empty={all.length === 0}
-            onChoose={(kindId) => setShown({ view: 'form', kindId })}
-          />
+          <>
+            <Catalog
+              catalog={catalog}
+              empty={all.length === 0}
+              onChoose={(kindId) => setShown({ view: 'form', kindId })}
+            />
+            <Letterhead api={api} project={project} />
+          </>
         )}
         {shown.view === 'register' && (
           <Register all={all} titleOf={(id) => kindOf(id)?.title ?? id} />
@@ -435,5 +438,59 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
         )}
       </p>
     </>
+  )
+}
+
+/** The Word document the deliverables of the project are written on, chosen once by the PM. */
+function Letterhead({ api, project }: Props) {
+  const [present, setPresent] = useState<boolean | null>(null)
+  const [error, setError] = useState<ErrorCode | null>(null)
+
+  const reload = useCallback(async () => {
+    const result = await api.hasLetterhead(project.id)
+    if (result.ok) setPresent(result.value)
+  }, [api, project.id])
+
+  useEffect(() => {
+    setPresent(null)
+    setError(null)
+    void reload()
+  }, [reload])
+
+  async function change(step: () => Promise<Result<unknown>>) {
+    setError(null)
+    const result = await step()
+    if (!result.ok) setError(result.code)
+    await reload()
+  }
+
+  if (present === null) return null
+  return (
+    <section className="letterhead" aria-label={messages.letterheadTitle}>
+      <h4>{messages.letterheadTitle}</h4>
+      <p className={present ? 'badge badge-ok' : 'badge'}>
+        {present ? messages.letterheadSet : messages.letterheadNone}
+      </p>
+      <p className="hint">{messages.letterheadHint}</p>
+      {error && (
+        <p className="warning" role="alert">
+          {errorText(error)}
+        </p>
+      )}
+      <div className="actions">
+        <button type="button" onClick={() => void change(() => api.chooseLetterhead(project.id))}>
+          {messages.letterheadChoose}
+        </button>
+        {present && (
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => void change(() => api.removeLetterhead(project.id))}
+          >
+            {messages.letterheadRemove}
+          </button>
+        )}
+      </div>
+    </section>
   )
 }

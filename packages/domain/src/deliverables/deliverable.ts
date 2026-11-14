@@ -105,6 +105,9 @@ export const JOBS_FOLDER = `${OCTO_FOLDER}/.lavori`
 export const APPROVED_FOLDER = `${DELIVERABLES_FOLDER}/approvati`
 export const PROJECT_INSTRUCTIONS_FOLDER = `${OCTO_FOLDER}/.istruzioni`
 
+/** The Word document a project's deliverables are written on, when the PM chose one. */
+export const LETTERHEAD_PATH = `${OCTO_FOLDER}/.modelli/carta-intestata.docx`
+
 export const jobPath = (id: string): string => `${JOBS_FOLDER}/${id}.json`
 export const projectInstructionsPath = (kindId: string): string =>
   `${PROJECT_INSTRUCTIONS_FOLDER}/${kindId}.md`

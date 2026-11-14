@@ -80,6 +80,9 @@ type DeliverablesApi = Pick<
   | 'deliverableInstructions'
   | 'saveDeliverableInstructions'
   | 'onDeliverableProgress'
+  | 'hasLetterhead'
+  | 'chooseLetterhead'
+  | 'removeLetterhead'
   | 'openEvidence'
 >
 
@@ -97,6 +100,9 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
       progress = listener
       return () => {}
     },
+    hasLetterhead: vi.fn(async () => ok(false)),
+    chooseLetterhead: vi.fn(async () => ok(true)),
+    removeLetterhead: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
@@ -196,6 +202,36 @@ describe('DeliverablesView', () => {
     const greeting = screen.getByText(/Gentile Carla,/)
     expect(greeting.querySelector('br')).not.toBeNull()
     expect(screen.queryByText(/\|---\|/)).toBeNull()
+  })
+
+  it('lets the PM choose a letterhead for the Word files, and take it away', async () => {
+    const has = vi
+      .fn<OctoApi['hasLetterhead']>()
+      .mockResolvedValueOnce(ok(false))
+      .mockResolvedValueOnce(ok(true))
+      .mockResolvedValue(ok(false))
+    const { api } = fakeApi({ hasLetterhead: has })
+    render(<DeliverablesView api={api} project={project} />)
+
+    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadChoose }))
+    expect(await screen.findByText(messages.letterheadSet)).toBeTruthy()
+    expect(api.chooseLetterhead).toHaveBeenCalledWith('p-1')
+
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
+    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
+    expect(api.removeLetterhead).toHaveBeenCalledWith('p-1')
+  })
+
+  it('explains a file that is not a letterhead', async () => {
+    const { api } = fakeApi({
+      chooseLetterhead: vi.fn(
+        async () => ({ ok: false, code: 'letterhead_invalid' }) as Result<boolean>,
+      ),
+    })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.letterheadChoose }))
+    expect(await screen.findByText(/non è un documento Word che posso usare/)).toBeTruthy()
   })
 
   it('shows the register of what each deliverable cost', async () => {

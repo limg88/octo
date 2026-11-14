@@ -1,3 +1,4 @@
+import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   AgentRunner,
@@ -11,7 +12,7 @@ import type {
   QuestionLog,
   Sources,
 } from '@octo/application'
-import { FEED_NAMES, isDomainError, WAREHOUSE_TLS_MODES } from '@octo/domain'
+import { DomainError, FEED_NAMES, isDomainError, WAREHOUSE_TLS_MODES } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import { CHANNELS, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
@@ -29,6 +30,7 @@ export type IpcDeps = {
   feeding: Feeding
   deliverables: Deliverables
   folderDialogTitle: string
+  letterheadDialogTitle: string
 }
 
 const MAX_QUESTION_LENGTH = 4000
@@ -81,6 +83,8 @@ const feedSaveInput = z.discriminatedUnion('feed', [
   byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi.nullable() }),
 ])
 
+/** A letterhead larger than this is not one: it would travel in every Word file. */
+const MAX_LETTERHEAD_BYTES = 20 * 1024 * 1024
 const MAX_INPUT_LENGTH = 4000
 const MAX_INSTRUCTIONS_LENGTH = 20_000
 /** An id Octo made, used in a file name: letters, digits and dashes only. */
@@ -242,6 +246,30 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.instructionsSave, instructionsSaveInput, async (input) => {
     const project = await deps.projects.get(input.projectId)
     await deps.deliverables.saveInstructions(project, input.kindId, input.text)
+    return null
+  })
+
+  handle(CHANNELS.letterheadGet, byProject, async ({ projectId }) =>
+    deps.deliverables.hasLetterhead(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.letterheadChoose, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.letterheadDialogTitle,
+      properties: ['openFile'],
+      filters: [{ name: 'Word', extensions: ['docx'] }],
+    })
+    const file = choice.filePaths[0]
+    if (choice.canceled || !file) return false
+    const info = await stat(file)
+    if (info.size > MAX_LETTERHEAD_BYTES) throw new DomainError('letterhead_invalid')
+    await deps.deliverables.setLetterhead(project, new Uint8Array(await readFile(file)))
+    return true
+  })
+
+  handle(CHANNELS.letterheadRemove, byProject, async ({ projectId }) => {
+    await deps.deliverables.setLetterhead(await deps.projects.get(projectId), null)
     return null
   })
 

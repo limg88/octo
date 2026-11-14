@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createDeliverables } from '@octo/application'
 import { deliverableKind, type Project } from '@octo/domain'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { extract } from '../src/extract/extract.ts'
 import {
@@ -222,5 +223,61 @@ describe('a Word document from Markdown', () => {
     ]) {
       expect(text).toContain(expected)
     }
+  })
+})
+
+describe('a Word document on the letterhead of the PM', () => {
+  const HEADER =
+    '<w:hdr xmlns:w="x"><w:p><w:r><w:t>Carta intestata Aurora</w:t></w:r></w:p></w:hdr>'
+  const SECTION =
+    '<w:sectPr><w:headerReference w:type="default" r:id="rId7"/><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>'
+  const letterhead = (body: string): Uint8Array =>
+    zipSync({
+      '[Content_Types].xml': strToU8('<Types/>'),
+      'word/header1.xml': strToU8(HEADER),
+      'word/document.xml': strToU8(
+        `<w:document xmlns:w="x" xmlns:r="y"><w:body>${body}${SECTION}</w:body></w:document>`,
+      ),
+    })
+
+  it('replaces the text only: header, section and every other part stay the letterhead’s', async () => {
+    const template = letterhead('<w:p><w:r><w:t>Testo di esempio da togliere</w:t></w:r></w:p>')
+    const renderer = createWordRenderer()
+
+    const bytes = await renderer.word(
+      'Email',
+      '# Oggetto\n\nIl collaudo è **confermato**.',
+      template,
+    )
+
+    const parts = unzipSync(bytes)
+    expect(strFromU8(parts['word/header1.xml'] ?? new Uint8Array())).toBe(HEADER)
+    const document = strFromU8(parts['word/document.xml'] ?? new Uint8Array())
+    expect(document).not.toContain('Testo di esempio da togliere')
+    expect(document).toContain('Il collaudo è ')
+    expect(document).toContain('<w:b/>')
+    expect(document.endsWith(`${SECTION}</w:body></w:document>`)).toBe(true)
+    await expect(renderer.checkLetterhead(template)).resolves.toBeUndefined()
+  })
+
+  it('refuses what is not a Word document it can write in', async () => {
+    const renderer = createWordRenderer()
+    const noBody = zipSync({ 'word/document.xml': strToU8('<w:document/>') })
+
+    for (const bytes of [
+      new TextEncoder().encode('non uno zip'),
+      zipSync({ 'a.txt': strToU8('x') }),
+      noBody,
+    ]) {
+      await expect(renderer.checkLetterhead(bytes)).rejects.toMatchObject({
+        code: 'letterhead_invalid',
+      })
+    }
+  })
+
+  it('drops characters XML forbids and keeps what would be markup as text', async () => {
+    const bytes = await createWordRenderer().word('x', 'a < b & c\u0001 > d')
+    const document = strFromU8(unzipSync(bytes)['word/document.xml'] ?? new Uint8Array())
+    expect(document).toContain('a &lt; b &amp; c &gt; d')
   })
 })

@@ -39,7 +39,13 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
         return clean
       },
     },
-    renderer: { word: async () => new Uint8Array([1, 2, 3]) },
+    renderer: {
+      word: async (_title, _markdown, letterhead) =>
+        new Uint8Array(letterhead ? [1, 2, 3, 4, 5] : [1, 2, 3]),
+      checkLetterhead: async (bytes) => {
+        if (bytes.length === 0) throw new DomainError('letterhead_invalid')
+      },
+    },
     evidence: evidenceFrom({
       'posta/a.md': {
         kind: 'found',
@@ -49,6 +55,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
     }),
     files: {
       ...base,
+      read: async () => new Uint8Array([9, 9]),
       under: async (_folder, folder) =>
         [...memory.files.keys()].filter((path) => path.startsWith(`${folder}/`)),
     },
@@ -178,6 +185,23 @@ describe('approving a deliverable', () => {
     await expect(
       service.revise(project, { deliverableId: made.id, request: 'Ancora' }),
     ).rejects.toMatchObject({ code: 'deliverable_not_ready' })
+  })
+
+  it('writes the Word file on the letterhead of the project, once the PM chose one', async () => {
+    const { service, memory } = setup()
+    expect(await service.hasLetterhead(project)).toBe(false)
+    await expect(service.setLetterhead(project, new Uint8Array())).rejects.toMatchObject({
+      code: 'letterhead_invalid',
+    })
+
+    await service.setLetterhead(project, new Uint8Array([9, 9]))
+    expect(await service.hasLetterhead(project)).toBe(true)
+    const made = await service.start(project, { kindId: 'email-cliente', inputs })
+    const approved = await service.approve(project, made.id)
+    expect(memory.files.get(approved.files[1] ?? '')).toBe('<5 bytes>')
+
+    await service.setLetterhead(project, null)
+    expect(await service.hasLetterhead(project)).toBe(false)
   })
 
   it('keeps the register of the project up to date at every approval', async () => {

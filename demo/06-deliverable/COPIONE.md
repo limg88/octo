@@ -46,6 +46,10 @@ Durata: 4 minuti. Mostra un deliverable dalla richiesta del PM al file approvato
    Atteso: una riga per deliverable con minuti di scrittura, minuti di revisione e giri, e in fondo il totale degli approvati. Lo stesso registro è nel file `_octo/deliverable/registro.md`.
    Dimostra: quanto costa ogni deliverable si misura da solo.
 
+10. **Carta intestata.** «Nuovo deliverable»: sotto il catalogo c'è «Carta intestata». Premi «Scegli un documento Word» e scegli un `.docx` con intestazione e piè di pagina.
+    Atteso: «Impostata: i file Word escono sulla tua carta intestata.» Dal prossimo deliverable approvato il Word ha la tua intestazione; «Togli» torna alla pagina bianca.
+    Dimostra: Octo scrive solo il testo; intestazione, piè di pagina, margini e caratteri restano quelli del tuo documento.
+
 ## Con Claude vero
 ```bash
 REAL=1 bash demo/06-deliverable/run.sh

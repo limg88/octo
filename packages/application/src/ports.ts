@@ -208,6 +208,11 @@ export interface DeliverableWriter {
 
 /** Turns an approved text into the files a person sends or files away. */
 export interface DocumentRenderer {
-  /** The bytes of a Word document with this title and Markdown body. */
-  word(title: string, markdown: string): Promise<Uint8Array>
+  /**
+   * The bytes of a Word document with this Markdown body: plain, or inside the letterhead given
+   * (a Word document whose header, footer, margins and fonts are kept).
+   */
+  word(title: string, markdown: string, letterhead?: Uint8Array): Promise<Uint8Array>
+  /** Throws a DomainError `letterhead_invalid` when the bytes are not a usable Word document. */
+  checkLetterhead(bytes: Uint8Array): Promise<void>
 }

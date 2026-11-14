@@ -13,7 +13,6 @@
     "@octo/application": "workspace:*",
     "@octo/connectors": "workspace:*",
     "@octo/domain": "workspace:*",
-    "docx": "9.15.0",
     "fflate": "0.8.3",
     "marked": "18.1.2",
     "postal-mime": "4.2.0",

@@ -14,6 +14,7 @@ import {
   isDomainError,
   JOBS_FOLDER,
   jobPath,
+  LETTERHEAD_PATH,
   type Project,
   projectInstructionsPath,
   REGISTER_PATH,
@@ -70,6 +71,10 @@ export type Deliverables = {
   /** What the PM added, for this project, to how a kind is written. Empty when nothing. */
   instructions(project: Project, kindId: string): Promise<string>
   saveInstructions(project: Project, kindId: string, text: string): Promise<void>
+  /** Whether the project has a letterhead its Word files are written on. */
+  hasLetterhead(project: Project): Promise<boolean>
+  /** Keeps a Word document as the letterhead of the project; null goes back to plain files. */
+  setLetterhead(project: Project, bytes: Uint8Array | null): Promise<void>
 }
 
 const TITLE_FIELDS = ['tema', 'periodo', 'riunione'] as const
@@ -239,10 +244,13 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     const markdown = `${APPROVED_FOLDER}/${approvedFileName(approved, MARKDOWN)}`
     const word = `${APPROVED_FOLDER}/${approvedFileName(approved, WORD)}`
     await deps.memory.write(project.folder, markdown, `${text.trimEnd()}\n`)
+    const letterhead = (await hasLetterhead(project))
+      ? await deps.files.read(project.folder, LETTERHEAD_PATH)
+      : undefined
     await deps.memory.writeBytes(
       project.folder,
       word,
-      await deps.renderer.word(approved.title, text),
+      await deps.renderer.word(approved.title, text, letterhead),
     )
     const done = { ...approved, files: [markdown, word] }
     await save(project, done)
@@ -254,6 +262,18 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     return done
   }
 
+  async function hasLetterhead(project: Project): Promise<boolean> {
+    const folder = LETTERHEAD_PATH.slice(0, LETTERHEAD_PATH.lastIndexOf('/'))
+    return (await deps.files.under(project.folder, folder)).includes(LETTERHEAD_PATH)
+  }
+
+  async function setLetterhead(project: Project, bytes: Uint8Array | null): Promise<void> {
+    if (bytes === null) return deps.files.remove(project.folder, LETTERHEAD_PATH)
+    await deps.renderer.checkLetterhead(bytes)
+    await deps.memory.claim(project.folder)
+    await deps.memory.writeBytes(project.folder, LETTERHEAD_PATH, bytes)
+  }
+
   return {
     catalog: () => DELIVERABLE_CATALOG,
     list,
@@ -262,6 +282,8 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     revise,
     approve,
     instructions,
+    hasLetterhead,
+    setLetterhead,
     saveInstructions: async (project, kindId, text) => {
       const path = projectInstructionsPath(kindOf(kindId).id)
       await deps.memory.claim(project.folder)

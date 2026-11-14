@@ -53,6 +53,9 @@ export const CHANNELS = {
   deliverablesProgress: 'deliverables:progress',
   instructionsGet: 'deliverables:instructions:get',
   instructionsSave: 'deliverables:instructions:save',
+  letterheadGet: 'deliverables:letterhead:get',
+  letterheadChoose: 'deliverables:letterhead:choose',
+  letterheadRemove: 'deliverables:letterhead:remove',
   feedGet: 'sources:feed:get',
   feedSave: 'sources:feed:save',
   feedSync: 'sources:feed:sync',
@@ -133,6 +136,11 @@ export type OctoApi = {
     kindId: string,
     text: string,
   ): Promise<Result<null>>
+  /** Whether the project has a letterhead its Word files are written on. */
+  hasLetterhead(projectId: string): Promise<Result<boolean>>
+  /** Lets the PM choose a Word document as letterhead; false when the PM closes the dialog. */
+  chooseLetterhead(projectId: string): Promise<Result<boolean>>
+  removeLetterhead(projectId: string): Promise<Result<null>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */
