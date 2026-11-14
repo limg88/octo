@@ -180,6 +180,16 @@ describe('approving a deliverable', () => {
     ).rejects.toMatchObject({ code: 'deliverable_not_ready' })
   })
 
+  it('keeps the register of the project up to date at every approval', async () => {
+    const { service, memory } = setup()
+    const made = await service.start(project, { kindId: 'email-cliente', inputs })
+    await service.approve(project, made.id)
+
+    expect(memory.files.get('_octo/deliverable/registro.md')).toContain(
+      '| Email al cliente | Collaudo | approvato |',
+    )
+  })
+
   it('lists the deliverables of a project, newest first', async () => {
     const { service, wait } = setup()
     await service.start(project, { kindId: 'email-cliente', inputs })

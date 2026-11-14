@@ -23,6 +23,8 @@ if (!email) throw new Error('the catalog has no email')
 
 let root: string
 let project: Project
+/** Ids are counted across the tests of this file: each deliverable has its own file. */
+let made = 0
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'octo-deliverables-')))
@@ -52,7 +54,7 @@ function deliverables() {
     files: createFsProjectFiles(),
     memory: createFsMemoryWriter(),
     clock: { now: () => new Date(Date.parse('2026-11-14T10:00:00.000Z') + 60_000 * tick++) },
-    ids: { next: () => 'd-1' },
+    ids: { next: () => `d-${++made}` },
   })
 }
 
@@ -99,6 +101,31 @@ describe('a deliverable from the request to the approved file', () => {
       'La consegna è il 12 dicembre.',
     )
     expect(await readFile(join(project.folder, '_octo', '.gitignore'), 'utf8')).toBe('*\n')
+  })
+
+  it('puts in an estimate the totals the code computes, and keeps the register', async () => {
+    const service = deliverables()
+
+    const made = await service.start(project, {
+      kindId: 'stima',
+      inputs: { tema: 'Migrazione ordini' },
+    })
+
+    expect(made.status).toBe('review')
+    const text = made.draft?.text ?? ''
+    expect(text).not.toContain('{{STIMA}}')
+    expect(text).toContain('Totale **9,0 gg**')
+    expect(text).toContain('| W-02 | Sviluppo | Migrazione |')
+    expect(text).toContain('Esclusa dai totali — W-03')
+    expect(made.written?.text).toContain('{{STIMA}}')
+
+    await service.approve(project, made.id)
+    const register = await readFile(
+      join(project.folder, '_octo', 'deliverable', 'registro.md'),
+      'utf8',
+    )
+    expect(register).toContain('| Stima | Migrazione ordini | approvato |')
+    expect(register).toContain('| Email al cliente | Data di consegna | approvato |')
   })
 
   it('keeps for the project what the PM adds to how a kind is written', async () => {

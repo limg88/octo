@@ -46,6 +46,55 @@ if (args.join(' ').includes('You attack the content of a deliverable')) {
   process.exit(0)
 }
 
+// A run of the writer of an estimate: it gives the lines, never the totals.
+if (args.join(' ').includes('Write an estimate of effort in days')) {
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: '## Perimetro\n\nMigrazione del modulo ordini [1].\n\n## Stima\n\n{{STIMA}}\n\n## Domande aperte\n\n- Chi fa il collaudo?',
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: ['Numero di requisiti da migrare'],
+      wbs: [
+        {
+          id: 'W-01',
+          fase: 'Analisi',
+          attivita: 'Allineamento con il cliente',
+          driver: 'Una riunione [1]',
+          ruolo: 'PM',
+          ott: 1,
+          prob: 2,
+          pess: 3,
+          stato: 'parziale',
+        },
+        {
+          id: 'W-02',
+          fase: 'Sviluppo',
+          attivita: 'Migrazione',
+          driver: 'Modulo ordini [1]',
+          ruolo: 'Dev',
+          ott: 4,
+          prob: 6,
+          pess: 14,
+          stato: 'mancante',
+        },
+        {
+          id: 'W-03',
+          fase: 'Sviluppo',
+          attivita: 'Riga sbagliata',
+          driver: 'Niente',
+          ruolo: 'Dev',
+          ott: 5,
+          prob: 3,
+          pess: 9,
+          stato: 'completo',
+        },
+      ],
+    },
+  })
+  process.exit(0)
+}
+
 emit({ type: 'system', subtype: 'init' })
 console.log('not json at all')
 

@@ -1,7 +1,8 @@
-import type { CheckedAnswer } from '../answer.ts'
+import type { CheckedAnswer, DraftAnswer } from '../answer.ts'
 import { DomainError, type DomainErrorCode } from '../errors.ts'
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { slugOf } from '../mail/document.ts'
+import type { WbsRow } from './pert.ts'
 
 /** Who reads a deliverable: what may be said in it depends on it. */
 export type DeliverableAudience = 'client' | 'internal'
@@ -29,7 +30,12 @@ export type DeliverableKind = {
   instructions: string
   /** What the PM checks before approving: shown as a list, never ticked by the model. */
   checklist: string[]
+  /** The numbers this kind needs that only the code may compute. */
+  calculation?: 'pert'
 }
+
+/** What the writer gives back: the text and, for a kind with numbers, the lines to compute. */
+export type DeliverableDraft = DraftAnswer & { wbs?: WbsRow[] }
 
 export const RED_TEAM_SEVERITIES = ['grave', 'media', 'lieve'] as const
 export type RedTeamSeverity = (typeof RED_TEAM_SEVERITIES)[number]
@@ -77,6 +83,8 @@ export type Deliverable = {
   rounds: DeliverableRound[]
   /** The text with its sources checked by the code; null until a draft exists. */
   draft: CheckedAnswer | null
+  /** What the writer gave, before the code put the numbers in: a change starts from here. */
+  written: DeliverableDraft | null
   redTeam: RedTeamReport | null
   /** When the draft now shown became ready: the review time is counted from here. */
   readyAt: string | null
@@ -160,4 +168,69 @@ export function costOf(deliverable: Deliverable): DeliverableCost {
     reviewMinutes: minutes(deliverable.reviewMs),
     rounds: deliverable.rounds.length,
   }
+}
+
+/** The register of a project: what each deliverable cost, kept beside the approved files. */
+export const REGISTER_PATH = `${DELIVERABLES_FOLDER}/registro.md`
+
+const STATUS_LABELS: Readonly<Record<DeliverableStatus, string>> = {
+  writing: 'in scrittura',
+  review: 'da rivedere',
+  approved: 'approvato',
+  failed: 'non riuscito',
+}
+
+export type RegisterTotals = DeliverableCost & { deliverables: number }
+
+/** What the approved deliverables of a project cost in all. */
+export function registerTotals(deliverables: readonly Deliverable[]): RegisterTotals {
+  const approved = deliverables.filter((deliverable) => deliverable.status === 'approved')
+  const costs = approved.map(costOf)
+  const sum = (pick: (cost: DeliverableCost) => number): number =>
+    Math.round(costs.reduce((total, cost) => total + pick(cost), 0) * 10) / 10
+  return {
+    deliverables: approved.length,
+    draftMinutes: sum((cost) => cost.draftMinutes),
+    reviewMinutes: sum((cost) => cost.reviewMinutes),
+    rounds: sum((cost) => cost.rounds),
+  }
+}
+
+/**
+ * The register as a file of the project: one line per deliverable, newest first, with the minutes
+ * of writing, the minutes of review and the rounds. It is the measure of what the work costs.
+ */
+export function registerMarkdown(
+  deliverables: readonly Deliverable[],
+  kinds: readonly DeliverableKind[],
+): string {
+  const titles = new Map(kinds.map((kind) => [kind.id, kind.title]))
+  const cell = (text: string): string => text.replace(/\|/g, '\\|')
+  const lines = [...deliverables]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((deliverable) => {
+      const cost = costOf(deliverable)
+      return `| ${[
+        deliverable.createdAt.slice(0, 10),
+        cell(titles.get(deliverable.kindId) ?? deliverable.kindId),
+        cell(deliverable.title),
+        STATUS_LABELS[deliverable.status],
+        cost.draftMinutes,
+        cost.reviewMinutes,
+        cost.rounds,
+      ].join(' | ')} |`
+    })
+  const totals = registerTotals(deliverables)
+  return [
+    '# Registro dei deliverable',
+    '',
+    'Una riga per deliverable. I minuti di revisione sono il tempo passato sulla bozza prima di una richiesta o dell’approvazione; una pausa oltre 20 minuti non conta.',
+    '',
+    '| Data | Tipo | Oggetto | Stato | Scrittura (min) | Revisione (min) | Giri |',
+    '|---|---|---|---|---:|---:|---:|',
+    ...lines,
+    '',
+    `Approvati: ${totals.deliverables} · scrittura ${totals.draftMinutes} min · revisione ${totals.reviewMinutes} min · ${totals.rounds} giri.`,
+    '',
+  ].join('\n')
 }

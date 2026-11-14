@@ -1,5 +1,6 @@
 import type {
   ArchivedMail,
+  DeliverableDraft,
   DeliverableKind,
   DraftAnswer,
   Evidence,
@@ -183,7 +184,7 @@ export type DraftRequest = {
   projectInstructions: string | null
   inputs: Readonly<Record<string, string>>
   /** A change asked in words on the draft shown; null for the first draft. */
-  revision: { draft: DraftAnswer; request: string } | null
+  revision: { draft: DeliverableDraft; request: string } | null
   onProgress?: (progress: AgentProgress) => void
   signal?: AbortSignal
 }
@@ -201,7 +202,7 @@ export type RedTeamRequest = {
  * as the one who will receive it. Failures are DomainErrors with an `agent_*` code.
  */
 export interface DeliverableWriter {
-  draft(request: DraftRequest): Promise<DraftAnswer>
+  draft(request: DraftRequest): Promise<DeliverableDraft>
   redTeam(request: RedTeamRequest): Promise<RedTeamReport>
 }
 

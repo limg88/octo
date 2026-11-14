@@ -40,6 +40,7 @@ const review: Deliverable = {
     missing: ['Chi firma il verbale'],
     markersWithoutCitation: [],
   },
+  written: null,
   redTeam: {
     verdict: 'fix_first',
     findings: [
@@ -172,6 +173,23 @@ describe('DeliverablesView', () => {
     const [source] = screen.getAllByRole('button', { name: 'posta/a.md' })
     if (source) fireEvent.click(source)
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md')
+  })
+
+  it('shows the register of what each deliverable cost', async () => {
+    const empty = fakeApi()
+    render(<DeliverablesView api={empty.api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.deliverableRegister }))
+    expect(await screen.findByText(messages.deliverableRegisterEmpty)).toBeTruthy()
+    cleanup()
+
+    const { api } = fakeApi({ listDeliverables: vi.fn(async () => ok([approved])) })
+    render(<DeliverablesView api={api} project={project} />)
+    await screen.findByRole('button', { name: /Collaudo/ })
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableRegister }))
+
+    const row = (await screen.findByRole('cell', { name: 'Collaudo' })).closest('tr')
+    expect(row?.textContent).toContain('Email al clienteCollaudoApprovato281')
+    expect(screen.getByText(messages.deliverableRegisterTotals(1, 2, 8, 1))).toBeTruthy()
   })
 
   it('keeps for the project what the PM adds to how a kind is written', async () => {

@@ -196,6 +196,19 @@ try {
   assert.match(approvedText, /La consegna è il 12 dicembre\./)
   assert.doesNotMatch(approvedText, /\[\d\]/)
 
+  // An estimate: the writer gives the lines, the code the totals. Then the register.
+  await work06.getByRole('button', { name: 'Nuovo deliverable' }).click()
+  await work06.getByRole('button', { name: /^Stima/ }).click()
+  await work06.getByLabel(/^Che cosa va stimato/).fill('Migrazione ordini')
+  await work06.getByRole('button', { name: 'Scrivi la bozza' }).click()
+  await work06.getByText(/Totale 9,0 gg/).waitFor({ timeout: TIMEOUT_MS })
+  await work06.getByText(/Esclusa dai totali — W-03/).waitFor()
+  await work06.getByRole('button', { name: 'Registro' }).click()
+  await work06.getByRole('cell', { name: 'Data di consegna' }).waitFor()
+  await work06.getByText(/^Approvati: 1 ·/).waitFor()
+  const register = readFileSync(`${work}/Aurora/_octo/deliverable/registro.md`, 'utf8')
+  assert.match(register, /\| Email al cliente \| Data di consegna \| approvato \|/)
+
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 
   // The history survives a restart of the app.

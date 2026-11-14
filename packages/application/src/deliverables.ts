@@ -16,7 +16,10 @@ import {
   jobPath,
   type Project,
   projectInstructionsPath,
+  REGISTER_PATH,
+  registerMarkdown,
   reviewTimeSince,
+  withEstimate,
   withoutMarkers,
 } from '@octo/domain'
 import type {
@@ -130,9 +133,9 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     running.add(deliverable.id)
     const kind = kindOf(deliverable.kindId)
     const startedAt = deps.clock.now()
-    const previous = deliverable.draft
+    const previous = deliverable.written
     try {
-      const draft = await deps.writer.draft({
+      const written = await deps.writer.draft({
         projectFolder: project.folder,
         kind,
         projectInstructions: (await instructions(project, kind.id)) || null,
@@ -140,7 +143,9 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         revision: previous && request ? { draft: previous, request } : null,
         ...(onProgress ? { onProgress } : {}),
       })
-      const checked = await check(project, draft)
+      // Numbers only the code may compute are put in the text before anything is checked.
+      const text = kind.calculation ? withEstimate(written.text, written.wbs ?? []) : written.text
+      const checked = await check(project, { ...written, text })
       const redTeam = await deps.writer.redTeam({
         projectFolder: project.folder,
         kind,
@@ -151,6 +156,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         ...deliverable,
         status: 'review',
         draft: checked,
+        written,
         redTeam,
         readyAt: readyAt.toISOString(),
         rounds: [...deliverable.rounds, roundOf(startedAt, readyAt, request, null)],
@@ -185,6 +191,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       createdAt: deps.clock.now().toISOString(),
       rounds: [],
       draft: null,
+      written: null,
       redTeam: null,
       readyAt: null,
       reviewMs: 0,
@@ -239,6 +246,11 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     )
     const done = { ...approved, files: [markdown, word] }
     await save(project, done)
+    await deps.memory.write(
+      project.folder,
+      REGISTER_PATH,
+      registerMarkdown(await list(project), DELIVERABLE_CATALOG),
+    )
     return done
   }
 

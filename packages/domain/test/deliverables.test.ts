@@ -6,8 +6,15 @@ import {
   DELIVERABLE_CATALOG,
   type Deliverable,
   deliverableKind,
+  ESTIMATE_PLACEHOLDER,
+  estimate,
+  estimateMarkdown,
   MAX_REVIEW_PAUSE_MS,
+  registerMarkdown,
+  registerTotals,
   reviewTimeSince,
+  type WbsRow,
+  withEstimate,
   withoutMarkers,
 } from '../src/index.ts'
 
@@ -27,6 +34,7 @@ const deliverable: Deliverable = {
     { at: '', request: 'Più breve', durationMs: 45_000, error: null },
   ],
   draft: null,
+  written: null,
   redTeam: null,
   readyAt: null,
   reviewMs: 6 * 60_000,
@@ -89,5 +97,116 @@ describe('what leaves and what it cost', () => {
     expect(reviewTimeSince(ready, new Date('2026-11-15T10:00:00.000Z'))).toBe(MAX_REVIEW_PAUSE_MS)
     expect(reviewTimeSince(ready, new Date('2026-11-14T09:00:00.000Z'))).toBe(0)
     expect(reviewTimeSince(null, new Date())).toBe(0)
+  })
+})
+
+describe('an estimate computed by the code', () => {
+  const row = (overrides: Partial<WbsRow>): WbsRow => ({
+    id: 'W-01',
+    fase: 'Analisi',
+    attivita: 'Allineamento',
+    driver: 'Una riunione [1]',
+    ruolo: 'PM',
+    ott: 1,
+    prob: 2,
+    pess: 3,
+    stato: 'parziale',
+    ...overrides,
+  })
+
+  it('weighs the three points, sums by phase and role and gives the interval', () => {
+    const result = estimate([
+      row({}),
+      row({
+        id: 'W-02',
+        fase: 'Sviluppo',
+        ruolo: 'Dev',
+        ott: 4,
+        prob: 6,
+        pess: 14,
+        stato: 'mancante',
+      }),
+    ])
+
+    expect(result.rows.map((line) => line.media)).toEqual([2, 7])
+    expect(result.total).toBe(9)
+    expect(result.sd).toBeCloseTo(Math.sqrt((2 / 6) ** 2 + (10 / 6) ** 2))
+    expect(result.min).toBeCloseTo(9 - 1.2816 * result.sd)
+    expect(result.max).toBeCloseTo(9 + 1.2816 * result.sd)
+    expect(result.byPhase).toEqual([
+      ['Sviluppo', 7],
+      ['Analisi', 2],
+    ])
+    expect(result.byRole[0]).toEqual(['Dev', 7])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('leaves out, and says, the lines it cannot compute', () => {
+    const result = estimate([
+      row({}),
+      row({ id: 'W-01' }),
+      row({ id: '' }),
+      row({ id: 'W-03', driver: ' ' }),
+      row({ id: 'W-04', ott: 5, prob: 3, pess: 9 }),
+      row({ id: 'W-05', ott: 2, prob: 2, pess: 2 }),
+      row({ id: 'W-06', ott: Number.NaN }),
+    ])
+
+    expect(result.rows.map((line) => line.id)).toEqual(['W-01'])
+    expect(result.warnings).toHaveLength(6)
+    expect(result.warnings.every((warning) => warning.startsWith('Esclusa dai totali'))).toBe(true)
+  })
+
+  it('warns when the range does not match what is known', () => {
+    const result = estimate([
+      row({ id: 'A', stato: 'completo', ott: 1, prob: 2, pess: 5 }),
+      row({ id: 'B', stato: 'parziale', ott: 1, prob: 2, pess: 4 }),
+      row({ id: 'C', stato: 'mancante', ott: 2, prob: 3, pess: 4 }),
+      row({ id: 'D', stato: 'completo', ott: 2, prob: 3, pess: 4 }),
+    ])
+
+    expect(result.rows).toHaveLength(4)
+    expect(result.warnings.map((warning) => warning.slice(0, 2))).toEqual(['A:', 'B:', 'C:'])
+    expect(result.min).toBeGreaterThanOrEqual(0)
+  })
+
+  it('writes the numbers where the writer said, or at the end', () => {
+    const rows = [row({})]
+    const placed = withEstimate(`## Stima\n\n${ESTIMATE_PLACEHOLDER}\n\n## Rischi`, rows)
+    expect(placed).toContain('Totale **2,0 gg**')
+    expect(placed.indexOf('Totale')).toBeLessThan(placed.indexOf('## Rischi'))
+    expect(placed).toContain('| W-01 | Analisi | Allineamento | Una riunione [1] | PM |')
+
+    expect(withEstimate('Senza segnaposto.', rows)).toMatch(/^Senza segnaposto\.\n\nTotale/)
+    expect(estimateMarkdown(estimate([row({ id: 'X', ott: 9, prob: 1, pess: 2 })]))).toContain(
+      '### Avvisi',
+    )
+  })
+})
+
+describe('the register of a project', () => {
+  it('lists every deliverable with what it cost and sums the approved ones', () => {
+    const other: Deliverable = {
+      ...deliverable,
+      id: 'd-2',
+      kindId: 'sconosciuto',
+      title: 'Bozza | in corso',
+      status: 'review',
+      createdAt: '2026-11-14T08:00:00.000Z',
+    }
+    const text = registerMarkdown([deliverable, other], DELIVERABLE_CATALOG)
+
+    expect(text).toContain(
+      '| 2026-11-13 | Email al cliente | Collaudo: nuova data | approvato | 2.3 | 6 | 2 |',
+    )
+    expect(text).toContain('| 2026-11-14 | sconosciuto | Bozza \\| in corso | da rivedere |')
+    expect(text.indexOf('2026-11-14 |')).toBeLessThan(text.indexOf('2026-11-13 |'))
+    expect(text).toContain('Approvati: 1 · scrittura 2.3 min · revisione 6 min · 2 giri.')
+    expect(registerTotals([other])).toEqual({
+      deliverables: 0,
+      draftMinutes: 0,
+      reviewMinutes: 0,
+      rounds: 0,
+    })
   })
 })

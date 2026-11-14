@@ -5,11 +5,12 @@ import {
   type DeliverableKind,
   type Project,
   type RedTeamReport,
+  registerTotals,
 } from '@octo/domain'
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
-import { errorText, messages, progressText } from './messages.ts'
+import { dateText, errorText, messages, progressText } from './messages.ts'
 
 type Props = {
   api: OctoApi
@@ -17,7 +18,11 @@ type Props = {
 }
 
 /** What the right side shows: the catalog, the form of a kind, or a deliverable. */
-type Shown = { view: 'catalog' } | { view: 'form'; kindId: string } | { view: 'one'; id: string }
+type Shown =
+  | { view: 'catalog' }
+  | { view: 'register' }
+  | { view: 'form'; kindId: string }
+  | { view: 'one'; id: string }
 
 /** The deliverables of a project: the catalog, the ones in the making, the approved ones. */
 export function DeliverablesView({ api, project }: Props) {
@@ -73,6 +78,9 @@ export function DeliverablesView({ api, project }: Props) {
         <button type="button" onClick={() => setShown({ view: 'catalog' })}>
           {messages.deliverableNew}
         </button>
+        <button type="button" className="quiet" onClick={() => setShown({ view: 'register' })}>
+          {messages.deliverableRegister}
+        </button>
         <ul>
           {all.map((deliverable) => (
             <li key={deliverable.id}>
@@ -108,6 +116,9 @@ export function DeliverablesView({ api, project }: Props) {
             empty={all.length === 0}
             onChoose={(kindId) => setShown({ view: 'form', kindId })}
           />
+        )}
+        {shown.view === 'register' && (
+          <Register all={all} titleOf={(id) => kindOf(id)?.title ?? id} />
         )}
         {formKind && (
           <KindForm
@@ -377,5 +388,52 @@ function RedTeam({ report }: { report: RedTeamReport }) {
         </p>
       )}
     </section>
+  )
+}
+
+function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: string) => string }) {
+  const totals = registerTotals(all)
+  return (
+    <>
+      <h3>{messages.deliverableRegister}</h3>
+      <p className="hint">{messages.deliverableRegisterIntro}</p>
+      {all.length === 0 ? (
+        <p className="hint">{messages.deliverableRegisterEmpty}</p>
+      ) : (
+        <table className="register">
+          <thead>
+            <tr>
+              {messages.deliverableRegisterHead.map((head) => (
+                <th key={head}>{head}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {all.map((deliverable) => {
+              const cost = costOf(deliverable)
+              return (
+                <tr key={deliverable.id}>
+                  <td>{dateText(deliverable.createdAt)}</td>
+                  <td>{titleOf(deliverable.kindId)}</td>
+                  <td>{deliverable.title}</td>
+                  <td>{messages.deliverableStatus[deliverable.status]}</td>
+                  <td>{cost.draftMinutes}</td>
+                  <td>{cost.reviewMinutes}</td>
+                  <td>{cost.rounds}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+      <p className="badge">
+        {messages.deliverableRegisterTotals(
+          totals.deliverables,
+          totals.draftMinutes,
+          totals.reviewMinutes,
+          totals.rounds,
+        )}
+      </p>
+    </>
   )
 }

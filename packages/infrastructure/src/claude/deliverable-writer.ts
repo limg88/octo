@@ -1,9 +1,11 @@
 import type { DeliverableWriter, DraftRequest } from '@octo/application'
 import {
+  type DeliverableDraft,
   type DeliverableKind,
   MIN_QUOTE_LENGTH,
   RED_TEAM_SEVERITIES,
   RED_TEAM_VERDICTS,
+  WBS_STATES,
 } from '@octo/domain'
 import { z } from 'zod'
 import { draftAnswerSchema } from './ask-prompt.ts'
@@ -21,6 +23,27 @@ const redTeamSchema = z.object({
   ),
   holds: z.string(),
 })
+
+/** What the writer of a kind with numbers gives back: the text and the lines to compute. */
+const estimateDraftSchema = draftAnswerSchema.extend({
+  wbs: z.array(
+    z.object({
+      id: z.string(),
+      fase: z.string(),
+      attivita: z.string(),
+      driver: z.string(),
+      ruolo: z.string(),
+      ott: z.number(),
+      prob: z.number(),
+      pess: z.number(),
+      stato: z.enum(WBS_STATES),
+    }),
+  ),
+})
+
+/** The shape of a draft for a kind: with the lines of the estimate when the kind computes one. */
+const draftSchemaOf = (kind: DeliverableKind): z.ZodType<DeliverableDraft> =>
+  kind.calculation === 'pert' ? estimateDraftSchema : draftAnswerSchema
 
 const RULES_OPEN = '<project_rules>'
 const RULES_CLOSE = '</project_rules>'
@@ -91,6 +114,7 @@ export function writerInput(request: DraftRequest): string {
       text: request.revision.draft.text,
       citations: request.revision.draft.citations.map(({ n, path, quote }) => ({ n, path, quote })),
       missing: request.revision.draft.missing,
+      ...(request.revision.draft.wbs ? { wbs: request.revision.draft.wbs } : {}),
     }),
     '',
     'The change the Project Manager asks. Apply it and give back the whole draft; leave the rest',
@@ -144,7 +168,7 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
         projectFolder: request.projectFolder,
         input: writerInput(request),
         systemPrompt: writerSystemPrompt(request, await projectRules(request.projectFolder)),
-        schema: draftAnswerSchema,
+        schema: draftSchemaOf(request.kind),
         onProgress: request.onProgress,
         signal: request.signal,
       }),

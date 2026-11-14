@@ -15,7 +15,7 @@ Durata: 4 minuti. Mostra un deliverable dalla richiesta del PM al file approvato
    Atteso: si apre Octo sul progetto «Aurora».
 
 2. **Apri «Deliverable».**
-   Atteso: il catalogo con tre schede — Email al cliente, Stato di avanzamento, Verbale di riunione — ciascuna con scritto se è per il cliente o interna.
+   Atteso: il catalogo con quattro schede — Email al cliente, Stato di avanzamento, Verbale di riunione, Stima — ciascuna con scritto se è per il cliente o interna.
 
 3. **Scegli «Email al cliente» e compila.** A chi scrivi: `Carla Bianchi`. Di che cosa: `Data di consegna`. Che cosa chiedi: `Conferma della data`. Premi «Scrivi la bozza».
    Atteso: una riga dice che cosa sta leggendo; poi compare la bozza con «1 fonte controllata», la fonte `wiki/stato.md` e, sotto «Rilettura critica», «Può uscire: nessun punto contestabile trovato.»
@@ -38,6 +38,14 @@ Durata: 4 minuti. Mostra un deliverable dalla richiesta del PM al file approvato
 7. **Istruzioni del progetto.** «Nuovo deliverable» → «Email al cliente» → apri «Istruzioni di questo progetto per questo deliverable», scrivi `Dai sempre del lei.` e premi «Salva le istruzioni».
    Atteso: «Istruzioni salvate.» Valgono per tutte le prossime email di questo progetto.
 
+8. **Una stima.** «Nuovo deliverable» → «Stima». Che cosa va stimato: `Migrazione ordini`. Premi «Scrivi la bozza».
+   Atteso: sotto «Stima» il totale «9,0 gg» con l'intervallo all'80%, le tabelle per fase e per ruolo e, fra gli avvisi, «Esclusa dai totali — W-03».
+   Dimostra: Claude propone le righe, i conti li fa Octo. Una riga impossibile (ottimistico sopra il probabile) non viene corretta di nascosto: resta fuori dal totale e viene detta.
+
+9. **Il registro.** Premi «Registro» nella colonna di sinistra.
+   Atteso: una riga per deliverable con minuti di scrittura, minuti di revisione e giri, e in fondo il totale degli approvati. Lo stesso registro è nel file `_octo/deliverable/registro.md`.
+   Dimostra: quanto costa ogni deliverable si misura da solo.
+
 ## Con Claude vero
 ```bash
 REAL=1 bash demo/06-deliverable/run.sh
@@ -45,4 +53,4 @@ REAL=1 bash demo/06-deliverable/run.sh
 Stessi passi 2-5 senza `#inventa`: chiedi per esempio `Rendila più breve`. La bozza richiede un minuto o due: sono due letture del progetto. Consuma quota del tuo seat.
 
 ## Senza interfaccia
-`pnpm e2e` esegue i passi da 2 a 6 nella finestra vera e stampa `e2e: ok`.
+`pnpm e2e` esegue i passi da 2 a 6, 8 e 9 nella finestra vera e stampa `e2e: ok`.

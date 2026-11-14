@@ -93,6 +93,21 @@ export const messages = {
   },
   deliverablesTab: 'Deliverable',
   deliverableNew: 'Nuovo deliverable',
+  deliverableRegister: 'Registro',
+  deliverableRegisterIntro:
+    'Che cosa è costato ogni deliverable: minuti di scrittura, minuti di revisione e giri. Una pausa oltre 20 minuti non conta come revisione.',
+  deliverableRegisterEmpty: 'Ancora nessun deliverable.',
+  deliverableRegisterHead: [
+    'Data',
+    'Tipo',
+    'Oggetto',
+    'Stato',
+    'Scrittura (min)',
+    'Revisione (min)',
+    'Giri',
+  ],
+  deliverableRegisterTotals: (count: number, draft: number, review: number, rounds: number) =>
+    `Approvati: ${count} · scrittura ${draft} min · revisione ${review} min · ${rounds} giri.`,
   deliverableNone: 'Nessun deliverable ancora. Scegline uno dal catalogo.',
   deliverableChoose: 'Che cosa vuoi preparare?',
   deliverableFor: { client: 'Per il cliente', internal: 'Interno' },
