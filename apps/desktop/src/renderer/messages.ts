@@ -9,7 +9,15 @@ export const messages = {
   project: 'Progetto',
   addProject: 'Aggiungi un progetto…',
   close: 'Chiudi',
-  openSources: 'Apri «Fonti»',
+  openSources: 'Apri «Impostazioni»',
+  openSection: (name: string) => `Apri «${name}»`,
+  nav: {
+    sections: 'Sezioni del progetto',
+    work: 'Lavoro',
+    monthly: 'Ogni mese',
+    sprint: 'Ogni sprint',
+    project: 'Progetto',
+  },
   choosePath: 'Scegli…',
   commaList: 'Più valori si separano con la virgola.',
   monthBefore: 'Mese precedente',
@@ -108,7 +116,7 @@ export const messages = {
   toCheck: (count: number) =>
     count === 1 ? '1 punto da controllare' : `${count} punti da controllare`,
   markerWithoutSource: (marker: number) => `Il richiamo [${marker}] non ha una fonte.`,
-  sourcesTab: 'Fonti',
+  sourcesTab: 'Impostazioni',
   mailTitle: 'Posta',
   mailIntro:
     'Octo legge la posta che Mail tiene su questo computer e scrive nel progetto le mail che lo riguardano, una per file. Non invia e non modifica nulla.',
@@ -217,7 +225,8 @@ export const messages = {
     skipped: (names: string[]) =>
       `Non ripristinati perché la cartella non è su questo computer: ${names.join(', ')}. Copia la cartella e ripeti il ripristino.`,
     nothing: 'La copia non contiene progetti.',
-    credentials: 'Rimetti le credenziali di Jira e Azure DevOps in «Fonti»: non sono nella copia.',
+    credentials:
+      'Rimetti le credenziali di Jira e Azure DevOps in «Impostazioni»: non sono nella copia.',
   },
   models: {
     title: 'Modelli',
@@ -579,9 +588,9 @@ export const messages = {
     aliasWrong: (n: number) => `Riga ${n}: servono tutti e due i nomi.`,
     saveNeeds: 'Per salvare indica dove sono i timesheet e le ore del tracker.',
     netsuiteUnlinked:
-      'NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.',
+      'NetSuite non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere i timesheet.',
     jiraUnlinked:
-      'Jira non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere le ore.',
+      'Jira non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere le ore.',
     setupTitle: 'Da dove leggo le ore',
     setupIntro:
       'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Le leggo io da NetSuite e da Jira con i pulsanti qui sotto, oppure indichi due esportazioni che hai già nella cartella del progetto. Non scrivo in nessun sistema.',
@@ -638,14 +647,14 @@ export const messages = {
       `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
     timesheetsTitle: 'Timesheet da NetSuite',
     timesheetsIntro:
-      'Leggo le ore dei timesheet delle commesse indicate in «Fonti», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Il costo di ogni riga serve al previsionale: lo tengo a parte, in una cartella che non entra nelle risposte né nei deliverable.',
+      'Leggo le ore dei timesheet delle commesse indicate in «Impostazioni», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Il costo di ogni riga serve al previsionale: lo tengo a parte, in una cartella che non entra nelle risposte né nei deliverable.',
     readTimesheets: 'Leggi i timesheet da NetSuite',
     readingTimesheets: 'Leggo i timesheet da NetSuite…',
     timesheetsRead: (entries: number, months: string, when: string) =>
       `Lette ${entries} righe di timesheet (${months}) alle ${when}`,
     trackerTitle: 'Ore da Jira',
     trackerIntro:
-      'Leggo le ore segnate sulle issue dei progetti Jira indicati in «Fonti», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e issue.',
+      'Leggo le ore segnate sulle issue dei progetti Jira indicati in «Impostazioni», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e issue.',
     readTracker: 'Leggi le ore da Jira',
     readingTracker: 'Leggo le ore da Jira…',
     trackerRead: (entries: number, months: string, when: string) =>
@@ -655,14 +664,14 @@ export const messages = {
   dashboard: {
     loading: 'Leggo l’esportazione del tracker…',
     adoUnlinked:
-      'Azure DevOps non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere.',
+      'Azure DevOps non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere.',
     saveNeeds: 'Per salvare indica il file dell’esportazione.',
     setupTitle: 'Da dove leggo bug e requisiti',
     setupIntro:
       'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da Azure DevOps qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.',
     trackerTitle: 'Leggi da Azure DevOps',
     trackerIntro:
-      'Leggo adesso i work item del progetto e delle aree indicati in «Fonti», con il tuo Personal Access Token di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
+      'Leggo adesso i work item del progetto e delle aree indicati in «Impostazioni», con il tuo Personal Access Token di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
     readTracker: 'Leggi da Azure DevOps',
     readingTracker: 'Sto leggendo Azure DevOps…',
     trackerRead: (items: number, withHistory: number, when: string) =>
@@ -852,7 +861,7 @@ export const messages = {
     dwsi: 'NetSuite',
     documents: 'Documenti',
   },
-  guideAsk: 'Fatto. Ora puoi fare domande nella scheda «Chiedi».',
+  guideAsk: 'Fatto. Ora puoi fare domande in «Chiedi».',
   mailPreview: 'Anteprima',
   mailPreviewing: 'Sto cercando nella posta…',
   mailPreviewCount: (count: number) =>
@@ -954,9 +963,9 @@ const errors: Record<ErrorCode, string> = {
     'Le impostazioni del previsionale non sono valide: il modello deve stare nella cartella del progetto.',
   alignment_sprint_not_set: 'Indica lo sprint da confrontare.',
   alignment_items_missing:
-    'Indica il file di esportazione del tracker del cliente, qui o nella scheda «Cruscotto».',
+    'Indica il file di esportazione del tracker del cliente, qui o in «Cruscotto».',
   alignment_tickets_missing:
-    'Non trovo ticket da confrontare: configura Jira in «Fonti» e leggi i ticket, oppure indica la cartella dove sono.',
+    'Non trovo ticket da confrontare: configura Jira in «Impostazioni» e leggi i ticket, oppure indica la cartella dove sono.',
   alignment_settings_invalid:
     'Le impostazioni dell’allineamento non sono valide: la cartella dei ticket deve stare nel progetto.',
   progress_model_not_set: 'Indica il file Excel del modulo vuoto.',
@@ -968,7 +977,7 @@ const errors: Record<ErrorCode, string> = {
   progress_not_computable:
     'Non posso compilare il modulo. O c’è un problema segnalato qui sopra da correggere, o l’ordine ha più posizioni delle righe che hai indicato per la tabella del modulo: in quel caso aumenta il «numero di righe».',
   progress_request_missing: 'Questa richiesta non c’è più.',
-  forecast_timesheet_not_set: 'Indica prima, nella scheda «Ore», dove sono i timesheet.',
+  forecast_timesheet_not_set: 'Indica prima, in «Ore», dove sono i timesheet.',
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',
   dashboard_settings_invalid: 'Le impostazioni del cruscotto sono rovinate: salvale di nuovo.',

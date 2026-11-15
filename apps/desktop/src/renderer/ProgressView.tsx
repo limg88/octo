@@ -8,6 +8,7 @@ import {
 } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Failure } from './Failure.tsx'
 import { dateText, errorText, messages } from './messages.ts'
 import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
@@ -180,14 +181,6 @@ export function ProgressView({ api, project }: Props) {
         />
       ))}
     </div>
-  )
-}
-
-function Failure({ code }: { code: ErrorCode }) {
-  return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
   )
 }
 

@@ -505,7 +505,8 @@ main {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 12px 24px 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
 }
 
 .project-header h2 {
@@ -706,14 +707,6 @@ main > .warning {
 
 .composer button {
   min-height: 32px;
-}
-
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 0 18px 8px;
-  border-bottom: 1px solid var(--line);
 }
 
 /* A tab is a quiet pill: the one in use is filled, not underlined. */
@@ -1618,4 +1611,42 @@ details.advanced[open] > summary {
 .month-field button {
   min-width: 30px;
   padding: 0;
+}
+
+/* The sections of a project, in the sidebar: grouped by how often they are used. */
+.section-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.section-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.section-group-title {
+  padding: 0 8px 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.nav-item {
+  min-height: 28px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.nav-item-selected,
+.nav-item-selected:hover:not(:disabled) {
+  background: var(--hover);
+  font-weight: 600;
 }

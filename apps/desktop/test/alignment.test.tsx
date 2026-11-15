@@ -286,8 +286,14 @@ describe('the alignment', () => {
       alignmentView: vi.fn(async () => noExport),
       saveAlignmentSettings: vi.fn(async () => failing),
     })
-    render(<AlignmentView api={api} project={project} />)
-    expect((await screen.findByRole('alert')).textContent).toMatch(/scheda «Cruscotto»/)
+    const onOpenSection = vi.fn()
+    render(<AlignmentView api={api} project={project} onOpenSection={onOpenSection} />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/in «Cruscotto»/)
+    // An error that is put right elsewhere leads there.
+    fireEvent.click(
+      screen.getByRole('button', { name: messages.openSection(messages.dashboardTab) }),
+    )
+    expect(onOpenSection).toHaveBeenCalledWith('dashboard')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/non sono valide/))
   })

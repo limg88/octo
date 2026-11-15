@@ -2,6 +2,7 @@ import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { KnownList } from './KnownList.tsx'
 import { MonthField } from './MonthField.tsx'
@@ -237,6 +238,17 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
+      <details className="dashboard-settings">
+        <summary>{text.settings}</summary>
+        <SettingsForm
+          settings={settings}
+          candidates={candidates}
+          codes={view?.projectCodes ?? []}
+          people={view?.reconciliation.rows.map((row) => row.person) ?? []}
+          onSave={save}
+          onChooseFolder={chooseFolder}
+        />
+      </details>
       <div className="range-fields">
         <MonthField
           label={text.month}
@@ -266,26 +278,7 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
       {view && <Comparison view={view} onExpect={expect} />}
       {timesheets}
       {tracker}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        <SettingsForm
-          settings={settings}
-          candidates={candidates}
-          codes={view?.projectCodes ?? []}
-          people={view?.reconciliation.rows.map((row) => row.person) ?? []}
-          onSave={save}
-          onChooseFolder={chooseFolder}
-        />
-      </details>
     </div>
-  )
-}
-
-function Failure({ code }: { code: ErrorCode }) {
-  return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
   )
 }
 

@@ -351,7 +351,11 @@ describe('the forecast', () => {
       })),
     })
     render(<ForecastView api={noTimesheet} project={project} now={now} />)
-    expect((await screen.findByRole('alert')).textContent).toMatch(/scheda «Ore»/)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/in «Ore»/)
+    // Without a way to another section the error only says where to go.
+    expect(
+      screen.queryByRole('button', { name: messages.openSection(messages.hoursTab) }),
+    ).toBeNull()
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
   })
 })

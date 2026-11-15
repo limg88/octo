@@ -51,6 +51,6 @@ Durata: 4 minuti. Mostra il confronto fra le voci del tracker del cliente in uno
 - Le regole (prefisso del riferimento, tag della squadra, gruppi di stati) sono impostazioni del progetto.
 
 ## Che cosa non fa ancora
-- Non legge i ticket da solo in questa demo: nell'uso reale sono quelli della fonte Jira configurata in «Fonti».
+- Non legge i ticket da solo in questa demo: nell'uso reale sono quelli della fonte Jira configurata in «Impostazioni».
 - Non mette priorità né assegnatario del tuo tracker nel file di import.
 - Non tiene conto delle persone per cui l'assenza di ticket è attesa.

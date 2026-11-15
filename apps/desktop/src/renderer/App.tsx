@@ -13,16 +13,8 @@ import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
 import { ProjectSettings } from './ProjectSettings.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
-
-type Tab =
-  | 'ask'
-  | 'deliverables'
-  | 'dashboard'
-  | 'hours'
-  | 'forecast'
-  | 'progress'
-  | 'alignment'
-  | 'sources'
+import { SectionNav } from './SectionNav.tsx'
+import type { Section } from './sections.ts'
 
 type Props = {
   api: OctoApi
@@ -36,7 +28,7 @@ export function App({ api }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
-  const [tab, setTab] = useState<Tab>('ask')
+  const [tab, setTab] = useState<Section>('ask')
   const [dialog, setDialog] = useState<'add' | 'manage' | null>(null)
   const [backupNotes, setBackupNotes] = useState<string[]>([])
   /** The project just taken off the list, while it can still be put back with one click. */
@@ -159,6 +151,7 @@ export function App({ api }: Props) {
           onAdd={() => openDialog('add')}
           onManage={() => openDialog('manage')}
         />
+        {selected && <SectionNav current={tab} onSelect={setTab} />}
         {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
       </nav>
       <main>
@@ -201,46 +194,6 @@ export function App({ api }: Props) {
                 <p className="folder">{selected.folder}</p>
               </div>
             </header>
-            <div className="tabs" role="tablist">
-              <TabButton current={tab} tab="ask" label={messages.ask} onSelect={setTab} />
-              <TabButton
-                current={tab}
-                tab="deliverables"
-                label={messages.deliverablesTab}
-                onSelect={setTab}
-              />
-              <TabButton
-                current={tab}
-                tab="dashboard"
-                label={messages.dashboardTab}
-                onSelect={setTab}
-              />
-              <TabButton current={tab} tab="hours" label={messages.hoursTab} onSelect={setTab} />
-              <TabButton
-                current={tab}
-                tab="forecast"
-                label={messages.forecastTab}
-                onSelect={setTab}
-              />
-              <TabButton
-                current={tab}
-                tab="progress"
-                label={messages.progressTab}
-                onSelect={setTab}
-              />
-              <TabButton
-                current={tab}
-                tab="alignment"
-                label={messages.alignmentTab}
-                onSelect={setTab}
-              />
-              <TabButton
-                current={tab}
-                tab="sources"
-                label={messages.sourcesTab}
-                onSelect={setTab}
-              />
-            </div>
             {tab === 'ask' ? (
               <AskView api={api} project={selected} />
             ) : tab === 'deliverables' ? (
@@ -250,11 +203,11 @@ export function App({ api }: Props) {
             ) : tab === 'hours' ? (
               <HoursView api={api} project={selected} onOpenSources={() => setTab('sources')} />
             ) : tab === 'forecast' ? (
-              <ForecastView api={api} project={selected} />
+              <ForecastView api={api} project={selected} onOpenSection={setTab} />
             ) : tab === 'progress' ? (
               <ProgressView api={api} project={selected} />
             ) : tab === 'alignment' ? (
-              <AlignmentView api={api} project={selected} />
+              <AlignmentView api={api} project={selected} onOpenSection={setTab} />
             ) : (
               <ProjectSettings api={api} project={selected} />
             )}
@@ -311,28 +264,4 @@ function restoreNotes(outcome: RestoreOutcome): string[] {
     ...(skipped.length > 0 ? [messages.backup.skipped(skipped)] : []),
     ...(restored.length > 0 ? [messages.backup.credentials] : []),
   ]
-}
-
-function TabButton({
-  current,
-  tab,
-  label,
-  onSelect,
-}: {
-  current: Tab
-  tab: Tab
-  label: string
-  onSelect: (tab: Tab) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={current === tab}
-      className={current === tab ? 'tab tab-selected' : 'tab'}
-      onClick={() => onSelect(tab)}
-    >
-      {label}
-    </button>
-  )
 }

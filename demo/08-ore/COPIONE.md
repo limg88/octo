@@ -40,7 +40,7 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
 8. **Cambia periodo.** Con le frecce ‹ › accanto a «Mese» passa al mese prima e torna; oppure scegli due date in «Dal» e «Al».
    Atteso: la tabella segue il periodo; un mese senza ore dice «Nessuna ora nel periodo».
 
-9. **Leggi le ore direttamente da Jira.** Apri «Fonti», premi «Collega» nella riga «Jira» e scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».
+9. **Leggi le ore direttamente da Jira.** Apri «Impostazioni», premi «Collega» nella riga «Jira» e scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».
    Atteso: «Lette 100 registrazioni di ore (<mese>)…» e la stessa tabella di prima: 664 ore contro 630.
    Nel terminale:
    ```bash
@@ -50,8 +50,8 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
    Dimostra: non serve più esportare a mano; Octo legge con il tuo token di sola lettura, tiene solo persona, giorno, ore e issue, e non scrive su Jira.
 
 10. **Chiedi i timesheet a NetSuite.** Sempre in «Ore» premi «Leggi i timesheet da NetSuite».
-    Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.» Nella demo NetSuite non c'è: serve un database, e la lettura vera è provata dai test contro un database di prova.
-    Dimostra: con NetSuite collegato in «Fonti» lo stesso pulsante legge le ore delle commesse per i mesi del periodo, le scrive in `_octo/ore/netsuite/timesheet_<mese>.json` e il confronto parte da lì, senza file esportati a mano. Di ogni riga restano persona, giorno, ore, commessa e stato di approvazione: mai il costo.
+    Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere i timesheet.» Nella demo NetSuite non c'è: serve un database, e la lettura vera è provata dai test contro un database di prova.
+    Dimostra: con NetSuite collegato in «Impostazioni» lo stesso pulsante legge le ore delle commesse per i mesi del periodo, le scrive in `_octo/ore/netsuite/timesheet_<mese>.json` e il confronto parte da lì, senza file esportati a mano. Di ogni riga restano persona, giorno, ore, commessa e stato di approvazione: mai il costo.
 
 10. **Controlla dove sono le scelte.** Nel terminale:
    ```bash

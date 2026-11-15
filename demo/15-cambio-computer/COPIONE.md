@@ -25,7 +25,7 @@ Durata: 4 minuti. Mostra come un PM riparte su un computer nuovo senza perdere n
    Atteso: «Nessun progetto».
 
 5. **Ripristina.** Premi «Nessun progetto» nella colonna di sinistra, poi «Gestisci i progetti…» e «Ripristina», e scegli il file nella cartella `Chiavetta`. Octo chiede «Dov'è la cartella del progetto «Aurora» su questo computer?»: scegli `Nuovo computer/Aurora`.
-   Atteso: «Ripristinati: Aurora.» e «Rimetti le credenziali di Jira e Azure DevOps in «Fonti»: non sono nella copia.» Aurora è in elenco.
+   Atteso: «Ripristinati: Aurora.» e «Rimetti le credenziali di Jira e Azure DevOps in «Impostazioni»: non sono nella copia.» Aurora è in elenco.
    Dimostra: il percorso può cambiare, anche da Mac a Windows; Octo chiede solo quello che non trova.
 
 6. **Apri «Chiedi».**
@@ -37,4 +37,4 @@ Durata: 4 minuti. Mostra come un PM riparte su un computer nuovo senza perdere n
 ## Che cosa dimostra
 - Per non perdere nulla servono due cose: la cartella del progetto copiata altrove (memoria, impostazioni, modelli, deliverable, domande) e la copia di sicurezza (elenco dei progetti, stato delle letture).
 - Senza la copia si riparte lo stesso: «Aggiungi un progetto…» sulla cartella, e le fonti si rileggono da capo scrivendo sopra gli stessi file, senza doppioni.
-- Le credenziali restano nel deposito del sistema del vecchio computer e non escono mai: sul nuovo si rimettono in «Fonti».
+- Le credenziali restano nel deposito del sistema del vecchio computer e non escono mai: sul nuovo si rimettono in «Impostazioni».

@@ -14,7 +14,7 @@ Durata: 3 minuti. Mostra che il cruscotto non dipende più da un file esportato 
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Collega Azure DevOps.** Apri «Fonti» e premi «Collega» nella riga «Azure DevOps». Organizzazione `contoso`, Progetto `Aurora`, Personal Access Token `demo-pat`. Premi «Prova e salva».
+2. **Collega Azure DevOps.** Apri «Impostazioni» e premi «Collega» nella riga «Azure DevOps». Organizzazione `contoso`, Progetto `Aurora`, Personal Access Token `demo-pat`. Premi «Prova e salva».
    Atteso: «Collegamento riuscito e salvato.»
    Dimostra: la credenziale è la stessa che alimenta la memoria; resta su questo computer.
 

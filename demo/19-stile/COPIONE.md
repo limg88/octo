@@ -14,11 +14,11 @@ Durata: 3 minuti. Mostra l'aspetto nuovo dell'app, asciutto e denso sul modello 
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Apri «Fonti» e apri una riga.** Premi «Collega» su «Posta», poi su «NetSuite»; guarda anche le parti «Persone e calendario» e «Avanzate».
-   Atteso: ovunque gli stessi campi (bordo sottile, stessa altezza, etichetta sopra); nei menu la freccia è disegnata staccata dal bordo destro. In ogni modulo un solo pulsante blu: quello che salva. «Riempi la memoria ora» è blu. La scheda in uso è una pastiglia grigia, non una riga sottolineata.
+2. **Apri «Impostazioni» e apri una riga.** Premi «Collega» su «Posta», poi su «NetSuite»; guarda anche le parti «Persone e calendario» e «Avanzate».
+   Atteso: ovunque gli stessi campi (bordo sottile, stessa altezza, etichetta sopra); nei menu la freccia è disegnata staccata dal bordo destro. In ogni modulo un solo pulsante blu: quello che salva. «Riempi la memoria ora» è blu. La sezione in uso, nella colonna di sinistra, ha il fondo grigio.
 
 3. **Apri «Previsionale».**
-   Atteso: gli stessi campi di «Fonti». «Salva» è grigio finché non indichi il modello, e si legge. «Ore in una giornata» è un campo corto, non largo quanto la pagina.
+   Atteso: gli stessi campi di «Impostazioni». «Salva» è grigio finché non indichi il modello, e si legge. «Ore in una giornata» è un campo corto, non largo quanto la pagina.
 
 4. **Apri «Avanzamento».**
    Atteso: tre riquadri numerati con il bordo arrotondato; i campi delle celle e delle posizioni sono righe allineate; «Salva» è l'unico pulsante blu della pagina; «Aggiungi una cella» e «Aggiungi una posizione» sono pulsanti normali, la «×» di ogni riga è senza cornice.
@@ -30,7 +30,7 @@ Durata: 3 minuti. Mostra l'aspetto nuovo dell'app, asciutto e denso sul modello 
    Atteso: i numeri sono incolonnati; nelle tabelle dei dati la riga sotto il mouse si evidenzia.
 
 7. **Stringi la finestra al minimo.**
-   Atteso: le schede vanno a capo su due righe; «Fonti» resta raggiungibile.
+   Atteso: le sezioni restano tutte nella colonna di sinistra, «Impostazioni» compresa; il contenuto si stringe senza barre di scorrimento orizzontali della finestra.
 
 ## Che cosa dimostra
 - Un solo insieme di regole per pulsanti (principale, normale, senza cornice, distruttivo), campi, moduli, fuoco e tabelle: tutte in `styles.css`.

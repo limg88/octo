@@ -69,6 +69,16 @@ try {
 
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('Claude 9.9.9 (Fake Claude)').waitFor({ timeout: TIMEOUT_MS })
+  // Demo 21: the sections are in the sidebar, grouped, and the arrows move among them.
+  const nav21 = (group) => page.getByRole('tablist', { name: group }).getByRole('tab')
+  assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
+  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Ore', 'Previsionale', 'Avanzamento'])
+  assert.deepEqual(await nav21('Progetto').allInnerTexts(), ['Impostazioni'])
+  await page.getByRole('tab', { name: 'Chiedi' }).focus()
+  await page.keyboard.press('ArrowUp')
+  await page.getByRole('region', { name: 'Avvio del progetto' }).waitFor({ timeout: TIMEOUT_MS })
+  await page.keyboard.press('ArrowDown')
+  await page.getByPlaceholder('Chiedi qualcosa su questo progetto…').waitFor()
   // The list of the projects opens from the name of the one in use.
   const openProjects = () => page.locator('.switcher-button').click()
   const manageProjects = async () => {
@@ -86,7 +96,7 @@ try {
   await page.screenshot({ path: `${work}/chiedi.png` })
 
   // Demo 02: the mail of the project enters its folder, once.
-  await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Impostazioni' }).click()
   // Demo 05: the guide shows what is still to link, and the mail starts from the project's name.
   const guide = page.getByRole('region', { name: 'Avvio del progetto' })
   await guide.getByText(/^Niente è ancora collegato/).waitFor({ timeout: TIMEOUT_MS })
@@ -340,7 +350,7 @@ try {
   assert.equal(await hoursRow('E. Costa').count(), 0)
   await page.screenshot({ path: `${work}/ore.png` })
   // The same hours read from Jira itself, with the token of its feed.
-  await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Impostazioni' }).click()
   const jiraSection = page.getByRole('region', { name: 'Jira', exact: true })
   await openSource('Collega', 'Jira')
   await jiraSection.getByLabel(/^Sito/).fill(DEMO_JIRA.site)
@@ -599,7 +609,7 @@ try {
   await page.screenshot({ path: `${work}/allineamento.png` })
 
   // Demo 14: people and calendar of the project, and their effect on the hours.
-  await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Impostazioni' }).click()
   await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team14 = page.getByRole('region', { name: 'Persone e calendario' })
   await cell(team14, 'Nome, persona 1').fill('Neri Sara')
@@ -644,7 +654,7 @@ try {
 
   // Demo 17: the model that answers is chosen for the project and written beside the answer.
   await page.getByText('modello claude-fake-default').first().waitFor({ timeout: TIMEOUT_MS })
-  await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Impostazioni' }).click()
   await page.getByRole('tab', { name: 'Avanzate' }).click()
   const models17 = page.getByRole('region', { name: 'Modelli' })
   await models17.getByLabel('Risposte in «Chiedi»').selectOption('sonnet')
@@ -823,7 +833,7 @@ try {
   await page
     .getByText(/^NetSuite non è collegato a questo progetto/)
     .waitFor({ timeout: TIMEOUT_MS })
-  await page.getByRole('button', { name: 'Apri «Fonti»' }).click()
+  await page.getByRole('button', { name: 'Apri «Impostazioni»' }).click()
   await page.getByRole('region', { name: 'Avvio del progetto' }).waitFor({ timeout: TIMEOUT_MS })
   console.log('e2e: ok')
 } finally {

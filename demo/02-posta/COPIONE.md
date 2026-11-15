@@ -14,7 +14,7 @@ Durata: 4 minuti. Mostra che Octo legge la posta che Mail tiene sul computer, sc
    ```
    Atteso: si apre Octo sul progetto «Aurora». Il terminale stampa il percorso dell'archivio finto: 6 mail, di cui 2 del progetto.
 
-2. **Apri «Fonti».** Fai clic sulla scheda «Fonti», poi su «Collega» nella riga «Posta».
+2. **Apri «Impostazioni».** Fai clic su «Impostazioni», in fondo alla colonna di sinistra, poi su «Collega» nella riga «Posta».
    Atteso: «La posta di questo progetto non è ancora configurata.» «Dal giorno» propone 30 giorni fa; sotto «Avanzate», «Cartella nel progetto» propone `_octo/posta`. «Leggi ora» è spento.
 
 3. **Configura.** In «Parole chiave» scrivi `Aurora`. In «Mittenti da escludere» scrivi `avvisi@monitor.example`. Premi «Salva».

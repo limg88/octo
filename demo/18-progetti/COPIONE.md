@@ -18,7 +18,7 @@ Durata: 4 minuti. Mostra il selettore dei progetti in cima alla colonna di sinis
    Atteso: la testata dice «Boreale»; l'elenco si chiude. Con ⌘1 (Ctrl+1 su Windows) torni ad Aurora, con ⌘2 a Boreale.
    Dimostra: l'elenco dei progetti è un selettore, e c'è un solo posto dove si cambia progetto.
 
-3. **Fai leggere la posta ad Aurora.** Torna su «Aurora», apri «Fonti», premi «Collega» nella riga «Posta», poi «Salva» e «Leggi ora».
+3. **Fai leggere la posta ad Aurora.** Torna su «Aurora», apri «Impostazioni», premi «Collega» nella riga «Posta», poi «Salva» e «Leggi ora».
    Atteso: «Ultima lettura …: 3 nuove, 0 già presenti.»
 
 4. **Prova a togliere Aurora e ripensaci.** Apri l'elenco, premi «Gestisci i progetti…», poi «Togli da Octo» accanto ad Aurora.
@@ -28,12 +28,12 @@ Durata: 4 minuti. Mostra il selettore dei progetti in cima alla colonna di sinis
 5. **Toglila davvero.** Di nuovo «Togli da Octo», poi «Togli».
    Atteso: si apre «Boreale». In alto: ««Aurora» non è più in elenco. La cartella è rimasta dov'è.» con il pulsante «Rimettilo in elenco».
 
-6. **Rimettila.** Premi «Rimettilo in elenco» e apri «Fonti».
+6. **Rimettila.** Premi «Rimettilo in elenco» e apri «Impostazioni».
    Atteso: Aurora è di nuovo aperta; in «Posta» c'è la stessa «Ultima lettura» del passo 3.
    Dimostra: togliere non cancella né le letture né le credenziali.
 
 7. **Toglila ancora e falla rientrare dalla cartella.** Ripeti il passo 5 e chiudi l'avviso con la «×». Apri l'elenco, premi «Aggiungi un progetto…», poi «Scegli la cartella…» sotto «Ho già una cartella» e scegli la cartella `Aurora` stampata nel terminale.
-   Atteso: Aurora torna e si apre su «Fonti», con la stessa «Ultima lettura»: la stessa cartella è lo stesso progetto.
+   Atteso: Aurora torna e si apre su «Impostazioni», con la stessa «Ultima lettura»: la stessa cartella è lo stesso progetto.
 
 8. **Guarda l'altra strada.** Riapri «Aggiungi un progetto…».
    Atteso: sotto «Parto da zero» si scrive un nome e Octo crea la cartella; «Annulla», Esc o un clic fuori chiudono senza fare nulla. In «Gestisci i progetti…», sotto «Se cambi computer», ci sono «Copia di sicurezza» e «Ripristina».

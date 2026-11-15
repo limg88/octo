@@ -14,7 +14,7 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Scrivi una persona e un periodo a metà.** Apri «Fonti» e, in alto, la parte «Persone e calendario». Nella prima riga delle persone scrivi solo il ruolo `sviluppatore`; nel calendario il nome `Sprint 1` e solo la data «Dal». Premi «Salva persone e calendario».
+2. **Scrivi una persona e un periodo a metà.** Apri «Impostazioni» e, in alto, la parte «Persone e calendario». Nella prima riga delle persone scrivi solo il ruolo `sviluppatore`; nel calendario il nome `Sprint 1` e solo la data «Dal». Premi «Salva persone e calendario».
    Atteso: sotto le persone «Persona 1: manca il nome.»; sotto il calendario «Periodo 1: servono il nome e le due date.»; accanto al pulsante «Non ho salvato: correggi ciò che è segnalato sotto i campi.»
    Dimostra: prima una riga incompleta spariva al salvataggio e la risposta era una conferma verde. Una parte che non è «nostra» o «cliente» e una data che non esiste non si possono più nemmeno scrivere: sono un menu e un campo data.
 
@@ -33,7 +33,7 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    Atteso: subito, sotto l'importo: «La richiesta 1 porta il totale chiesto 4.000,00 oltre il totale dell'ordine.» «Salva e compila il modulo» non salva. Con «Tutto ciò che resta: 1.000,00» l'importo torna giusto.
 
 7. **Chiedi una lettura a un sistema non collegato.** Apri «Ore» e premi «Leggi i timesheet da NetSuite».
-   Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.» con il pulsante «Apri «Fonti»», che porta alla scheda. Lo stesso in «Cruscotto» con «Leggi da Azure DevOps».
+   Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere i timesheet.» con il pulsante «Apri «Impostazioni»», che porta alla scheda. Lo stesso in «Cruscotto» con «Leggi da Azure DevOps».
    Dimostra: prima la risposta era «Questa fonte non è ancora configurata», senza dire quale.
 
 8. **Guarda un «Salva» spento.** In «Ore», accanto a «Salva».

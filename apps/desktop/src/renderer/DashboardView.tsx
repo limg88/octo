@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
+import { Failure } from './Failure.tsx'
 import { dateText, dateTimeText, errorText, messages } from './messages.ts'
 import { TrendChart } from './TrendChart.tsx'
 import { Unlinked } from './Unlinked.tsx'
@@ -179,6 +180,17 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
+      <details className="dashboard-settings">
+        <summary>{text.settings}</summary>
+        {tracker}
+        <DashboardSettingsForm
+          settings={settings}
+          candidates={candidates}
+          view={view}
+          onSave={save}
+          onChooseFile={chooseFile}
+        />
+      </details>
       <section className="dashboard-range" aria-label={text.rangeTitle}>
         <fieldset className="chips" aria-label={text.rangeTitle}>
           {RANGE_PRESETS.map((candidate) => (
@@ -308,26 +320,7 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
           </section>
         </>
       )}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        {tracker}
-        <DashboardSettingsForm
-          settings={settings}
-          candidates={candidates}
-          view={view}
-          onSave={save}
-          onChooseFile={chooseFile}
-        />
-      </details>
     </div>
-  )
-}
-
-function Failure({ code }: { code: ErrorCode }) {
-  return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
   )
 }
 

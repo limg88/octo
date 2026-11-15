@@ -14,7 +14,7 @@ Durata: 5 minuti. Mostra che un PM porta un progetto da zero a una memoria piena
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Apri «Fonti».** In cima c'è «Avvio del progetto»; sotto, una riga per ogni fonte.
+2. **Apri «Impostazioni».** In cima c'è «Avvio del progetto»; sotto, una riga per ogni fonte.
    Atteso: «Niente è ancora collegato…». Posta, Azure DevOps, Jira e NetSuite sono righe chiuse con il loro stato («non ancora configurata», «Non collegato.») e il pulsante blu «Collega»; i documenti hanno «Converti ora» perché non richiedono nulla. La pagina sta in una finestra. In alto tre parti: «Collegamenti», «Persone e calendario», «Avanzate».
    Dimostra: il PM vede in un colpo che cosa manca, e ogni riga porta dove si collega. Su un progetto appena aggiunto questa pagina si apre da sola.
 
@@ -33,7 +33,7 @@ Durata: 5 minuti. Mostra che un PM porta un progetto da zero a una memoria piena
    Atteso: «Collegamento riuscito e salvato.» e, in cima, «2 su 4 collegati». «Scollega» ora c'è, e chiede conferma dicendo che cosa succede.
 
 7. **Riempi.** Torna in cima e premi «Riempi la memoria ora».
-   Atteso: una riga per fonte man mano che finisce — Posta, Azure DevOps, Documenti — con quanti elementi sono entrati, poi «Fatto. Ora puoi fare domande nella scheda «Chiedi».»
+   Atteso: una riga per fonte man mano che finisce — Posta, Azure DevOps, Documenti — con quanti elementi sono entrati, poi «Fatto. Ora puoi fare domande in «Chiedi».»
 
 8. **Guarda il progetto.** Nel terminale:
    ```bash

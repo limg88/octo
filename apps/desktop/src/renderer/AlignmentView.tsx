@@ -2,12 +2,14 @@ import type { AlignmentChoices, AlignmentFile, AlignmentView as View } from '@oc
 import type { AlignedPair, AlignmentSettings, Project, StateGroup } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, PathKind } from '../shared/api.ts'
+import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { KnownList } from './KnownList.tsx'
 import { dateText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { listOf, listText } from './progress-text.ts'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import type { Section } from './sections.ts'
 
 type AlignmentApi = Pick<
   OctoApi,
@@ -20,7 +22,12 @@ type AlignmentApi = Pick<
   | 'chooseProjectPath'
 >
 
-type Props = { api: AlignmentApi; project: Project }
+type Props = {
+  api: AlignmentApi
+  project: Project
+  /** Takes the PM to the section where an error is put right. */
+  onOpenSection?: (section: Section) => void
+}
 
 const text = messages.alignment
 const NO_CHOICES: AlignmentChoices = { sprints: [], periods: [], tags: [] }
@@ -32,7 +39,7 @@ const GROUP_COLUMNS: RowsColumn<GroupKey>[] = [
 ]
 
 /** The client's tracker and the supplier's own, compared sprint by sprint. */
-export function AlignmentView({ api, project }: Props) {
+export function AlignmentView({ api, project, onOpenSection }: Props) {
   const [settings, setSettings] = useState<AlignmentSettings | null>(null)
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
@@ -86,7 +93,11 @@ export function AlignmentView({ api, project }: Props) {
   }
 
   if (settings === null) {
-    return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+    return error ? (
+      <Failure code={error} onOpen={onOpenSection} />
+    ) : (
+      <p className="progress">{text.loading}</p>
+    )
   }
   /** The export is a JSON file of the project, the tickets a folder of it. */
   async function choose(what: PathKind): Promise<string | null> {
@@ -102,16 +113,7 @@ export function AlignmentView({ api, project }: Props) {
 
   return (
     <div className="dashboard">
-      {error && <Failure code={error} />}
-      <p className="hint">{text.intro}</p>
-      {view && (
-        <Result
-          view={view}
-          file={file}
-          onExport={() => void exportMissing()}
-          onOpen={(path) => void api.openEvidence(project.id, path)}
-        />
-      )}
+      {error && <Failure code={error} onOpen={onOpenSection} />}
       {view ? (
         <details className="dashboard-settings">
           <summary>{text.settings}</summary>
@@ -123,15 +125,16 @@ export function AlignmentView({ api, project }: Props) {
           {form}
         </section>
       )}
+      <p className="hint">{text.intro}</p>
+      {view && (
+        <Result
+          view={view}
+          file={file}
+          onExport={() => void exportMissing()}
+          onOpen={(path) => void api.openEvidence(project.id, path)}
+        />
+      )}
     </div>
-  )
-}
-
-function Failure({ code }: { code: ErrorCode }) {
-  return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
   )
 }
 

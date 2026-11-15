@@ -629,6 +629,51 @@ describe('project tabs', () => {
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
   })
 
+  it('groups the sections in the sidebar and moves among them with the arrows', async () => {
+    const { api } = fakeApi()
+    render(<App api={api} />)
+    await screen.findByRole('heading', { name: 'Aurora' })
+    const group = (title: string) =>
+      within(screen.getByRole('tablist', { name: title }))
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent)
+    expect(group(messages.nav.work)).toEqual([
+      messages.ask,
+      messages.deliverablesTab,
+      messages.dashboardTab,
+    ])
+    expect(group(messages.nav.monthly)).toEqual([
+      messages.hoursTab,
+      messages.forecastTab,
+      messages.progressTab,
+    ])
+    expect(group(messages.nav.sprint)).toEqual([messages.alignmentTab])
+    expect(group(messages.nav.project)).toEqual([messages.sourcesTab])
+
+    // The settings have tabs of their own: the section in use is the one of the sidebar.
+    const selected = () =>
+      within(screen.getByRole('navigation', { name: messages.projects })).getByRole('tab', {
+        selected: true,
+      }).textContent
+    const ask = screen.getByRole('tab', { name: messages.ask })
+    expect(selected()).toBe(messages.ask)
+    // Down goes to the next section whatever its group; up from the first goes to the last.
+    fireEvent.keyDown(ask, { key: 'ArrowDown' })
+    expect(selected()).toBe(messages.deliverablesTab)
+    expect(document.activeElement?.textContent).toBe(messages.deliverablesTab)
+    fireEvent.keyDown(ask, { key: 'ArrowUp' })
+    expect(selected()).toBe(messages.sourcesTab)
+    fireEvent.keyDown(ask, { key: 'a' })
+    expect(selected()).toBe(messages.sourcesTab)
+  })
+
+  it('has no sections to show while there is no project', async () => {
+    const { api } = fakeApi({ listProjects: async () => ok([]) })
+    render(<App api={api} />)
+    await screen.findByText(messages.noProjectTitle, { selector: 'h2' })
+    expect(screen.queryByRole('tab')).toBeNull()
+  })
+
   it('lists the sources as rows that open one at a time, apart from people and the rest', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)

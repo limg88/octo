@@ -17,7 +17,7 @@ Durata: 5 minuti. Mostra tre cose piccole che servono ogni giorno: le persone e 
 2. **Guarda le ore senza le persone.** Apri «Ore».
    Atteso: Neri Sara è segnalata «Nessuna ora sul tracker».
 
-3. **Scrivi persone e calendario.** Apri «Fonti» e, in alto, la parte «Persone e calendario». Ogni persona è una riga con un campo per valore. Nella prima: nome `Neri Sara`, ruolo `analista`, allocazione `50`, «Al» il 31 gennaio 2026. Premi «Aggiungi una persona»: nome `Carla Bianchi`, ruolo `referente`, parte «cliente», «Come scrivergli» `dare del lei, prima la richiesta e poi il contesto`.
+3. **Scrivi persone e calendario.** Apri «Impostazioni» e, in alto, la parte «Persone e calendario». Ogni persona è una riga con un campo per valore. Nella prima: nome `Neri Sara`, ruolo `analista`, allocazione `50`, «Al» il 31 gennaio 2026. Premi «Aggiungi una persona»: nome `Carla Bianchi`, ruolo `referente`, parte «cliente», «Come scrivergli» `dare del lei, prima la richiesta e poi il contesto`.
    Nel calendario: `Fase 3` dal 1° ottobre al 31 dicembre 2026; con «Aggiungi un periodo», `Sprint 28` dal 26 ottobre al 13 novembre 2026.
    Premi «Salva persone e calendario».
    Atteso: «Salvate 2 persone e 2 periodi.» Nel testo del progetto Neri Sara è «analista, al 50% del suo tempo». Un'allocazione di `150` o scritta a parole non si salva: «Persona 1: l'allocazione è una percentuale, più di 0 e al massimo 100.» Nella cartella del progetto compare `_octo/progetto/persone-e-calendario.md`, con le persone divise fra «Dalla nostra parte» e «Dal cliente» e la tabella del calendario.
@@ -30,7 +30,7 @@ Durata: 5 minuti. Mostra tre cose piccole che servono ogni giorno: le persone e 
    Atteso: la domanda compare nel riquadro, completa, e non parte da sola: la puoi correggere prima di inviarla.
 
 6. **Crea un progetto nuovo.** Nella colonna di sinistra premi il nome del progetto, poi «Aggiungi un progetto…»; sotto «Parto da zero» scrivi `Boreale`, premi «Scegli dove crearla…» e scegli la cartella `Nuovi progetti` stampata nel terminale.
-   Atteso: «Boreale» compare fra i progetti e si apre su «Fonti». Nella cartella scelta c'è `Boreale/` con `LEGGIMI.md` e le cartelle `Contratti`, `Documenti`, `Riunioni`, `Tracker`.
+   Atteso: «Boreale» compare fra i progetti e si apre su «Impostazioni». Nella cartella scelta c'è `Boreale/` con `LEGGIMI.md` e le cartelle `Contratti`, `Documenti`, `Riunioni`, `Tracker`.
 
 7. **Riprova con lo stesso nome.** Di nuovo «Aggiungi un progetto…», `Boreale`, stessa cartella.
    Atteso: «Lì c'è già una cartella con questo nome»: Octo non scrive sopra una cartella che esiste.

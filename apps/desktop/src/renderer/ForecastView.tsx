@@ -9,12 +9,14 @@ import {
 } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
 import { errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import type { Section } from './sections.ts'
 
 type ForecastApi = Pick<
   OctoApi,
@@ -32,6 +34,8 @@ type Props = {
   project: Project
   /** The present moment; a test passes its own. */
   now?: () => Date
+  /** Takes the PM to the section where an error is put right. */
+  onOpenSection?: (section: Section) => void
 }
 
 const text = messages.forecast
@@ -43,7 +47,7 @@ export function previousMonthOf(today: Date): string {
 }
 
 /** The monthly forecast of the administration, filled on its own spreadsheet. */
-export function ForecastView({ api, project, now = () => new Date() }: Props) {
+export function ForecastView({ api, project, now = () => new Date(), onOpenSection }: Props) {
   const [settings, setSettings] = useState<ForecastSettings | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
   const [view, setView] = useState<View | null>(null)
@@ -106,13 +110,17 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
   }
 
   if (settings === null) {
-    return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+    return error ? (
+      <Failure code={error} onOpen={onOpenSection} />
+    ) : (
+      <p className="progress">{text.loading}</p>
+    )
   }
 
   if (settings.modelPath === '') {
     return (
       <div className="dashboard">
-        {error && <Failure code={error} />}
+        {error && <Failure code={error} onOpen={onOpenSection} />}
         <section aria-label={text.setupTitle}>
           <h3>{text.setupTitle}</h3>
           <p className="hint">{text.setupIntro}</p>
@@ -136,7 +144,17 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
 
   return (
     <div className="dashboard">
-      {error && <Failure code={error} />}
+      {error && <Failure code={error} onOpen={onOpenSection} />}
+      <details className="dashboard-settings">
+        <summary>{text.settings}</summary>
+        <SettingsForm
+          settings={settings}
+          candidates={candidates}
+          codes={view?.forecast.rows.map((row) => row.code) ?? []}
+          onSave={save}
+          onChooseModel={chooseModel}
+        />
+      </details>
       <p className="hint">{text.internal}</p>
       <div className="range-fields">
         <MonthField
@@ -194,25 +212,7 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
           ))}
         </>
       )}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        <SettingsForm
-          settings={settings}
-          candidates={candidates}
-          codes={view?.forecast.rows.map((row) => row.code) ?? []}
-          onSave={save}
-          onChooseModel={chooseModel}
-        />
-      </details>
     </div>
-  )
-}
-
-function Failure({ code }: { code: ErrorCode }) {
-  return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
   )
 }
 
