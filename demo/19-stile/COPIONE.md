@@ -20,14 +20,14 @@ Durata: 3 minuti. Mostra l'aspetto nuovo dell'app, asciutto e denso sul modello 
 3. **Apri «Previsionale».**
    Atteso: gli stessi campi di «Fonti». «Salva» è grigio finché non indichi il modello, e si legge. «Ore in una giornata» è un campo corto, non largo quanto la pagina.
 
-4. **Apri «Avanzamento» e compila il minimo.** In «Posizioni dell'ordine» scrivi `00001; 1000`, premi «Aggiungi una richiesta», importo `500`, poi «Salva».
-   Atteso: «Compila il modulo della richiesta 1» è il pulsante blu della pagina. «Ordine e richieste» è un pulsante con la freccia: aprilo, le richieste sono riquadri con il bordo arrotondato e «Togli la richiesta 1» è un pulsante senza cornice.
+4. **Apri «Avanzamento».**
+   Atteso: tre riquadri numerati con il bordo arrotondato; i campi delle celle e delle posizioni sono righe allineate; «Salva» è l'unico pulsante blu della pagina; «Aggiungi una cella» e «Aggiungi una posizione» sono pulsanti normali, la «×» di ogni riga è senza cornice.
 
-5. **Usa solo la tastiera.** Con «Ordine e richieste» aperto premi Tab più volte.
-   Atteso: ogni campo, data e menu prende il bordo blu con un alone; ogni pulsante un contorno blu.
+5. **Usa solo la tastiera.** Premi Tab più volte.
+   Atteso: ogni campo e menu prende il bordo blu con un alone; ogni pulsante un contorno blu.
 
-6. **Passa il mouse su una tabella.** Sulla tabella della richiesta 1.
-   Atteso: la riga sotto il mouse si evidenzia; i numeri sono incolonnati.
+6. **Passa il mouse su una tabella.** Apri «Deliverable», premi «Registro» e passa sulle righe; oppure, con un ordine già scritto, sulla tabella di una richiesta in «Avanzamento».
+   Atteso: i numeri sono incolonnati; nelle tabelle dei dati la riga sotto il mouse si evidenzia.
 
 7. **Stringi la finestra al minimo.**
    Atteso: le schede vanno a capo su due righe; «Fonti» resta raggiungibile.

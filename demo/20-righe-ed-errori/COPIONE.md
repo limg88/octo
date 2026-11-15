@@ -25,18 +25,12 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    Atteso: sotto «Sito», «La tua email su Jira», «Progetti» e «API token» compare «Manca: va compilato per collegare il sistema.»; accanto ai pulsanti «Non ho provato il collegamento: compila i campi segnalati.»
    Dimostra: prima la risposta era «Controlla il giorno di inizio e la cartella», i due soli campi già compilati.
 
-5. **Scrivi un ordine con una riga sbagliata.** Apri «Avanzamento». In «Totale dichiarato dall'ordine» scrivi `mille`; in «Posizioni dell'ordine»:
-   ```
-   00001; 1000
-   pippo
-   00002; mille
-   ```
-   Premi «Salva».
-   Atteso: sotto il totale «Non è un numero che capisco…»; sotto le posizioni «Riga 2, «pippo»: scrivila nella forma «codice; importo».» e «Riga 3, «00002; mille»: c'è un numero che non capisco…». Nulla è salvato.
-   Dimostra: prima le due righe sparivano e le percentuali si calcolavano su una posizione sola.
+5. **Scrivi un ordine con una posizione sbagliata.** Apri «Avanzamento». In «Totale dell'ordine» scrivi `mille`; nelle posizioni `00001` e `1000`, poi con «Aggiungi una posizione» `00002` e `mille`. Premi «Salva».
+   Atteso: sotto il totale «Non è un numero che capisco…»; sotto le posizioni «Posizione 2: servono un codice e un importo scritto in cifre…». Accanto a «Salva»: «Non ho salvato…».
+   Dimostra: prima una posizione scritta male spariva e le percentuali si calcolavano sulle altre.
 
-6. **Correggi e sbaglia l'importo.** Totale `1.000`, posizioni `00001; 1000`; premi «Aggiungi una richiesta», importo `5000`, «Salva».
-   Atteso: «La richiesta 1 porta il totale chiesto 4.000,00 oltre il totale dell'ordine.» e il modulo «Ordine e richieste» resta aperto, con i campi da correggere in vista.
+6. **Correggi e sbaglia l'importo di una richiesta.** Totale `1.000`, togli la posizione 2 con la «×» e salva. Premi «Nuova richiesta» e scrivi l'importo `5000`.
+   Atteso: subito, sotto l'importo: «La richiesta 1 porta il totale chiesto 4.000,00 oltre il totale dell'ordine.» «Salva e compila il modulo» non salva. Con «Tutto ciò che resta: 1.000,00» l'importo torna giusto.
 
 7. **Chiedi una lettura a un sistema non collegato.** Apri «Ore» e premi «Leggi i timesheet da NetSuite».
    Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.» con il pulsante «Apri «Fonti»», che porta alla scheda. Lo stesso in «Cruscotto» con «Leggi da Azure DevOps».
@@ -50,6 +44,6 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
 - Gli errori stanno sotto il campo o accanto al pulsante che li ha provocati, e dicono che cosa manca e dove andare.
 
 ## Limiti
-- I campi restano righe con i separatori: diventano tabelle nell'incremento 6.
+- Fuori da «Avanzamento» i campi restano righe con i separatori: diventano tabelle nell'incremento 6.
 - Un «Salva» riuscito non dà ancora una conferma uguale in tutte le schede.
 - Gli errori che arrivano dai sistemi (credenziale rifiutata, sistema che non risponde) sono quelli di prima.

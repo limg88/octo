@@ -391,43 +391,52 @@ try {
   const formFile = `${work}/Aurora/Moduli/Richiesta stato avanzamento.xlsx`
   const formBefore = readFileSync(formFile)
   await page.getByRole('tab', { name: 'Avanzamento' }).click()
-  const order10 = page.getByRole('region', { name: 'Ordine e richieste' })
-  await order10.waitFor({ timeout: TIMEOUT_MS })
-  await order10.getByLabel(/^Ordine, come/).fill('ORD-2026-077')
-  await order10.getByLabel(/^Totale dichiarato/).fill('340.000')
-  await order10
-    .getByLabel(/^Posizioni dell’ordine/)
-    .fill('00001; 100.000\n00002; 60.000\n00003; 142.000\n00004; 38.000')
-  const addRequest = async (n, from, to, amount, note) => {
-    await page.getByRole('button', { name: 'Aggiungi una richiesta' }).click()
-    const group = page.getByRole('group', { name: `Richiesta ${n}` })
-    if (from) await group.getByLabel('Dal', { exact: true }).fill(from)
-    await group.getByLabel('Al', { exact: true }).fill(to)
-    await group.getByLabel('Importo della richiesta').fill(amount)
-    await group.getByLabel('Annotazione').fill(note)
+  // The form of the client and the map of its cells were set once: only the order is to type.
+  const setup10 = page.getByRole('form', { name: 'Impostazioni dell’ordine e del modulo' })
+  await setup10.waitFor({ timeout: TIMEOUT_MS })
+  await setup10.getByLabel(/^Numero dell’ordine/).fill('ORD-2026-077')
+  await setup10.getByLabel(/^Totale dell’ordine/).fill('340.000')
+  const positions10 = [
+    ['00001', '100.000'],
+    ['00002', '60.000'],
+    ['00003', '142.000'],
+    ['00004', '38.000'],
+  ]
+  for (const [index, [code, amount]] of positions10.entries()) {
+    if (index > 0) await setup10.getByRole('button', { name: 'Aggiungi una posizione' }).click()
+    await setup10.getByLabel(`Codice della posizione ${index + 1}`).fill(code)
+    await setup10.getByLabel(`Importo della posizione ${index + 1}`).fill(amount)
   }
-  await addRequest(1, '2026-03-01', '2026-03-31', '289.540', 'Fattura n. 101 del 31/03/2026')
-  await page.locator('.settings-form').getByRole('button', { name: 'Salva' }).click()
+  await setup10.getByText('Le posizioni sommano 340.000,00.').waitFor()
+  await setup10.getByRole('button', { name: 'Salva', exact: true }).click()
+  const newRequest10 = async (n) => {
+    await page.getByRole('button', { name: 'Nuova richiesta' }).click()
+    return page.getByRole('form', { name: `Nuova richiesta (la numero ${n})` })
+  }
   const request10 = (n) => page.getByRole('region', { name: `Richiesta ${n}`, exact: true })
-  await request10(1).getByText('91,23%').first().waitFor({ timeout: TIMEOUT_MS })
-  await page.getByText('Ordine e richieste').click()
-  await addRequest(2, '', '2026-04-30', '50.460', 'Fattura da emettere il 30/04/2026')
-  assert.equal(
-    await page
-      .getByRole('group', { name: 'Richiesta 2' })
-      .getByLabel('Dal', { exact: true })
-      .inputValue(),
-    '2026-03-31',
-  )
-  await page.locator('.settings-form').getByRole('button', { name: 'Salva' }).click()
+  const first10 = await newRequest10(1)
+  await first10.getByLabel('Dal', { exact: true }).fill('2026-03-01')
+  await first10.getByLabel('Al', { exact: true }).fill('2026-03-31')
+  await first10.getByLabel('Importo della richiesta').fill('289.540')
+  await first10.getByLabel('Fattura di riferimento').fill('Fattura n. 101 del 31/03/2026')
+  // The shares are shown while the request is typed, before anything is saved.
+  await first10.getByText('91,23%').first().waitFor({ timeout: TIMEOUT_MS })
+  await page.screenshot({ path: `${work}/avanzamento-richiesta.png` })
+  await first10.getByRole('button', { name: 'Salva e compila il modulo' }).click()
+  await page
+    .getByText(/^Modulo compilato in _octo\/avanzamento\/Richiesta stato avanzamento - 1\.xlsx/)
+    .waitFor({ timeout: TIMEOUT_MS })
+  const second10 = await newRequest10(2)
+  assert.equal(await second10.getByLabel('Dal', { exact: true }).inputValue(), '2026-03-31')
+  await second10.getByLabel('Al', { exact: true }).fill('2026-04-30')
+  await second10.getByRole('button', { name: 'Tutto ciò che resta: 50.460,00' }).click()
+  await second10.getByLabel('Fattura di riferimento').fill('Fattura da emettere il 30/04/2026')
+  await second10.getByText(/^Raggiunge il totale dell’ordine/).waitFor()
+  await second10.getByRole('button', { name: 'Salva senza compilare' }).click()
   await request10(2)
     .getByText(/^Raggiunge il totale dell’ordine/)
     .waitFor({ timeout: TIMEOUT_MS })
   await request10(2).getByText('8,77%').waitFor()
-  await page.getByRole('button', { name: 'Compila il modulo della richiesta 1' }).click()
-  await page
-    .getByText(/^Modulo compilato in _octo\/avanzamento\/Richiesta stato avanzamento - 1\.xlsx/)
-    .waitFor({ timeout: TIMEOUT_MS })
   const filledForm = readFileSync(
     `${work}/Aurora/_octo/avanzamento/Richiesta stato avanzamento - 1.xlsx`,
   )
@@ -744,14 +753,17 @@ try {
   await page.screenshot({ path: `${work}/righe.png` })
 
   await page.getByRole('tab', { name: 'Avanzamento' }).click()
-  await page.locator('.dashboard-settings summary').click()
-  await page.getByLabel(/^Posizioni dell’ordine/).fill('00001; 100000\npippo\n00002; mille')
-  await page.getByRole('button', { name: 'Salva', exact: true }).click()
-  await page.getByText('Riga 2, «pippo»: scrivila nella forma «codice; importo».').waitFor()
-  await page.getByText(/Riga 3, «00002; mille»: c’è un numero che non capisco/).waitFor()
+  await page.getByRole('button', { name: 'Impostazioni', exact: true }).click()
+  const setup20 = page.getByRole('form', { name: 'Impostazioni dell’ordine e del modulo' })
+  await setup20.getByLabel('Importo della posizione 2').fill('mille')
+  await setup20.getByLabel('Cella della riga 1').fill('Numero')
+  await setup20.getByRole('button', { name: 'Salva', exact: true }).click()
+  await setup20.getByText(/^Posizione 2: servono un codice e un importo/).waitFor()
+  await setup20.getByText(/^Riga 1: una cella si scrive con lettere e numero/).waitFor()
+  await page.screenshot({ path: `${work}/righe-avanzamento.png` })
+  await setup20.getByRole('button', { name: 'Chiudi' }).click()
   // The shares shown are still those of the order as it was saved.
   await page.getByRole('region', { name: 'Richiesta 2' }).getByText('00004').waitFor()
-  await page.screenshot({ path: `${work}/righe-avanzamento.png` })
 
   // A reading asked from a system that is not linked names it and leads to the sources.
   await page.getByRole('tab', { name: 'Ore' }).click()

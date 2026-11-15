@@ -1364,3 +1364,98 @@ fieldset > button {
   font-size: 13px;
   font-weight: 500;
 }
+
+/* Rows typed one field per value: a small table that can grow. */
+.rows {
+  display: grid;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.rows-cells {
+  grid-template-columns: 90px 1fr 30px;
+}
+
+.rows-positions {
+  grid-template-columns: 1fr 180px 30px;
+}
+
+.rows-row {
+  display: contents;
+}
+
+.rows-head {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rows button {
+  padding: 0;
+}
+
+input.amount {
+  width: 180px;
+  max-width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input.short {
+  width: 110px;
+}
+
+.progress-setup fieldset .status {
+  margin-left: 6px;
+}
+
+.progress-overview header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-overview progress {
+  width: 100%;
+  height: 6px;
+  appearance: none;
+  border: none;
+  border-radius: 3px;
+  background: var(--hover);
+  overflow: hidden;
+}
+
+.progress-overview progress::-webkit-progress-bar {
+  background: var(--hover);
+}
+
+.progress-overview progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.request-form {
+  max-width: none;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-control);
+}
+
+.request-form > label {
+  max-width: 720px;
+}
+
+.request {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+}
+
+.request > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+.request > section {
+  padding: 4px 14px 14px;
+}

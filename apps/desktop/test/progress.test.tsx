@@ -5,15 +5,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { messages } from '../src/renderer/messages.ts'
 import { ProgressView } from '../src/renderer/ProgressView.tsx'
-import {
-  fieldLines,
-  fieldsOf,
-  listOf,
-  positionLines,
-  positionsOf,
-  tableLine,
-  tableOf,
-} from '../src/renderer/progress-text.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -103,72 +94,35 @@ function fakeApi(overrides: Partial<Api> = {}) {
 
 afterEach(cleanup)
 
-describe('what the PM types for a progress request', () => {
-  it('reads positions, the map of the form and its table, and writes them back', () => {
-    const positions = positionsOf(
-      '00001; 100.000,50\n\nsenza importo\n; 5\n00002; 60000\n00003; mille\n00004; 1; 2',
-    )
-    expect(positions.values).toEqual([
-      { code: '00001', amount: 100000.5 },
-      { code: '00002', amount: 60000 },
-    ])
-    // A line that is not a position is never dropped in silence: it is told, with its place.
-    expect(positions.problems).toEqual([
-      { line: 3, text: 'senza importo', reason: 'shape' },
-      { line: 4, text: '; 5', reason: 'shape' },
-      { line: 6, text: '00003; mille', reason: 'amount' },
-      { line: 7, text: '00004; 1; 2', reason: 'shape' },
-    ])
-    expect(positionLines(positions.values)).toBe('00001; 100000,5\n00002; 60000')
-    const fields = fieldsOf('d2 = {n}\nA10 = Oggetto = DEEM\nsenza uguale\nNumero = 5')
-    expect(fields.values).toEqual([
-      { ref: 'D2', text: '{n}' },
-      { ref: 'A10', text: 'Oggetto = DEEM' },
-    ])
-    expect(fields.problems).toEqual([
-      { line: 3, text: 'senza uguale', reason: 'shape' },
-      { line: 4, text: 'Numero = 5', reason: 'cell' },
-    ])
-    expect(fieldLines(fields.values)).toBe('D2 = {n}\nA10 = Oggetto = DEEM')
-    const table = tableOf('14; 6; a; B; C; D').values[0] ?? null
-    expect(table).toEqual({
-      firstRow: 14,
-      rows: 6,
-      position: 'A',
-      previous: 'B',
-      current: 'C',
-      period: 'D',
-    })
-    expect(tableLine(table)).toBe('14; 6; A; B; C; D')
-    expect(tableOf('').values).toEqual([])
-    expect(tableOf('').problems).toEqual([])
-    for (const wrong of ['14; 6; A', 'x; 6; A; B; C; D', '14; 6; A; B; C; 4', '0; 6; A; B; C; D']) {
-      expect(tableOf(wrong)).toEqual({
-        values: [],
-        problems: [{ line: 1, text: wrong, reason: 'shape' }],
-      })
-    }
-    expect(tableLine(null)).toBe('')
-    expect(listOf(' 1, ,2 ')).toEqual(['1', '2'])
-  })
-})
+const onlyFirst: ProgressSettings = { ...configured, requests: [first] }
+const type = (label: string, value: string) =>
+  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+const press = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 
-describe('progress requests', () => {
-  it('shows the shares of each request with what to look at', async () => {
+describe('the requests of an order', () => {
+  it('shows the order at a glance and the shares of each request with what to look at', async () => {
     render(<ProgressView api={fakeApi()} project={project} />)
-    const one = await screen.findByRole('region', { name: text.requestN(1) })
+    const order = await screen.findByRole('region', { name: text.orderName('ORD-77') })
+    expect(within(order).getAllByText('1.000,00')).toHaveLength(2)
+    expect(within(order).getByText('0,00')).toBeTruthy()
+    const one = screen.getByRole('region', { name: text.requestN(1) })
     expect(within(one).getByText('25,12%', { selector: 'td:nth-child(4)' })).toBeTruthy()
-    expect(within(one).getByText(/700,00, in tutto 700,00 su 1\.000,00/)).toBeTruthy()
     expect(within(one).getByText(text.drift('0,48'))).toBeTruthy()
+    expect(screen.getByText(/700,00, in tutto 700,00 su 1\.000,00/)).toBeTruthy()
     const two = screen.getByRole('region', { name: text.requestN(2) })
     expect(within(two).getByText(text.closing)).toBeTruthy()
     expect(within(two).getByText('74,88%')).toBeTruthy()
     expect(within(two).queryByText(/ricostruiscono/)).toBeNull()
-    expect(within(two).getByText(/al …/)).toBeTruthy()
+    expect(screen.getByText(/al …/)).toBeTruthy()
+    // What is about the whole order is said once; what is about a request, inside it.
     expect(screen.getByText(text.warning.total_differs('900,00', '1.000,00'))).toBeTruthy()
-    expect(screen.getByText(text.warning.dates_missing(2))).toBeTruthy()
-    expect(screen.getByText(text.warning.dates_not_chained(2))).toBeTruthy()
-    expect(screen.getByText(text.warning.note_missing(2))).toBeTruthy()
+    expect(within(two).getByText(text.warning.dates_missing(2))).toBeTruthy()
+    expect(within(two).getByText(text.warning.dates_not_chained(2))).toBeTruthy()
+    expect(within(two).getByText(text.warning.note_missing(2))).toBeTruthy()
+    // Only the latest request is the main action, and only it can be taken off.
+    expect(screen.getByRole('button', { name: text.compile(2) }).className).toBe('primary')
+    expect(screen.getByRole('button', { name: text.compile(1) }).className).toBe('')
+    expect(screen.queryByRole('button', { name: text.removeN(1) })).toBeNull()
   })
 
   it.each([
@@ -191,17 +145,20 @@ describe('progress requests', () => {
       />,
     )
     expect((await screen.findByRole('alert')).textContent).toBe(message)
+    // The requests are still there to be corrected, without shares to show or a form to fill.
+    expect(screen.getByRole('button', { name: text.correctN(1) })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: text.compile(1) })).toBeNull()
   })
 
   it('says when there is no request yet', async () => {
     const empty: View = { computation: { ok: true, total: 1000, steps: [] }, warnings: [] }
-    render(
-      <ProgressView
-        api={fakeApi({ progressView: vi.fn(async () => ok(empty)) })}
-        project={project}
-      />,
-    )
+    const api = fakeApi({
+      progressSettings: vi.fn(async () => ok({ ...configured, order: '', requests: [] })),
+      progressView: vi.fn(async () => ok(empty)),
+    })
+    render(<ProgressView api={api} project={project} />)
     expect(await screen.findByText(text.noRequests)).toBeTruthy()
+    expect(screen.getByRole('region', { name: text.orderName('') })).toBeTruthy()
   })
 
   it('writes the form of a request and opens it', async () => {
@@ -212,7 +169,7 @@ describe('progress requests', () => {
     const two = screen.getByRole('region', { name: text.requestN(2) })
     expect(await within(two).findByText(new RegExp(path))).toBeTruthy()
     expect(api.compileProgress).toHaveBeenCalledWith('p-1', 2)
-    fireEvent.click(screen.getByRole('button', { name: text.open }))
+    press(text.open)
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', path)
   })
 
@@ -230,80 +187,225 @@ describe('progress requests', () => {
     )
   })
 
-  it('starts from the order, proposing the only form found, and saves what is typed', async () => {
-    const api = fakeApi({ progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)) })
+  it('adds a request with its shares shown while typing, saves it and fills its form', async () => {
+    const api = fakeApi({ progressSettings: vi.fn(async () => ok(onlyFirst)) })
     render(<ProgressView api={api} project={project} />)
-    const model = (await screen.findByLabelText(text.modelPath)) as HTMLInputElement
-    await waitFor(() => expect(model.value).toBe('Moduli/Richiesta SAL.xlsx'))
-    const type = (label: string, value: string) =>
-      fireEvent.change(screen.getByLabelText(label), { target: { value } })
-    type(text.order, 'ORD-77')
-    type(text.total, '1.000')
-    type(text.positions, '1; 600\n2; 400')
-    fireEvent.click(screen.getByRole('button', { name: text.addRequest }))
-    fireEvent.click(screen.getByRole('button', { name: text.addRequest }))
-    fireEvent.click(screen.getByRole('button', { name: text.addRequest }))
-    const group = (n: number) => within(screen.getByRole('group', { name: text.requestN(n) }))
-    const fill = (n: number, label: string, value: string) =>
-      fireEvent.change(group(n).getByLabelText(label), { target: { value } })
-    fill(1, text.from, '2026-03-01')
-    fill(1, text.to, '2026-03-31')
-    fill(1, text.amount, '700')
-    fill(1, text.note, 'Fattura 1')
-    fill(2, text.amount, 'abc')
-    fill(3, text.amount, '300')
-    // Nothing is saved while something typed is not understood: each problem is under its field.
-    type(text.total, 'mille')
-    type(text.positions, '1; 600\n2; 400\npippo')
-    type(text.fields, 'senza uguale')
-    type(text.table, '14; 6')
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    fireEvent.click(await screen.findByRole('button', { name: text.newRequest }))
+    const form = screen.getByRole('form', { name: text.request.titleNew(2) })
+    // It starts where the request before ends, and shows nothing until there is an amount.
+    expect((within(form).getByLabelText(text.from) as HTMLInputElement).value).toBe('2026-03-31')
+    expect(within(form).getByText(text.request.previewNone)).toBeTruthy()
+    expect(within(form).queryByText(text.request.laterRecomputed)).toBeNull()
+
+    // Nothing typed, or something that is not an amount, is refused under the field.
+    press(text.request.saveOnly)
+    expect(within(form).getByRole('alert').textContent).toBe(messages.lines.single.amount())
+    type(text.request.amount, 'tanto')
+    expect(within(form).getByRole('alert').textContent).toBe(messages.lines.single.amount())
+    // More than what is left is said while typing, and not saved.
+    type(text.request.amount, '5.000')
+    expect(within(form).getByRole('alert').textContent).toBe(text.problem.over_total(2, '4.700,00'))
+    press(text.request.saveAndCompile)
     expect(api.saveProgressSettings).not.toHaveBeenCalled()
-    expect(screen.getAllByRole('alert')).toHaveLength(5)
-    expect(
-      screen.getByText(messages.lines.line(3, 'pippo', 'shape', text.shapes.positions)),
-    ).toBeTruthy()
-    expect(screen.getByText(messages.lines.single.shape(text.shapes.table))).toBeTruthy()
-    expect(screen.getAllByText(messages.lines.single.amount())).toHaveLength(2)
-    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
-    type(text.total, '1.000')
-    type(text.positions, '1; 600\n2; 400')
-    fill(3, text.requestPositions, '2, 1')
-    fireEvent.click(screen.getByRole('button', { name: text.removeRequest(2) }))
-    // The request added after the first one starts where that one ends.
-    fireEvent.click(screen.getByRole('button', { name: text.addRequest }))
-    expect((group(3).getByLabelText(text.from) as HTMLInputElement).value).toBe('')
-    fireEvent.click(screen.getByRole('button', { name: text.removeRequest(3) }))
-    type(text.fields, 'D2 = {n}')
-    type(text.table, '14; 6; A; B; C; D')
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
-    await waitFor(() => expect(api.saveProgressSettings).toHaveBeenCalled())
-    expect(screen.queryByRole('status')).toBeNull()
+
+    press(text.request.allLeft('300,00'))
+    expect((within(form).getByLabelText(text.request.amount) as HTMLInputElement).value).toBe('300')
+    expect(within(form).getByText(text.closing)).toBeTruthy()
+    expect(within(form).getByText(text.warning.dates_missing(2))).toBeTruthy()
+    type(text.to, '2026-04-30')
+    type(text.request.note, 'Fattura 2')
+    // Only on the positions ticked, kept in the order of the order.
+    fireEvent.click(within(form).getByLabelText(text.request.chosen))
+    fireEvent.click(within(form).getByLabelText(text.request.positionLeft('2', '300,00')))
+    fireEvent.click(within(form).getByLabelText(text.request.positionLeft('1', '0,00')))
+    fireEvent.click(within(form).getByLabelText(text.request.positionLeft('1', '0,00')))
+    press(text.request.saveAndCompile)
+    await waitFor(() => expect(api.compileProgress).toHaveBeenCalledWith('p-1', 2))
     expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', {
-      modelPath: 'Moduli/Richiesta SAL.xlsx',
-      order: 'ORD-77',
-      total: 1000,
-      positions: configured.positions,
-      requests: [first, { n: 2, from: '', to: '', amount: 300, note: '', positions: ['2', '1'] }],
-      form: configured.form,
+      ...onlyFirst,
+      requests: [
+        first,
+        {
+          n: 2,
+          from: '2026-03-31',
+          to: '2026-04-30',
+          amount: 300,
+          note: 'Fattura 2',
+          positions: ['2'],
+        },
+      ],
     })
+    expect(screen.queryByRole('form')).toBeNull()
   })
 
-  it('keeps the form empty when more than one could be it, and shows a failed save', async () => {
+  it('corrects a request, saying that the later ones change, and can be left', async () => {
+    const api = fakeApi()
+    render(<ProgressView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.correctN(2) }))
+    let form = screen.getByRole('form', { name: text.request.titleEdit(2) })
+    // The positions the request names are ticked, and can be given up for the usual order.
+    expect(
+      (within(form).getByLabelText(text.request.positionLeft('2', '300,00')) as HTMLInputElement)
+        .checked,
+    ).toBe(true)
+    fireEvent.click(within(form).getByLabelText(text.request.inOrder))
+    press(text.request.saveOnly)
+    await waitFor(() =>
+      expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', {
+        ...configured,
+        requests: [first, { ...second, positions: [] }],
+      }),
+    )
+    expect(api.compileProgress).not.toHaveBeenCalled()
+
+    fireEvent.click(await screen.findByRole('button', { name: text.correctN(1) }))
+    form = screen.getByRole('form', { name: text.request.titleEdit(1) })
+    expect(within(form).getByText(text.request.laterRecomputed)).toBeTruthy()
+    expect((within(form).getByLabelText(text.request.amount) as HTMLInputElement).value).toBe('700')
+    press(messages.cancel)
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(api.saveProgressSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the request open when the save fails', async () => {
     const api = fakeApi({
-      progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
-      progressCandidates: vi.fn(async () => ok(['a.xlsx', 'b.xlsx'])),
+      progressSettings: vi.fn(async () => ok(onlyFirst)),
       saveProgressSettings: vi.fn(async () => ({
         ok: false as const,
         code: 'progress_settings_invalid' as const,
       })),
     })
     render(<ProgressView api={api} project={project} />)
-    const model = (await screen.findByLabelText(text.modelPath)) as HTMLInputElement
+    fireEvent.click(await screen.findByRole('button', { name: text.newRequest }))
+    type(text.request.amount, '100')
+    press(text.request.saveAndCompile)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/non sono valide/)
+    expect(screen.getByRole('form', { name: text.request.titleNew(2) })).toBeTruthy()
+    expect(api.compileProgress).not.toHaveBeenCalled()
+  })
+
+  it('takes off the latest request only after a confirmation', async () => {
+    const api = fakeApi()
+    render(<ProgressView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.removeN(2) }))
+    expect(screen.getByText(text.removeConfirm(2))).toBeTruthy()
+    press(messages.cancel)
+    expect(screen.queryByText(text.removeConfirm(2))).toBeNull()
+    press(text.removeN(2))
+    press(text.remove)
+    await waitFor(() => expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', onlyFirst))
+  })
+})
+
+describe('the settings of the order and of the form', () => {
+  it('asks for them the first time, proposing the only form found, and saves what is typed', async () => {
+    const api = fakeApi({ progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)) })
+    render(<ProgressView api={api} project={project} />)
+    expect(await screen.findByText(text.setup.firstTime)).toBeTruthy()
+    const model = screen.getByLabelText(text.setup.modelPath) as HTMLSelectElement
+    await waitFor(() => expect(model.value).toBe('Moduli/Richiesta SAL.xlsx'))
+    expect(screen.getAllByText(text.setup.todo)).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: text.setup.close })).toBeNull()
+    const setup = text.setup
+
+    // What is not understood is told under its part, and nothing is saved.
+    type(setup.cellN(1), 'Numero')
+    type(setup.cellTextN(1), 'x')
+    type(setup.firstRow, '14')
+    type(setup.total, 'mille')
+    type(setup.codeN(1), '1')
+    press(setup.save)
+    expect(screen.getByText(setup.cellWrong(1))).toBeTruthy()
+    expect(screen.getByText(setup.tableWrong)).toBeTruthy()
+    expect(screen.getByText(setup.positionWrong(1))).toBeTruthy()
+    expect(screen.getByText(messages.lines.single.amount())).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
+    expect(api.saveProgressSettings).not.toHaveBeenCalled()
+
+    // A datum of the request is inserted with a button into the row last typed in.
+    type(setup.cellN(1), 'd2')
+    type(setup.cellTextN(1), '')
+    press(setup.addCell)
+    press(setup.addCell)
+    type(setup.cellN(2), 'A4')
+    type(setup.cellTextN(2), 'Fornitore')
+    fireEvent.focus(screen.getByLabelText(setup.cellTextN(1)))
+    press('Numero della richiesta')
+    press(setup.removeCell(2))
+    expect(screen.queryByLabelText(setup.cellN(3))).toBeNull()
+    for (const [label, value] of [
+      [setup.rows, '6'],
+      [setup.position, 'a'],
+      [setup.previous, 'B'],
+      [setup.current, 'C'],
+      [setup.period, 'D'],
+      [setup.order, 'ORD-77'],
+      [setup.total, '900'],
+      [setup.amountN(1), '600'],
+    ] as const) {
+      type(label, value)
+    }
+    press(setup.addPosition)
+    press(setup.addPosition)
+    type(setup.codeN(2), '2')
+    type(setup.amountN(2), '400')
+    press(setup.removePosition(3))
+    // The sum is shown while typing, and compared with the total written.
+    expect(screen.getByText(setup.sumDiffers('1.000,00', '900,00'))).toBeTruthy()
+    type(setup.total, '1.000')
+    expect(screen.getByText(setup.sum('1.000,00'))).toBeTruthy()
+    press(setup.save)
+    await waitFor(() =>
+      expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', {
+        ...configured,
+        requests: [],
+      }),
+    )
+    // With the three things in place the page of the requests takes over.
+    expect(await screen.findByRole('button', { name: text.newRequest })).toBeTruthy()
+  })
+
+  it('lets the path be typed when no form is found, and shows a failed save', async () => {
+    const api = fakeApi({
+      progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
+      progressCandidates: vi.fn(async () => ok([])),
+      saveProgressSettings: vi.fn(async () => ({
+        ok: false as const,
+        code: 'progress_settings_invalid' as const,
+      })),
+    })
+    render(<ProgressView api={api} project={project} />)
+    const model = (await screen.findByLabelText(text.setup.modelPath)) as HTMLInputElement
     await waitFor(() => expect(api.progressCandidates).toHaveBeenCalled())
     expect(model.value).toBe('')
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(screen.getByText(text.setup.modelNone)).toBeTruthy()
+    type(text.setup.modelPath, '../fuori.xlsx')
+    press(text.setup.save)
     expect((await screen.findByRole('alert')).textContent).toMatch(/cartella del progetto/)
+  })
+
+  it('opens from the page, shows what is saved and closes without saving', async () => {
+    const api = fakeApi({
+      progressSettings: vi.fn(async () => ok({ ...configured, modelPath: 'Altro/Modulo.xlsx' })),
+      progressCandidates: vi.fn(async () => ok(['Moduli/Richiesta SAL.xlsx', 'Moduli/B.xlsx'])),
+    })
+    render(<ProgressView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.setup.open }))
+    const form = screen.getByRole('form', { name: text.setup.title })
+    expect(within(form).getAllByText(text.setup.done)).toHaveLength(3)
+    // The form in use stays among the choices even when it is not one of those found.
+    const model = within(form).getByLabelText(text.setup.modelPath) as HTMLSelectElement
+    await waitFor(() => expect(model.value).toBe('Altro/Modulo.xlsx'))
+    expect(within(model).getAllByRole('option')).toHaveLength(4)
+    expect((screen.getByLabelText(text.setup.cellN(1)) as HTMLInputElement).value).toBe('D2')
+    expect((screen.getByLabelText(text.setup.firstRow) as HTMLInputElement).value).toBe('14')
+    expect((screen.getByLabelText(text.setup.amountN(2)) as HTMLInputElement).value).toBe('400')
+    // A table left wholly empty is no table, and a list emptied keeps one row to type in.
+    press(text.setup.removeCell(1))
+    expect((screen.getByLabelText(text.setup.cellN(1)) as HTMLInputElement).value).toBe('')
+    press(text.setup.close)
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(api.saveProgressSettings).not.toHaveBeenCalled()
   })
 
   it('shows why the settings or the shares cannot be read', async () => {
