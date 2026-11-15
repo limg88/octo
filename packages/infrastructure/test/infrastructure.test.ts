@@ -12,6 +12,7 @@ import {
   createFsFolderProbe,
   createFsQuestionLog,
   createJsonBackupFiles,
+  createJsonPreferences,
   createJsonProjectRegistry,
   createJsonSetAsideProjects,
   locateClaude,
@@ -200,6 +201,14 @@ describe('json stores', () => {
 
     await createJsonProjectRegistry(data).save([sample])
     expect(await createJsonProjectRegistry(data).list()).toEqual([sample])
+  })
+
+  it('keeps what the person set for the app, and knows nothing before it is set', async () => {
+    const data = join(root, 'dati-preferenze')
+    expect(await createJsonPreferences(data).load()).toBeNull()
+
+    await createJsonPreferences(data).save({ theme: 'dark' })
+    expect(await createJsonPreferences(data).load()).toEqual({ theme: 'dark' })
   })
 
   it('keeps the projects taken off the list apart from the list', async () => {

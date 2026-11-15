@@ -26,6 +26,7 @@ import type {
   MailJudgement,
   MailMessage,
   ModelSettings,
+  Preferences,
   ProgressSettings,
   Project,
   ProjectTeam,
@@ -339,6 +340,12 @@ export interface TimesheetReader {
 export interface ModelSettingsStore {
   load(projectFolder: string): Promise<ModelSettings>
   save(projectFolder: string, settings: ModelSettings): Promise<void>
+}
+
+/** What a person set for the app itself, kept in the app's data folder; unknown when never set. */
+export interface PreferencesStore {
+  load(): Promise<unknown>
+  save(preferences: Preferences): Promise<void>
 }
 
 /** The tracker as it is now, in the shape of the export the dashboard reads. */

@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import type {
   BackupFiles,
   FolderProbe,
+  PreferencesStore,
   ProjectRegistry,
   ProjectScaffold,
   QuestionLog,
@@ -59,6 +60,7 @@ const questionSchema = z.object({
 const PROJECTS_FILE = 'projects.json'
 const SET_ASIDE_FILE = 'projects-set-aside.json'
 const QUESTIONS_FILE = 'domande.json'
+const PREFERENCES_FILE = 'preferences.json'
 const PRIVATE_FILE_MODE = 0o600
 
 /** The app's own state lives in its data folder, never in the project folder. */
@@ -69,6 +71,15 @@ export function createJsonProjectRegistry(dataFolder: string): ProjectRegistry {
 /** The projects taken off the list, beside the list itself. */
 export function createJsonSetAsideProjects(dataFolder: string): ProjectRegistry {
   return projectListIn(join(dataFolder, SET_ASIDE_FILE))
+}
+
+/** What the person set for the app on this computer, beside the list of the projects. */
+export function createJsonPreferences(dataFolder: string): PreferencesStore {
+  const file = join(dataFolder, PREFERENCES_FILE)
+  return {
+    load: () => readJsonOr(file, null),
+    save: (preferences) => writeJson(file, preferences, PRIVATE_FILE_MODE),
+  }
 }
 
 function projectListIn(file: string): ProjectRegistry {
