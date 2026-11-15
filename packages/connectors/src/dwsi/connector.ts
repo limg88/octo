@@ -17,6 +17,13 @@ import { isRecord, uniquePeople } from '../shared/values.ts'
 import { codeOfOption, type DwsiConfig, parseDwsiConfig, prjOption } from './config.ts'
 import { extractionDocument, extractionTitle, type ViewRows } from './evidence.ts'
 import { type DwsiSession, openDwsiSession, pgFailure, type SessionTarget } from './session.ts'
+import {
+  checkedTimesheetPeriod,
+  type DwsiTimesheetRow,
+  TIMESHEET_HOURS_VIEW,
+  type TimesheetPeriod,
+  timesheetHoursQuery,
+} from './timesheets.ts'
 import { columnValue } from './values.ts'
 import {
   BOUND_CODES_QUERY,
@@ -298,9 +305,18 @@ const older = (a: Date, b: Date | null) => (b !== null && b.getTime() < a.getTim
  * default, in a `READ ONLY` transaction rolled back at the end; an account that can write, a
  * changed definition or more rows than a query reads refuse the extraction.
  */
-export function createDwsiConnector(
-  options: DwsiConnectorOptions = {},
-): Connector<DwsiConfig, DwsiCursor> {
+export type DwsiConnector = Connector<DwsiConfig, DwsiCursor> & {
+  /**
+   * The hours of the chosen projects over a period, for the codes bound to the PM who owns the
+   * source. Read only when the PM asks for them.
+   */
+  timesheets(
+    ctx: ConnectorContext<DwsiConfig>,
+    period: TimesheetPeriod,
+  ): Promise<DwsiTimesheetRow[]>
+}
+
+export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiConnector {
   const open = options.open ?? openDwsiSession
   const maxRows = options.maxRowsPerQuery ?? MAX_ROWS_PER_QUERY
 
@@ -354,6 +370,33 @@ export function createDwsiConnector(
   return {
     kind: 'netsuite_dwsi',
     parseConfig: parseDwsiConfig,
+
+    async timesheets(ctx, period) {
+      const { from, to } = checkedTimesheetPeriod(period)
+      const chosen = codesOf(ctx)
+      return withSession(ctx, async (session) => {
+        const bound = await boundCodes(session, ctx, chosen)
+        if (bound.size === 0) throw new ConnectorError('source_not_authorized')
+        const all: DwsiTimesheetRow[] = []
+        for (const code of chosen.filter((candidate) => bound.has(candidate))) {
+          ctx.signal.throwIfAborted()
+          let rows: Record<string, unknown>[]
+          try {
+            rows = await session.query(timesheetHoursQuery(maxRows), [code, from, to], { maxRows })
+          } catch (error) {
+            throw pgFailure(error)
+          }
+          if (rows.length > maxRows) throw new ConnectorError('response_too_large')
+          // The query filters by project; a row of another project is dropped, never kept.
+          for (const row of rows) {
+            if (row.projectid !== code) continue
+            all.push(valuesOf(TIMESHEET_HOURS_VIEW, row) as unknown as DwsiTimesheetRow)
+          }
+        }
+        return all
+      })
+    },
+
     parseCursor,
     // The warehouse is not reached over HTTP: no call is allowed.
     rules: () => [],

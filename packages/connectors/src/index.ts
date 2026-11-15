@@ -19,11 +19,13 @@ export { type ConnectorDelivery, toDelivery } from './delivery.ts'
 export { type DwsiConfig, parseDwsiConfig, prjOption } from './dwsi/config.ts'
 export {
   createDwsiConnector,
+  type DwsiConnector,
   type DwsiConnectorOptions,
   type DwsiCursor,
   dwsiConnector,
   MAX_ROWS_PER_QUERY,
 } from './dwsi/connector.ts'
+export type { DwsiTimesheetRow, TimesheetPeriod } from './dwsi/timesheets.ts'
 export { DWSI_VIEWS } from './dwsi/views.ts'
 export {
   ConnectorError,

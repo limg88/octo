@@ -31,6 +31,7 @@ import type {
   SourcesConfig,
   StarterFile,
   TrackerHours,
+  WarehouseFeedConfig,
 } from '@octo/domain'
 
 /** What the agent is doing right now, in terms a PM can read. */
@@ -287,6 +288,21 @@ export interface TrackerHoursReader {
     period: HoursPeriod,
     signal: AbortSignal,
   ): Promise<TrackerHours[]>
+}
+
+/**
+ * Reads the hours of the timesheets from the company's system with the PM's own read-only
+ * credential, only when the PM asks. Each row has the names of a timesheet export (`employee`,
+ * `timesheetdate`, `projectid`, `duration`, `approvalstatus`, `internalid`) and nothing else.
+ * Failures are DomainErrors with a `feed_*` code.
+ */
+export interface TimesheetReader {
+  read(
+    config: WarehouseFeedConfig,
+    secret: string,
+    period: HoursPeriod,
+    signal: AbortSignal,
+  ): Promise<Array<Record<string, unknown>>>
 }
 
 /** The tracker as it is now, in the shape of the export the dashboard reads. */

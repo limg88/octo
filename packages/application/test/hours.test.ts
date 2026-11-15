@@ -7,12 +7,15 @@ import {
   NO_SOURCES,
   type Project,
   type ProjectTeam,
+  parseTimesheetExport,
   type TrackerHours,
+  type WarehouseFeedConfig,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import {
   createHours,
   type HoursSettingsStore,
+  NETSUITE_TIMESHEET_FOLDER,
   type ProjectFiles,
   TRACKER_HOURS_FOLDER,
   type TrackerHoursReader,
@@ -51,7 +54,21 @@ const jira: JiraFeedConfig = {
   projects: ['AUR'],
 }
 
+const warehouse: WarehouseFeedConfig = {
+  since: '2026-01-01',
+  targetFolder: '_octo/fonti/NetSuite',
+  host: 'dwsi.example.test',
+  port: 5432,
+  database: 'dwsi',
+  user: 'reader',
+  ownerEmail: 'pm@example.test',
+  projectCodes: ['PRJ000101'],
+  tls: 'verify_full',
+}
+
 type TrackerSetup = {
+  /** What the company's system gives for the timesheets, or how it fails. */
+  timesheets?: Array<Record<string, unknown>> | Error
   team?: ProjectTeam
   configured?: boolean
   secret?: string | null
@@ -83,7 +100,10 @@ function setup(initial: Partial<HoursSettings> = {}, tracker: TrackerSetup = {})
   }
   const writer = memoryWriter()
   const secrets = memoryVault()
-  if (tracker.secret !== null) void secrets.set('p-1/jira', tracker.secret ?? 'token')
+  if (tracker.secret !== null) {
+    void secrets.set('p-1/jira', tracker.secret ?? 'token')
+    void secrets.set('p-1/dwsi', tracker.secret ?? 'token')
+  }
   const asked: HoursPeriod[] = []
   const reader: TrackerHoursReader = {
     read: async (_config, _secret, period) => {
@@ -97,10 +117,17 @@ function setup(initial: Partial<HoursSettings> = {}, tracker: TrackerSetup = {})
     settings,
     files,
     sources: memorySourceSettings(
-      tracker.configured === false ? NO_SOURCES : { ...NO_SOURCES, jira },
+      tracker.configured === false ? NO_SOURCES : { ...NO_SOURCES, jira, dwsi: warehouse },
     ),
     secrets,
     tracker: reader,
+    timesheets: {
+      read: async (_config, _secret, period) => {
+        asked.push(period)
+        if (tracker.timesheets instanceof Error) throw tracker.timesheets
+        return tracker.timesheets ?? []
+      },
+    },
     writer,
     clock: { now: () => new Date('2026-07-10T10:00:00.000Z') },
   })
@@ -301,6 +328,63 @@ describe('hours', () => {
     ).toBe('no_worklog')
   })
 
+  it('reads the timesheets from the company system, one file per month, and compares from them', async () => {
+    const hours = setup(
+      { worklogPath: 'ore/jira', timesheetPath: 'raw/vecchi' },
+      {
+        timesheets: [
+          row(11, 'Mario Rossi', '2026-05-29', 8),
+          row(12, 'Mario Rossi', '2026-06-03', 6),
+          row(13, 'Anna Bianchi', '2026-06-04', 4),
+        ],
+      },
+    )
+
+    const run = await hours.readTimesheets(project, { from: '2026-05-20', to: '2026-06-10' })
+
+    // Whole months are asked, so a month is never written half.
+    expect(hours.asked).toEqual([{ from: '2026-05-01', to: '2026-06-30' }])
+    expect(run).toEqual({
+      at: '2026-07-10T10:00:00.000Z',
+      entries: 3,
+      months: ['2026-05', '2026-06'],
+      folder: NETSUITE_TIMESHEET_FOLDER,
+    })
+    const june = JSON.parse(
+      hours.written.get(`${NETSUITE_TIMESHEET_FOLDER}/timesheet_2026-06.json`) ?? '',
+    )
+    expect(june).toMatchObject({ source: 'NetSuite', exported_at: '2026-07-10T10:00:00.000Z' })
+    expect(june.rows.map((entry: { internalid: number }) => entry.internalid)).toEqual([12, 13])
+    expect(hours.saved().timesheetPath).toBe(NETSUITE_TIMESHEET_FOLDER)
+    // What is written is an export the comparison reads.
+    expect(parseTimesheetExport(june)?.map((entry) => entry.hours)).toEqual([6, 4])
+  })
+
+  it('needs the NetSuite source and its credential, a valid period, and keeps the failure code', async () => {
+    await expect(
+      setup({}, { configured: false }).readTimesheets(project, JUNE),
+    ).rejects.toMatchObject({ code: 'source_not_configured' })
+    await expect(setup({}, { secret: null }).readTimesheets(project, JUNE)).rejects.toMatchObject({
+      code: 'secret_missing',
+    })
+    const ready = setup()
+    await expect(
+      ready.readTimesheets(project, { from: '2026-07-01', to: '2026-06-01' }),
+    ).rejects.toMatchObject({ code: 'hours_period_invalid' })
+    await expect(
+      ready.readTimesheets(project, { from: '2025-01-01', to: '2026-06-01' }),
+    ).rejects.toMatchObject({ code: 'hours_period_invalid' })
+    const failing = setup({}, { timesheets: new DomainError('feed_unreachable') })
+    await expect(failing.readTimesheets(project, JUNE)).rejects.toMatchObject({
+      code: 'feed_unreachable',
+    })
+    // A failure frees the reading: the next one is not refused as busy.
+    await expect(failing.readTimesheets(project, JUNE)).rejects.toMatchObject({
+      code: 'feed_unreachable',
+    })
+    expect(failing.written.size).toBe(0)
+  })
+
   it('hands the timesheet rows to what else is computed from them, each once', async () => {
     const rows = await setup({ timesheetPath: 'ore/Timesheets' }).timesheet(project)
     expect(rows?.map((row) => row.id).sort()).toEqual(['1', '2', '3'])
@@ -323,6 +407,7 @@ function createHoursWaiting(until: Promise<void>) {
     files: {} as ProjectFiles,
     sources: memorySourceSettings({ ...NO_SOURCES, jira }),
     secrets,
+    timesheets: { read: async () => [] },
     tracker: {
       read: async () => {
         await until

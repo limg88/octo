@@ -91,6 +91,8 @@ const api: OctoApi = {
   team: (projectId) => ipcRenderer.invoke(CHANNELS.teamGet, { projectId }),
   saveTeam: (projectId, team) => ipcRenderer.invoke(CHANNELS.teamSave, { projectId, team }),
   createProject: (name) => ipcRenderer.invoke(CHANNELS.projectsCreate, { name }),
+  readTimesheets: (projectId, period) =>
+    ipcRenderer.invoke(CHANNELS.hoursReadTimesheets, { projectId, period }),
   readTrackerSnapshot: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardReadTracker, { projectId }),
   saveBackup: () => ipcRenderer.invoke(CHANNELS.backupSave),

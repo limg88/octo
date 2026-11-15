@@ -349,7 +349,7 @@ export const messages = {
     loading: 'Leggo le ore…',
     setupTitle: 'Da dove leggo le ore',
     setupIntro:
-      'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Leggo due esportazioni tenute nella cartella del progetto: non le modifico e non scrivo in nessun sistema.',
+      'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Le leggo io da NetSuite e da Jira con i pulsanti qui sotto, oppure indichi due esportazioni che hai già nella cartella del progetto. Non scrivo in nessun sistema.',
     timesheetPath: 'Timesheet: file o cartella delle esportazioni (JSON)',
     worklogPath: 'Ore del tracker: file o cartella delle esportazioni (CSV)',
     worklogHint:
@@ -403,6 +403,13 @@ export const messages = {
     possibleDuplicate: (hours: string, first: string, second: string) =>
       `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
     codesFound: 'Codici trovati nel periodo',
+    timesheetsTitle: 'Timesheet da NetSuite',
+    timesheetsIntro:
+      'Leggo le ore dei timesheet delle commesse indicate in «Fonti», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Di ogni riga tengo solo persona, giorno, ore, commessa e stato di approvazione: mai il costo.',
+    readTimesheets: 'Leggi i timesheet da NetSuite',
+    readingTimesheets: 'Leggo i timesheet da NetSuite…',
+    timesheetsRead: (entries: number, months: string, when: string) =>
+      `Lette ${entries} righe di timesheet (${months}) alle ${when}`,
     trackerTitle: 'Ore da Jira',
     trackerIntro:
       'Leggo le ore segnate sulle issue dei progetti Jira indicati in «Fonti», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e issue.',

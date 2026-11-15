@@ -97,6 +97,7 @@ export const CHANNELS = {
   hoursCandidates: 'hours:candidates',
   hoursView: 'hours:view',
   hoursReadTracker: 'hours:tracker:read',
+  hoursReadTimesheets: 'hours:timesheets:read',
   forecastSettingsGet: 'forecast:settings:get',
   forecastSettingsSave: 'forecast:settings:save',
   forecastCandidates: 'forecast:candidates',
@@ -224,6 +225,8 @@ export type OctoApi = {
   hoursView(projectId: string, period: HoursPeriod): Promise<Result<HoursView>>
   /** Reads the hours of the period from the tracker, with the credential of its feed. */
   readTrackerHours(projectId: string, period: HoursPeriod): Promise<Result<TrackerHoursRun>>
+  /** Reads the timesheets of the period from NetSuite, with the credential of its source. */
+  readTimesheets(projectId: string, period: HoursPeriod): Promise<Result<TrackerHoursRun>>
   /** Reads Azure DevOps as it is now, with the credential of its source, for the dashboard. */
   readTrackerSnapshot(projectId: string): Promise<Result<TrackerSnapshotRun>>
   forecastSettings(projectId: string): Promise<Result<ForecastSettings>>

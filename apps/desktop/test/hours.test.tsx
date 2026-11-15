@@ -76,7 +76,12 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
-  'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView' | 'readTrackerHours'
+  | 'hoursSettings'
+  | 'saveHoursSettings'
+  | 'hoursCandidates'
+  | 'hoursView'
+  | 'readTrackerHours'
+  | 'readTimesheets'
 >
 
 function fakeApi(overrides: Partial<Api> = {}) {
@@ -93,6 +98,14 @@ function fakeApi(overrides: Partial<Api> = {}) {
         entries: 42,
         months: ['2026-06'],
         folder: '_octo/ore/jira',
+      }),
+    ),
+    readTimesheets: vi.fn(async () =>
+      ok({
+        at: '2026-07-10T10:00:00.000Z',
+        entries: 310,
+        months: ['2026-06'],
+        folder: '_octo/ore/netsuite',
       }),
     ),
     ...overrides,
@@ -211,6 +224,37 @@ describe('hours', () => {
     await screen.findByText('Bianchi Anna')
     fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
     expect((await screen.findByRole('alert')).textContent).toBeTruthy()
+  })
+
+  it('reads the timesheets from NetSuite when asked, from the first setup too', async () => {
+    const fromNetSuite = { ...configured, timesheetPath: '_octo/ore/netsuite' }
+    const settings = vi
+      .fn<Api['hoursSettings']>()
+      .mockResolvedValueOnce(ok(DEFAULT_HOURS_SETTINGS))
+      .mockResolvedValue(ok(fromNetSuite))
+    const api = fakeApi({
+      hoursSettings: settings,
+      readTimesheets: vi
+        .fn<Api['readTimesheets']>()
+        .mockResolvedValueOnce({ ok: false, code: 'feed_unreachable' })
+        .mockResolvedValue(
+          ok({
+            at: '2026-07-10T10:00:00.000Z',
+            entries: 310,
+            months: ['2026-06'],
+            folder: '_octo/ore/netsuite',
+          }),
+        ),
+    })
+    render(<HoursView api={api} project={project} now={now} />)
+    const read = await screen.findByRole('button', { name: text.readTimesheets })
+    fireEvent.click(read)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Il sistema non risponde/)
+    fireEvent.click(read)
+    expect(await screen.findByText(/^Lette 310 righe di timesheet \(2026-06\)/)).toBeTruthy()
+    expect(api.readTimesheets).toHaveBeenLastCalledWith('p-1', JUNE)
+    // The comparison is computed from what was read.
+    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
   })
 
   it('says when the numbers cannot be used and explains a failure', async () => {

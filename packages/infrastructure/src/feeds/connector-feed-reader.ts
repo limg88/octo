@@ -1,4 +1,9 @@
-import type { FeedReader, TrackerHoursReader, TrackerSnapshotReader } from '@octo/application'
+import type {
+  FeedReader,
+  TimesheetReader,
+  TrackerHoursReader,
+  TrackerSnapshotReader,
+} from '@octo/application'
 import {
   ConnectorError,
   type ConnectorReader,
@@ -383,6 +388,29 @@ export function createAdoTrackerReader(options: ConnectorFeedOptions = {}): Trac
         const { config: raw, scope } = trackerOf.ado(config)
         const source = await trackers.connect('ado', raw, secret, scope)
         return await trackers.tracker({ ...source, secret }, { detailTypes }, signal)
+      } catch (error) {
+        throw failure(error)
+      }
+    },
+  }
+}
+
+/**
+ * The hours of the timesheets from the NetSuite warehouse, through the same read-only connector
+ * the feed uses and with the same credential. Only who, which day, how long, on which project and
+ * whether approved leaves the connector: never the cost of an hour.
+ */
+export function createWarehouseTimesheetReader(
+  options: ConnectorFeedOptions = {},
+): TimesheetReader {
+  return {
+    async read(config, secret, period) {
+      try {
+        const rows = await dwsiConnector.timesheets(
+          warehouseContext(config, secret, options),
+          period,
+        )
+        return rows.map((row) => ({ ...row }))
       } catch (error) {
         throw failure(error)
       }

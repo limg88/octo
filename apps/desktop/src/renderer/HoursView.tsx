@@ -6,7 +6,12 @@ import { dateText, dateTimeText, errorText, messages } from './messages.ts'
 
 type HoursApi = Pick<
   OctoApi,
-  'hoursSettings' | 'saveHoursSettings' | 'hoursCandidates' | 'hoursView' | 'readTrackerHours'
+  | 'hoursSettings'
+  | 'saveHoursSettings'
+  | 'hoursCandidates'
+  | 'hoursView'
+  | 'readTrackerHours'
+  | 'readTimesheets'
 >
 
 type Props = {
@@ -49,6 +54,8 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
   const [error, setError] = useState<ErrorCode | null>(null)
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerHoursRun | null>(null)
+  const [readingTimesheets, setReadingTimesheets] = useState(false)
+  const [timesheetRun, setTimesheetRun] = useState<TrackerHoursRun | null>(null)
 
   const ready = (candidate: HoursSettings) =>
     candidate.timesheetPath !== '' && candidate.worklogPath !== ''
@@ -84,6 +91,47 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
     setSettings(result.value)
     if (ready(result.value)) await loadView(period)
   }
+
+  async function readTimesheets() {
+    setReadingTimesheets(true)
+    setError(null)
+    setTimesheetRun(null)
+    const result = await api.readTimesheets(project.id, period)
+    setReadingTimesheets(false)
+    if (!result.ok) return setError(result.code)
+    setTimesheetRun(result.value)
+    // The reading points the comparison at the timesheets it wrote: the settings are read again.
+    const saved = await api.hoursSettings(project.id)
+    if (!saved.ok) return setError(saved.code)
+    setSettings(saved.value)
+    if (ready(saved.value)) await loadView(period)
+  }
+
+  const timesheets = (
+    <section aria-label={text.timesheetsTitle}>
+      <h3>{text.timesheetsTitle}</h3>
+      <p className="hint">{text.timesheetsIntro}</p>
+      {readingTimesheets && (
+        <p className="progress" role="status">
+          {text.readingTimesheets}
+        </p>
+      )}
+      {timesheetRun && (
+        <p className="badge badge-ok">
+          {text.timesheetsRead(
+            timesheetRun.entries,
+            timesheetRun.months.join(', '),
+            dateTimeText(timesheetRun.at),
+          )}
+        </p>
+      )}
+      <div className="actions">
+        <button type="button" disabled={readingTimesheets} onClick={() => void readTimesheets()}>
+          {text.readTimesheets}
+        </button>
+      </div>
+    </section>
+  )
 
   async function readTracker() {
     setReading(true)
@@ -140,6 +188,7 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
           <p className="hint">{text.setupIntro}</p>
           <SettingsForm settings={settings} candidates={candidates} codes={[]} onSave={save} />
         </section>
+        {timesheets}
         {tracker}
       </div>
     )
@@ -185,6 +234,7 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
         </label>
       </div>
       {view && <Comparison view={view} onExpect={expect} />}
+      {timesheets}
       {tracker}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>

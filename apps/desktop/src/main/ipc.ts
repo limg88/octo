@@ -592,6 +592,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps.trackerSnapshots.read(await deps.projects.get(projectId)),
   )
 
+  handle(CHANNELS.hoursReadTimesheets, hoursViewInput, async (input) =>
+    deps.hours.readTimesheets(await deps.projects.get(input.projectId), input.period),
+  )
+
   handle(CHANNELS.hoursReadTracker, hoursViewInput, async (input) =>
     deps.hours.readFromTracker(await deps.projects.get(input.projectId), input.period),
   )

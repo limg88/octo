@@ -886,4 +886,51 @@ describe('a DWSI sync', () => {
       .catch((e: unknown) => e)
     expect(String(error)).toContain('stopped')
   })
+
+  it('reads the hours of a period for the bound projects: who, when, how long, never the cost', async () => {
+    const rows = await dwsiConnector.timesheets(ctx([APOLLO, BOREA]), {
+      from: '2026-10-06',
+      to: '2026-10-31',
+    })
+    // Marta Neri is bound to both; the row of 5 October is before the period.
+    expect(rows).toEqual([
+      {
+        internalid: '9002',
+        projectid: 'PRJ000101',
+        employee: 'Bruno Sala',
+        timesheetdate: '2026-10-06',
+        duration: '8.0000',
+        approvalstatus: 'Pending Approval',
+      },
+      {
+        internalid: '9003',
+        projectid: 'PRJ000202',
+        employee: 'Carla Fumi',
+        timesheetdate: '2026-10-06',
+        duration: '4.0000',
+        approvalstatus: 'Approved',
+      },
+      {
+        internalid: '9004',
+        projectid: 'PRJ000202',
+        employee: 'Marta Neri',
+        timesheetdate: '2026-10-07',
+        duration: '1.0000',
+        approvalstatus: 'Approved',
+      },
+    ])
+    expect(JSON.stringify(rows)).not.toMatch(/laborcost|memo|nota privata/)
+
+    // A PM bound to one project only reads that one; bound to none, nothing.
+    const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })
+    const october = { from: '2026-10-01', to: '2026-10-31' }
+    const lucas = await dwsiConnector.timesheets(asLuca([APOLLO, BOREA]), october)
+    expect([...new Set(lucas.map((row) => row.projectid))]).toEqual(['PRJ000202'])
+    expect(await codeOf(dwsiConnector.timesheets(asLuca([APOLLO]), october))).toBe(
+      'source_not_authorized',
+    )
+    await expect(
+      dwsiConnector.timesheets(ctx([APOLLO]), { from: '2026-11-01', to: '2026-10-01' }),
+    ).rejects.toThrow(TypeError)
+  })
 })

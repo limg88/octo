@@ -319,6 +319,9 @@ try {
   await page.getByText('Quadratura: 664 ore approvate, tutte nel confronto').waitFor({
     timeout: TIMEOUT_MS,
   })
+  // Without the NetSuite source the timesheets cannot be read from it, and the app says why.
+  await page.getByRole('button', { name: 'Leggi i timesheet da NetSuite' }).click()
+  await page.getByText('Questa fonte non è ancora configurata.').waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('button', { name: 'Leggi le ore da Jira' }).click()
   await page.getByText(/^Lette 100 registrazioni di ore/).waitFor({ timeout: TIMEOUT_MS })
   const fromJira = readdirSync(`${work}/Aurora/_octo/ore/jira`)

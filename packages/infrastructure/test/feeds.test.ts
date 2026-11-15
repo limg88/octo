@@ -8,6 +8,7 @@ import {
   type AdoFeedConfig,
   type JiraFeedConfig,
   type Project,
+  parseTimesheetExport,
   parseTrackerExport,
   parseTrackerHistory,
   type WarehouseFeedConfig,
@@ -26,6 +27,7 @@ import {
   createJiraHoursReader,
   createJsonFeedIndexes,
   createJsonSourceStates,
+  createWarehouseTimesheetReader,
   jiraSite,
 } from '../src/index.ts'
 
@@ -331,6 +333,40 @@ describe.runIf(HAS_TEST_DATABASE)('the NetSuite warehouse as files of the projec
     tls: 'plaintext',
     since: '2026-01-01',
     targetFolder: 'Fonti/NetSuite',
+  })
+
+  it('reads the timesheets of a period as an export the hours comparison reads', async () => {
+    const reader = createWarehouseTimesheetReader(LOCAL_WAREHOUSE)
+    const signal = new AbortController().signal
+    const october = { from: '2026-10-01', to: '2026-10-31' }
+
+    // The settings of a source are kept clean: the codes in upper case.
+    const clean = { ...config(), projectCodes: ['PRJ000101'] }
+
+    const rows = await reader.read(clean, fake.reader.password, october, signal)
+
+    expect(parseTimesheetExport({ rows })).toEqual([
+      {
+        person: 'Anna Riva',
+        day: '2026-10-05',
+        hours: 7.5,
+        project: 'PRJ000101',
+        approved: true,
+        id: '9001',
+      },
+      {
+        person: 'Bruno Sala',
+        day: '2026-10-06',
+        hours: 8,
+        project: 'PRJ000101',
+        approved: false,
+        id: '9002',
+      },
+    ])
+    expect(JSON.stringify(rows)).not.toMatch(/laborcost/)
+    await expect(reader.read(clean, 'sbagliata', october, signal)).rejects.toMatchObject({
+      code: 'feed_credential_refused',
+    })
   })
 
   it('writes the rows of each view of the project, and finds them unchanged afterwards', async () => {

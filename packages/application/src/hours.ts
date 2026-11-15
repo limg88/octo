@@ -24,6 +24,7 @@ import type {
   ProjectFiles,
   SecretVault,
   SourceSettings,
+  TimesheetReader,
   TrackerHoursReader,
 } from './ports.ts'
 
@@ -34,6 +35,7 @@ export type HoursDeps = {
   sources: SourceSettings
   secrets: SecretVault
   tracker: TrackerHoursReader
+  timesheets: TimesheetReader
   writer: MemoryWriter
   clock: Clock
   /** The people of the project with the days they are on it; without it, everyone always is. */
@@ -45,8 +47,13 @@ export type TrackerHoursRun = { at: string; entries: number; months: string[]; f
 
 /** Where Octo keeps the hours it read from the tracker, one file per month. */
 export const TRACKER_HOURS_FOLDER = `${OCTO_FOLDER}/ore/jira`
+/** Where Octo keeps the timesheets it read from the company's system, one file per month. */
+export const NETSUITE_TIMESHEET_FOLDER = `${OCTO_FOLDER}/ore/netsuite`
+const timesheetFile = (month: string): string =>
+  `${NETSUITE_TIMESHEET_FOLDER}/timesheet_${month}.json`
 /** Months read in one go at most: a longer period is asked in pieces. */
 export const MAX_MONTHS_READ = 12
+const TIMESHEET_SOURCE = 'NetSuite'
 const worklogFile = (month: string): string => `${TRACKER_HOURS_FOLDER}/worklog_${month}.csv`
 
 /** Where the hours of a project seem to be kept, to propose to the PM. */
@@ -81,6 +88,11 @@ export type Hours = {
    */
   readFromTracker(project: Project, period: HoursPeriod): Promise<TrackerHoursRun>
   /**
+   * Reads the timesheets of the whole months of the period from the NetSuite source, writes them
+   * in the project one file per month and points the comparison at them.
+   */
+  readTimesheets(project: Project, period: HoursPeriod): Promise<TrackerHoursRun>
+  /**
    * Every row of the timesheets of the project, each one once; null when the PM has not said
    * where they are. For what else is computed from the same hours.
    */
@@ -92,7 +104,7 @@ const WORKLOG_EXTENSION = 'csv'
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const TIMESHEET_NAME = /timesheet|netsuite/i
 const WORKLOG_NAME = /worklog|tempo|ore|hours/i
-const TIMESHEET_FOLDER = /timesheet/i
+const TIMESHEET_FOLDER_NAME = /timesheet/i
 const MAX_CANDIDATES = 10
 
 const extensionOf = (path: string): string => (path.split('.').pop() ?? '').toLowerCase()
@@ -110,7 +122,7 @@ function checkedPath(path: string): string {
 /** The folder that holds every month of timesheets, when the path names one; else the file's own. */
 function timesheetRoot(path: string): string {
   const parts = folderOf(path).split('/')
-  const index = parts.findIndex((part) => TIMESHEET_FOLDER.test(part))
+  const index = parts.findIndex((part) => TIMESHEET_FOLDER_NAME.test(part))
   return index < 0 ? folderOf(path) : parts.slice(0, index + 1).join('/')
 }
 
@@ -283,6 +295,51 @@ export function createHours(deps: HoursDeps): Hours {
           entries: entries.length,
           months: months.map(({ month }) => month),
           folder: TRACKER_HOURS_FOLDER,
+        }
+      } finally {
+        reading.delete(project.id)
+      }
+    },
+
+    async readTimesheets(project, period) {
+      if (!validPeriod(period)) throw new DomainError('hours_period_invalid')
+      const months = monthsOf(period)
+      if (months.length === 0 || months.length > MAX_MONTHS_READ) {
+        throw new DomainError('hours_period_invalid')
+      }
+      const config = (await deps.sources.load(project.folder)).dwsi
+      if (config === null) throw new DomainError('source_not_configured')
+      const secret = await deps.secrets.get(secretKey(project, 'dwsi'))
+      if (secret === null) throw new DomainError('secret_missing')
+      if (reading.has(project.id)) throw new DomainError('source_busy')
+      const abort = new AbortController()
+      reading.set(project.id, abort)
+      try {
+        const whole = { from: months[0]?.from ?? period.from, to: months.at(-1)?.to ?? period.to }
+        const rows = await deps.timesheets.read(config, secret, whole, abort.signal)
+        const at = deps.clock.now().toISOString()
+        await deps.writer.claim(project.folder)
+        for (const { month } of months) {
+          const ofMonth = rows.filter((row) => String(row.timesheetdate ?? '').startsWith(month))
+          const content = { exported_at: at, source: TIMESHEET_SOURCE, rows: ofMonth }
+          await deps.writer.write(
+            project.folder,
+            timesheetFile(month),
+            `${JSON.stringify(content, null, 1)}\n`,
+          )
+        }
+        const settings = await deps.settings.load(project.folder)
+        if (settings.timesheetPath !== NETSUITE_TIMESHEET_FOLDER) {
+          await deps.settings.save(project.folder, {
+            ...settings,
+            timesheetPath: NETSUITE_TIMESHEET_FOLDER,
+          })
+        }
+        return {
+          at,
+          entries: rows.length,
+          months: months.map(({ month }) => month),
+          folder: NETSUITE_TIMESHEET_FOLDER,
         }
       } finally {
         reading.delete(project.id)
