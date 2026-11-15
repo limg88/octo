@@ -1,5 +1,6 @@
 import type { DeliverableWriter, DraftRequest } from '@octo/application'
 import {
+  type DeckOutline,
   type DeliverableDraft,
   type DeliverableKind,
   MIN_QUOTE_LENGTH,
@@ -42,9 +43,63 @@ const estimateDraftSchema = draftAnswerSchema.extend({
   ),
 })
 
+const deckDraftSchema = z.object({
+  deck: z.object({
+    slides: z.array(
+      z.object({
+        slide: z.number().int().positive(),
+        skip: z.boolean(),
+        texts: z.array(z.object({ id: z.string(), text: z.string() })),
+        tables: z.array(
+          z.object({
+            id: z.string(),
+            columns: z.array(z.string()),
+            rows: z.array(z.array(z.string())),
+          }),
+        ),
+      }),
+    ),
+  }),
+  citations: draftAnswerSchema.shape.citations,
+  missing: draftAnswerSchema.shape.missing,
+})
+
 /** The shape of a draft for a kind: with the lines of the estimate when the kind computes one. */
 const draftSchemaOf = (kind: DeliverableKind): z.ZodType<DeliverableDraft> =>
   kind.calculation === 'pert' ? estimateDraftSchema : draftAnswerSchema
+
+const OUTLINE_OPEN = '<deck_outline>'
+const OUTLINE_CLOSE = '</deck_outline>'
+
+/** How a deck is written on the outline of a model: the same slides, for the period asked. */
+function deckPrompt(outline: DeckOutline): string {
+  return `This deliverable is a deck written on the model deck of the Project Manager. You do not give "text":
+you give "deck", the same slides as the model, each one updated to what the Project Manager asks.
+The sections named above say what a deliverable of this kind covers and how it speaks; the slides,
+their order and their tables are those of the outline below, not those sections.
+${fenced(OUTLINE_OPEN, OUTLINE_CLOSE, JSON.stringify(outline))}
+How to fill it, slide by slide:
+1. Give every slide of the outline, in its order, with its "slide" number. For a slide give every
+   text id and every table id the outline has for it, and no other id.
+2. A text that is a label or a heading stays as it is, unless it names a period, a date or a count:
+   then write the one of the period asked. A text that is a figure, a status or a sentence about
+   the work is replaced by the one of the period asked, found in the project.
+3. A table keeps its columns, in "columns", in the same order and number. Change a heading only
+   when it names a date or a period. In "rows" give the rows of the period asked, as many as the
+   project gives, each with exactly one value per column.
+4. Write a row the way the rows in "sample" are written: the same words and marks for the same
+   status, the same way of writing ids and dates, a total as the last row when the sample has one.
+5. What the outline says, in its texts and in "sample", is of the period the model was made for.
+   It shows the form only. It is never a source: do not copy a figure, a date, a status or a name
+   from it. Everything you write comes from a file you read in this run and carries its marker [n]
+   inside the text or the cell.
+6. A text or a cell you cannot source for the period asked stays empty (""), and "missing" says
+   which slide and what is needed. Never leave there what the model said.
+7. A total or a count is written only when a file states it: cite that file. Never add up or count
+   yourself.
+8. When the project has nothing for a slide in the period asked, set "skip" to true for it, give
+   no texts and no tables, and say so in "missing".`
+}
 
 const RULES_OPEN = '<project_rules>'
 const RULES_CLOSE = '</project_rules>'
@@ -91,6 +146,7 @@ ${kind.instructions}`,
 the ones above and win where they differ, except for what must never reach a client.
 ${fenced(PM_OPEN, PM_CLOSE, request.projectInstructions)}`)
   }
+  if (request.deckOutline) parts.push(deckPrompt(request.deckOutline))
   const live = liveSourcesPrompt(request.liveSources).trim()
   if (live !== '') parts.push(live)
   if (rules) {
@@ -116,10 +172,12 @@ export function writerInput(request: DraftRequest): string {
     '',
     'The draft the Project Manager is reviewing, as JSON:',
     JSON.stringify({
-      text: request.revision.draft.text,
+      // A draft written as slides is changed in its slides: its text is made from them.
+      ...(request.revision.draft.deck ? {} : { text: request.revision.draft.text }),
       citations: request.revision.draft.citations.map(({ n, path, quote }) => ({ n, path, quote })),
       missing: request.revision.draft.missing,
       ...(request.revision.draft.wbs ? { wbs: request.revision.draft.wbs } : {}),
+      ...(request.revision.draft.deck ? { deck: request.revision.draft.deck } : {}),
     }),
     '',
     'The change the Project Manager asks. Apply it and give back the whole draft; leave the rest',
@@ -168,17 +226,23 @@ ${fenced(RULES_OPEN, RULES_CLOSE, rules)}`)
 /** Writes and attacks deliverables with Claude Code on the PM's seat, read-only on the project. */
 export function createClaudeDeliverableWriter(config: ClaudeCliConfig): DeliverableWriter {
   return {
-    draft: async (request) =>
-      runStructured(config, {
+    async draft(request) {
+      const run = {
         projectFolder: request.projectFolder,
         input: writerInput(request),
         systemPrompt: writerSystemPrompt(request, await projectRules(request.projectFolder)),
-        schema: draftSchemaOf(request.kind),
         onProgress: request.onProgress,
         signal: request.signal,
         model: request.model,
         onModel: request.onModel,
-      }),
+      }
+      if (!request.deckOutline) {
+        return runStructured(config, { ...run, schema: draftSchemaOf(request.kind) })
+      }
+      // Written as slides: the text a person reads is made from them by the code.
+      const slides = await runStructured(config, { ...run, schema: deckDraftSchema })
+      return { ...slides, text: '' }
+    },
     redTeam: async (request) =>
       runStructured(config, {
         projectFolder: request.projectFolder,

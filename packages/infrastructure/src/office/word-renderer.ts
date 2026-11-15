@@ -2,6 +2,7 @@ import type { DocumentRenderer } from '@octo/application'
 import { DomainError } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { lexer, type Token, type Tokens } from 'marked'
+import { fillDeck, readDeckOutline } from './deck-model.ts'
 import { renderDeck } from './deck-renderer.ts'
 
 type Style = { bold?: boolean; italics?: boolean; size?: number }
@@ -212,8 +213,10 @@ export function createWordRenderer(): DocumentRenderer {
       inTemplate(bytes, '')
     },
     deck: async (title, markdown, model) => renderDeck(title, markdown, model),
+    deckOutline: async (model) => readDeckOutline(model),
+    fillDeck: async (model, deck) => fillDeck(model, deck),
     async checkDeckModel(bytes) {
-      renderDeck('', '', bytes)
+      readDeckOutline(bytes)
     },
   }
 }

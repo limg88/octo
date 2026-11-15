@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import { DEMO_ADO, extraItem, startDemoAdo } from '../demo/lib/fake-ado.ts'
 import { DEMO_JIRA, startDemoJira } from '../demo/lib/fake-jira.ts'
+import { readDeckOutline } from '../packages/infrastructure/src/office/deck-model.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const work = `${root}.tmp/e2e`
@@ -438,6 +439,14 @@ try {
   await work11.getByLabel(/^Periodo/).fill('Sprint 28')
   await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
   await work11.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
+  // The draft is the slides of the model, updated: what the PM reviews is slide by slide.
+  await work11
+    .getByRole('heading', { name: 'Slide 2 — Aurora - Avanzamento — PI7' })
+    .waitFor({ timeout: TIMEOUT_MS })
+  await work11
+    .getByText(/Slide 3 del modello|Rischi del periodo: nessuna fonte/)
+    .first()
+    .waitFor()
   await page.screenshot({ path: `${work}/presentazione-bozza.png` })
   await work11.getByRole('button', { name: 'Approva', exact: true }).click()
   await assertEventually(() =>
@@ -445,6 +454,21 @@ try {
       /stato-avanzamento.*\.pptx$/.test(name),
     ),
   )
+  const approved11 = `${work}/Aurora/_octo/deliverable/approvati`
+  const deck11 = readDeckOutline(
+    new Uint8Array(
+      readFileSync(
+        `${approved11}/${readdirSync(approved11).find((name) => /stato-avanzamento.*\.pptx$/.test(name))}`,
+      ),
+    ),
+  )
+  // The same slides as the model, less the one the period has nothing for; no source marker left.
+  assert.equal(deck11.slides.length, 3)
+  assert.equal(deck11.slides[1].texts[0].text, 'Aurora - Avanzamento — PI7')
+  assert.deepEqual(deck11.slides[1].tables[0].sample, [
+    ['Modulo ordini: consegna fissata al 12 dicembre 2026', 'In corso', ''],
+  ])
+  assert.equal(deck11.slides[2].texts[0].text, 'GRAZIE')
   await page.screenshot({ path: `${work}/presentazione.png` })
 
   // Demo 12: the six kinds of text added to the catalog.

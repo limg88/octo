@@ -54,6 +54,42 @@ if (args.join(' ').includes('You attack the content of a deliverable')) {
   process.exit(0)
 }
 
+// A run of a writer given the outline of a model deck: the same slides, for the period asked.
+const outlined = /<deck_outline>\n([\s\S]*?)\n<\/deck_outline>/.exec(args.join(' '))
+if (outlined) {
+  const outline = JSON.parse(outlined[1])
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      deck: {
+        slides: outline.slides.map((slide) => ({
+          slide: slide.slide,
+          // The model's last slide of content has nothing for this period.
+          skip: slide.texts.some((text) => text.text.startsWith('Rischi')),
+          texts: slide.texts.map((text) => ({
+            id: text.id,
+            text: text.text.replace('del periodo scorso', 'dello Sprint 28').replace('PI6', 'PI7'),
+          })),
+          tables: slide.tables.map((table) => ({
+            id: table.id,
+            columns: table.columns,
+            rows: [
+              ['Modulo ordini: consegna fissata al 12 dicembre 2026 [1]', 'In corso'].slice(
+                0,
+                table.columns.length,
+              ),
+            ],
+          })),
+        })),
+      },
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: ['Rischi del periodo: nessuna fonte li elenca.'],
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the writer of a status report: sections with headings, some lines and tables.
 if (args.join(' ').includes('Write the status report of the period')) {
   emit({

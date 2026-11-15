@@ -184,16 +184,29 @@ describe('a deck on the model of the PM', () => {
       renderer.checkDeckModel(zipSync({ 'word/document.xml': strToU8('<w:document/>') })),
     ).rejects.toThrow('deck_model_invalid')
     const parts = unzipSync(deckPptx())
-    // Only a cover: no slide to take the title and the layout from.
+    // Only a cover, or a slide without its layout: a deck is filled slide by slide, so it is
+    // accepted as a model, but there is no slide of content to write a text on.
     const onlyCover = strFromU8(parts['ppt/presentation.xml'] as Uint8Array).replace(
       /<p:sldId id="25[789]"[^>]*\/>/g,
       '',
     )
-    await expect(
-      renderer.checkDeckModel(zipSync({ ...parts, 'ppt/presentation.xml': strToU8(onlyCover) })),
-    ).rejects.toThrow('deck_model_invalid')
+    const cover = zipSync({ ...parts, 'ppt/presentation.xml': strToU8(onlyCover) })
+    await expect(renderer.checkDeckModel(cover)).resolves.toBeUndefined()
+    await expect(renderer.deck('Titolo', '## Sezione', cover)).rejects.toThrow('deck_model_invalid')
     const { 'ppt/slides/_rels/slide2.xml.rels': _rels, ...noLayout } = parts
-    await expect(renderer.checkDeckModel(zipSync(noLayout))).rejects.toThrow('deck_model_invalid')
+    await expect(renderer.deck('Titolo', '## Sezione', zipSync(noLayout))).rejects.toThrow(
+      'deck_model_invalid',
+    )
+    // A deck with nothing written on it has no outline to keep.
+    const blank = Object.fromEntries(
+      Object.entries(unzipSync(deckPptx({ plain: true }))).map(([name, part]) => [
+        name,
+        name.startsWith('ppt/slides/slide')
+          ? strToU8(strFromU8(part).replace(/<a:t>[^<]*<\/a:t>/g, '<a:t></a:t>'))
+          : part,
+      ]),
+    )
+    await expect(renderer.checkDeckModel(zipSync(blank))).rejects.toThrow('deck_model_invalid')
     await expect(renderer.checkDeckModel(deckPptx())).resolves.toBeUndefined()
   })
 })

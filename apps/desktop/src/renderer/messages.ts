@@ -571,7 +571,7 @@ export const messages = {
   deckModelNone: 'Nessuno: lo stato di avanzamento esce solo come testo e Word.',
   deckModelSet: 'Impostato: lo stato di avanzamento approvato esce anche come presentazione.',
   deckModelHint:
-    'Scegli una presentazione già fatta per questo cliente, per esempio quella del periodo scorso. Octo ne tiene una copia nel progetto: restano la copertina e la slide finale, le slide in mezzo sono riscritte una per sezione, con lo stesso layout e lo stesso aspetto delle tabelle. La copertina, se non ha un titolo da riempire, va aggiornata a mano.',
+    'Scegli una presentazione già fatta per questo cliente, per esempio quella del periodo scorso. Octo ne tiene una copia nel progetto e ne segue la scaletta: le stesse slide, con testi e tabelle aggiornati al periodo che chiedi. Dove il progetto non ha dati la slide viene tolta o la cella resta vuota, e te lo dice: non resta mai un numero del periodo scorso.',
   deckModelChoose: 'Scegli una presentazione',
   deliverableRegister: 'Registro',
   deliverableRegisterIntro:

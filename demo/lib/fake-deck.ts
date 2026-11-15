@@ -1,5 +1,6 @@
 // Writes into a project folder a presentation of a past period, as a PM would have it: cover,
-// two slides of content, a closing slide. With `chosen` it is also set as the deck of the
+// a slide with a table coloured by status and a line that dates the data, a slide of risks, a
+// closing slide. With `chosen` it is also set as the deck of the
 // project, as if the PM had picked it in the app.
 // Usage: node demo/lib/fake-deck.ts <project folder> [chosen]
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -9,7 +10,7 @@ import { deckPptx } from '../../packages/infrastructure/test/support/deck-pptx.t
 const [project, chosen] = process.argv.slice(2)
 if (!project) throw new Error('usage: fake-deck.ts <project folder> [chosen]')
 
-const deck = deckPptx()
+const deck = deckPptx({ rich: true })
 mkdirSync(join(project, 'Presentazioni'), { recursive: true })
 writeFileSync(join(project, 'Presentazioni', 'Stato avanzamento - periodo scorso.pptx'), deck)
 if (chosen) {

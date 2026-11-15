@@ -2,6 +2,7 @@ import type { CheckedAnswer, DraftAnswer } from '../answer.ts'
 import { DomainError, type DomainErrorCode } from '../errors.ts'
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { slugOf } from '../mail/document.ts'
+import type { DeckDraft } from './deck.ts'
 import type { WbsRow } from './pert.ts'
 
 /** Who reads a deliverable: what may be said in it depends on it. */
@@ -37,7 +38,11 @@ export type DeliverableKind = {
 }
 
 /** What the writer gives back: the text and, for a kind with numbers, the lines to compute. */
-export type DeliverableDraft = DraftAnswer & { wbs?: WbsRow[] }
+export type DeliverableDraft = DraftAnswer & {
+  wbs?: WbsRow[]
+  /** The slides, when the deliverable is written on the outline of a model deck. */
+  deck?: DeckDraft
+}
 
 export const RED_TEAM_SEVERITIES = ['grave', 'media', 'lieve'] as const
 export type RedTeamSeverity = (typeof RED_TEAM_SEVERITIES)[number]

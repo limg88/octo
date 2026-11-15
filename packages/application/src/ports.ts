@@ -4,6 +4,8 @@ import type {
   ArchivedMail,
   Backup,
   DashboardSettings,
+  DeckDraft,
+  DeckOutline,
   DeliverableDraft,
   DeliverableKind,
   DraftAnswer,
@@ -220,6 +222,8 @@ export type DraftRequest = {
   inputs: Readonly<Record<string, string>>
   /** A change asked in words on the draft shown; null for the first draft. */
   revision: { draft: DeliverableDraft; request: string } | null
+  /** With the outline of a model deck, the draft is its slides for the period asked. */
+  deckOutline?: DeckOutline
   liveSources?: readonly LiveSource[]
   model?: string | null
   onModel?: (model: string) => void
@@ -260,6 +264,13 @@ export interface DocumentRenderer {
    * its cover, its closing slide, its layouts and the look of its tables are kept.
    */
   deck(title: string, markdown: string, model: Uint8Array): Promise<Uint8Array>
+  /** The lines of text and the tables of every slide of a model deck: what a new deck keeps. */
+  deckOutline(model: Uint8Array): Promise<DeckOutline>
+  /**
+   * The model deck with the content written for another period: the same slides, each text and
+   * table in its place and with its look.
+   */
+  fillDeck(model: Uint8Array, deck: DeckDraft): Promise<Uint8Array>
   /** Throws a DomainError `deck_model_invalid` when slides cannot be written on these bytes. */
   checkDeckModel(bytes: Uint8Array): Promise<void>
 }

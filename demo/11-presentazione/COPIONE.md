@@ -1,10 +1,10 @@
-# Demo 11 — Presentazione: lo stato di avanzamento approvato diventa slide sul tuo modello
+# Demo 11 — Presentazione: le stesse slide del tuo modello, aggiornate al periodo
 
-Durata: 4 minuti. Mostra lo stato di avanzamento scritto come deliverable (fonti controllate, rilettura critica, approvazione) e reso dal codice come presentazione PowerPoint sulla presentazione del periodo scorso: stessa copertina, stesso layout, stesso aspetto delle tabelle.
+Durata: 4 minuti. Mostra lo stato di avanzamento scritto sulla presentazione del periodo scorso: Octo ne legge la scaletta (ogni testo e ogni tabella di ogni slide), Claude la riempie slide per slide con i dati del periodo chiesto, il codice rimette testi e righe al loro posto. Stesse slide, stesso ordine, stessi colori; contenuti nuovi, con le fonti controllate.
 
 ## Prerequisiti
 - Node 24, pnpm 12. PowerPoint, Keynote o LibreOffice per aprire il risultato.
-- Nessun accesso a Claude: risponde un modello finto, sempre uguale. La presentazione del periodo scorso è finta (copertina, due slide di contenuto, slide finale).
+- Nessun accesso a Claude: risponde un modello finto, sempre uguale. La presentazione del periodo scorso è finta: copertina, una slide con una tabella colorata per stato e la data dei dati, una slide dei rischi, slide finale.
 
 ## Passi
 
@@ -19,24 +19,25 @@ Durata: 4 minuti. Mostra lo stato di avanzamento scritto come deliverable (fonti
    Dimostra: si fa una volta per progetto; Octo tiene una copia del modello e non tocca il tuo file.
 
 3. **Chiedi lo stato di avanzamento.** Premi «Stato di avanzamento», in «Periodo» scrivi `Sprint 28` e premi «Scrivi la bozza».
-   Atteso: la bozza con le sezioni (sintesi, avanzamento per obiettivo, prossimi passi, rischi, decisioni), «1 fonte controllata» e l'esito della rilettura critica.
+   Atteso: la bozza è scritta slide per slide: «Slide 1», «Slide 2 — Aurora - Avanzamento — PI7» con la sua tabella, «Slide 4». «1 fonte controllata» e l'esito della rilettura critica. In «Non trovato»: i rischi del periodo non hanno una fonte, e la slide 3 del modello è stata tolta.
+   Dimostra: la struttura è quella del modello, non una scaletta generica. Dove il progetto non ha dati, la slide viene tolta o la cella resta vuota, e viene detto: non resta mai un numero del periodo scorso.
 
 4. **Approva.** Premi «Approva».
    Atteso: tre file approvati: il testo, il Word e un `.pptx`.
 
 5. **Apri la presentazione.** Premi sul file `.pptx` fra i file approvati.
-   Atteso: sette slide. La prima è la copertina del modello, l'ultima la sua slide finale («GRAZIE»). In mezzo, una slide per sezione: titolo con il carattere del modello, righe di testo o tabella nello stesso punto e con lo stesso stile della tabella del modello. Le slide del periodo scorso non ci sono più.
-   Dimostra: il contenuto è quello approvato, parola per parola; l'impaginazione è la tua.
+   Atteso: tre slide. La copertina; la slide «Aurora - Avanzamento — PI7» con la tabella alle sue colonne, la riga «In corso» azzurra come nel modello, la riga della data aggiornata; la slide finale («GRAZIE»). La slide dei rischi del periodo scorso non c'è.
+   Dimostra: titoli, tabelle, colori di stato e numero di slide sono al loro posto; il contenuto è quello approvato, senza i richiami alle fonti.
 
 6. **Guarda che un'email non diventa slide.** Torna al catalogo, scrivi e approva una «Email al cliente».
    Atteso: due file soltanto, testo e Word.
 
 ## Che cosa dimostra
-- Le slide non sono scritte da Claude: il codice impagina il testo approvato, sempre allo stesso modo.
-- Master, layout, tema e immagini sono quelli del modello.
-- Una sezione troppo lunga continua su una slide successiva con lo stesso titolo e il numero.
+- La scaletta la detta il modello: Claude riempie testi e tabelle con un identificativo ciascuno, in una forma guidata che regge anche con i modelli di Claude più leggeri.
+- Quello che il modello dice è del suo periodo: non è mai una fonte. Ciò che non viene riscritto resta vuoto e viene segnalato.
+- Una riga è disegnata come la riga del modello con lo stesso stato; una tabella troppo lunga continua su una copia della slide.
+- Master, layout, tema, immagini e numeri di slide sono quelli del modello.
 
 ## Che cosa non fa ancora
-- La copertina, se non ha un titolo da riempire, resta quella del modello: periodo e data vanno aggiornati a mano.
-- Non disegna slide «a cruscotto» con forme e indicatori: solo titolo, righe e tabelle.
+- Non aggiunge slide che il modello non ha, e non ridisegna grafici: i grafici del modello restano com'erano.
 - Vale per lo stato di avanzamento; gli altri tipi di deliverable escono come testo e Word.

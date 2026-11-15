@@ -20,6 +20,18 @@ const holder = (id: number, type: string, text: string, place = '') =>
 const box = (id: number, text: string) =>
   `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Testo ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="3000000" y="2600000"/><a:ext cx="6000000" cy="900000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="it-IT" sz="4000" b="1"/><a:t>${text}</a:t></a:r></a:p></p:txBody></p:sp>`
 const table = `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="4" name="Tabella 3"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm>${DECK_TABLE_PLACE}</p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${DECK_TABLE_STYLE}</a:tableStyleId></a:tblPr><a:tblGrid><a:gridCol w="11000000"/></a:tblGrid><a:tr h="370840"><a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="it-IT"/><a:t>Dato del periodo scorso</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>`
+const filled = (colour: string) =>
+  `<a:tcPr><a:solidFill><a:srgbClr val="${colour}"/></a:solidFill></a:tcPr>`
+const cellOf = (text: string, look: string, size = 1100) =>
+  `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/>${text === '' ? '' : `<a:r><a:rPr lang="it-IT" sz="${size}"/><a:t>${text}</a:t></a:r>`}<a:endParaRPr lang="it-IT" sz="${size}"/></a:p></a:txBody>${look}</a:tc>`
+const rowOf = (cells: string[], look: string) =>
+  `<a:tr h="300000">${cells.map((text) => cellOf(text, look)).join('')}</a:tr>`
+export const DECK_GREEN = 'D4EDDA'
+export const DECK_BLUE = 'DDEBF7'
+/** A table as a status deck has it: headings, rows coloured by their status, a total at the end. */
+const richTable = `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="4" name="Tabella 3"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm>${DECK_TABLE_PLACE}</p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>${DECK_TABLE_STYLE}</a:tableStyleId></a:tblPr><a:tblGrid><a:gridCol w="6000000"/><a:gridCol w="3000000"/><a:gridCol w="2000000"/></a:tblGrid>${rowOf(['Voce', 'Stato', 'Cons. 23/10'], '<a:tcPr/>')}${rowOf(['Modulo ordini', '✅ Done', '12'], filled(DECK_GREEN))}${rowOf(['Magazzino', '🔄 In corso', ''], filled(DECK_BLUE))}${rowOf(['Totale', '', '12'], filled('EEEEEE'))}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`
+const numberOfSlide =
+  '<p:sp><p:nvSpPr><p:cNvPr id="9" name="Numero"/><p:cNvSpPr/><p:nvPr><p:ph type="sldNum"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum"><a:rPr lang="it-IT"/><a:t>2</a:t></a:fld></a:p></p:txBody></p:sp>'
 const slide = (shapes: string) =>
   `${HEAD}<p:sld ${NS}><p:cSld><p:spTree>${TREE_START}${shapes}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
 const rels = (...entries: string[]) =>
@@ -44,6 +56,11 @@ export type DeckOptions = {
   plain?: boolean
   /** No closing slide: the deck ends with a slide of content. */
   open?: boolean
+  /**
+   * The first slide of content as a status deck has it: a table with headings, coloured rows and
+   * a total, a line that dates the data, a tile written on two lines, and the number of the slide.
+   */
+  rich?: boolean
 }
 
 /** Slides: 1 cover, 2 and 3 content of another period (2 has speaker notes), 4 closing. */
@@ -78,7 +95,11 @@ export function deckPptx(options: DeckOptions = {}): Uint8Array {
     ),
     'ppt/slides/slide1.xml': slide(cover),
     'ppt/slides/_rels/slide1.xml.rels': rels(layout),
-    'ppt/slides/slide2.xml': content('Avanzamento del periodo scorso'),
+    'ppt/slides/slide2.xml': options.rich
+      ? slide(
+          `${holder(2, 'title', 'Aurora - Avanzamento — PI6')}${richTable}${box(5, 'Dati al 23/10/2026')}${box(6, 'Consegne</a:t></a:r><a:br/><a:r><a:rPr lang="it-IT" sz="4000" b="1"/><a:t>3 &amp; mezzo')}${numberOfSlide}`,
+        )
+      : content('Avanzamento del periodo scorso'),
     'ppt/slides/_rels/slide2.xml.rels': rels(
       layout,
       rel('rId2', 'notesSlide', '../notesSlides/notesSlide1.xml'),

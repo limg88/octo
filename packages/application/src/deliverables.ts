@@ -6,11 +6,16 @@ import {
   cleanInputs,
   DECK_MODEL_PATH,
   DELIVERABLE_CATALOG,
+  type DeckOutline,
   type Deliverable,
+  type DeliverableDraft,
   type DeliverableKind,
   DomainError,
   type DraftAnswer,
+  deckMarkdown,
+  deckProblemText,
   type Evidence,
+  fitDeckDraft,
   isDomainError,
   isOwnKind,
   JOBS_FOLDER,
@@ -18,6 +23,7 @@ import {
   LETTERHEAD_PATH,
   type LiveSource,
   type ModelSettings,
+  mapDeckStrings,
   OWN_KINDS_FOLDER,
   type OwnKindInput,
   ownKind,
@@ -162,6 +168,24 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     return checkAnswer(draft, new Map(entries))
   }
 
+  /**
+   * A draft written as slides, made to fit the outline of the model: its text is the slides as a
+   * person reads them, and what the code had to mend is told among what is missing.
+   */
+  function onOutline(
+    title: string,
+    outline: DeckOutline,
+    draft: DeliverableDraft,
+  ): DeliverableDraft {
+    const { deck, problems } = fitDeckDraft(outline, draft.deck ?? { slides: [] })
+    return {
+      ...draft,
+      deck,
+      text: deckMarkdown(title, outline, deck),
+      missing: [...draft.missing, ...problems.map(deckProblemText)],
+    }
+  }
+
   /** One writing: the draft, its sources checked, the red team on the text the reader gets. */
   async function write(
     project: Project,
@@ -177,9 +201,15 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     try {
       const chosen = await deps.models?.(project)
       const models: NonNullable<Deliverable['models']> = { write: null, review: null }
-      const written = await deps.writer.draft({
+      // With a model deck the draft is its slides for the period: the outline is the structure.
+      const outline =
+        kind.deck && (await hasDeckModel(project))
+          ? await deps.renderer.deckOutline(await deps.files.read(project.folder, DECK_MODEL_PATH))
+          : null
+      const given = await deps.writer.draft({
         projectFolder: project.folder,
         kind,
+        ...(outline ? { deckOutline: outline } : {}),
         model: chosen?.write ?? null,
         liveSources: (await deps.liveSources?.(project)) ?? [],
         onModel: (used) => {
@@ -190,6 +220,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         revision: previous && request ? { draft: previous, request } : null,
         ...(onProgress ? { onProgress } : {}),
       })
+      const written = outline && given.deck ? onOutline(deliverable.title, outline, given) : given
       // Numbers only the code may compute are put in the text before anything is checked.
       const text = kind.calculation ? withEstimate(written.text, written.wbs ?? []) : written.text
       const checked = await check(project, { ...written, text })
@@ -303,10 +334,14 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     if ((await kindOf(project, approved.kindId)).deck && (await hasDeckModel(project))) {
       const deck = `${APPROVED_FOLDER}/${approvedFileName(approved, DECK)}`
       const model = await deps.files.read(project.folder, DECK_MODEL_PATH)
+      const slides = current.written?.deck
       await deps.memory.writeBytes(
         project.folder,
         deck,
-        await deps.renderer.deck(approved.title, text, model),
+        // Written on the outline of the model: its slides are filled. Else one slide per section.
+        slides
+          ? await deps.renderer.fillDeck(model, mapDeckStrings(slides, withoutMarkers))
+          : await deps.renderer.deck(approved.title, text, model),
       )
       files.push(deck)
     }

@@ -1,4 +1,6 @@
 import {
+  type DeckDraft,
+  type DeckOutline,
   type Deliverable,
   DomainError,
   type DraftAnswer,
@@ -21,7 +23,25 @@ const draft: DraftAnswer = {
 }
 const clean: RedTeamReport = { verdict: 'deliverable', findings: [], holds: 'La data regge.' }
 
-function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
+const OUTLINE: DeckOutline = {
+  slides: [
+    { slide: 1, texts: [{ id: 'S1.T1', text: 'Aurora — PI6', title: false }], tables: [] },
+    {
+      slide: 2,
+      texts: [
+        { id: 'S2.T1', text: 'Avanzamento — PI6', title: true },
+        { id: 'S2.T2', text: 'Dati al 23/10', title: false },
+      ],
+      tables: [
+        { id: 'S2.TAB1', columns: ['Voce', 'Stato'], rows: 1, sample: [['Ordini', 'Done']] },
+      ],
+    },
+    { slide: 3, texts: [{ id: 'S3.T1', text: 'Capacity', title: true }], tables: [] },
+  ],
+}
+
+function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft } = {}) {
+  const filled: DeckDraft[] = []
   const memory = memoryWriter()
   const requests: DraftRequest[] = []
   let now = START
@@ -32,6 +52,8 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
         requests.push(request)
         now += 2 * MINUTE
         if (options.fails) throw options.fails
+        // A writer given the outline of a model deck gives its slides, and no text.
+        if (request.deckOutline && options.deck) return { ...draft, text: '', deck: options.deck }
         return draft
       },
       redTeam: async () => {
@@ -48,6 +70,11 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
       deck: async (title, _markdown, model) => new Uint8Array(title.length + model.length),
       checkDeckModel: async (bytes) => {
         if (bytes.length === 0) throw new DomainError('deck_model_invalid')
+      },
+      deckOutline: async () => OUTLINE,
+      fillDeck: async (model, deck) => {
+        filled.push(deck)
+        return new Uint8Array(model.length + deck.slides.length)
       },
     },
     evidence: evidenceFrom({
@@ -67,7 +94,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error } = {}) {
     clock: { now: () => new Date(now) },
     ids: countingIds('d'),
   })
-  return { service, memory, requests, wait: (ms: number) => (now += ms), options }
+  return { service, memory, requests, filled, wait: (ms: number) => (now += ms), options }
 }
 
 describe('writing a deliverable', () => {
@@ -290,6 +317,83 @@ describe('approving a deliverable', () => {
 
     await service.setDeckModel(project, null)
     expect(await service.hasDeckModel(project)).toBe(false)
+  })
+
+  it('writes a deck on the outline of the model: its slides, checked as a text, filled at approval', async () => {
+    const deck: DeckDraft = {
+      slides: [
+        { slide: 1, skip: false, texts: [{ id: 'S1.T1', text: 'Aurora — PI7' }], tables: [] },
+        {
+          slide: 2,
+          skip: false,
+          // The line that dated the data is not written, and a text nobody asked for is.
+          texts: [
+            { id: 'S2.T1', text: 'Avanzamento — PI7' },
+            { id: 'S9.T9', text: 'Fuori scaletta' },
+          ],
+          tables: [
+            {
+              id: 'S2.TAB1',
+              columns: ['Voce', 'Stato'],
+              rows: [['Collaudo', 'spostato al 17 dicembre [1]'], ['Solo una cella']],
+            },
+          ],
+        },
+        // Slide 3 is not given at all.
+      ],
+    }
+    const { service, requests, filled } = setup({ deck })
+    await service.setDeckModel(project, new Uint8Array([7, 7, 7]))
+
+    const made = await service.start(project, {
+      kindId: 'stato-avanzamento',
+      inputs: { periodo: 'Sprint 28' },
+    })
+
+    expect(requests[0]?.deckOutline).toEqual(OUTLINE)
+    // The text a person reviews is the slides: a section each, the lines, the tables.
+    expect(made.draft?.text).toBe(
+      [
+        '# Sprint 28',
+        '',
+        '## Slide 1',
+        '',
+        '- Aurora — PI7',
+        '',
+        '## Slide 2 — Avanzamento — PI7',
+        '',
+        '| Voce | Stato |',
+        '|---|---|',
+        '| Collaudo | spostato al 17 dicembre [1] |',
+        '| Solo una cella |  |',
+        '',
+      ].join('\n'),
+    )
+    expect(made.draft?.citations[0]?.status).toBe('verified')
+    // What the code had to mend is told, in the words of the PM; nothing of the model is kept.
+    expect(made.draft?.missing).toEqual([
+      'Slide 2: il testo che nel modello dice «Dati al 23/10» non è stato scritto ed è rimasto vuoto.',
+      'Slide 2: 1 righe di una tabella avevano più o meno valori delle colonne e sono state adattate.',
+      'Slide 3 del modello: non è stata scritta, quindi è stata tolta dalla presentazione.',
+    ])
+    expect(made.written?.deck?.slides.map((slide) => [slide.slide, slide.skip])).toEqual([
+      [1, false],
+      [2, false],
+      [3, true],
+    ])
+
+    const approved = await service.approve(project, made.id)
+    expect(approved.files[2]).toMatch(/\.pptx$/)
+    // The model is filled with the slides, the source markers taken off.
+    expect(filled).toHaveLength(1)
+    expect(filled[0]?.slides[1]?.tables[0]?.rows[0]).toEqual([
+      'Collaudo',
+      'spostato al 17 dicembre',
+    ])
+    expect(filled[0]?.slides[1]?.texts).toEqual([
+      { id: 'S2.T1', text: 'Avanzamento — PI7' },
+      { id: 'S2.T2', text: '' },
+    ])
   })
 
   it('keeps the register of the project up to date at every approval', async () => {

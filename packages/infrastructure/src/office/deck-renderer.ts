@@ -11,13 +11,13 @@ import {
   deckContent,
 } from './deck-slides.ts'
 
-const PRESENTATION = 'ppt/presentation.xml'
-const PRESENTATION_RELS = 'ppt/_rels/presentation.xml.rels'
-const CONTENT_TYPES = '[Content_Types].xml'
-const SLIDE_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml'
-const OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+export const PRESENTATION = 'ppt/presentation.xml'
+export const PRESENTATION_RELS = 'ppt/_rels/presentation.xml.rels'
+export const CONTENT_TYPES = '[Content_Types].xml'
+export const SLIDE_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml'
+export const OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const TABLE_URI = 'http://schemas.openxmlformats.org/drawingml/2006/table'
-const TITLE_HOLDER = /<p:ph\b[^>]*type="(?:title|ctrTitle)"/
+export const TITLE_HOLDER = /<p:ph\b[^>]*type="(?:title|ctrTitle)"/
 /** A shape that is the title of its slide; shapes do not nest, so the first end closes it. */
 const TITLE_SHAPE =
   /<p:sp\b[^>]*>(?:(?!<p:sp\b)[\s\S])*?<p:ph\b[^>]*type="(?:title|ctrTitle)"[\s\S]*?<\/p:sp>/
@@ -28,10 +28,10 @@ const FRAME_PLACE =
   /<p:xfrm>\s*<a:off x="(-?\d+)" y="(-?\d+)"\s*\/>\s*<a:ext cx="(\d+)" cy="(\d+)"\s*\/>/
 const TABLE_LOOK = /<a:tblPr\b[^>]*?(?:\/>|>[\s\S]*?<\/a:tblPr>)/
 const SLIDE_SIZE = /<p:sldSz\b[^>]*\bcx="(\d+)"[^>]*\bcy="(\d+)"/
-const SLIDE_LIST = /<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/
+export const SLIDE_LIST = /<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/
 /** The sections of the model name slides that are no longer there. */
-const SECTIONS = /<p:ext\b[^>]*>\s*<p14:sectionLst\b[\s\S]*?<\/p14:sectionLst>\s*<\/p:ext>/
-const SLIDE_NUMBER = /slide(\d+)\.xml$/
+export const SECTIONS = /<p:ext\b[^>]*>\s*<p14:sectionLst\b[\s\S]*?<\/p14:sectionLst>\s*<\/p:ext>/
+export const SLIDE_NUMBER = /slide(\d+)\.xml$/
 const DEFAULT_TABLE_LOOK = '<a:tblPr firstRow="1" bandRow="1"/>'
 /** Where the content goes when the model shows no table to copy the place of: shares of the slide. */
 const DEFAULT_AREA = { left: 0.05, top: 0.22, width: 0.9, height: 0.66 }
@@ -45,12 +45,12 @@ const ROW_HEIGHT = 370_840
 const INDENT = 285_750
 
 type Area = { x: number; y: number; cx: number; cy: number }
-type Parts = Record<string, Uint8Array>
+export type Parts = Record<string, Uint8Array>
 
 const invalid = (): DomainError => new DomainError('deck_model_invalid')
 
 /** Text as it may stand inside an XML element; characters XML forbids are dropped. */
-const escaped = (text: string): string =>
+export const escaped = (text: string): string =>
   text
     // biome-ignore lint/suspicious/noControlCharactersInRegex: these are the characters XML 1.0 forbids.
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
@@ -129,16 +129,16 @@ function slideXml(mould: Mould, slide: DeckSlide): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${mould.root}<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapes}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
 }
 
-const relsOf = (part: string): string => {
+export const relsOf = (part: string): string => {
   const at = part.lastIndexOf('/')
   return `${part.slice(0, at)}/_rels/${part.slice(at + 1)}.rels`
 }
-const folderOf = (part: string): string => part.slice(0, part.lastIndexOf('/'))
+export const folderOf = (part: string): string => part.slice(0, part.lastIndexOf('/'))
 
-type ModelSlide = { id: number; part: string; xml: string }
+export type ModelSlide = { id: number; part: string; xml: string }
 
 /** The slides of the model in the order they are shown. */
-function modelSlides(files: Parts, presentation: string): ModelSlide[] {
+export function modelSlides(files: Parts, presentation: string): ModelSlide[] {
   const targets = relationships(files[PRESENTATION_RELS])
   return tags(SLIDE_LIST.exec(presentation)?.[0] ?? '', 'p:sldId').flatMap((attrs) => {
     const target = targets.get(attr(attrs, 'r:id') ?? '')
@@ -172,7 +172,7 @@ function mouldOf(files: Parts, slide: ModelSlide, presentation: string): Mould {
   return { root, titleShape, tableLook, area, layout }
 }
 
-const without = (xml: string, tag: string, targets: readonly string[]): string =>
+export const without = (xml: string, tag: string, targets: readonly string[]): string =>
   targets.reduce(
     (text, target) =>
       text.replace(
