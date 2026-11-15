@@ -13,6 +13,8 @@ type Props = { api: OctoApi; project: Project }
 
 const PARTS = ['links', 'team', 'advanced'] as const
 type Part = (typeof PARTS)[number]
+/** Where the arrow keys go from a part: the one before or after it, round the row. */
+const PART_STEPS: Readonly<Record<string, number>> = { ArrowRight: 1, ArrowLeft: -1 }
 /** The source whose settings are open: one at a time, so the list stays a list. */
 type Source = 'mail' | FeedName
 
@@ -37,9 +39,20 @@ export function ProjectSettings({ api, project }: Props) {
             key={candidate}
             type="button"
             role="tab"
+            id={`settings-part-${candidate}`}
             aria-selected={part === candidate}
+            tabIndex={part === candidate ? 0 : -1}
             className={part === candidate ? 'tab tab-selected' : 'tab'}
             onClick={() => setPart(candidate)}
+            onKeyDown={(event) => {
+              const step = PART_STEPS[event.key]
+              if (step === undefined) return
+              event.preventDefault()
+              const next = PARTS[(PARTS.indexOf(candidate) + step + PARTS.length) % PARTS.length]
+              if (next === undefined) return
+              setPart(next)
+              document.getElementById(`settings-part-${next}`)?.focus()
+            }}
           >
             {messages.settingsParts[candidate]}
           </button>

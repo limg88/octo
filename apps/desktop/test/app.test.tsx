@@ -488,6 +488,31 @@ describe('App', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('keeps the focus inside a dialog and gives it back when the dialog closes', async () => {
+    const { api } = fakeApi()
+    render(<App api={api} />)
+    const opener = await screen.findByRole('button', { name: 'Aurora' })
+    opener.focus()
+    const dialog = await openAdd()
+    expect(document.activeElement).toBe(dialog)
+    const stops = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input')]
+    const first = stops[0] as HTMLElement
+    const last = stops.at(-1) as HTMLElement
+    // From the dialog itself, back goes to its last stop; from the last, forward to the first.
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(dialog, { key: 'Tab' })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+    // In the middle Tab is left to do what it does.
+    ;(stops[1] as HTMLElement).focus()
+    fireEvent.keyDown(dialog, { key: 'Tab' })
+    expect(document.activeElement).toBe(stops[1])
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('writes a backup and says the credentials are not in it', async () => {
     const { api } = fakeApi({
       saveBackup: vi
@@ -695,6 +720,16 @@ describe('project tabs', () => {
     fireEvent.click(toggle(messages.close, 'Jira'))
     expect(formOf(messages.feedFields.site)?.hidden).toBe(true)
 
+    // The parts of the settings are moved through with the arrows too, round the row.
+    const links = screen.getByRole('tab', { name: messages.settingsParts.links })
+    fireEvent.keyDown(links, { key: 'ArrowLeft' })
+    expect(await screen.findByRole('region', { name: messages.models.title })).toBeTruthy()
+    expect(document.activeElement?.textContent).toBe(messages.settingsParts.advanced)
+    fireEvent.keyDown(screen.getByRole('tab', { name: messages.settingsParts.advanced }), {
+      key: 'ArrowRight',
+    })
+    fireEvent.keyDown(links, { key: 'a' })
+    await screen.findByText(messages.mailNotConfigured)
     fireEvent.click(screen.getByRole('tab', { name: messages.settingsParts.team }))
     expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
     expect(screen.queryByText(messages.mailNotConfigured)).toBeNull()

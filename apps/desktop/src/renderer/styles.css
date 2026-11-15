@@ -1742,3 +1742,11 @@ details.advanced[open] > summary {
 .trend-numbers[open] > summary {
   margin-bottom: 8px;
 }
+
+/* A small window: the columns that hold lists give room to the page. */
+@media (max-width: 1040px) {
+  .shell,
+  .deliverables {
+    grid-template-columns: 196px 1fr;
+  }
+}
