@@ -146,9 +146,14 @@ export function cleanFeedConfig<Name extends FeedName>(
  * another perimeter: they are removed and the reading starts over.
  */
 export function feedScope(config: FeedConfig): string {
-  const { targetFolder: _folder, ...what } = config
+  const { targetFolder: _folder, ...settings } = config
+  // An issue tracker read for more fields than before is another reading: it starts over once.
+  const what = 'site' in config ? { ...settings, fields: ISSUE_FIELDS_REVISION } : settings
   return JSON.stringify(what, Object.keys(what).sort())
 }
+
+/** Raised when the fields read of every issue change: the sprint and the estimate, since 2. */
+const ISSUE_FIELDS_REVISION = 2
 
 const FEED_LABELS: Readonly<Record<FeedName, string>> = {
   ado: 'Azure DevOps',

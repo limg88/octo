@@ -55,6 +55,8 @@ export interface FakeJira {
   options: FakeJiraOptions
   /** Answers the search with every issue, ignoring the projects (a misbehaving system). */
   leakPerimeter: boolean
+  /** Refuses the list of fields, as a site does to an account that may not see it. */
+  hideFields: boolean
   /**
    * Orders the search by the minute of the update only, then by key: issues changed within the
    * same minute come out of their millisecond order (a misbehaving system).
@@ -110,6 +112,7 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
     server: undefined as unknown as FakeServer,
     options,
     leakPerimeter: false,
+    hideFields: false,
     orderByMinuteOnly: false,
     allFields: false,
     inlineComments: undefined,
@@ -249,6 +252,31 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
         timeZone: options.timeZone ?? 'Europe/Rome',
         locale: 'it_IT',
       })
+      return
+    }
+    if (path === `${API}/field`) {
+      if (fake.hideFields) {
+        json(res, 403, { errorMessages: ['forbidden'] })
+        return
+      }
+      json(res, 200, [
+        { id: 'summary', name: 'Summary', custom: false, schema: { type: 'string' } },
+        {
+          id: 'customfield_10016',
+          name: 'Story Points',
+          custom: true,
+          schema: {
+            type: 'number',
+            custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float',
+          },
+        },
+        {
+          id: 'customfield_10020',
+          name: 'Sprint',
+          custom: true,
+          schema: { type: 'array', custom: 'com.pyxis.greenhopper.jira:gh-sprint' },
+        },
+      ])
       return
     }
     if (path === `${API}/project/search`) {

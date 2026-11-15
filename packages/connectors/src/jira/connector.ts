@@ -80,6 +80,33 @@ async function getJson(ctx: ConnectorContext<JiraConfig>, url: string): Promise<
   return res.json()
 }
 
+export interface JiraCustomFields {
+  sprintField: string | null
+  storyPointsField: string | null
+}
+
+/** What Jira Software calls the type of its sprint field and of its estimate. */
+const SPRINT_FIELD_TYPE = 'com.pyxis.greenhopper.jira:gh-sprint'
+const STORY_POINTS_FIELD_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
+const STORY_POINTS_NAME = /^story points?$/i
+const FIELD_ID = /^customfield_\d{1,10}$/
+
+/** The sprint and estimate fields in the list of fields of a site; null for one it lacks. */
+export function customFieldsOf(json: unknown): JiraCustomFields {
+  if (!Array.isArray(json)) return bad()
+  const found: JiraCustomFields = { sprintField: null, storyPointsField: null }
+  for (const field of json) {
+    if (!isRecord(field) || typeof field.id !== 'string' || !FIELD_ID.test(field.id)) continue
+    const type = isRecord(field.schema) ? field.schema.custom : undefined
+    const name = typeof field.name === 'string' ? field.name.trim() : ''
+    if (type === SPRINT_FIELD_TYPE) found.sprintField ??= field.id
+    // The estimate of a team-managed project, or the classic field by its name.
+    if (type === STORY_POINTS_FIELD_TYPE) found.storyPointsField = field.id
+    else if (STORY_POINTS_NAME.test(name)) found.storyPointsField ??= field.id
+  }
+  return found
+}
+
 function parseCursor(raw: unknown): JiraCursor {
   if (raw === null) return null
   if (!isRecord(raw)) throw new TypeError('jira cursor')
@@ -138,6 +165,11 @@ export interface JiraConnector extends Connector<JiraConfig, JiraCursor> {
    * long and on which issue. More than it can read fails, never a list cut short.
    */
   worklogs(ctx: ConnectorContext<JiraConfig>, period: WorklogPeriod): Promise<JiraWorklog[]>
+  /**
+   * The fields of this site that hold the sprint and the estimate of an issue: each site names
+   * them its own way, and without them an issue is read with neither.
+   */
+  customFields(ctx: ConnectorContext<JiraConfig>): Promise<JiraCustomFields>
 }
 
 export function createJiraConnector(options: JiraConnectorOptions = {}): JiraConnector {
@@ -316,6 +348,10 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
     },
 
     perimeterOptions: listProjects,
+
+    async customFields(ctx) {
+      return customFieldsOf(await getJson(ctx, apiUrl(endpointOf(ctx.config), ['field'])))
+    },
 
     async listIds(ctx) {
       const endpoint = endpointOf(ctx.config)

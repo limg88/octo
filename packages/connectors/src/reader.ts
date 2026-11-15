@@ -179,6 +179,29 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
     })
   }
 
+  /**
+   * The settings with the sprint and estimate fields of the site, where they name none: without
+   * them every issue is read with no sprint. A site that does not show its fields is read as before.
+   */
+  async function withJiraFields(config: unknown, secret: string): Promise<unknown> {
+    const settings = config as { sprintField: string | null; storyPointsField: string | null }
+    if (settings.sprintField !== null && settings.storyPointsField !== null) return config
+    const signal = new AbortController().signal
+    try {
+      const found = await withContext('jira', { config, perimeter: [], secret }, signal, (c, ctx) =>
+        (c as unknown as JiraConnector).customFields(ctx as never),
+      )
+      return {
+        ...settings,
+        sprintField: settings.sprintField ?? found.sprintField,
+        storyPointsField: settings.storyPointsField ?? found.storyPointsField,
+      }
+    } catch (error) {
+      if (error instanceof ConnectorError) return config
+      throw error
+    }
+  }
+
   return {
     entries: (kind, rawConfig, secret) =>
       optionsOf(kind, connectors[kind].parseConfig(rawConfig), secret),
@@ -194,8 +217,9 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
         const projectId = project.id.slice(PROJECT_OPTION_PREFIX.length)
         config = connectors[kind].parseConfig({ ...(rawConfig as object), projectId })
         entries = areasOf(await optionsFor(config), scope.slice(1))
-      } else if (scope.length > 0) {
-        entries = entries.filter((entry) => inScope(entry, scope))
+      } else {
+        if (scope.length > 0) entries = entries.filter((entry) => inScope(entry, scope))
+        config = await withJiraFields(config, secret)
       }
       if (entries.length === 0) throw new ConnectorError(NOTHING_TO_READ)
       return {
