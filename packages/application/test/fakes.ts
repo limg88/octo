@@ -69,12 +69,9 @@ export function memoryQuestionLog(): QuestionLog & { all(): QuestionRecord[] } {
   let records: QuestionRecord[] = []
   return {
     all: () => records,
-    list: async (projectId) => records.filter((record) => record.projectId === projectId),
-    append: async (record) => {
+    list: async () => records,
+    append: async (_projectFolder, record) => {
       records = [...records, record]
-    },
-    removeProject: async (projectId) => {
-      records = records.filter((record) => record.projectId !== projectId)
     },
   }
 }
@@ -111,6 +108,12 @@ export function memorySourceStates(): SourceStates & { all(): Map<string, Source
     set: async (projectId, source, state) => {
       states.set(`${projectId}/${source}`, state)
     },
+    ofProject: async (projectId) =>
+      Object.fromEntries(
+        [...states]
+          .filter(([key]) => key.startsWith(`${projectId}/`))
+          .map(([key, state]) => [key.slice(projectId.length + 1), state]),
+      ),
     removeProject: async (projectId) => {
       for (const key of [...states.keys()]) {
         if (key.startsWith(`${projectId}/`)) states.delete(key)

@@ -4,6 +4,7 @@ import type {
   AgentRunner,
   Alignments,
   AskQuestion,
+  Backups,
   Dashboard,
   Deliverables,
   Documents,
@@ -52,7 +53,21 @@ export type IpcDeps = {
   letterheadDialogTitle: string
   deckModelDialogTitle: string
   newProjectDialogTitle: string
+  backups: Backups
+  backupDialogs: BackupDialogs
 }
+
+/** The words of the dialogs of a backup: they are the interface's, not this file's. */
+export type BackupDialogs = {
+  saveTitle: string
+  openTitle: string
+  fileKind: string
+  /** The title of the dialog that asks where a project is on this computer. */
+  locateTitle(projectName: string): string
+  defaultFileName(): string
+}
+
+const BACKUP_EXTENSIONS = ['json']
 
 const MAX_QUESTION_LENGTH = 4000
 const MAX_RULE_LENGTH = 300
@@ -303,6 +318,39 @@ export function registerIpc(deps: IpcDeps): void {
     return choice.canceled || !parent ? null : deps.projects.create(parent, name)
   })
 
+  handle(CHANNELS.backupSave, none, async () => {
+    const choice = await dialog.showSaveDialog(deps.window, {
+      title: deps.backupDialogs.saveTitle,
+      defaultPath: deps.backupDialogs.defaultFileName(),
+      filters: [{ name: deps.backupDialogs.fileKind, extensions: BACKUP_EXTENSIONS }],
+    })
+    if (choice.canceled || !choice.filePath) return null
+    return { file: choice.filePath, projects: await deps.backups.save(choice.filePath) }
+  })
+
+  handle(CHANNELS.backupRestore, none, async () => {
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.backupDialogs.openTitle,
+      properties: ['openFile'],
+      filters: [{ name: deps.backupDialogs.fileKind, extensions: BACKUP_EXTENSIONS }],
+    })
+    const file = choice.filePaths[0]
+    if (choice.canceled || !file) return null
+    const { backup, toLocate } = await deps.backups.open(file)
+    const folders: Record<string, string> = {}
+    for (const project of toLocate) {
+      const where = await dialog.showOpenDialog(deps.window, {
+        title: deps.backupDialogs.locateTitle(project.name),
+        message: deps.backupDialogs.locateTitle(project.name),
+        properties: ['openDirectory'],
+      })
+      const folder = where.filePaths[0]
+      // A project the PM does not point at is left out, and the outcome says so.
+      if (!where.canceled && folder) folders[project.id] = folder
+    }
+    return deps.backups.restore(backup, folders)
+  })
+
   handle(CHANNELS.teamGet, byProject, async ({ projectId }) =>
     deps.team.get(await deps.projects.get(projectId)),
   )
@@ -319,7 +367,7 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.questionsList, byProject, async ({ projectId }) => {
     const project = await deps.projects.get(projectId)
-    return deps.questions.list(project.id)
+    return deps.questions.list(project.folder)
   })
 
   handle(CHANNELS.questionsAsk, askInput, async ({ projectId, question }) => {

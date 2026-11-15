@@ -148,6 +148,29 @@ describe('reading a feed', () => {
     )
   })
 
+  it('writes the same files over, with no duplicates, on a computer that lost its readings', async () => {
+    const script = { steps: [step({ files: [file('1', 'a'), file('2', 'a')], cursor: { at: 1 } })] }
+    const { feeds, writer, secrets } = setup(script)
+    secrets.all.set('p-1/ado', 'pat')
+    await feeds.sync(project, 'ado')
+    const before = [...writer.files.keys()].sort()
+
+    // Another computer: the same project folder, no index and no cursor.
+    const fresh = createFeeds({
+      settings: memorySourceSettings({ ...NO_SOURCES, ado: config }),
+      states: memorySourceStates(),
+      indexes: memoryFeedIndexes(),
+      secrets,
+      reader: scriptedFeed(script),
+      writer,
+      files: removerOf(writer.files),
+      clock: { now: () => NOW },
+    })
+
+    expect(await fresh.sync(project, 'ado')).toMatchObject({ error: null })
+    expect([...writer.files.keys()].sort()).toEqual(before)
+  })
+
   it('starts over, removing its files, when what it reads changes', async () => {
     const { feeds, writer, secrets, reader, script } = setup({
       steps: [step({ files: [file('1', 'a')], cursor: 7 })],

@@ -1,6 +1,7 @@
 import type {
   AlignmentSettings,
   ArchivedMail,
+  Backup,
   DashboardSettings,
   DeliverableDraft,
   DeliverableKind,
@@ -65,10 +66,10 @@ export interface ProjectRegistry {
   save(projects: Project[]): Promise<void>
 }
 
+/** The questions of a project, kept in the project folder so they travel with it. */
 export interface QuestionLog {
-  list(projectId: string): Promise<QuestionRecord[]>
-  append(record: QuestionRecord): Promise<void>
-  removeProject(projectId: string): Promise<void>
+  list(projectFolder: string): Promise<QuestionRecord[]>
+  append(projectFolder: string, record: QuestionRecord): Promise<void>
 }
 
 export interface FolderProbe {
@@ -134,6 +135,8 @@ export type SourceName = 'mail' | 'documents' | FeedName
 export interface SourceStates {
   get(projectId: string, source: SourceName): Promise<SourceState>
   set(projectId: string, source: SourceName, state: SourceState): Promise<void>
+  /** Every state of the project, by the name of its source. */
+  ofProject(projectId: string): Promise<Record<string, SourceState>>
   removeProject(projectId: string): Promise<void>
 }
 
@@ -331,4 +334,12 @@ export interface FeedRecords {
 export interface TeamStore {
   load(projectFolder: string): Promise<ProjectTeam>
   save(projectFolder: string, team: ProjectTeam): Promise<void>
+}
+
+/** The file of a backup, wherever the PM keeps it. */
+export interface BackupFiles {
+  /** Throws a DomainError `backup_invalid` when the file is not a backup Octo can read. */
+  read(file: string): Promise<Backup>
+  /** Throws a DomainError `backup_not_written` when the file cannot be written there. */
+  write(file: string, backup: Backup): Promise<void>
 }

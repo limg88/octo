@@ -1,10 +1,21 @@
-import { access, constants, mkdir, rm, stat, writeFile } from 'node:fs/promises'
+import { access, constants, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { FolderProbe, ProjectRegistry, ProjectScaffold, QuestionLog } from '@octo/application'
+import type {
+  BackupFiles,
+  FolderProbe,
+  ProjectRegistry,
+  ProjectScaffold,
+  QuestionLog,
+} from '@octo/application'
 import {
+  BACKUP_FORMAT,
+  BACKUP_VERSION,
+  type Backup,
   CITATION_STATUSES,
   DOMAIN_ERROR_CODES,
   DomainError,
+  FEED_NAMES,
+  HISTORY_FOLDER,
   type Project,
   type QuestionRecord,
 } from '@octo/domain'
@@ -44,7 +55,7 @@ const questionSchema = z.object({
 })
 
 const PROJECTS_FILE = 'projects.json'
-const QUESTIONS_FOLDER = 'questions'
+const QUESTIONS_FILE = 'domande.json'
 const PRIVATE_FILE_MODE = 0o600
 
 /** The app's own state lives in its data folder, never in the project folder. */
@@ -56,21 +67,70 @@ export function createJsonProjectRegistry(dataFolder: string): ProjectRegistry {
   }
 }
 
-export function createJsonQuestionLog(dataFolder: string): QuestionLog {
-  const fileOf = (projectId: string) =>
-    join(dataFolder, QUESTIONS_FOLDER, `${encodeURIComponent(projectId)}.json`)
-  const list = async (projectId: string): Promise<QuestionRecord[]> =>
-    z.array(questionSchema).parse(await readJsonOr(fileOf(projectId), []))
+/** Tells the search tools to leave the folder out: an earlier answer is not a source. */
+const SEARCH_DENY = { name: '.ignore', content: '*\n' }
+
+/** The questions of a project in its own folder: they follow it to another computer. */
+export function createFsQuestionLog(): QuestionLog {
+  const folderOf = (projectFolder: string) => join(projectFolder, ...HISTORY_FOLDER.split('/'))
+  const fileOf = (projectFolder: string) => join(folderOf(projectFolder), QUESTIONS_FILE)
+  const list = async (projectFolder: string): Promise<QuestionRecord[]> =>
+    z.array(questionSchema).parse(await readJsonOr(fileOf(projectFolder), []))
   return {
     list,
-    append: async (record) => {
-      await writeJson(
-        fileOf(record.projectId),
-        [...(await list(record.projectId)), record],
-        PRIVATE_FILE_MODE,
-      )
+    append: async (projectFolder, record) => {
+      await writeJson(fileOf(projectFolder), [...(await list(projectFolder)), record])
+      const marker = join(folderOf(projectFolder), SEARCH_DENY.name)
+      await writeFile(marker, SEARCH_DENY.content, 'utf8')
     },
-    removeProject: (projectId) => rm(fileOf(projectId), { force: true }),
+  }
+}
+
+const sourceStateSchema = z.object({
+  cursor: z.string().nullable(),
+  lastRun: z
+    .object({
+      at: z.string(),
+      written: z.number(),
+      unchanged: z.number(),
+      error: z.enum(DOMAIN_ERROR_CODES).nullable(),
+    })
+    .nullable(),
+})
+
+const feedIndexSchema = z.object({
+  scope: z.string(),
+  items: z.record(z.string(), z.object({ version: z.string(), path: z.string() })),
+})
+
+const backupSchema = z.object({
+  format: z.literal(BACKUP_FORMAT),
+  version: z.literal(BACKUP_VERSION),
+  createdAt: z.string(),
+  projects: z.array(
+    z.object({
+      project: projectSchema,
+      sources: z.record(z.string(), sourceStateSchema),
+      feeds: z.partialRecord(z.enum(FEED_NAMES), feedIndexSchema),
+    }),
+  ),
+})
+
+/** A backup as one JSON file, checked whole when it is read: it comes from outside. */
+export function createJsonBackupFiles(): BackupFiles {
+  return {
+    async read(file): Promise<Backup> {
+      const parsed = backupSchema.safeParse(await readJsonOr(file, null).catch(() => null))
+      if (!parsed.success) throw new DomainError('backup_invalid', file)
+      return parsed.data
+    },
+    async write(file, backup) {
+      try {
+        await writeJson(file, backup, PRIVATE_FILE_MODE)
+      } catch {
+        throw new DomainError('backup_not_written', file)
+      }
+    },
   }
 }
 

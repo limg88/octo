@@ -1,5 +1,5 @@
 import type { AgentStatus } from '@octo/application'
-import { FEED_NAMES, type Project } from '@octo/domain'
+import { FEED_NAMES, type Project, type RestoreOutcome } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AlignmentView } from './AlignmentView.tsx'
@@ -37,6 +37,7 @@ export function App({ api }: Props) {
   const [error, setError] = useState<ErrorCode | null>(null)
   const [tab, setTab] = useState<Tab>('ask')
   const [newName, setNewName] = useState<string | null>(null)
+  const [backupNotes, setBackupNotes] = useState<string[]>([])
 
   useEffect(() => {
     void api.agentStatus().then((result) => {
@@ -71,6 +72,28 @@ export function App({ api }: Props) {
     setProjects((previous) => [...previous, created])
     setSelectedId(created.id)
     setTab('sources')
+  }
+
+  async function saveBackup() {
+    setError(null)
+    setBackupNotes([])
+    const result = await api.saveBackup()
+    if (!result.ok) return setError(result.code)
+    if (result.value === null) return
+    setBackupNotes([messages.backup.saved(result.value.file, result.value.projects)])
+  }
+
+  async function restoreBackup() {
+    setError(null)
+    setBackupNotes([])
+    const result = await api.restoreBackup()
+    if (!result.ok) return setError(result.code)
+    if (result.value === null) return
+    setBackupNotes(restoreNotes(result.value))
+    const listed = await api.listProjects()
+    if (!listed.ok) return setError(listed.code)
+    setProjects(listed.value)
+    setSelectedId((current) => current ?? listed.value[0]?.id ?? null)
   }
 
   async function removeProject(project: Project) {
@@ -132,6 +155,16 @@ export function App({ api }: Props) {
             </button>
           </form>
         )}
+        <section className="backup" aria-label={messages.backup.title}>
+          <h2>{messages.backup.title}</h2>
+          <button type="button" className="quiet" onClick={() => void saveBackup()}>
+            {messages.backup.save}
+          </button>
+          <button type="button" className="quiet" onClick={() => void restoreBackup()}>
+            {messages.backup.restore}
+          </button>
+          <p className="hint">{messages.backup.hint}</p>
+        </section>
         {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
       </nav>
       <main>
@@ -139,6 +172,13 @@ export function App({ api }: Props) {
           <p className="warning" role="alert">
             {errorText(error)}
           </p>
+        )}
+        {backupNotes.length > 0 && (
+          <div className="notice" role="status">
+            {backupNotes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </div>
         )}
         {agent?.available === false && (
           <div className="notice" role="alert">
@@ -237,6 +277,18 @@ export function App({ api }: Props) {
       </main>
     </div>
   )
+}
+
+/** What a restore did, one line for each thing the PM has to know. */
+function restoreNotes(outcome: RestoreOutcome): string[] {
+  const { restored, alreadyHere, skipped } = outcome
+  if (restored.length + alreadyHere.length + skipped.length === 0) return [messages.backup.nothing]
+  return [
+    ...(restored.length > 0 ? [messages.backup.restored(restored)] : []),
+    ...(alreadyHere.length > 0 ? [messages.backup.alreadyHere(alreadyHere)] : []),
+    ...(skipped.length > 0 ? [messages.backup.skipped(skipped)] : []),
+    ...(restored.length > 0 ? [messages.backup.credentials] : []),
+  ]
 }
 
 function TabButton({

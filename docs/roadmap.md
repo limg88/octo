@@ -72,7 +72,8 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Variabili di un'altra sessione Claude** (`ANTHROPIC_*`, `CLAUDE*`) tolte dall'ambiente del processo: vale sempre l'accesso del PM.
 - **La domanda viaggia sullo standard input**: nessun problema di virgolette su Windows.
 - **Citazioni**: una frase vale come prova se è lunga almeno 12 caratteri e si trova nel file, ignorando a capo e spazi ripetuti. Un file citato si apre solo se il suo percorso reale sta nella cartella del progetto.
-- **Stato dell'app** (elenco dei progetti, storico delle domande) in file JSON nella cartella dati dell'utente, mai nella cartella del progetto.
+- **Stato dell'app** (elenco dei progetti, stato delle letture) in file JSON nella cartella dati dell'utente. Lo storico delle domande sta nella cartella del progetto (`_octo/.cronologia/`), fuori dalle fonti citabili, così segue il progetto.
+- **Cambio di computer** (demo 15): «Copia di sicurezza» scrive in un file l'elenco dei progetti e lo stato delle letture, mai le credenziali; «Ripristina» li rimette su un altro computer, chiede dove sono le cartelle che non trova e non tocca i progetti già in elenco. La cartella del progetto va tenuta in un posto copiato altrove: la copia di sicurezza non la contiene.
 - **Interfaccia isolata**: nessun accesso a Node, un solo ponte con richieste validate; ogni errore arriva come codice e l'interfaccia lo spiega a parole.
 - **Versioni delle dipendenze**: solo rilasci pubblicati da almeno 14 giorni.
 - **Non verificato**: installatore e avvio su Windows; il percorso di Claude Code su Windows è cercato solo nell'installazione nativa (`%USERPROFILE%\.local\bin\claude.exe`), altrimenti sul PATH.

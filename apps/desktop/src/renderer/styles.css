@@ -132,8 +132,15 @@ a:focus-visible {
   margin-top: 4px;
 }
 
-.agent {
+.backup {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent {
+  margin-top: 12px;
   padding: 0 8px;
   font-size: 12px;
   color: var(--muted);

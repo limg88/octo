@@ -49,6 +49,8 @@ export const DOMAIN_ERROR_CODES = [
   'team_invalid',
   'project_name_invalid',
   'project_folder_exists',
+  'backup_invalid',
+  'backup_not_written',
   'alignment_sprint_not_set',
   'alignment_items_missing',
   'alignment_tickets_missing',

@@ -2,7 +2,7 @@
 // of demo 01 in the real window. Run with `pnpm e2e` after `pnpm build`.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import { DEMO_ADO, extraItem, startDemoAdo } from '../demo/lib/fake-ado.ts'
@@ -44,12 +44,12 @@ async function assertEventuallyAsync(check) {
   assert.fail('the app did not get there in time')
 }
 
-const launch = () =>
+const launch = (dataFolder = `${work}/dati`) =>
   electron.launch({
     ...(packaged ? { executablePath: packaged, args: [] } : { args: [`${root}apps/desktop`] }),
     env: {
       ...process.env,
-      OCTO_DATA_DIR: `${work}/dati`,
+      OCTO_DATA_DIR: dataFolder,
       OCTO_CLAUDE_PATH: `${root}demo/lib/fake-claude`,
       OCTO_MAIL_ROOT: `${work}/Mail`,
       OCTO_DEV_ADO_URL: ado.server.origin,
@@ -543,6 +543,49 @@ try {
   app = await launch()
   page = await app.firstWindow()
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
+
+  // Demo 15: a backup on this computer, restored on a new one where the folder is elsewhere.
+  // The dialogs are the system's: here they answer by themselves.
+  const backupFile = `${work}/chiavetta/octo-copia.json`
+  await app.evaluate(({ dialog }, filePath) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath })
+  }, backupFile)
+  await page.getByRole('button', { name: 'Copia di sicurezza' }).click()
+  await page.getByText(/1 progetto\. Le credenziali non ci sono/).waitFor({ timeout: TIMEOUT_MS })
+  const backupText = readFileSync(backupFile, 'utf8')
+  assert.equal(JSON.parse(backupText).projects[0].project.name, 'Aurora')
+  assert.ok(JSON.parse(backupText).projects[0].sources.mail.cursor)
+  assert.doesNotMatch(backupText, new RegExp(`${DEMO_JIRA.token}|${DEMO_ADO.pat}`))
+  await app.close()
+
+  const movedFolder = `${work}/Aurora sul nuovo computer`
+  renameSync(`${work}/Aurora`, movedFolder)
+  app = await launch(`${work}/dati-nuovo`)
+  page = await app.firstWindow()
+  await page.getByRole('heading', { name: 'Nessun progetto' }).waitFor({ timeout: TIMEOUT_MS })
+  await app.evaluate(
+    ({ dialog }, { file, folder }) => {
+      dialog.showOpenDialog = async (_window, options) => ({
+        canceled: false,
+        filePaths: [options.properties.includes('openDirectory') ? folder : file],
+      })
+    },
+    { file: backupFile, folder: movedFolder },
+  )
+  await page.getByRole('button', { name: 'Ripristina' }).click()
+  await page.getByText('Ripristinati: Aurora.').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText(/Rimetti le credenziali/).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
+  // The questions came with the folder, the readings with the backup.
+  await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
+  const readings = (dataFolder) =>
+    JSON.parse(readFileSync(`${work}/${dataFolder}/feeds/demo-aurora/ado.json`, 'utf8'))
+  assert.deepEqual(readings('dati-nuovo'), readings('dati'))
+  assert.equal(
+    JSON.parse(readFileSync(`${work}/dati-nuovo/projects.json`, 'utf8'))[0].folder,
+    movedFolder,
+  )
+  await page.screenshot({ path: `${work}/ripristino.png` })
   console.log('e2e: ok')
 } finally {
   await app.close()

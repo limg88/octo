@@ -12,13 +12,11 @@ import type {
   IdGenerator,
   ProjectRegistry,
   ProjectScaffold,
-  QuestionLog,
   SourceStates,
 } from './ports.ts'
 
 export type ProjectsDeps = {
   registry: ProjectRegistry
-  questions: QuestionLog
   sourceStates: SourceStates
   folders: FolderProbe
   scaffold: ProjectScaffold
@@ -60,12 +58,14 @@ export function createProjects(deps: ProjectsDeps): Projects {
     return project
   }
 
-  /** Forgets the project, its questions and its readings. The folder itself is never touched. */
+  /**
+   * Forgets the project and its readings. The folder is never touched: its questions stay in it
+   * and come back when the folder is added again.
+   */
   async function remove(id: string): Promise<void> {
     const project = await get(id)
     const projects = await deps.registry.list()
     await deps.registry.save(projects.filter((candidate) => candidate.id !== project.id))
-    await deps.questions.removeProject(project.id)
     await deps.sourceStates.removeProject(project.id)
   }
 

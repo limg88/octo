@@ -1,17 +1,18 @@
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AgentProgress } from '@octo/application'
-import type { Project, QuestionRecord } from '@octo/domain'
+import { type Backup, HISTORY_FOLDER, type Project, type QuestionRecord } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   CLAUDE_PATH_VARIABLE,
   createClaudeCliRunner,
   createFsEvidenceReader,
   createFsFolderProbe,
+  createFsQuestionLog,
+  createJsonBackupFiles,
   createJsonProjectRegistry,
-  createJsonQuestionLog,
   locateClaude,
 } from '../src/index.ts'
 
@@ -187,20 +188,61 @@ describe('json stores', () => {
     expect(await createJsonProjectRegistry(data).list()).toEqual([])
 
     await createJsonProjectRegistry(data).save([sample])
-    await createJsonQuestionLog(data).append(record)
-    await createJsonQuestionLog(data).append({
+    expect(await createJsonProjectRegistry(data).list()).toEqual([sample])
+  })
+
+  it('keeps the questions in the project folder, out of the sources', async () => {
+    const folder = join(root, 'con-domande')
+    await mkdir(folder)
+    expect(await createFsQuestionLog().list(folder)).toEqual([])
+
+    await createFsQuestionLog().append(folder, record)
+    await createFsQuestionLog().append(folder, {
       ...record,
       id: 'q-2',
       answer: null,
       error: 'agent_failed',
     })
 
-    expect(await createJsonProjectRegistry(data).list()).toEqual([sample])
-    const questions = await createJsonQuestionLog(data).list('p-1')
+    const questions = await createFsQuestionLog().list(folder)
     expect(questions.map((question) => question.id)).toEqual(['q-1', 'q-2'])
+    // The search tools skip the folder, and a citation of an earlier answer is never verified.
+    expect(await readFile(join(folder, HISTORY_FOLDER, '.ignore'), 'utf8')).toBe('*\n')
+    const cited = await createFsEvidenceReader().read(folder, `${HISTORY_FOLDER}/domande.json`)
+    expect(cited).toEqual({ kind: 'missing' })
+  })
 
-    await createJsonQuestionLog(data).removeProject('p-1')
-    expect(await createJsonQuestionLog(data).list('p-1')).toEqual([])
+  it('writes a backup and reads it back, and refuses what is not one', async () => {
+    const files = createJsonBackupFiles()
+    const file = join(root, 'copie', 'octo-copia.json')
+    const backup: Backup = {
+      format: 'octo-backup',
+      version: 1,
+      createdAt: '2026-11-15T08:00:00.000Z',
+      projects: [
+        {
+          project: sample,
+          sources: { mail: { cursor: '2026-11-10T00:00:00.000Z', lastRun: null } },
+          feeds: { jira: { scope: 'AUR', items: { 'AUR-1': { version: '1', path: 'a.md' } } } },
+        },
+      ],
+    }
+
+    await files.write(file, backup)
+    expect(await files.read(file)).toEqual(backup)
+
+    const other = join(root, 'non-una-copia.json')
+    await writeFile(other, '{"format":"altro"}')
+    await expect(files.read(other)).rejects.toMatchObject({ code: 'backup_invalid' })
+    await writeFile(other, 'non è json')
+    await expect(files.read(other)).rejects.toMatchObject({ code: 'backup_invalid' })
+    await expect(files.read(join(root, 'manca.json'))).rejects.toMatchObject({
+      code: 'backup_invalid',
+    })
+    // The folder of the project is a folder: nothing can be written over it.
+    await expect(files.write(project, backup)).rejects.toMatchObject({
+      code: 'backup_not_written',
+    })
   })
 
   it('fails loudly on a damaged state file', async () => {

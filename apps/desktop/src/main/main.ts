@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import {
   createAlignments,
   createAskQuestion,
+  createBackups,
   createDashboard,
   createDeliverables,
   createDocuments,
@@ -22,7 +23,7 @@ import {
   type MailArchive,
   type Projects,
 } from '@octo/application'
-import { DomainError } from '@octo/domain'
+import { backupFileName, DomainError } from '@octo/domain'
 import {
   createAppleMailArchive,
   createClaudeCliRunner,
@@ -40,13 +41,14 @@ import {
   createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
+  createFsQuestionLog,
   createFsSourceSettings,
   createFsTeamStore,
   createFsTrackerExports,
   createJiraHoursReader,
+  createJsonBackupFiles,
   createJsonFeedIndexes,
   createJsonProjectRegistry,
-  createJsonQuestionLog,
   createJsonSourceStates,
   createWordRenderer,
   createWorkerTextExtractor,
@@ -63,6 +65,13 @@ const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 const LETTERHEAD_DIALOG_TITLE = 'Scegli il documento Word da usare come carta intestata'
 const DECK_MODEL_DIALOG_TITLE = 'Scegli la presentazione da usare come modello'
 const NEW_PROJECT_DIALOG_TITLE = 'Scegli dove creare la cartella del progetto'
+const BACKUP_DIALOGS = {
+  saveTitle: 'Scegli dove scrivere la copia di sicurezza',
+  openTitle: 'Scegli la copia di sicurezza da ripristinare',
+  fileKind: 'Copia di sicurezza di Octo',
+  locateTitle: (projectName: string) =>
+    `Dov’è la cartella del progetto «${projectName}» su questo computer?`,
+}
 /** Lets a demo or a test keep its state apart from the PM's real one. */
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 /** Points the mail reader at another Mail folder: a demo's fake archive. */
@@ -145,7 +154,7 @@ function start(): void {
   const dataFolder = process.env[DATA_FOLDER_VARIABLE] ?? app.getPath('userData')
   const clock = { now: () => new Date() }
   const ids = { next: () => randomUUID() }
-  const questions = createJsonQuestionLog(dataFolder)
+  const questions = createFsQuestionLog()
   const sourceStates = createJsonSourceStates(dataFolder)
   const evidence = createFsEvidenceReader()
   const claude = {
@@ -158,11 +167,12 @@ function start(): void {
     env: process.env,
   }
   const agent = createClaudeCliRunner(claude)
+  const registry = createJsonProjectRegistry(dataFolder)
+  const folders = createFsFolderProbe()
   const projects = createProjects({
-    registry: createJsonProjectRegistry(dataFolder),
-    questions,
+    registry,
     sourceStates,
-    folders: createFsFolderProbe(),
+    folders,
     scaffold: createFsProjectScaffold(),
     clock,
     ids,
@@ -179,10 +189,11 @@ function start(): void {
   const files = createFsProjectFiles()
   const secrets = createFileVault(dataFolder, secretCipher())
   const devEndpoints = { jira: process.env[DEV_JIRA_VARIABLE], ado: process.env[DEV_ADO_VARIABLE] }
+  const indexes = createJsonFeedIndexes(dataFolder)
   const feeds = createFeeds({
     settings,
     states: sourceStates,
-    indexes: createJsonFeedIndexes(dataFolder),
+    indexes,
     secrets,
     reader: createConnectorFeedReader({ devEndpoints }),
     writer,
@@ -258,6 +269,15 @@ function start(): void {
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
     newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
     team,
+    backups: createBackups({
+      registry,
+      sourceStates,
+      indexes,
+      folders,
+      files: createJsonBackupFiles(),
+      clock,
+    }),
+    backupDialogs: { ...BACKUP_DIALOGS, defaultFileName: () => backupFileName(clock.now()) },
   })
 }
 

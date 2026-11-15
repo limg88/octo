@@ -171,6 +171,7 @@ export function createJsonSourceStates(dataFolder: string): SourceStates {
     statesSchema.parse(await readJsonOr(fileOf(projectId), {}))
   return {
     get: async (projectId, source) => (await all(projectId))[source] ?? NEVER_READ,
+    ofProject: all,
     set: async (projectId, source, state) => {
       const next = { ...(await all(projectId)), [source]: state }
       await writeJson(fileOf(projectId), next, PRIVATE_FILE_MODE)

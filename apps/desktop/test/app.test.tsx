@@ -20,6 +20,7 @@ import {
   type Project,
   type ProjectTeam,
   type QuestionRecord,
+  type RestoreOutcome,
   type SourceRun,
   type SourceState,
 } from '@octo/domain'
@@ -28,7 +29,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
 import { linkMarkers, markerOfLink } from '../src/renderer/answer-text.ts'
 import { messages, progressText } from '../src/renderer/messages.ts'
-import type { OctoApi, Result } from '../src/shared/api.ts'
+import type { OctoApi, Result, SavedBackup } from '../src/shared/api.ts'
 
 const aurora: Project = {
   id: 'p-1',
@@ -149,6 +150,16 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     team: vi.fn(async () => ok(NO_TEAM)),
     saveTeam: vi.fn(async (_id: string, team: ProjectTeam) => ok(team)),
     createProject: vi.fn(async () => ok<Project | null>(boreale)),
+    saveBackup: vi.fn(async () =>
+      ok<SavedBackup | null>({ file: '/chiavetta/c.json', projects: 1 }),
+    ),
+    restoreBackup: vi.fn(async () =>
+      ok<RestoreOutcome | null>({
+        restored: ['Boreale'],
+        alreadyHere: ['Aurora'],
+        skipped: ['Cometa'],
+      }),
+    ),
     alignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
     saveAlignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
     alignmentView: vi.fn(async () => ({
@@ -335,6 +346,62 @@ describe('App', () => {
     expect(api.createProject).toHaveBeenLastCalledWith('Boreale')
     expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
     expect(screen.queryByLabelText(messages.newProjectName)).toBeNull()
+  })
+
+  it('writes a backup and says the credentials are not in it', async () => {
+    const { api } = fakeApi({
+      saveBackup: vi
+        .fn<OctoApi['saveBackup']>()
+        .mockResolvedValueOnce({ ok: false, code: 'backup_not_written' })
+        .mockResolvedValueOnce(ok(null))
+        .mockResolvedValue(ok({ file: '/chiavetta/c.json', projects: 2 })),
+    })
+    render(<App api={api} />)
+    const save = await screen.findByRole('button', { name: messages.backup.save })
+    fireEvent.click(save)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Non riesco a scrivere/)
+    fireEvent.click(save)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(screen.queryByRole('status')).toBeNull()
+    fireEvent.click(save)
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toContain('/chiavetta/c.json: 2 progetti')
+    expect(note.textContent).toMatch(/credenziali non ci sono/)
+  })
+
+  it('restores a backup, lists the projects again and tells what was left out', async () => {
+    const { api } = fakeApi()
+    vi.mocked(api.listProjects)
+      .mockResolvedValueOnce(ok([aurora]))
+      .mockResolvedValue(ok([aurora, boreale]))
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.backup.restore }))
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toContain('Ripristinati: Boreale.')
+    expect(note.textContent).toContain('Già in elenco, lasciati come sono: Aurora.')
+    expect(note.textContent).toMatch(/cartella non è su questo computer: Cometa/)
+    expect(note.textContent).toContain(messages.backup.credentials)
+    expect(await screen.findByRole('button', { name: 'Boreale' })).toBeTruthy()
+    // The project that was open stays open.
+    expect(screen.getByRole('heading', { name: 'Aurora' })).toBeTruthy()
+  })
+
+  it('says so when a backup holds no project, or is not a backup', async () => {
+    const { api } = fakeApi({
+      restoreBackup: vi
+        .fn<OctoApi['restoreBackup']>()
+        .mockResolvedValueOnce({ ok: false, code: 'backup_invalid' })
+        .mockResolvedValueOnce(ok(null))
+        .mockResolvedValue(ok({ restored: [], alreadyHere: [], skipped: [] })),
+    })
+    render(<App api={api} />)
+    const restore = await screen.findByRole('button', { name: messages.backup.restore })
+    fireEvent.click(restore)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/non è una copia di sicurezza/)
+    fireEvent.click(restore)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    fireEvent.click(restore)
+    expect((await screen.findByRole('status')).textContent).toBe(messages.backup.nothing)
   })
 
   it('offers ready questions that fill the composer without asking', async () => {

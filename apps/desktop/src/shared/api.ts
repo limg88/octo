@@ -37,6 +37,7 @@ import type {
   Project,
   ProjectTeam,
   QuestionRecord,
+  RestoreOutcome,
   SourceRun,
   SourceState,
 } from '@octo/domain'
@@ -112,8 +113,12 @@ export const CHANNELS = {
   teamGet: 'team:get',
   teamSave: 'team:save',
   projectsCreate: 'projects:create',
+  backupSave: 'backup:save',
+  backupRestore: 'backup:restore',
   sourcesChanged: 'sources:changed',
 } as const
+
+export type SavedBackup = { file: string; projects: number }
 
 /** What the interface can ask the app. It is the only door between the two. */
 export type OctoApi = {
@@ -256,6 +261,16 @@ export type OctoApi = {
    * the dialog.
    */
   createProject(name: string): Promise<Result<Project | null>>
+  /**
+   * Lets the PM choose where to write the backup: the list of the projects and the state of
+   * their readings, never the credentials. Null when the PM closes the dialog.
+   */
+  saveBackup(): Promise<Result<SavedBackup | null>>
+  /**
+   * Lets the PM choose a backup and, for each project whose folder is not where it was, where
+   * it is now. Null when the PM closes the first dialog.
+   */
+  restoreBackup(): Promise<Result<RestoreOutcome | null>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */

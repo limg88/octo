@@ -83,7 +83,7 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
       durationMs: deps.clock.now().getTime() - startedAt.getTime(),
       ...result,
     }
-    await deps.questions.append(record)
+    await deps.questions.append(input.project.folder, record)
     return record
   }
 }

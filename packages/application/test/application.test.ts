@@ -22,12 +22,10 @@ const project: Project = {
 }
 
 function projectsWith(initial: Project[] = []) {
-  const questions = memoryQuestionLog()
   const sourceStates = memorySourceStates()
   const created: Array<{ parent: string; name: string; paths: string[] }> = []
   const projects = createProjects({
     registry: memoryRegistry(initial),
-    questions,
     sourceStates,
     folders: folderProbe([FOLDER, `${FOLDER}/`, '/progetti/Boreale 2']),
     scaffold: {
@@ -39,7 +37,7 @@ function projectsWith(initial: Project[] = []) {
     clock: steppingClock(),
     ids: countingIds('p'),
   })
-  return { projects, questions, sourceStates, created }
+  return { projects, sourceStates, created }
 }
 
 describe('projects', () => {
@@ -86,18 +84,8 @@ describe('projects', () => {
     })
   })
 
-  it('forgets a project with its questions', async () => {
-    const { projects, questions, sourceStates } = projectsWith([project])
-    await questions.append({
-      id: 'q-1',
-      projectId: project.id,
-      question: 'x',
-      askedAt: project.addedAt,
-      durationMs: 0,
-      answer: null,
-      error: 'agent_failed',
-    })
-
+  it('forgets a project with its readings', async () => {
+    const { projects, sourceStates } = projectsWith([project])
     await sourceStates.set(project.id, 'mail', {
       cursor: '2026-11-10T00:00:00.000Z',
       lastRun: null,
@@ -106,7 +94,6 @@ describe('projects', () => {
     await projects.remove(project.id)
 
     expect(await projects.list()).toEqual([])
-    expect(questions.all()).toEqual([])
     expect(sourceStates.all().size).toBe(0)
     await expect(projects.get(project.id)).rejects.toMatchObject({ code: 'project_not_found' })
   })
@@ -154,7 +141,7 @@ describe('askQuestion', () => {
     expect(record.answer?.citations.map((c) => c.status)).toEqual(['verified', 'quote_not_found'])
     expect(record).toMatchObject({ id: 'q-1', error: null, durationMs: STEP_MS })
     expect(progress).toEqual([{ kind: 'reading', target: 'wiki/stato.md' }])
-    expect(await questions.list(project.id)).toEqual([record])
+    expect(await questions.list(project.folder)).toEqual([record])
   })
 
   it('keeps a failure of the agent as the outcome of the question', async () => {

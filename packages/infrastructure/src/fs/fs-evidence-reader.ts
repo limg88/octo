@@ -1,7 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import type { EvidenceReader } from '@octo/application'
-import type { Evidence } from '@octo/domain'
+import { type Evidence, HISTORY_FOLDER } from '@octo/domain'
 
 /** Tracker exports reach tens of megabytes; beyond this a file is reported as too large. */
 export const MAX_EVIDENCE_BYTES = 200 * 1024 * 1024
@@ -19,6 +19,8 @@ export function createFsEvidenceReader(maxBytes = MAX_EVIDENCE_BYTES): EvidenceR
         return isInside(root, resolve(root, citedPath)) ? { kind: 'missing' } : { kind: 'outside' }
       }
       if (!isInside(root, target)) return { kind: 'outside' }
+      // An earlier answer is not a source: a citation of it is never verified.
+      if (isInside(resolve(root, HISTORY_FOLDER), target)) return { kind: 'missing' }
       const info = await stat(target)
       if (!info.isFile()) return { kind: 'missing' }
       if (info.size > maxBytes) return { kind: 'too_large' }

@@ -103,6 +103,20 @@ export const messages = {
     saved: (people: number, periods: number) => `Salvate ${people} persone e ${periods} periodi.`,
     sides: { supplier: 'nostra', client: 'cliente' },
   },
+  backup: {
+    title: 'Se cambi computer',
+    save: 'Copia di sicurezza',
+    restore: 'Ripristina',
+    hint: 'La copia tiene l’elenco dei progetti e il punto a cui sono arrivate le letture. Le cartelle dei progetti vanno copiate a parte; le credenziali si rimettono.',
+    saved: (file: string, projects: number) =>
+      `Copia scritta in ${file}: ${projects === 1 ? '1 progetto' : `${projects} progetti`}. Le credenziali non ci sono: sul nuovo computer vanno rimesse.`,
+    restored: (names: string[]) => `Ripristinati: ${names.join(', ')}.`,
+    alreadyHere: (names: string[]) => `Già in elenco, lasciati come sono: ${names.join(', ')}.`,
+    skipped: (names: string[]) =>
+      `Non ripristinati perché la cartella non è su questo computer: ${names.join(', ')}. Copia la cartella e ripeti il ripristino.`,
+    nothing: 'La copia non contiene progetti.',
+    credentials: 'Rimetti le credenziali di Jira e Azure DevOps in «Fonti»: non sono nella copia.',
+  },
   newProject: 'Nuovo progetto',
   newProjectName: 'Nome del nuovo progetto',
   newProjectCreate: 'Scegli dove crearlo',
@@ -718,6 +732,8 @@ const errors: Record<ErrorCode, string> = {
   team_invalid: 'Le persone e il calendario del progetto non sono leggibili.',
   project_name_invalid:
     'Questo nome non può essere il nome di una cartella: togli i caratteri speciali e non iniziare con un punto.',
+  backup_invalid: 'Questo file non è una copia di sicurezza di Octo, o è rovinato.',
+  backup_not_written: 'Non riesco a scrivere la copia lì: scegli un altro posto.',
   project_folder_exists:
     'Lì c’è già una cartella con questo nome: scegli un altro nome o un altro posto.',
   deck_model_invalid:

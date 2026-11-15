@@ -1,5 +1,12 @@
 import type { CheckedAnswer } from './answer.ts'
 import { DomainError, type DomainErrorCode } from './errors.ts'
+import { OCTO_FOLDER } from './extracted-document.ts'
+
+/**
+ * Where the questions of a project are kept: in its folder, so they travel with it. Earlier
+ * answers are not a source: nothing in here may be cited.
+ */
+export const HISTORY_FOLDER = `${OCTO_FOLDER}/.cronologia`
 
 /** One question of the PM with its outcome: a checked answer or the reason it failed. */
 export type QuestionRecord = {
