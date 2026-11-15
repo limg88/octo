@@ -19,7 +19,7 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    Dimostra: prima una riga incompleta spariva al salvataggio e la risposta era una conferma verde. Una parte che non è «nostra» o «cliente» e una data che non esiste non si possono più nemmeno scrivere: sono un menu e un campo data.
 
 3. **Correggi.** Nome `Mario Rossi`, «Al» del periodo il 13 novembre 2026, poi salva.
-   Atteso: «Salvate 1 persone e 1 periodi.» e nessun avviso.
+   Atteso: «Salvati: 1 persona e 1 periodo.» e nessun avviso.
 
 4. **Collega Jira a metà.** Torna alla parte «Collegamenti», premi «Collega» nella riga «Jira» e poi «Prova e salva» senza scrivere nulla.
    Atteso: sotto «Sito», «La tua email su Jira», «Progetti» e «API token» compare «Manca: va compilato per collegare il sistema.»; accanto ai pulsanti «Non ho provato il collegamento: compila i campi segnalati.»

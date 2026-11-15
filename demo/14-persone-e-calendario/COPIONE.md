@@ -20,7 +20,7 @@ Durata: 5 minuti. Mostra tre cose piccole che servono ogni giorno: le persone e 
 3. **Scrivi persone e calendario.** Apri «Impostazioni» e, in alto, la parte «Persone e calendario». Ogni persona è una riga con un campo per valore. Nella prima: nome `Neri Sara`, ruolo `analista`, allocazione `50`, «Al» il 31 gennaio 2026. Premi «Aggiungi una persona»: nome `Carla Bianchi`, ruolo `referente`, parte «cliente», «Come scrivergli» `dare del lei, prima la richiesta e poi il contesto`.
    Nel calendario: `Fase 3` dal 1° ottobre al 31 dicembre 2026; con «Aggiungi un periodo», `Sprint 28` dal 26 ottobre al 13 novembre 2026.
    Premi «Salva persone e calendario».
-   Atteso: «Salvate 2 persone e 2 periodi.» Nel testo del progetto Neri Sara è «analista, al 50% del suo tempo». Un'allocazione di `150` o scritta a parole non si salva: «Persona 1: l'allocazione è una percentuale, più di 0 e al massimo 100.» Nella cartella del progetto compare `_octo/progetto/persone-e-calendario.md`, con le persone divise fra «Dalla nostra parte» e «Dal cliente» e la tabella del calendario.
+   Atteso: «Salvati: 2 persone e 2 periodi.» Nel testo del progetto Neri Sara è «analista, al 50% del suo tempo». Un'allocazione di `150` o scritta a parole non si salva: «Persona 1: l'allocazione è una percentuale, più di 0 e al massimo 100.» Nella cartella del progetto compare `_octo/progetto/persone-e-calendario.md`, con le persone divise fra «Dalla nostra parte» e «Dal cliente» e la tabella del calendario.
    Dimostra: è un testo del progetto come gli altri: risposte e deliverable lo leggono e lo citano. L'email al cliente segue ciò che è scritto sul destinatario.
 
 4. **Torna a «Ore».**

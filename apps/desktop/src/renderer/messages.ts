@@ -60,7 +60,7 @@ export const messages = {
     },
     dwsi: {
       steps: [
-        'Chiedi a chi amministra il data warehouse aziendale un utente di sola lettura.',
+        'Chiedi a chi amministra l’archivio dei dati aziendali (dove finiscono i dati di NetSuite) un utente di sola lettura.',
         'Fatti dare anche il nome del server e del database.',
       ],
       note: 'Un utente che può anche scrivere viene rifiutato da Octo.',
@@ -140,9 +140,9 @@ export const messages = {
   mailStale: 'La posta non viene letta da più di un giorno.',
   mailNotConfigured: 'La posta di questo progetto non è ancora configurata.',
   feedIntro: {
-    ado: 'Work item del progetto, uno per file, letti con il tuo Personal Access Token di sola lettura (Work Items: Read, Project and Team: Read).',
-    jira: 'Issue dei progetti indicati, una per file, lette con la tua email e un API token di sola lettura.',
-    dwsi: 'Ore, ordini, fatture e ricavi delle commesse indicate, letti dal data warehouse con il tuo utente di sola lettura. La connessione resta su questo computer.',
+    ado: 'Le voci del tracker del progetto (bug, storie, attività), una per file, lette con il tuo token personale di sola lettura.',
+    jira: 'I ticket dei progetti indicati, uno per file, letti con la tua email e un token di sola lettura.',
+    dwsi: 'Ore, ordini, fatture e ricavi delle commesse indicate, letti dall’archivio dei dati aziendali con il tuo utente di sola lettura. La connessione resta su questo computer.',
   },
   feedSecret: { ado: 'Personal Access Token', jira: 'API token', dwsi: 'Password' },
   feedSecretKept: 'Già salvata su questo computer: lascia vuoto per tenerla.',
@@ -211,7 +211,8 @@ export const messages = {
       `Persona ${n}: l’allocazione è una percentuale, più di 0 e al massimo 100.`,
     periodWrong: (n: number) => `Periodo ${n}: servono il nome e le due date.`,
     save: 'Salva persone e calendario',
-    saved: (people: number, periods: number) => `Salvate ${people} persone e ${periods} periodi.`,
+    saved: (people: number, periods: number) =>
+      `Salvati: ${people === 1 ? '1 persona' : `${people} persone`} e ${periods === 1 ? '1 periodo' : `${periods} periodi`}.`,
     sides: { supplier: 'nostra', client: 'cliente' },
   },
   backup: {
@@ -230,7 +231,7 @@ export const messages = {
       'Rimetti le credenziali di Jira e Azure DevOps in «Impostazioni»: non sono nella copia.',
   },
   models: {
-    title: 'Modelli',
+    title: 'Quale Claude lavora',
     intro:
       'Quale modello di Claude risponde alle domande, scrive i deliverable e li rilegge in questo progetto. «Predefinito» è quello che Claude Code usa su questo computer: su un altro può essere diverso. Accanto a ogni risposta e a ogni deliverable resta scritto il modello che ha lavorato davvero.',
     task: {
@@ -674,7 +675,7 @@ export const messages = {
       `Lette ${entries} righe di timesheet (${months}) alle ${when}`,
     trackerTitle: 'Ore da Jira',
     trackerIntro:
-      'Leggo le ore segnate sulle issue dei progetti Jira indicati in «Impostazioni», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e issue.',
+      'Leggo le ore segnate sui ticket dei progetti Jira indicati in «Impostazioni», con il tuo token di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto e da lì le confronto. Di ogni registrazione tengo solo persona, giorno, ore e ticket.',
     readTracker: 'Leggi le ore da Jira',
     readingTracker: 'Leggo le ore da Jira…',
     trackerRead: (entries: number, months: string, when: string) =>
@@ -693,11 +694,11 @@ export const messages = {
       'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da Azure DevOps qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.',
     trackerTitle: 'Leggi da Azure DevOps',
     trackerIntro:
-      'Leggo adesso i work item del progetto e delle aree indicati in «Impostazioni», con il tuo Personal Access Token di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
+      'Leggo adesso le voci del progetto e delle aree indicati in «Impostazioni», con il tuo token personale di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
     readTracker: 'Leggi da Azure DevOps',
     readingTracker: 'Sto leggendo Azure DevOps…',
     trackerRead: (items: number, withHistory: number, when: string) =>
-      `Letti ${items} work item, ${withHistory} con la cronologia, alle ${when}`,
+      `Lette ${items} voci, ${withHistory} con la cronologia, alle ${when}`,
     exportPath: 'File dell’esportazione',
     historyPath: 'File della cronologia (facoltativo)',
     historyHint: 'Con la cronologia l’andamento segue i cambi di stato veri; senza, è una stima.',
@@ -850,7 +851,7 @@ export const messages = {
   deliverableInstructionsSaved: 'Istruzioni salvate.',
   deliverableClientFilter: 'Cifre da controllare prima che esca',
   deliverableClientFilterIntro:
-    'Questo testo va al cliente. Il codice ha trovato giornate di lavoro o importi: controlla che siano già concordati con il cliente e non dati interni. Non tolgo nulla da solo.',
+    'Questo testo va al cliente. Octo ha trovato giornate di lavoro o importi: controlla che siano già concordati con il cliente e non dati interni. Non tolgo nulla da solo.',
   deliverableClientFilterKind: { effort: 'Giornate', money: 'Importo' },
   deliverableRedTeam: 'Rilettura critica',
   deliverableRedTeamOk: 'Può uscire: nessun punto contestabile trovato.',
@@ -897,7 +898,7 @@ export const messages = {
   feedChoicesNone: 'Nessun progetto visibile con questa credenziale.',
   documentsTitle: 'Documenti',
   documentsIntro:
-    'Octo scrive il testo di Word, Excel, PowerPoint e PDF della cartella in «_octo/testo», così Claude può cercarlo e citarlo. Gli originali non vengono toccati.',
+    'Octo rende leggibile il testo di Word, Excel, PowerPoint e PDF della cartella, così nelle risposte può cercarlo e citarlo. Gli originali non vengono toccati.',
   documentsConvert: 'Converti ora',
   documentsConverting: 'Sto leggendo i documenti…',
   documentsNever: 'Mai convertiti.',
@@ -972,9 +973,8 @@ const errors: Record<ErrorCode, string> = {
   tracker_export_unreadable: 'Questo file non è un’esportazione del tracker che so leggere.',
   dashboard_range_invalid: 'Il periodo non è valido o è troppo lungo per il passo scelto.',
   hours_sources_not_set: 'Indica dove sono i timesheet e le ore del tracker.',
-  hours_timesheet_missing: 'Non trovo esportazioni di timesheet (file .json) nel posto indicato.',
-  hours_worklog_missing:
-    'Non trovo esportazioni delle ore del tracker (file .csv) nel posto indicato.',
+  hours_timesheet_missing: 'Non trovo esportazioni di timesheet nel posto indicato.',
+  hours_worklog_missing: 'Non trovo esportazioni delle ore del tracker nel posto indicato.',
   hours_period_invalid: 'Il periodo non è valido.',
   forecast_model_not_set: 'Indica il file Excel del modello.',
   forecast_model_missing: 'Non trovo il file del modello nel posto indicato.',

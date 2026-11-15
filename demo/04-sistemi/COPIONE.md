@@ -47,7 +47,7 @@ In «Chiedi» scrivi `Quali work item sono bloccati e a quando risalgono i dati 
 
 ## Jira e NetSuite
 - **Jira**: sito, la tua email, un API token di sola lettura, le chiavi dei progetti.
-- **NetSuite (DWSI)**: server, database, il tuo utente di sola lettura, la tua email aziendale e i codici commessa. La connessione al warehouse resta su questo computer.
+- **NetSuite**: server, database, il tuo utente di sola lettura, la tua email aziendale e i codici commessa. La connessione al warehouse resta su questo computer.
 
 Entrambi sono provati dai test contro un Jira finto e un warehouse finto (`pnpm db:setup` avvia il database di prova).
 

@@ -158,7 +158,7 @@ const ISSUE_FIELDS_REVISION = 2
 const FEED_LABELS: Readonly<Record<FeedName, string>> = {
   ado: 'Azure DevOps',
   jira: 'Jira',
-  dwsi: 'NetSuite (DWSI)',
+  dwsi: 'NetSuite',
 }
 
 export const feedLabel = (feed: FeedName): string => FEED_LABELS[feed]

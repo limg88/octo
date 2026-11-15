@@ -137,7 +137,7 @@ describe('dashboard', () => {
     expect(api.dashboardView).not.toHaveBeenCalled()
 
     fireEvent.click(read)
-    expect(await screen.findByText(/Letti 4601 work item, 677 con la cronologia/)).toBeTruthy()
+    expect(await screen.findByText(/Lette 4601 voci, 677 con la cronologia/)).toBeTruthy()
     // The settings now point at the file Octo wrote: the dashboard is computed from it.
     expect(await screen.findByRole('region', { name: text.openTitle })).toBeTruthy()
     expect(api.readTrackerSnapshot).toHaveBeenLastCalledWith('p-1')

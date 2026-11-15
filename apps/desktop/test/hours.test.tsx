@@ -386,7 +386,7 @@ describe('hours', () => {
       })),
     })
     render(<HoursView api={missing} project={project} now={now} />)
-    expect((await screen.findByRole('alert')).textContent).toContain('.csv')
+    expect((await screen.findByRole('alert')).textContent).toContain('ore del tracker')
     cleanup()
     const damaged = fakeApi({
       hoursSettings: vi.fn(async () => ({

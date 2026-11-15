@@ -18,7 +18,7 @@ Durata: 3 minuti. Mostra che il modello di Claude non è più quello che capita 
    Atteso: sotto la domanda, accanto all'ora, «modello claude-fake-default» (con Claude vero: il modello predefinito del tuo Claude Code).
    Dimostra: anche senza scelta si sa chi ha risposto.
 
-3. **Scegli i modelli.** Apri «Impostazioni» e, in alto, la parte «Avanzate»: lì c'è «Modelli». In «Risposte in «Chiedi»» scegli `Sonnet`, in «Scrittura dei deliverable» `Opus`, in «Rilettura critica dei deliverable» `Haiku`. Premi «Salva i modelli».
+3. **Scegli i modelli.** Apri «Impostazioni» e, in alto, la parte «Avanzate»: lì c'è «Quale Claude lavora». In «Risposte in «Chiedi»» scegli `Sonnet`, in «Scrittura dei deliverable» `Opus`, in «Rilettura critica dei deliverable» `Haiku`. Premi «Salva i modelli».
    Atteso: «Modelli salvati: valgono dalla prossima domanda e dal prossimo deliverable.»
 
 4. **Rifai la domanda.** Torna in «Chiedi» e fai la stessa domanda.
@@ -28,7 +28,7 @@ Durata: 3 minuti. Mostra che il modello di Claude non è più quello che capita 
    Atteso: nella riga sotto il titolo, dopo i minuti, «scritto da claude-opus-fake, riletto da claude-haiku-fake».
    Dimostra: scrittura e rilettura possono avere modelli diversi, per esempio uno più capace per scrivere e uno diverso per attaccare il testo.
 
-6. **Torna al predefinito.** In «Modelli» rimetti «Predefinito di Claude Code» dove vuoi e salva.
+6. **Torna al predefinito.** In «Quale Claude lavora» rimetti «Predefinito di Claude Code» dove vuoi e salva.
 
 ## Che cosa dimostra
 - La scelta sta nelle impostazioni del progetto: segue la cartella su un altro computer.
