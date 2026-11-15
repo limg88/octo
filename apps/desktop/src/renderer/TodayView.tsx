@@ -15,7 +15,6 @@ import {
   NO_TODAY_FOCUS,
   TODAY_GROUPS,
   type TodayFocus,
-  type TodayGroup,
 } from './context.ts'
 import { Failure } from './Failure.tsx'
 import { dateTimeText, messages, progressText } from './messages.ts'
