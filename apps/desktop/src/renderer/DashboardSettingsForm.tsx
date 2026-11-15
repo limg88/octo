@@ -1,6 +1,7 @@
 import type { DashboardView, ExportCandidates } from '@octo/application'
 import { type DashboardSettings, PHASES, type Phase } from '@octo/domain'
 import { useEffect, useRef, useState } from 'react'
+import { KnownList } from './KnownList.tsx'
 import { messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 
@@ -15,15 +16,9 @@ type Props = {
 }
 
 const text = messages.dashboard
-const LIST_SEPARATOR = ','
-const listOf = (value: string): string[] => value.split(LIST_SEPARATOR).map((part) => part.trim())
-const toggled = (values: string[], value: string): string[] =>
-  values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value]
-
 /** Where the tracker export is and how to read it. Nothing here leaves the project folder. */
 export function DashboardSettingsForm({ settings, candidates, view, onSave, onChooseFile }: Props) {
   const [draft, setDraft] = useState(settings)
-  const [tags, setTags] = useState(settings.tags.join(`${LIST_SEPARATOR} `))
   const [saving, setSaving] = useState(false)
 
   // Only when other settings arrive: what is typed right after the form opens is never undone.
@@ -32,7 +27,6 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
     if (shown.current === settings) return
     shown.current = settings
     setDraft(settings)
-    setTags(settings.tags.join(`${LIST_SEPARATOR} `))
   }, [settings])
 
   // The only export of the folder is proposed without asking.
@@ -56,7 +50,7 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
 
   async function submit() {
     setSaving(true)
-    await onSave({ ...draft, tags: listOf(tags) })
+    await onSave(draft)
     setSaving(false)
   }
 
@@ -86,10 +80,12 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         onChoose={onChooseFile}
       />
       <p className="hint">{text.historyHint}</p>
-      <label>
-        {text.tags}
-        <input value={tags} onChange={(event) => setTags(event.target.value)} />
-      </label>
+      <KnownList
+        label={text.tags}
+        known={view?.tags ?? []}
+        chosen={draft.tags}
+        onChange={(tags) => change({ tags })}
+      />
       <label>
         {text.stuckDays}
         <input
@@ -100,25 +96,19 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         />
       </label>
       {view && view.periods.length > 0 && (
-        <CheckList
-          legend={text.periods}
-          options={view.periods}
+        <KnownList
+          label={text.periods}
+          known={view.periods}
           chosen={draft.requirementPeriods}
-          onToggle={(period) =>
-            update((current) => ({
-              requirementPeriods: toggled(current.requirementPeriods, period),
-            }))
-          }
+          onChange={(requirementPeriods) => change({ requirementPeriods })}
         />
       )}
       {verifyStates.length > 0 && (
-        <CheckList
-          legend={text.handover}
-          options={verifyStates.map((entry) => entry.state)}
+        <KnownList
+          label={text.handover}
+          known={verifyStates.map((entry) => entry.state)}
           chosen={draft.handoverStates}
-          onToggle={(state) =>
-            update((current) => ({ handoverStates: toggled(current.handoverStates, state) }))
-          }
+          onChange={(handoverStates) => change({ handoverStates })}
         />
       )}
       {view && view.states.length > 0 && (
@@ -155,35 +145,5 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         {draft.exportPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
       </div>
     </form>
-  )
-}
-
-function CheckList({
-  legend,
-  options,
-  chosen,
-  onToggle,
-}: {
-  legend: string
-  options: string[]
-  chosen: string[]
-  onToggle: (option: string) => void
-}) {
-  return (
-    <fieldset>
-      <legend>{legend}</legend>
-      <div className="checks">
-        {options.map((option) => (
-          <label key={option} className="check">
-            <input
-              type="checkbox"
-              checked={chosen.includes(option)}
-              onChange={() => onToggle(option)}
-            />
-            {option}
-          </label>
-        ))}
-      </div>
-    </fieldset>
   )
 }

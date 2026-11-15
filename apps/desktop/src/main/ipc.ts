@@ -688,6 +688,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps.alignments.view(await deps.projects.get(projectId)),
   )
 
+  handle(CHANNELS.alignmentChoices, byProject, async ({ projectId }) =>
+    deps.alignments.choices(await deps.projects.get(projectId)),
+  )
+
   handle(CHANNELS.alignmentExport, byProject, async ({ projectId }) =>
     deps.alignments.exportMissing(await deps.projects.get(projectId)),
   )

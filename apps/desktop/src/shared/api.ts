@@ -1,6 +1,7 @@
 import type {
   AgentProgress,
   AgentStatus,
+  AlignmentChoices,
   AlignmentFile,
   AlignmentView,
   DashboardRange,
@@ -114,6 +115,7 @@ export const CHANNELS = {
   alignmentSettingsGet: 'alignment:settings:get',
   alignmentSettingsSave: 'alignment:settings:save',
   alignmentView: 'alignment:view',
+  alignmentChoices: 'alignment:choices',
   alignmentExport: 'alignment:export',
   teamGet: 'team:get',
   teamSave: 'team:save',
@@ -278,6 +280,8 @@ export type OctoApi = {
   ): Promise<Result<AlignmentSettings>>
   /** The client's items of the sprint against the supplier's tickets. */
   alignmentView(projectId: string): Promise<Result<AlignmentView>>
+  /** What the client's export offers to choose from; empty lists while there is no export. */
+  alignmentChoices(projectId: string): Promise<Result<AlignmentChoices>>
   /** Writes the missing items as a file the supplier's tracker imports. */
   exportMissingTickets(projectId: string): Promise<Result<AlignmentFile>>
   /** The people and the calendar of the project. */

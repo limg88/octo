@@ -114,6 +114,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
   const status: AgentStatus = { available: true, version: '2.1' }
   const api: OctoApi = {
     chooseProjectPath: vi.fn(async () => ok<string | null>(null)),
+    alignmentChoices: vi.fn(async () => ok({ sprints: [], periods: [], tags: [] })),
     agentStatus: vi.fn(async () => ok(status)),
     listProjects: vi.fn(async () => ok([aurora])),
     addProject: vi.fn(async () => ok<Project | null>(boreale)),

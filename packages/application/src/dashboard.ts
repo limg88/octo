@@ -51,6 +51,8 @@ export type DashboardView = {
   states: StateMapping[]
   /** The planning periods the stories in scope have, for choosing which to check. */
   periods: string[]
+  /** Every tag the export holds, in scope or not, for choosing which make the scope. */
+  tags: string[]
 }
 
 export type Dashboard = {
@@ -158,6 +160,9 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
         requirements: unclearRequirements(data, settings),
         states: statesOf(data, settings),
         periods: periodsOf(data, settings),
+        tags: [...new Set(data.items.flatMap((item) => item.tags))].sort((a, b) =>
+          a.localeCompare(b, 'en', { numeric: true }),
+        ),
       }
     },
   }

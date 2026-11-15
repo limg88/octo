@@ -71,6 +71,7 @@ const view: View = {
     { state: '06 - Ready for Test', phase: 'verify', mappedByHand: false, count: 0 },
   ],
   periods: ['P1', 'P2'],
+  tags: ['Team', 'Altro', 'Terzo'],
 }
 
 type Api = Pick<

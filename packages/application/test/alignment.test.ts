@@ -114,7 +114,6 @@ describe('the alignment of two trackers', () => {
     expect(asked).toEqual(['_octo/fonti/Jira'])
     expect(view.exportedAt).toBe('2026-11-13T08:00:00Z')
     expect(view.tickets).toBe(2)
-    expect(view.sprints).toEqual(['Sprint 2', 'Sprint 28'])
     expect(view.alignment.total).toBe(2)
     expect(view.alignment.linked[0]?.tickets[0]).toEqual({
       key: 'AUR-1',
@@ -126,6 +125,21 @@ describe('the alignment of two trackers', () => {
       assignee: 'Mario Rossi',
     })
     expect(view.alignment.missing.map((entry) => entry.id)).toEqual(['102'])
+  })
+
+  it('offers the sprints, periods and tags of the export before anything is compared', async () => {
+    // No sprint chosen yet, no ticket read: the choices come from the export alone.
+    const { alignments, asked } = setup({ settings: { sprint: '' }, records: [] })
+    expect(await alignments.choices(project)).toEqual({
+      sprints: ['Sprint 2', 'Sprint 28'],
+      periods: [],
+      tags: ['Squadra'],
+    })
+    expect(asked).toEqual([])
+    const nothing = { sprints: [], periods: [], tags: [] }
+    for (const options of [{ exportPath: '' }, { exported: null }, { exported: { altro: 1 } }]) {
+      expect(await setup(options).alignments.choices(project)).toEqual(nothing)
+    }
   })
 
   it('reads the export and the tickets from where the PM says, when they say', async () => {

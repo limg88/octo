@@ -18,7 +18,7 @@ Durata: 4 minuti. Mostra il cruscotto calcolato da Octo da un'esportazione del t
    Atteso: «Da dove leggo bug e requisiti», con il file `dati/tracker/export.json` e la cronologia `dati/tracker/cronologia.json` già proposti.
    Dimostra: Octo trova da solo le esportazioni nella cartella; non c'è niente da cercare a mano.
 
-3. **Limita al tuo perimetro e salva.** In «Solo gli elementi con questi tag» scrivi `Squadra` e premi «Salva».
+3. **Limita al tuo perimetro e salva.** In «Solo gli elementi con questi tag» scrivi `Squadra` e premi «Salva». La prima volta si scrive, perché l'esportazione non è ancora stata letta; da allora, in «Impostazioni del cruscotto», i tag dell'esportazione sono caselle da spuntare.
    Atteso: «Dati aggiornati»; Bug aperti **15** su 30 nel perimetro; In lavorazione **10**; In verifica **5**; Validati, in attesa di rilascio **2**; Fermi da oltre 30 giorni **11**.
    Dimostra: i 6 bug dell'altro fornitore restano fuori; «aperto» vuol dire che qualcuno deve ancora fare qualcosa prima del rilascio.
 

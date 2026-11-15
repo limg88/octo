@@ -128,6 +128,8 @@ describe('dashboard', () => {
       age: 'warning',
       periods: ['P1', 'P2'],
     })
+    expect(view.tags.length).toBeGreaterThan(0)
+    expect(view.tags).toEqual([...new Set(view.tags)].sort())
     expect(view.bugs.total).toBe(2)
     expect(view.bugs.open).toHaveLength(1)
     expect(view.bugs.open[0]?.daysInState).toBe(20)

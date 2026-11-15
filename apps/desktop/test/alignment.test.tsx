@@ -55,7 +55,6 @@ const configured: AlignmentSettings = { ...DEFAULT_ALIGNMENT_SETTINGS, sprint: '
 const view: View = {
   exportedAt: '2026-11-13T08:00:00Z',
   tickets: 42,
-  sprints: ['Sprint 27', 'Sprint 28'],
   alignment: {
     total: 6,
     linked: [
@@ -86,6 +85,7 @@ const view: View = {
 type Api = Pick<
   OctoApi,
   | 'chooseProjectPath'
+  | 'alignmentChoices'
   | 'alignmentSettings'
   | 'saveAlignmentSettings'
   | 'alignmentView'
@@ -96,6 +96,13 @@ type Api = Pick<
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
     chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
+    alignmentChoices: vi.fn(async () =>
+      ok({
+        sprints: ['Sprint 27', 'Sprint 28'],
+        periods: ['PI7', 'PI8'],
+        tags: ['Squadra', 'Altri'],
+      }),
+    ),
     alignmentSettings: vi.fn(async () => ok(configured)),
     saveAlignmentSettings: vi.fn(async (_id: string, settings: AlignmentSettings) => ok(settings)),
     alignmentView: vi.fn(async () => ok(view)),
@@ -183,7 +190,12 @@ describe('the alignment', () => {
       fireEvent.change(screen.getByLabelText(label), { target: { value } })
     type(text.sprint, 'Sprint 28')
     type(text.period, 'PI7')
-    type(text.tags, 'Squadra, Altri')
+    // What the export holds is chosen, not typed again: sprint and period from a menu, tags ticked.
+    expect(screen.getByLabelText<HTMLSelectElement>(text.sprint).options).toHaveLength(3)
+    fireEvent.click(screen.getByLabelText('Squadra'))
+    fireEvent.click(screen.getByLabelText('Altri'))
+    fireEvent.click(screen.getByLabelText('Altri'))
+    fireEvent.click(screen.getByLabelText('Altri'))
     type(text.referencePrefixes, 'AZDO')
     const group = (column: string, row: number) =>
       screen.getByLabelText(text.groupCell(column, row))
@@ -220,6 +232,43 @@ describe('the alignment', () => {
       }),
     )
     expect(await screen.findByText(text.summary(6, 3, 2, 1))).toBeTruthy()
+  })
+
+  it('lets sprint, period and tags be typed while the export is not known, and keeps what is in use', async () => {
+    const api = fakeApi({
+      alignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
+      alignmentChoices: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    })
+    const view = render(<AlignmentView api={api} project={project} />)
+    fireEvent.change(await screen.findByLabelText(text.tags), { target: { value: 'Squadra, ' } })
+    expect(screen.getByLabelText<HTMLInputElement>(text.tags).value).toBe('Squadra, ')
+    expect(screen.getByLabelText(text.sprint).tagName).toBe('INPUT')
+    expect(screen.getByText(messages.commaList)).toBeTruthy()
+    view.unmount()
+
+    // A sprint and a tag saved before, no longer in the export, stay among the choices.
+    const saved = {
+      ...DEFAULT_ALIGNMENT_SETTINGS,
+      sprint: 'Sprint 1',
+      period: 'PI1',
+      tags: ['Vecchio'],
+    }
+    render(
+      <AlignmentView
+        api={fakeApi({ alignmentSettings: vi.fn(async () => ok(saved)) })}
+        project={project}
+      />,
+    )
+    const sprint = await screen.findByLabelText<HTMLSelectElement>(text.sprint)
+    await waitFor(() => expect(sprint.tagName).toBe('SELECT'))
+    expect([...sprint.options].map((option) => option.value)).toEqual([
+      '',
+      'Sprint 1',
+      'Sprint 27',
+      'Sprint 28',
+    ])
+    expect(screen.getByLabelText<HTMLSelectElement>(text.period).value).toBe('PI1')
+    expect(screen.getByLabelText<HTMLInputElement>('Vecchio').checked).toBe(true)
   })
 
   it('shows why the settings cannot be read, saved or the trackers compared', async () => {

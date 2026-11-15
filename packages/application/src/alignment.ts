@@ -41,15 +41,18 @@ export type AlignmentView = {
   exportedAt: string | null
   /** How many tickets were read, in any sprint. */
   tickets: number
-  /** The sprints the client's items name, to choose from. */
-  sprints: string[]
 }
+/** What the client's tracker holds to choose from, known before anything is compared. */
+export type AlignmentChoices = { sprints: string[]; periods: string[]; tags: string[] }
+const NO_CHOICES: AlignmentChoices = { sprints: [], periods: [], tags: [] }
 /** The import file of the missing tickets, as a path from the project folder. */
 export type AlignmentFile = { path: string; rows: number }
 
 export type Alignments = {
   settings(project: Project): Promise<AlignmentSettings>
   saveSettings(project: Project, settings: AlignmentSettings): Promise<AlignmentSettings>
+  /** The sprints, periods and tags of the client's export; empty lists while there is none. */
+  choices(project: Project): Promise<AlignmentChoices>
   view(project: Project): Promise<AlignmentView>
   /** Writes the missing items of the sprint as a file the supplier's tracker imports. */
   exportMissing(project: Project): Promise<AlignmentFile>
@@ -92,11 +95,19 @@ const fileSlug = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
+/** Names as a person reads them in a list: `Sprint 9` before `Sprint 10`. */
+const inOrder = (names: Iterable<string>): string[] =>
+  [...new Set(names)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
 export function createAlignments(deps: AlignmentDeps): Alignments {
+  /** The export named for the alignment, or the one the dashboard reads. */
+  const exportPathOf = async (project: Project, settings: AlignmentSettings): Promise<string> =>
+    settings.exportPath || (await deps.dashboard.load(project.folder)).exportPath
+
   async function load(project: Project) {
     const settings = await deps.settings.load(project.folder)
     if (settings.sprint === '') throw new DomainError('alignment_sprint_not_set')
-    const exportPath = settings.exportPath || (await deps.dashboard.load(project.folder)).exportPath
+    const exportPath = await exportPathOf(project, settings)
     if (exportPath === '') throw new DomainError('alignment_items_missing')
     const raw = await deps.exports.readJson(project.folder, exportPath)
     if (raw === null) throw new DomainError('tracker_export_missing', exportPath)
@@ -130,15 +141,27 @@ export function createAlignments(deps: AlignmentDeps): Alignments {
       return saved
     },
 
+    async choices(project) {
+      const settings = await deps.settings.load(project.folder)
+      const exportPath = await exportPathOf(project, settings)
+      if (exportPath === '') return NO_CHOICES
+      const raw = await deps.exports.readJson(project.folder, exportPath)
+      const parsed = raw === null ? null : parseTrackerExport(raw)
+      if (parsed === null) return NO_CHOICES
+      const items: AlignItem[] = parsed.items
+      return {
+        sprints: inOrder(items.flatMap((item) => (item.sprint ? [sprintName(item.sprint)] : []))),
+        periods: inOrder(items.flatMap((item) => (item.period ? [item.period] : []))),
+        tags: inOrder(items.flatMap((item) => item.tags)),
+      }
+    },
+
     async view(project) {
       const { settings, parsed, items, tickets } = await load(project)
-      const sprints = new Set<string>()
-      for (const item of items) if (item.sprint) sprints.add(sprintName(item.sprint))
       return {
         alignment: alignTrackers(items, tickets, settings),
         exportedAt: parsed.exportedAt,
         tickets: tickets.length,
-        sprints: [...sprints].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
       }
     },
 

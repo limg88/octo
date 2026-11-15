@@ -3,6 +3,8 @@ import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
+import { KnownList } from './KnownList.tsx'
+import { MonthField } from './MonthField.tsx'
 import { dateText, dateTimeText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
@@ -30,7 +32,6 @@ type Props = {
 
 const text = messages.hours
 const NO_CANDIDATES: HoursCandidates = { timesheets: [], worklogs: [] }
-const LIST_SEPARATOR = ','
 
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 
@@ -237,17 +238,14 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
     <div className="dashboard">
       {error && <Failure code={error} />}
       <div className="range-fields">
-        <label>
-          {text.month}
-          <input
-            type="month"
-            value={period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''}
-            onChange={(event) => {
-              const month = monthPeriod(event.target.value)
-              if (month) changePeriod(month)
-            }}
-          />
-        </label>
+        <MonthField
+          label={text.month}
+          value={period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''}
+          onChange={(value) => {
+            const month = monthPeriod(value)
+            if (month) changePeriod(month)
+          }}
+        />
         <label>
           {text.from}
           <input
@@ -397,8 +395,6 @@ function Comparison({ view, onExpect }: { view: View; onExpect: (row: HoursRow) 
   )
 }
 
-const listOf = (value: string): string[] => value.split(LIST_SEPARATOR).map((part) => part.trim())
-const joined = (values: string[]): string => values.join(`${LIST_SEPARATOR} `)
 type AliasKey = 'worklog' | 'timesheet'
 const ALIAS_COLUMNS: RowsColumn<AliasKey>[] = [
   { key: 'worklog', label: text.aliasColumns.worklog },
@@ -406,27 +402,27 @@ const ALIAS_COLUMNS: RowsColumn<AliasKey>[] = [
 ]
 
 /** The fields of the form that hold one typed value. */
-type TextField = Exclude<keyof Draft, 'aliases'>
+type TextField = 'thresholdPct' | 'cutoff'
 
 type Draft = {
   timesheetPath: string
   worklogPath: string
-  projects: string
+  projects: string[]
   thresholdPct: string
   cutoff: string
-  noWorklogExpected: string
-  noTimesheetExpected: string
+  noWorklogExpected: string[]
+  noTimesheetExpected: string[]
   aliases: Row<AliasKey>[]
 }
 
 const draftOf = (settings: HoursSettings): Draft => ({
   timesheetPath: settings.timesheetPath,
   worklogPath: settings.worklogPath,
-  projects: joined(settings.projects),
+  projects: settings.projects,
   thresholdPct: String(settings.thresholdPct),
   cutoff: settings.cutoff,
-  noWorklogExpected: joined(settings.noWorklogExpected),
-  noTimesheetExpected: joined(settings.noTimesheetExpected),
+  noWorklogExpected: settings.noWorklogExpected,
+  noTimesheetExpected: settings.noTimesheetExpected,
   aliases: orOneRow([...settings.aliases], ALIAS_COLUMNS),
 })
 
@@ -462,25 +458,17 @@ function SettingsForm({
     }))
   }, [candidates])
 
-  const field = (name: TextField, label: string, options: string[] = [], type = 'text') => (
+  const field = (name: TextField, label: string, type: 'number' | 'date') => (
     <label>
       {label}
       <input
         type={type}
-        list={options.length > 0 ? `hours-${name}` : undefined}
         value={draft[name]}
         onChange={(event) => {
           const { value } = event.target
           setDraft((current) => ({ ...current, [name]: value }))
         }}
       />
-      {options.length > 0 && (
-        <datalist id={`hours-${name}`}>
-          {options.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
-      )}
     </label>
   )
 
@@ -499,11 +487,11 @@ function SettingsForm({
         void onSave({
           timesheetPath: draft.timesheetPath,
           worklogPath: draft.worklogPath,
-          projects: listOf(draft.projects),
+          projects: draft.projects,
           thresholdPct: Number(draft.thresholdPct),
           cutoff: draft.cutoff,
-          noWorklogExpected: listOf(draft.noWorklogExpected),
-          noTimesheetExpected: listOf(draft.noTimesheetExpected),
+          noWorklogExpected: draft.noWorklogExpected,
+          noTimesheetExpected: draft.noTimesheetExpected,
           aliases: draft.aliases
             .filter((row) => !blankRow(row))
             .map((row) => ({ worklog: row.worklog.trim(), timesheet: row.timesheet.trim() })),
@@ -525,16 +513,28 @@ function SettingsForm({
         onChoose={onChooseFolder}
       />
       <p className="hint">{text.worklogHint}</p>
-      {field('projects', text.projects)}
-      {codes.length > 0 && (
-        <p className="hint">
-          {text.codesFound}: {codes.join(', ')}
-        </p>
-      )}
-      {field('thresholdPct', text.threshold, [], 'number')}
-      {field('cutoff', text.cutoff, [], 'date')}
-      {field('noWorklogExpected', text.noWorklogExpected)}
-      {field('noTimesheetExpected', text.noTimesheetExpected)}
+      <KnownList
+        label={text.projects}
+        known={codes}
+        chosen={draft.projects}
+        onChange={(projects) => setDraft((current) => ({ ...current, projects }))}
+      />
+      {field('thresholdPct', text.threshold, 'number')}
+      {field('cutoff', text.cutoff, 'date')}
+      <KnownList
+        label={text.noWorklogExpected}
+        known={people}
+        chosen={draft.noWorklogExpected}
+        onChange={(noWorklogExpected) => setDraft((current) => ({ ...current, noWorklogExpected }))}
+      />
+      <KnownList
+        label={text.noTimesheetExpected}
+        known={people}
+        chosen={draft.noTimesheetExpected}
+        onChange={(noTimesheetExpected) =>
+          setDraft((current) => ({ ...current, noTimesheetExpected }))
+        }
+      />
       <h4>{text.aliases}</h4>
       <RowsField
         label={text.aliases}

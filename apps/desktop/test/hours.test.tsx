@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { HoursView as View } from '@octo/application'
 import { DEFAULT_HOURS_SETTINGS, type HoursSettings, type Project } from '@octo/domain'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HoursView, monthPeriod, previousMonth } from '../src/renderer/HoursView.tsx'
 import { messages } from '../src/renderer/messages.ts'
@@ -130,7 +130,7 @@ describe('hours', () => {
   it('shows the comparison of the last complete month with what was left out', async () => {
     const api = fakeApi()
     render(<HoursView api={api} project={project} now={now} />)
-    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+    expect(await screen.findByText('Bianchi Anna', { selector: 'td' })).toBeTruthy()
     expect(api.hoursView).toHaveBeenCalledWith('p-1', JUNE)
     expect(screen.getByText(text.tieOutOk('260'))).toBeTruthy()
     expect(screen.getByText(text.status.outlier)).toBeTruthy()
@@ -141,13 +141,35 @@ describe('hours', () => {
     expect(screen.getByText(text.otherProject('P9', '6'))).toBeTruthy()
     expect(screen.getByText(text.unreadable('ore/jira/altro.csv'))).toBeTruthy()
     expect(screen.getByText(new RegExp(`tracker ${text.noDay}`))).toBeTruthy()
-    expect(screen.getByText(/P1, P9/)).toBeTruthy()
+    // The codes found in the period are there to tick, not to type.
+    expect(screen.getByLabelText<HTMLInputElement>('P9').type).toBe('checkbox')
+  })
+
+  it('chooses codes and people among those found, and steps from month to month', async () => {
+    const api = fakeApi()
+    render(<HoursView api={api} project={project} now={now} />)
+    await screen.findByText('Bianchi Anna', { selector: 'td' })
+    const known = (group: string) => within(screen.getByRole('group', { name: group }))
+    fireEvent.click(known(text.projects).getByLabelText('P9'))
+    fireEvent.click(known(text.noTimesheetExpected).getByLabelText('Gialli Ugo'))
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalledTimes(1))
+    const saved = vi.mocked(api.saveHoursSettings).mock.calls[0]?.[1]
+    expect(saved?.projects).toEqual([...configured.projects, 'P9'])
+    expect(saved?.noTimesheetExpected).toEqual([...configured.noTimesheetExpected, 'Gialli Ugo'])
+
+    const month = screen.getByLabelText<HTMLInputElement>(text.month)
+    const shown = month.value
+    fireEvent.click(screen.getByRole('button', { name: messages.monthBefore }))
+    await waitFor(() => expect(month.value).not.toBe(shown))
+    fireEvent.click(screen.getByRole('button', { name: messages.monthAfter }))
+    await waitFor(() => expect(month.value).toBe(shown))
   })
 
   it('follows the month or the two days the PM chooses', async () => {
     const api = fakeApi()
     render(<HoursView api={api} project={project} now={now} />)
-    await screen.findByText('Bianchi Anna')
+    await screen.findByText('Bianchi Anna', { selector: 'td' })
     fireEvent.change(screen.getByLabelText(text.month), { target: { value: '2026-05' } })
     await waitFor(() =>
       expect(api.hoursView).toHaveBeenLastCalledWith('p-1', {
@@ -167,7 +189,7 @@ describe('hours', () => {
   it('remembers who is expected to have no hours on one side', async () => {
     const api = fakeApi()
     render(<HoursView api={api} project={project} now={now} />)
-    await screen.findByText('Bianchi Anna')
+    await screen.findByText('Bianchi Anna', { selector: 'td' })
     fireEvent.click(screen.getByRole('button', { name: `${text.markExpected}: Verdi Luca` }))
     await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalledTimes(1))
     expect(vi.mocked(api.saveHoursSettings).mock.calls[0]?.[1].noWorklogExpected).toEqual([
@@ -221,7 +243,7 @@ describe('hours', () => {
       thresholdPct: 30,
       aliases: [{ worklog: 'anna.b', timesheet: 'Bianchi Anna' }],
     })
-    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+    expect(await screen.findByText('Bianchi Anna', { selector: 'td' })).toBeTruthy()
   })
 
   it('reads the hours from Jira when asked and compares again from what it read', async () => {
@@ -235,7 +257,7 @@ describe('hours', () => {
     fireEvent.click(await screen.findByRole('button', { name: text.readTracker }))
     expect(await screen.findByText(/^Lette 42 registrazioni di ore \(2026-06\)/)).toBeTruthy()
     expect(api.readTrackerHours).toHaveBeenCalledWith('p-1', JUNE)
-    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+    expect(await screen.findByText('Bianchi Anna', { selector: 'td' })).toBeTruthy()
     cleanup()
     const refused = fakeApi({
       readTrackerHours: vi.fn(async () => ({
@@ -244,7 +266,7 @@ describe('hours', () => {
       })),
     })
     render(<HoursView api={refused} project={project} now={now} />)
-    await screen.findByText('Bianchi Anna')
+    await screen.findByText('Bianchi Anna', { selector: 'td' })
     fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
     expect((await screen.findByRole('alert')).textContent).toBeTruthy()
   })
@@ -277,7 +299,7 @@ describe('hours', () => {
     expect(await screen.findByText(/^Lette 310 righe di timesheet \(2026-06\)/)).toBeTruthy()
     expect(api.readTimesheets).toHaveBeenLastCalledWith('p-1', JUNE)
     // The comparison is computed from what was read.
-    expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+    expect(await screen.findByText('Bianchi Anna', { selector: 'td' })).toBeTruthy()
   })
 
   it('names the system that is not linked and takes the PM to the sources', async () => {

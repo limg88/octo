@@ -1,8 +1,9 @@
-import type { AlignmentFile, AlignmentView as View } from '@octo/application'
+import type { AlignmentChoices, AlignmentFile, AlignmentView as View } from '@octo/application'
 import type { AlignedPair, AlignmentSettings, Project, StateGroup } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, PathKind } from '../shared/api.ts'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
+import { KnownList } from './KnownList.tsx'
 import { dateText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { listOf, listText } from './progress-text.ts'
@@ -13,6 +14,7 @@ type AlignmentApi = Pick<
   | 'alignmentSettings'
   | 'saveAlignmentSettings'
   | 'alignmentView'
+  | 'alignmentChoices'
   | 'exportMissingTickets'
   | 'openEvidence'
   | 'chooseProjectPath'
@@ -21,6 +23,7 @@ type AlignmentApi = Pick<
 type Props = { api: AlignmentApi; project: Project }
 
 const text = messages.alignment
+const NO_CHOICES: AlignmentChoices = { sprints: [], periods: [], tags: [] }
 type GroupKey = 'name' | 'item' | 'ticket'
 const GROUP_COLUMNS: RowsColumn<GroupKey>[] = [
   { key: 'name', label: text.groupColumns.name, width: '200px' },
@@ -34,6 +37,13 @@ export function AlignmentView({ api, project }: Props) {
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [file, setFile] = useState<AlignmentFile | null>(null)
+  const [choices, setChoices] = useState<AlignmentChoices>(NO_CHOICES)
+
+  /** What there is to choose among is read again whenever the export may have changed. */
+  async function loadChoices() {
+    const result = await api.alignmentChoices(project.id)
+    setChoices(result.ok ? result.value : NO_CHOICES)
+  }
 
   async function loadView() {
     setFile(null)
@@ -54,6 +64,7 @@ export function AlignmentView({ api, project }: Props) {
     void api.alignmentSettings(project.id).then(async (result) => {
       if (!result.ok) return setError(result.code)
       setSettings(result.value)
+      void loadChoices()
       if (result.value.sprint !== '') await loadView()
     })
   }, [api, project.id])
@@ -63,6 +74,7 @@ export function AlignmentView({ api, project }: Props) {
     const result = await api.saveAlignmentSettings(project.id, next)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    void loadChoices()
     if (result.value.sprint !== '') await loadView()
   }
 
@@ -85,12 +97,7 @@ export function AlignmentView({ api, project }: Props) {
     return null
   }
   const form = (
-    <SettingsForm
-      settings={settings}
-      sprints={view?.sprints ?? []}
-      onSave={save}
-      onChoose={choose}
-    />
+    <SettingsForm settings={settings} choices={choices} onSave={save} onChoose={choose} />
   )
 
   return (
@@ -322,12 +329,16 @@ function Result({
 }
 
 /** The fields of the form that hold one typed value. */
-type TextField = Exclude<keyof Draft, 'stateGroups'>
+type TextField = Exclude<keyof Draft, 'stateGroups' | 'tags'>
+
+/** The known values, with the one in use kept among them even when it is no longer known. */
+const withCurrent = (known: readonly string[], current: string): string[] =>
+  current === '' || known.includes(current) ? [...known] : [current, ...known]
 
 type Draft = {
   sprint: string
   period: string
-  tags: string
+  tags: string[]
   exportPath: string
   ticketFolder: string
   referencePrefixes: string
@@ -337,7 +348,7 @@ type Draft = {
 const draftOf = (settings: AlignmentSettings): Draft => ({
   sprint: settings.sprint,
   period: settings.period,
-  tags: listText(settings.tags),
+  tags: settings.tags,
   exportPath: settings.exportPath,
   ticketFolder: settings.ticketFolder,
   referencePrefixes: listText(settings.referencePrefixes),
@@ -353,12 +364,13 @@ const draftOf = (settings: AlignmentSettings): Draft => ({
 
 function SettingsForm({
   settings,
-  sprints,
+  choices,
   onSave,
   onChoose,
 }: {
   settings: AlignmentSettings
-  sprints: string[]
+  /** What the client's export holds to choose from; empty lists while it is not known. */
+  choices: AlignmentChoices
   onSave: (settings: AlignmentSettings) => Promise<void>
   onChoose: (what: PathKind) => Promise<string | null>
 }) {
@@ -367,22 +379,10 @@ function SettingsForm({
   useEffect(() => setDraft(draftOf(settings)), [settings])
   const set = (name: TextField, value: string) =>
     setDraft((current) => ({ ...current, [name]: value }))
-  const input = (name: TextField, label: string, options: string[] = []) => (
+  const input = (name: TextField, label: string) => (
     <label>
       {label}
-      <input
-        type="text"
-        list={options.length > 0 ? `alignment-${name}` : undefined}
-        value={draft[name]}
-        onChange={(event) => set(name, event.target.value)}
-      />
-      {options.length > 0 && (
-        <datalist id={`alignment-${name}`}>
-          {options.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
-      )}
+      <input type="text" value={draft[name]} onChange={(event) => set(name, event.target.value)} />
     </label>
   )
   return (
@@ -409,7 +409,7 @@ function SettingsForm({
           ...settings,
           sprint: draft.sprint,
           period: draft.period,
-          tags: listOf(draft.tags),
+          tags: draft.tags,
           exportPath: draft.exportPath,
           ticketFolder: draft.ticketFolder,
           referencePrefixes: listOf(draft.referencePrefixes),
@@ -417,9 +417,42 @@ function SettingsForm({
         })
       }}
     >
-      {input('sprint', text.sprint, sprints)}
-      {input('period', text.period)}
-      {input('tags', text.tags)}
+      {choices.sprints.length > 0 ? (
+        <label>
+          {text.sprint}
+          <select value={draft.sprint} onChange={(event) => set('sprint', event.target.value)}>
+            <option value="">{text.sprintChoose}</option>
+            {withCurrent(choices.sprints, draft.sprint).map((sprint) => (
+              <option key={sprint} value={sprint}>
+                {sprint}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        input('sprint', text.sprint)
+      )}
+      {choices.periods.length > 0 ? (
+        <label>
+          {text.period}
+          <select value={draft.period} onChange={(event) => set('period', event.target.value)}>
+            <option value="">{text.periodAny}</option>
+            {withCurrent(choices.periods, draft.period).map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        input('period', text.period)
+      )}
+      <KnownList
+        label={text.tags}
+        known={choices.tags}
+        chosen={draft.tags}
+        onChange={(tags) => setDraft((current) => ({ ...current, tags }))}
+      />
       {input('referencePrefixes', text.referencePrefixes)}
       <h4>{text.stateGroups}</h4>
       <p className="hint">{text.stateGroupsHint}</p>

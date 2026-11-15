@@ -1608,3 +1608,14 @@ details.advanced[open] > summary {
 .settings-form .field label {
   font-weight: 500;
 }
+
+/* A month with one step back and one forward beside it. */
+.month-field {
+  display: flex;
+  gap: 4px;
+}
+
+.month-field button {
+  min-width: 30px;
+  padding: 0;
+}

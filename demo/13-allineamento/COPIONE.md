@@ -17,7 +17,8 @@ Durata: 4 minuti. Mostra il confronto fra le voci del tracker del cliente in uno
 2. **Apri «Allineamento».**
    Atteso: «Che cosa confronto», con il file dell'esportazione e la cartella dei ticket già indicati.
 
-3. **Indica lo sprint e la squadra e salva.** In «Sprint» scrivi `Sprint 28`, in «Tag delle voci che sono della tua squadra» `Squadra`, premi «Salva».
+3. **Indica lo sprint e la squadra e salva.** In «Sprint» scegli `Sprint 28` dal menu: ci sono gli sprint che l'esportazione del cliente nomina. Sotto «Tag delle voci che sono della tua squadra» spunta `Squadra`. Premi «Salva».
+   Dimostra: sprint, periodi e tag non si riscrivono a memoria: Octo li ha già letti dall'esportazione.
    Atteso: «6 voci del cliente nello sprint: 3 con il ticket nello sprint, 1 con il ticket altrove, 2 senza ticket.» e «Quadratura: ogni voce è in una sola delle tre liste.»
    Dimostra: la voce di un altro sprint e quella di un'altra squadra restano fuori; i numeri tornano.
 

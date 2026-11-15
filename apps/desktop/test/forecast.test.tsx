@@ -168,6 +168,12 @@ describe('the forecast', () => {
     await waitFor(() => expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-05'))
     fireEvent.change(month, { target: { value: '' } })
     expect(api.forecastView).toHaveBeenCalledTimes(2)
+    // One step back and one forward, across the turn of a year too.
+    fireEvent.click(screen.getByRole('button', { name: messages.monthAfter }))
+    await waitFor(() => expect(api.forecastView).toHaveBeenLastCalledWith('p-1', '2026-06'))
+    fireEvent.change(month, { target: { value: '2026-01' } })
+    fireEvent.click(screen.getByRole('button', { name: messages.monthBefore }))
+    await waitFor(() => expect(api.forecastView).toHaveBeenLastCalledWith('p-1', '2025-12'))
   })
 
   it('writes the filled model and opens it', async () => {

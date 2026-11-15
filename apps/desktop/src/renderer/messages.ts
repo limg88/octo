@@ -11,6 +11,9 @@ export const messages = {
   close: 'Chiudi',
   openSources: 'Apri «Fonti»',
   choosePath: 'Scegli…',
+  commaList: 'Più valori si separano con la virgola.',
+  monthBefore: 'Mese precedente',
+  monthAfter: 'Mese successivo',
   sourceLink: 'Collega',
   sourceEdit: 'Modifica',
   settingsParts: {
@@ -280,8 +283,10 @@ export const messages = {
       'Confronto le voci del tracker del cliente in uno sprint con i ticket del tuo tracker. Una voce e un ticket sono collegati quando la voce porta fra i tag la chiave del ticket, oppure il titolo del ticket nomina l’id della voce, per esempio «[AZDO 123]». Leggo l’esportazione usata dal cruscotto e i ticket che Octo ha già letto: non scrivo in nessuno dei due tracker.',
     settings: 'Che cosa confronto',
     sprint: 'Sprint, come lo chiamano i due tracker',
-    period: 'Periodo di pianificazione delle voci del cliente (vuoto: qualunque)',
-    tags: 'Tag delle voci che sono della tua squadra (separati da virgola; vuoto: tutte)',
+    period: 'Periodo di pianificazione delle voci del cliente',
+    periodAny: 'Qualunque',
+    sprintChoose: 'Scegli lo sprint…',
+    tags: 'Tag delle voci che sono della tua squadra (nessuno: tutte)',
     exportPath:
       'Esportazione del tracker del cliente: file nel progetto (vuoto: quella del cruscotto)',
     ticketFolder: 'Cartella dei ticket nel progetto (vuoto: quella della fonte Jira)',
@@ -587,8 +592,8 @@ export const messages = {
     projects: 'Codici di progetto dei timesheet che sono di questo progetto (nessuno: tutti)',
     threshold: 'Scostamento oltre il quale una persona è da guardare (%)',
     cutoff: 'Ultimo giorno completo (i giorni dopo restano fuori dal confronto; vuoto: nessuno)',
-    noWorklogExpected: 'Persone che non segnano ore sul tracker (separate da virgola)',
-    noTimesheetExpected: 'Persone senza timesheet qui, per esempio esterni (separate da virgola)',
+    noWorklogExpected: 'Persone che non segnano ore sul tracker',
+    noTimesheetExpected: 'Persone senza timesheet qui, per esempio esterni',
     aliases: 'Stessa persona, nomi diversi',
     save: 'Salva',
     settings: 'Impostazioni delle ore',
@@ -631,7 +636,6 @@ export const messages = {
     nothingExcluded: 'Niente.',
     possibleDuplicate: (hours: string, first: string, second: string) =>
       `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
-    codesFound: 'Codici trovati nel periodo',
     timesheetsTitle: 'Timesheet da NetSuite',
     timesheetsIntro:
       'Leggo le ore dei timesheet delle commesse indicate in «Fonti», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Il costo di ogni riga serve al previsionale: lo tengo a parte, in una cartella che non entra nelle risposte né nei deliverable.',
@@ -669,7 +673,7 @@ export const messages = {
     noCandidates: 'Nessuna esportazione trovata nella cartella: scrivi il percorso a mano.',
     choose: 'Scegli…',
     none: 'Nessuno',
-    tags: 'Solo gli elementi con questi tag (separati da virgola; vuoto: tutti)',
+    tags: 'Solo gli elementi con questi tag (nessuno: tutti)',
     stuckDays: 'Giorni nello stesso stato dopo i quali un bug è «fermo»',
     periods: 'Periodi di pianificazione da controllare per i requisiti (nessuno: tutti)',
     handover:

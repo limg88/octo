@@ -34,10 +34,10 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
 6. **Di' che un'assenza è attesa.** Sulla riga di Neri Sara premi «È atteso».
    Atteso: lo stato diventa «Atteso» e la riga scende in fondo. Fai lo stesso con Ugo Gialli (un esterno, senza timesheet qui).
 
-7. **Unisci due nomi della stessa persona.** Apri «Impostazioni delle ore», sotto «Stessa persona, nomi diversi» scrivi `E. Costa` in «Nome sul tracker» e `Costa Elena` in «Nome nel timesheet» (i nomi trovati sono proposti mentre scrivi) e premi «Salva».
+7. **Unisci due nomi della stessa persona.** Apri «Impostazioni delle ore»: i codici di progetto e le persone attese sono ora caselle con i valori trovati (`PRJ000101`, `PRJ000999`; i nomi della tabella), da spuntare invece che da scrivere. Poi, sotto «Stessa persona, nomi diversi» scrivi `E. Costa` in «Nome sul tracker» e `Costa Elena` in «Nome nel timesheet» (i nomi trovati sono proposti mentre scrivi) e premi «Salva».
    Atteso: resta una sola riga «Costa Elena», 120 contro 120, «Torna».
 
-8. **Cambia periodo.** Scegli un altro mese o due date in «Dal» e «Al».
+8. **Cambia periodo.** Con le frecce ‹ › accanto a «Mese» passa al mese prima e torna; oppure scegli due date in «Dal» e «Al».
    Atteso: la tabella segue il periodo; un mese senza ore dice «Nessuna ora nel periodo».
 
 9. **Leggi le ore direttamente da Jira.** Apri «Fonti», premi «Collega» nella riga «Jira» e scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».

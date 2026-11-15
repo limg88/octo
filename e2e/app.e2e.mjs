@@ -328,6 +328,13 @@ try {
   const cell = (scope, label) => scope.getByLabel(label, { exact: true })
   await cell(page, 'Nome sul tracker, riga 1').fill('E. Costa')
   await cell(page, 'Nome nel timesheet, riga 1').fill('Costa Elena')
+  // Codes and people found in the period are there to tick.
+  const hoursSettings = page.locator('.dashboard-settings')
+  await hoursSettings.getByRole('checkbox', { name: 'PRJ000999', exact: true }).waitFor()
+  await hoursSettings
+    .getByRole('group', { name: /^Persone che non segnano/ })
+    .scrollIntoViewIfNeeded()
+  await page.screenshot({ path: `${work}/ore-impostazioni.png` })
   await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
   await hoursRow('Costa Elena').getByText('Torna').waitFor({ timeout: TIMEOUT_MS })
   assert.equal(await hoursRow('E. Costa').count(), 0)
@@ -542,8 +549,10 @@ try {
   await page.getByRole('tab', { name: 'Allineamento' }).click()
   const setup13 = page.getByRole('region', { name: 'Che cosa confronto' })
   await setup13.waitFor({ timeout: TIMEOUT_MS })
-  await setup13.getByLabel(/^Sprint, come/).fill('Sprint 28')
-  await setup13.getByLabel(/^Tag delle voci/).fill('Squadra')
+  // What the client's export holds is chosen, not typed: the sprint from a menu, the tags ticked.
+  await setup13.locator('select').first().waitFor({ timeout: TIMEOUT_MS })
+  await setup13.getByLabel(/^Sprint, come/).selectOption('Sprint 28')
+  await setup13.getByRole('checkbox', { name: 'Squadra', exact: true }).check()
   await setup13.getByRole('button', { name: 'Salva' }).click()
   await page
     .getByText(

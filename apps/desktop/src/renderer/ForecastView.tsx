@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
+import { MonthField } from './MonthField.tsx'
 import { errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
@@ -138,19 +139,14 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
       {error && <Failure code={error} />}
       <p className="hint">{text.internal}</p>
       <div className="range-fields">
-        <label>
-          {text.month}
-          <input
-            type="month"
-            value={month}
-            onChange={(event) => {
-              const { value } = event.target
-              if (value === '') return
-              setMonth(value)
-              void loadView(value)
-            }}
-          />
-        </label>
+        <MonthField
+          label={text.month}
+          value={month}
+          onChange={(value) => {
+            setMonth(value)
+            void loadView(value)
+          }}
+        />
       </div>
       {view && (
         <>
