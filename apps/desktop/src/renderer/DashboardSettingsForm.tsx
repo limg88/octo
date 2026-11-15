@@ -1,6 +1,6 @@
 import type { DashboardView, ExportCandidates } from '@octo/application'
 import { type DashboardSettings, PHASES, type Phase } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { messages } from './messages.ts'
 
 type Props = {
@@ -23,7 +23,11 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
   const [tags, setTags] = useState(settings.tags.join(`${LIST_SEPARATOR} `))
   const [saving, setSaving] = useState(false)
 
+  // Only when other settings arrive: what is typed right after the form opens is never undone.
+  const shown = useRef(settings)
   useEffect(() => {
+    if (shown.current === settings) return
+    shown.current = settings
     setDraft(settings)
     setTags(settings.tags.join(`${LIST_SEPARATOR} `))
   }, [settings])
