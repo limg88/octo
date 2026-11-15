@@ -142,6 +142,11 @@ export interface MeetingExports {
    * cannot be opened.
    */
   list(root: string): Promise<MeetingReading[]>
+  /**
+   * What one export folder is at this moment, read again; null when it is no longer one of
+   * Verbale's. Asked after the files of a meeting were read, to know they are of one export.
+   */
+  reading(root: string, folder: string): Promise<MeetingReading | null>
   /** The text of a file of an export folder; null when the export has no such file. */
   read(root: string, folder: string, file: string): Promise<string | null>
 }

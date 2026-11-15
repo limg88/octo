@@ -429,6 +429,10 @@ describe('approving a deliverable', () => {
       timezone: 'Europe/Rome',
       durationSeconds: 2700,
       participants: [],
+      calendarEventUID: null,
+      onlineMeetingURL: null,
+      exportRevision: null,
+      exportedAt: null,
     }
     await memory.write(project.folder, `${folder}/_meta.md`, meetingMeta(meeting, 'export', []))
 

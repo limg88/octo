@@ -2,7 +2,7 @@ import { phraseIn } from '../mail/match.ts'
 import type { RecordedMeeting } from './model.ts'
 
 /** When a meeting of the calendar is: an invitation the mail of a project holds. */
-export type MeetingInvite = { start: string; end: string | null }
+export type MeetingInvite = { uid: string; start: string; end: string | null }
 
 /** What a project offers to recognise a meeting as its own. */
 export type MeetingCandidate = {
@@ -22,8 +22,10 @@ export function projectKeywords(name: string, mailKeywords: readonly string[]): 
 }
 
 /**
- * The project a recorded meeting belongs to, or null when it cannot be told. First the projects
- * whose calendar has a meeting at that time; then, among them or among all when there is none,
+ * The project a recorded meeting belongs to, or null when it cannot be told. First the only
+ * project whose mail holds the invitation to the very event Verbale names, whatever its day: a
+ * meeting that repeats is invited once. Then the projects whose calendar has a meeting at that
+ * time; then, among them or among all when there is none,
  * those named in the title or in the notes. A meeting two projects could claim is of neither:
  * it is never given by chance.
  */
@@ -39,6 +41,10 @@ export function meetingOwner(
     const end = invite.end === null ? start + DEFAULT_INVITE_MS : Date.parse(invite.end)
     return start < to && from < end
   }
+  const called = candidates.filter((candidate) =>
+    candidate.invites.some((invite) => invite.uid === meeting.calendarEventUID),
+  )
+  if (called.length === 1) return called[0]?.projectId ?? null
   const invited = candidates.filter((candidate) => candidate.invites.some(overlaps))
   if (invited.length === 1) return invited[0]?.projectId ?? null
   const text = `${meeting.title}\n${notes}`

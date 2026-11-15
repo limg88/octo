@@ -25,6 +25,10 @@ const meeting = (n: number, title: string): RecordedMeeting => ({
   timezone: 'Europe/Rome',
   durationSeconds: 1800,
   participants: [],
+  calendarEventUID: null,
+  onlineMeetingURL: null,
+  exportRevision: 1,
+  exportedAt: null,
 })
 const complete = (n: number, title: string): MeetingReading => ({
   folder: `export-${n}`,
@@ -33,7 +37,12 @@ const complete = (n: number, title: string): MeetingReading => ({
 })
 
 function setup(
-  options: { readings?: MeetingReading[] | Error; configs?: Record<string, SourcesConfig> } = {},
+  options: {
+    readings?: MeetingReading[] | Error
+    configs?: Record<string, SourcesConfig>
+    /** What a folder turns out to be when it is read again after its files. */
+    after?: Record<string, MeetingReading | null>
+  } = {},
 ) {
   const linked: SourcesConfig = { ...NO_SOURCES, meetings: { root: ROOT } }
   const configs = new Map<string, SourcesConfig>(
@@ -61,6 +70,11 @@ function setup(
         await gate
         if (options.readings instanceof Error) throw options.readings
         return options.readings ?? []
+      },
+      reading: async (_root, folder) => {
+        if (options.after && folder in options.after) return options.after[folder] ?? null
+        const all = options.readings instanceof Error ? [] : (options.readings ?? [])
+        return all.find((reading) => reading.folder === folder) ?? null
       },
       read: async (_root, folder, file) => (file === 'transcript.md' ? `# ${folder}` : null),
     },
@@ -162,6 +176,29 @@ describe('the meetings of a project', () => {
     expect((await meetings.imported(borea)).map((stored) => stored.title)).toEqual(['Punto Borea'])
     expect((await meetings.unassigned(aurora)).map((waiting) => waiting.title)).toEqual(['Varie'])
     expect(disk.get(`${aurora.folder}:${MEETINGS_FOLDER}/_lettura.md`)).toContain('«Varie»')
+  })
+
+  it('writes nothing of a meeting exported again while its files were being read', async () => {
+    const first = complete(1, 'Kickoff Aurora')
+    const next = { ...first, meeting: { ...meeting(1, 'Kickoff Aurora'), exportRevision: 2 } }
+    const moved = setup({
+      readings: [first, complete(3, 'Varie'), complete(4, 'Altro')],
+      after: { 'export-1': next, 'export-3': null },
+    })
+
+    expect(await moved.meetings.sync(aurora)).toMatchObject({
+      written: 0,
+      unchanged: 0,
+      error: null,
+    })
+    expect(await moved.meetings.imported(aurora)).toEqual([])
+    expect(moved.disk.get(`${aurora.folder}:${MEETINGS_FOLDER}/_lettura.md`)).toContain(
+      '- `export-1`: esportata di nuovo durante la lettura',
+    )
+    // Given by hand at that very moment: nothing is written, the PM tries again.
+    await expect(moved.meetings.assign(aurora, meeting(3, '').id)).rejects.toThrow('source_busy')
+    await moved.meetings.assign(aurora, meeting(4, '').id)
+    expect(await moved.meetings.imported(aurora)).toHaveLength(1)
   })
 
   it('does not count as a rival a project that reads another folder', async () => {

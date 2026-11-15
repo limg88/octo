@@ -20,7 +20,7 @@ import {
   createFsSourceSettings,
   createJsonSourceStates,
 } from '../src/index.ts'
-import { type FakeExport, writeExport } from './support/verbale-export.ts'
+import { type FakeExport, publishDestination, writeExport } from './support/verbale-export.ts'
 
 const NOW = new Date('2026-11-14T10:00:00.000Z')
 const KICKOFF: FakeExport = {
@@ -75,7 +75,7 @@ let borea: Project
 let meetings: Meetings
 const files = createFsProjectFiles()
 const settings = createFsSourceSettings()
-const exportsOf = () => createFsMeetingExports({ home, sessionsFolder: join(base, 'sessioni') })
+const exportsOf = () => createFsMeetingExports({ home, verbaleFolder: join(base, 'verbale') })
 
 const imported = (project: Project, path: string): Promise<string> =>
   readFile(join(project.folder, MEETINGS_FOLDER, path), 'utf8')
@@ -86,7 +86,7 @@ beforeAll(async () => {
   root = join(home, 'Verbale')
   aurora = { id: 'p-aurora', name: 'Aurora', folder: join(base, 'Aurora'), addedAt: '' }
   borea = { id: 'p-borea', name: 'Borea', folder: join(base, 'Borea'), addedAt: '' }
-  for (const folder of [root, aurora.folder, borea.folder, join(base, 'sessioni')]) {
+  for (const folder of [root, aurora.folder, borea.folder, join(base, 'verbale', 'Sessions')]) {
     await mkdir(folder, { recursive: true })
   }
   // Something of the PM's in the same folder: not an export, never mentioned.
@@ -297,7 +297,7 @@ describe('the folder of Verbale as this computer tells it', () => {
   })
 
   it('proposes the folder Verbale last exported to, when its sessions name one that exists', async () => {
-    const sessions = join(base, 'sessioni')
+    const sessions = join(base, 'verbale', 'Sessions')
     const session = async (name: string, content: string) => {
       await mkdir(join(sessions, name), { recursive: true })
       await writeFile(join(sessions, name, 'meeting.json'), content)
@@ -315,6 +315,87 @@ describe('the folder of Verbale as this computer tells it', () => {
     await session('fuori', JSON.stringify({ destination: base }))
     expect(await exportsOf().defaultRoot()).toBe(base)
     expect(await createFsMeetingExports({ home: join(base, 'nessuno') }).defaultRoot()).toBeNull()
+  })
+})
+
+describe('the export of a Verbale that says more', () => {
+  let newer: string
+  let exports: ReturnType<typeof exportsOf>
+  const WEEKLY: FakeExport = {
+    id: '22000000-0000-4000-8000-000000000008',
+    title: 'Punto',
+    started: '2026-11-09T09:00:00Z',
+    duration: 900,
+    revision: 1,
+    speakers: { '1': 'Anna' },
+  }
+  const folderOf = '2026-11-09_090000_Punto_22000000'
+
+  beforeAll(async () => {
+    newer = join(home, 'Nuovo')
+    await mkdir(newer, { recursive: true })
+    exports = exportsOf()
+  })
+
+  it('reads the summary in place of the manifest, which only has to be there', async () => {
+    // A manifest no reader of the known fields could use: what is read is the summary.
+    await writeExport(newer, { ...WEEKLY, manifest: '{"schemaVersion": 1, "segments": []}' })
+
+    expect(await exports.list(newer)).toMatchObject([
+      {
+        folder: folderOf,
+        status: 'complete',
+        meeting: { title: 'Punto', exportRevision: 1, participants: ['Anna'] },
+      },
+    ])
+  })
+
+  it('goes back to the manifest when the summary cannot be used', async () => {
+    const listed = { ...WEEKLY, participants: [{ name: 'Anna', email: 'anna@cliente.example' }] }
+    await writeExport(newer, { ...listed, revision: 2, summary: '{"schemaVersion": 1,' })
+
+    const [reading] = await exports.list(newer)
+    expect(reading).toMatchObject({
+      status: 'complete',
+      meeting: { exportRevision: 2, participants: ['Anna <anna@cliente.example>'] },
+    })
+  })
+
+  it('takes a summary without its manifest for an export that is not finished', async () => {
+    await writeExport(newer, { ...WEEKLY, revision: 3, manifest: null })
+
+    expect(await exports.list(newer)).toMatchObject([{ status: 'skipped', reason: 'no_manifest' }])
+    expect(await exports.reading(newer, folderOf)).toMatchObject({ reason: 'no_manifest' })
+  })
+
+  it('tells, reading a folder again, that the meeting was exported again meanwhile', async () => {
+    await writeExport(newer, { ...WEEKLY, revision: 4 })
+    const [before] = await exports.list(newer)
+    await writeExport(newer, { ...WEEKLY, revision: 5 })
+
+    const after = await exports.reading('~/Nuovo', folderOf)
+    expect(before).toMatchObject({ meeting: { exportRevision: 4 } })
+    expect(after).toMatchObject({ meeting: { exportRevision: 5 } })
+    expect(await exports.reading(newer, 'Vacanze')).toBeNull()
+    await expect(exports.reading(newer, '../Verbale')).rejects.toThrow('source_config_invalid')
+  })
+
+  it('proposes the folder Verbale says it exports to, before looking at its sessions', async () => {
+    const verbale = join(base, 'verbale')
+    // The sessions name another folder: what Verbale says now comes first.
+    await publishDestination(verbale, newer)
+    expect(await exportsOf().defaultRoot()).toBe('~/Nuovo')
+
+    await publishDestination(verbale, join(base, 'non-esiste'))
+    expect(await exportsOf().defaultRoot()).toBe(base)
+    await writeFile(
+      join(verbale, 'export.json'),
+      JSON.stringify({ schemaVersion: 2, destination: newer }),
+    )
+    expect(await exportsOf().defaultRoot()).toBe(base)
+    await writeFile(join(verbale, 'export.json'), JSON.stringify({ schemaVersion: 1 }))
+    expect(await exportsOf().defaultRoot()).toBe(base)
+    await rm(join(verbale, 'export.json'))
   })
 })
 

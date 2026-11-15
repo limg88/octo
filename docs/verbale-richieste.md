@@ -1,6 +1,20 @@
 # Richieste per Verbale
 
-Limiti trovati integrando Verbale in Octo (tappa T1) che si risolvono bene solo dal lato di Verbale. Verbale non è stato toccato: per ognuno Octo ha un ripiego, descritto qui. Fonte del contratto letto: `verbale/Sources/VerbaleCore/SessionStore.swift` e `Domain.swift`.
+Limiti trovati integrando Verbale in Octo (tappa T1) che si risolvono bene solo dal lato di Verbale. Per ognuno Octo ha un ripiego, descritto qui, che resta valido per gli export fatti prima.
+
+## Stato
+
+Verbale ha risposto sul branch `feat/octo-export` (contratto in `verbale/docs/EXPORT-CONTRACT.md`, guida in `verbale/docs/octo-integrazione.md`); `schemaVersion` resta 1. Octo legge ciò che è arrivato.
+
+| Richiesta | In Verbale | In Octo |
+|---|---|---|
+| 1. Dove si esporta | fatto: `~/Library/Application Support/Verbale/export.json` | letto per primo; poi il ripiego sulle sessioni |
+| 2. Riesportazione riconoscibile | fatto: `meeting.json` tolto prima di riscrivere, `exportedAt`, `exportRevision` | dopo i documenti rilegge la revisione: se è cambiata non scrive e riprova |
+| 3. Evento di calendario | campi previsti ma sempre assenti: Verbale rileva la chiamata Teams, non l'evento. Servirebbero EventKit e il consenso dell'utente, e va verificato che l'identificativo coincida con l'UID degli inviti | se `calendarEventUID` arriva, vince sull'orario; `onlineMeetingURL` va in `_meta.md` |
+| 4. Partecipanti | fatto in parte: `participants` con i nomi assegnati o riconosciuti; niente invitati né indirizzi finché manca il punto 3 | usati al posto di `speakers`, con l'indirizzo se c'è |
+| 5. Manifest leggero | fatto: `summary.json` nella cartella della riunione | letto al posto di `meeting.json`, che deve comunque esserci |
+
+Resta aperta solo la 3, ed è quella che serve alle riunioni ricorrenti. Il testo sotto è la richiesta com'era stata scritta: fonte del contratto letto allora, `verbale/Sources/VerbaleCore/SessionStore.swift` e `Domain.swift`.
 
 ## 1. Dire dove si esporta
 

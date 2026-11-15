@@ -1,19 +1,21 @@
 // Writes what stands for Verbale in a demo: the folder it exports the meetings to, with finished
-// meetings and exports Octo must leave out, the sessions folder that names that export folder,
-// and the invitation of one of the meetings in the fake Mail folder.
-// Usage: node demo/lib/fake-verbale.ts <export folder> <sessions folder> <mail folder> [again]
+// meetings and exports Octo must leave out, the data folder where Verbale says which folder it
+// exports to, and the invitation of one of the meetings in the fake Mail folder.
+// Usage: node demo/lib/fake-verbale.ts <export folder> <Verbale data folder> <mail folder> [again]
 // With `again`, the first meeting is exported again: a correction and a report.
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync } from 'node:fs'
 import { addFakeMail } from '../../packages/infrastructure/test/support/mail-folder.ts'
 import {
   type FakeExport,
+  publishDestination,
   writeExport,
 } from '../../packages/infrastructure/test/support/verbale-export.ts'
 
-const [root, sessions, mailRoot, again] = process.argv.slice(2)
-if (!root || !sessions || !mailRoot) {
-  throw new Error('usage: fake-verbale.ts <export folder> <sessions folder> <mail folder> [again]')
+const [root, verbaleFolder, mailRoot, again] = process.argv.slice(2)
+if (!root || !verbaleFolder || !mailRoot) {
+  throw new Error(
+    'usage: fake-verbale.ts <export folder> <Verbale data folder> <mail folder> [again]',
+  )
 }
 
 const HOUR_MS = 60 * 60 * 1000
@@ -30,6 +32,7 @@ const WEEKLY: FakeExport = {
   title: 'Punto settimanale',
   started: tenOf(1),
   duration: 45 * 60,
+  revision: 1,
   speakers: { '1': 'Carla Bianchi', '2': 'Paola Verdi' },
   notes: 'Collaudo: serve l’ambiente di prova entro venerdì.',
   passages: [
@@ -39,6 +42,7 @@ const WEEKLY: FakeExport = {
 }
 const CORRECTED: FakeExport = {
   ...WEEKLY,
+  revision: 2,
   passages: [
     'Il collaudo resta il 17 dicembre, se l’ambiente di prova arriva entro mercoledì.',
     'Luca conferma l’ambiente di prova entro martedì.',
@@ -53,6 +57,7 @@ const EXPORTS: FakeExport[] = [
     title: 'Boreale: pianificazione di gennaio',
     started: tenOf(2),
     duration: 30 * 60,
+    revision: 1,
     passages: ['Il collaudo di Boreale si pianifica nella seconda settimana di gennaio.'],
   },
   {
@@ -91,10 +96,8 @@ if (again) {
 } else {
   mkdirSync(root, { recursive: true })
   for (const meeting of EXPORTS) await writeExport(root, meeting)
-  // Verbale's own session keeps the folder it exported to: Octo proposes it.
-  const session = join(sessions, WEEKLY.id)
-  mkdirSync(session, { recursive: true })
-  writeFileSync(join(session, 'meeting.json'), JSON.stringify({ destination: root }))
+  // Verbale says which folder it exports to: Octo proposes it.
+  await publishDestination(verbaleFolder, root)
   const start = compact(WEEKLY.started)
   const end = compact(new Date(Date.parse(WEEKLY.started) + HOUR_MS).toISOString().slice(0, 19))
   addFakeMail(mailRoot, [

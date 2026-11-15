@@ -13,7 +13,7 @@ source "$root/demo/lib/project.sh"
 
 cd "$root"
 if [[ "${AGAIN:-0}" == "1" ]]; then
-  node demo/lib/fake-verbale.ts "$work/Verbale" "$work/VerbaleSessioni" "$work/Mail" again
+  node demo/lib/fake-verbale.ts "$work/Verbale" "$work/VerbaleDati" "$work/Mail" again
   echo "Riunione «Punto settimanale» esportata di nuovo da Verbale: in Octo premi «Leggi ora»."
   exit 0
 fi
@@ -25,7 +25,7 @@ if [[ "${KEEP:-0}" != "1" || ! -d "$work/dati" ]]; then
   boreale="$work/Boreale"
   # The mail of Aurora is already linked: its invitations tell whose a meeting is.
   node demo/lib/fake-today.ts "$aurora" "$work/Mail"
-  node demo/lib/fake-verbale.ts "$work/Verbale" "$work/VerbaleSessioni" "$work/Mail"
+  node demo/lib/fake-verbale.ts "$work/Verbale" "$work/VerbaleDati" "$work/Mail"
   # A second project already reads the same folder of Verbale: a meeting is of one of the two.
   mkdir -p "$boreale/_octo/.impostazioni"
   printf '# Boreale\n\nIl collaudo del progetto Boreale è previsto a gennaio 2027.\n' > "$boreale/stato.md"
@@ -40,7 +40,7 @@ fi
 
 export OCTO_DATA_DIR="$work/dati"
 export OCTO_MAIL_ROOT="$work/Mail"
-export OCTO_VERBALE_SESSIONS="$work/VerbaleSessioni"
+export OCTO_VERBALE_DIR="$work/VerbaleDati"
 # Demo only: a person already signed in (the sign-in is shown by demo 23), and no system keychain.
 export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_DEMO_PLAIN_SECRETS=1

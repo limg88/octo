@@ -36,8 +36,14 @@ export type RecordedMeeting = {
   started: string
   timezone: string
   durationSeconds: number
-  /** The people Verbale gave a name to; empty when it named nobody. */
+  /** The people Verbale names, with the address when it knows it; empty when it names nobody. */
   participants: string[]
+  /** The event of the calendar the recording started from; null when Verbale does not know it. */
+  calendarEventUID: string | null
+  onlineMeetingURL: string | null
+  /** Which export of the meeting this is; null in an export made before Verbale counted them. */
+  exportRevision: number | null
+  exportedAt: string | null
 }
 
 export const MEETING_SKIP_REASONS = [
@@ -46,6 +52,7 @@ export const MEETING_SKIP_REASONS = [
   'invalid',
   'schema',
   'not_complete',
+  'changing',
 ] as const
 export type MeetingSkipReason = (typeof MEETING_SKIP_REASONS)[number]
 
@@ -64,19 +71,39 @@ const FALLBACK_SLUG = 'riunione'
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-/** The names Verbale gave to the voices, each once, in alphabetical order. */
-function participantsOf(speakers: unknown): string[] {
-  if (!isRecord(speakers)) return []
-  const names = Object.values(speakers)
-    .filter((name): name is string => typeof name === 'string')
-    .map((name) => name.trim())
-    .filter((name) => name !== '')
-  return [...new Set(names)].sort((a, b) => a.localeCompare(b, 'it'))
+const textOf = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+
+/** A participant as Verbale lists it: the name, with the address when there is one. */
+function listedPerson(entry: unknown): string | null {
+  if (!isRecord(entry)) return null
+  const name = textOf(entry.name)
+  const email = textOf(entry.email)
+  return name !== null && email !== null ? `${name} <${email}>` : name
 }
 
 /**
- * What the manifest of an export folder says. The text is null when the folder has no manifest
- * yet. The version is looked at first: a manifest of a version Octo does not know is not judged
+ * The people of a meeting, each once, in alphabetical order: those Verbale lists as participants
+ * or, in an export that has no such list, the names it gave to the voices.
+ */
+function participantsOf(participants: unknown, speakers: unknown): string[] {
+  const names = Array.isArray(participants)
+    ? participants.map(listedPerson)
+    : isRecord(speakers)
+      ? Object.values(speakers).map(textOf)
+      : []
+  const known = names.filter((name): name is string => name !== null)
+  return [...new Set(known)].sort((a, b) => a.localeCompare(b, 'it'))
+}
+
+const instantOf = (value: unknown): string | null =>
+  typeof value === 'string' && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toISOString()
+    : null
+
+/**
+ * What the manifest of an export folder says, or its summary: the two have the same fields. The
+ * text is null when the folder has no manifest yet. The version is looked at first: a manifest of a version Octo does not know is not judged
  * by the fields of the one it knows.
  */
 export function readMeetingManifest(folder: string, text: string | null): MeetingReading {
@@ -119,9 +146,26 @@ export function readMeetingManifest(folder: string, text: string | null): Meetin
       started: new Date(started as string).toISOString(),
       timezone: typeof timezone === 'string' ? timezone : '',
       durationSeconds: duration as number,
-      participants: participantsOf(raw.speakers),
+      participants: participantsOf(raw.participants, raw.speakers),
+      calendarEventUID: textOf(raw.calendarEventUID),
+      onlineMeetingURL: textOf(raw.onlineMeetingURL),
+      exportRevision: typeof raw.exportRevision === 'number' ? raw.exportRevision : null,
+      exportedAt: instantOf(raw.exportedAt),
     },
   }
+}
+
+/**
+ * Whether two readings of a folder are of the same export: the same meeting, published once.
+ * An export made before Verbale counted them is the same as long as its manifest is there.
+ */
+export function sameExport(before: RecordedMeeting, after: MeetingReading): boolean {
+  return (
+    after.status === 'complete' &&
+    after.meeting.id === before.id &&
+    after.meeting.exportRevision === before.exportRevision &&
+    after.meeting.exportedAt === before.exportedAt
+  )
 }
 
 /** The configuration as it is saved: trimmed, and a folder named from the root of the disk. */
@@ -182,6 +226,9 @@ export function meetingMeta(
     `- Data: ${WHEN.format(new Date(meeting.started))} (ora italiana)`,
     `- Durata: ${minutes} minuti`,
     ...(people === '' ? [] : [`- Partecipanti: ${people}`]),
+    ...(meeting.onlineMeetingURL === null
+      ? []
+      : [`- Riunione online: ${meeting.onlineMeetingURL}`]),
     `- Origine: registrata con Verbale, cartella \`${exportFolder}\``,
     '',
     '## File',
@@ -226,6 +273,7 @@ const SKIP_WORDS: Readonly<Record<MeetingSkipReason, string>> = {
   invalid: '`meeting.json` non ha i campi attesi',
   schema: 'versione del formato non supportata',
   not_complete: 'riunione non completa',
+  changing: 'esportata di nuovo durante la lettura: la riprendo alla prossima',
 }
 
 /**

@@ -100,8 +100,8 @@ const BACKUP_DIALOGS = {
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 /** Points the mail reader at another Mail folder: a demo's fake archive. */
 const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
-/** Demos and tests only: a folder that stands for Verbale's own sessions on this computer. */
-const VERBALE_SESSIONS_VARIABLE = 'OCTO_VERBALE_SESSIONS'
+/** Demos and tests only: a folder that stands for Verbale's own data on this computer. */
+const VERBALE_FOLDER_VARIABLE = 'OCTO_VERBALE_DIR'
 const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
@@ -263,13 +263,13 @@ function start(): void {
     clock,
     files,
   })
-  const verbaleSessions = process.env[VERBALE_SESSIONS_VARIABLE]
+  const verbaleFolder = process.env[VERBALE_FOLDER_VARIABLE]
   const meetings = createMeetings({
     settings,
     states: sourceStates,
     exports: createFsMeetingExports({
       home: homedir(),
-      ...(verbaleSessions ? { sessionsFolder: verbaleSessions } : {}),
+      ...(verbaleFolder ? { verbaleFolder } : {}),
     }),
     projects: () => projects.list(),
     files,

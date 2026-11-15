@@ -22,6 +22,7 @@ import {
   type SourceRun,
   type SourceState,
   type StoredMeeting,
+  sameExport,
 } from '@octo/domain'
 import type {
   Clock,
@@ -129,7 +130,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const content = await deps.files.readText(project.folder, path)
       const stored = content === null ? null : parseMailDocument(path, content)
       if (stored?.meeting && stored.invite !== CALENDAR_CANCEL) {
-        invites.push({ start: stored.meeting.start, end: stored.meeting.end })
+        const { uid, start, end } = stored.meeting
+        invites.push({ uid, start, end })
       }
     }
     return {
@@ -172,26 +174,35 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     return found
   }
 
-  /** Writes the text files of a meeting and its `_meta.md`; a file no longer exported goes. */
+  /**
+   * Writes the text files of a meeting and its `_meta.md`; a file no longer exported goes.
+   * Nothing is written when Verbale exported the meeting again while its files were being read:
+   * they could be half of one export and half of the other.
+   */
   async function importOne(
     project: Project,
     config: MeetingsSourceConfig,
     { reading, folder }: Owned,
-  ): Promise<WriteOutcome> {
+  ): Promise<WriteOutcome | 'changing'> {
+    const texts = new Map<(typeof MEETING_TEXT_FILES)[number], string>()
+    for (const name of MEETING_TEXT_FILES) {
+      const text = await deps.exports.read(config.root, reading.folder, name)
+      if (text !== null) texts.set(name, text)
+    }
+    const after = await deps.exports.reading(config.root, reading.folder)
+    if (after === null || !sameExport(reading.meeting, after)) return 'changing'
     const outcomes: WriteOutcome[] = []
-    const present: (typeof MEETING_TEXT_FILES)[number][] = []
     for (const name of MEETING_TEXT_FILES) {
       const path = `${folder}/${name}`
-      const text = await deps.exports.read(config.root, reading.folder, name)
-      if (text !== null) {
-        present.push(name)
+      const text = texts.get(name)
+      if (text !== undefined) {
         outcomes.push(await deps.writer.write(project.folder, path, text))
       } else if ((await deps.files.readText(project.folder, path)) !== null) {
         await deps.files.remove(project.folder, path)
         outcomes.push('written')
       }
     }
-    const meta = meetingMeta(reading.meeting, reading.folder, present)
+    const meta = meetingMeta(reading.meeting, reading.folder, [...texts.keys()])
     outcomes.push(await deps.writer.write(project.folder, `${folder}/${MEETING_META_FILE}`, meta))
     return outcomes.includes('written') ? 'written' : 'unchanged'
   }
@@ -202,8 +213,16 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
   ): Promise<Pick<SourceRun, 'written' | 'unchanged'>> {
     const found = await scan(project, config)
     const counts = { written: 0, unchanged: 0 }
-    for (const owned of found.mine) counts[await importOne(project, config, owned)] += 1
-    const note = meetingsReadingNote(config.root, found.skipped, found.unassigned)
+    const changing: Skipped[] = []
+    for (const owned of found.mine) {
+      const outcome = await importOne(project, config, owned)
+      if (outcome === 'changing') {
+        const { folder } = owned.reading
+        changing.push({ folder, status: 'skipped', reason: 'changing', detail: '' })
+      } else counts[outcome] += 1
+    }
+    const skipped = [...found.skipped, ...changing]
+    const note = meetingsReadingNote(config.root, skipped, found.unassigned)
     await deps.writer.write(project.folder, MEETINGS_READING_PATH, note)
     return counts
   }
@@ -263,7 +282,9 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const reading = unassigned.find((candidate) => candidate.meeting.id === meetingId)
       if (!reading) throw new DomainError('meeting_not_found', meetingId)
       const folder = `${MEETINGS_FOLDER}/${meetingFolderName(reading.meeting)}`
-      await importOne(project, config, { reading, folder })
+      const outcome = await importOne(project, config, { reading, folder })
+      // Exported again this very moment: the PM tries again, nothing was written.
+      if (outcome === 'changing') throw new DomainError('source_busy', SOURCE)
     },
   }
 }

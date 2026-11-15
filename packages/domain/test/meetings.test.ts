@@ -12,6 +12,7 @@ import {
   projectKeywords,
   type RecordedMeeting,
   readMeetingManifest,
+  sameExport,
   unassignedMeetingItems,
 } from '../src/index.ts'
 
@@ -36,6 +37,10 @@ const kickoff: RecordedMeeting = {
   timezone: 'Europe/Rome',
   durationSeconds: 2700,
   participants: ['Anna', 'Luca'],
+  calendarEventUID: null,
+  onlineMeetingURL: null,
+  exportRevision: null,
+  exportedAt: null,
 }
 
 const skipOf = (reading: MeetingReading) =>
@@ -52,6 +57,55 @@ describe('the manifest of an export of Verbale', () => {
     expect(
       bare.status === 'complete' && [bare.meeting.participants, bare.meeting.timezone],
     ).toEqual([[], ''])
+  })
+
+  it('takes what a newer Verbale adds: who took part, the event, which export it is', () => {
+    const reading = readMeetingManifest(
+      'c',
+      manifest({
+        participants: [
+          { name: 'Luca', email: 'luca@cliente.example' },
+          { name: ' Anna ' },
+          { name: 'Anna' },
+          { email: 'senza@nome.example' },
+          'Marta',
+        ],
+        calendarEventUID: ' uid-7 ',
+        onlineMeetingURL: 'https://teams.example/l/1',
+        exportRevision: 3,
+        exportedAt: '2026-11-10T10:00:00Z',
+      }),
+    )
+    expect(reading.status === 'complete' && reading.meeting).toMatchObject({
+      // The list of the participants comes before the names given to the voices.
+      participants: ['Anna', 'Luca <luca@cliente.example>'],
+      calendarEventUID: 'uid-7',
+      onlineMeetingURL: 'https://teams.example/l/1',
+      exportRevision: 3,
+      exportedAt: '2026-11-10T10:00:00.000Z',
+    })
+    const odd = readMeetingManifest('c', manifest({ exportedAt: 'boh', exportRevision: '3' }))
+    expect(
+      odd.status === 'complete' && [odd.meeting.exportedAt, odd.meeting.exportRevision],
+    ).toEqual([null, null])
+  })
+
+  it('tells whether a folder read again still holds the same export', () => {
+    const third = { ...kickoff, exportRevision: 3, exportedAt: '2026-11-10T10:00:00.000Z' }
+    const again = (meeting: RecordedMeeting): MeetingReading => ({
+      folder: 'c',
+      status: 'complete',
+      meeting,
+    })
+    expect(sameExport(third, again(third))).toBe(true)
+    // An export made before Verbale counted them: the same as long as it is there.
+    expect(sameExport(kickoff, again(kickoff))).toBe(true)
+    expect(sameExport(third, again({ ...third, exportRevision: 4 }))).toBe(false)
+    expect(sameExport(third, again({ ...third, exportedAt: '2026-11-10T10:05:00.000Z' }))).toBe(
+      false,
+    )
+    expect(sameExport(third, again({ ...third, id: 'altra' }))).toBe(false)
+    expect(sameExport(third, readMeetingManifest('c', null))).toBe(false)
   })
 
   it('leaves out what is not finished, not readable or of another version, with its reason', () => {
@@ -124,6 +178,9 @@ describe('a meeting in the memory of a project', () => {
       participants: ['Anna', 'Luca'],
       folder: `${MEETINGS_FOLDER}/2026-11-10_kickoff-aurora_ab12cd34`,
     })
+    expect(meta).not.toContain('Riunione online')
+    const online = { ...kickoff, onlineMeetingURL: 'https://teams.example/l/1' }
+    expect(meetingMeta(online, 'c', [])).toContain('- Riunione online: https://teams.example/l/1')
     const alone = meetingMeta({ ...kickoff, participants: [] }, 'c', [])
     expect(alone).not.toContain('Partecipanti:')
     expect(parseMeetingMeta(path, alone)?.participants).toEqual([])
@@ -145,12 +202,14 @@ describe('what a reading left out', () => {
       [
         { folder: 'in-corso', status: 'skipped', reason: 'not_complete', detail: 'recording' },
         { folder: 'rotta', status: 'skipped', reason: 'corrupt', detail: '' },
+        { folder: 'mossa', status: 'skipped', reason: 'changing', detail: '' },
       ],
       [{ folder: 'orfana', status: 'complete', meeting: kickoff }],
     )
     expect(note).toContain('Cartella letta: `~/Verbale`')
     expect(note).toContain('- `in-corso`: riunione non completa (recording)')
     expect(note).toContain('- `rotta`: `meeting.json` non si legge: non è JSON valido')
+    expect(note).toContain('- `mossa`: esportata di nuovo durante la lettura')
     expect(note).toContain('- `orfana`: «Kickoff Aurora» del 2026-11-10')
     expect(meetingsReadingNote('/v', [], []).match(/Nessuna\./g)).toHaveLength(2)
   })
@@ -162,15 +221,27 @@ describe('whose a recorded meeting is', () => {
     invites: MeetingCandidate['invites'],
     keywords: string[] = [],
   ): MeetingCandidate => ({ projectId, invites, keywords })
-  const during = { start: '2026-11-10T09:30:00.000Z', end: '2026-11-10T10:30:00.000Z' }
-  const before = { start: '2026-11-10T08:00:00.000Z', end: '2026-11-10T09:00:00.000Z' }
+  const during = { uid: 'd', start: '2026-11-10T09:30:00.000Z', end: '2026-11-10T10:30:00.000Z' }
+  const before = { uid: 'b', start: '2026-11-10T08:00:00.000Z', end: '2026-11-10T09:00:00.000Z' }
 
   it('is of the only project whose calendar has a meeting at that time', () => {
     const candidates = [candidate('aurora', [before, during]), candidate('borea', [before])]
     expect(meetingOwner(kickoff, '', candidates)).toBe('aurora')
     // An invitation without an end is taken to last an hour.
-    const open = [candidate('borea', [{ start: '2026-11-10T08:30:00.000Z', end: null }])]
+    const open = [candidate('borea', [{ uid: 'o', start: '2026-11-10T08:30:00.000Z', end: null }])]
     expect(meetingOwner({ ...kickoff, title: 'Sync' }, '', open)).toBe('borea')
+  })
+
+  it('is of the only project invited to the very event Verbale names, whatever its day', () => {
+    // A meeting that repeats is invited once, with the day of its first time.
+    const series = { uid: 'serie-1', start: '2026-10-06T09:00:00.000Z', end: null }
+    const named = { ...kickoff, title: 'Sync', calendarEventUID: 'serie-1' }
+    expect(
+      meetingOwner(named, '', [candidate('aurora', [during]), candidate('borea', [series])]),
+    ).toBe('borea')
+    // Invited in two projects, the event says nothing: the time and the words decide.
+    const both = [candidate('aurora', [series, during]), candidate('borea', [series])]
+    expect(meetingOwner(named, '', both)).toBe('aurora')
   })
 
   it('is told by the words of the title or of the notes when the calendar does not say', () => {

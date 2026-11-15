@@ -12,8 +12,8 @@ import { isMissing } from './json-file.ts'
 export type MeetingExportsOptions = {
   /** The home of who uses Octo: what `~` stands for in a root. */
   home: string
-  /** Where Verbale keeps its own sessions; by default its folder in the user's library. */
-  sessionsFolder?: string
+  /** Where Verbale keeps its own data; by default its folder in the user's library. */
+  verbaleFolder?: string
 }
 
 /** The file Verbale leaves in every folder it exports, from the first moment. */
@@ -22,7 +22,15 @@ const HIDDEN_PREFIX = '.'
 const HOME_MARK = '~'
 /** Sessions looked at to tell where Verbale exports: the newest ones say where it does now. */
 const SESSIONS_PROBED = 5
-const VERBALE_SESSIONS = ['Library', 'Application Support', 'Verbale', 'Sessions']
+const VERBALE_FOLDER = ['Library', 'Application Support', 'Verbale']
+const SESSIONS_FOLDER = 'Sessions'
+/** Where Verbale says which folder it exports to; absent in a Verbale that does not say it. */
+const DESTINATION_FILE = 'export.json'
+const DESTINATION_SCHEMA = 1
+/** The light copy of the manifest a newer Verbale writes beside it. */
+const SUMMARY_FILE = 'summary.json'
+/** What a summary that cannot be used reads as: then the manifest itself is read. */
+const UNUSABLE: readonly string[] = ['corrupt', 'invalid']
 
 const isPlainName = (name: string): boolean =>
   name !== '' && name !== '.' && name !== '..' && !/[\\/]/.test(name)
@@ -32,7 +40,8 @@ const isPlainName = (name: string): boolean =>
  * its exports. A manifest is read again only when its file changed.
  */
 export function createFsMeetingExports(options: MeetingExportsOptions): MeetingExports {
-  const sessions = options.sessionsFolder ?? join(options.home, ...VERBALE_SESSIONS)
+  const verbale = options.verbaleFolder ?? join(options.home, ...VERBALE_FOLDER)
+  const sessions = join(verbale, SESSIONS_FOLDER)
   const readings = new Map<string, { stamp: string; reading: MeetingReading }>()
 
   const expanded = (root: string): string =>
@@ -50,24 +59,66 @@ export function createFsMeetingExports(options: MeetingExportsOptions): MeetingE
     return `${HOME_MARK}/${inside}`
   }
 
+  const textOrNull = (file: string): Promise<string | null> =>
+    readFile(file, 'utf8').catch((error: unknown) => {
+      if (isMissing(error)) return null
+      throw error
+    })
+
+  /**
+   * What an export folder is. The summary is read in place of the manifest when it is there and
+   * says something: the manifest holds every word of the meeting, the summary a few lines. The
+   * manifest must be there all the same: it is what says that the export is finished.
+   */
   async function readingOf(root: string, folder: string): Promise<MeetingReading | null> {
     const manifest = join(root, folder, MEETING_MANIFEST_FILE)
+    const summary = join(root, folder, SUMMARY_FILE)
     const info = await stat(manifest).catch(() => null)
     if (info === null) {
       // A folder Verbale has not marked is somebody else's: it is not even mentioned.
       const marked = await stat(join(root, folder, OWNER_FILE)).catch(() => null)
       return marked ? readMeetingManifest(folder, null) : null
     }
-    const stamp = `${info.mtimeMs}:${info.size}`
+    const light = await stat(summary).catch(() => null)
+    const stamp = `${info.mtimeMs}:${info.size}:${light?.mtimeMs ?? ''}:${light?.size ?? ''}`
     const known = readings.get(manifest)
     if (known?.stamp === stamp) return known.reading
-    const reading = readMeetingManifest(folder, await readFile(manifest, 'utf8'))
-    readings.set(manifest, { stamp, reading })
+    const brief = light ? await textOrNull(summary) : null
+    const fromSummary = brief === null ? null : readMeetingManifest(folder, brief)
+    const usable =
+      fromSummary !== null &&
+      !(fromSummary.status === 'skipped' && UNUSABLE.includes(fromSummary.reason))
+    // Taken away between the look and the reading: Verbale is exporting the meeting again.
+    const reading = usable ? fromSummary : readMeetingManifest(folder, await textOrNull(manifest))
+    if (!(reading.status === 'skipped' && reading.reason === 'no_manifest')) {
+      readings.set(manifest, { stamp, reading })
+    }
     return reading
   }
 
+  /** The folder Verbale says it exports to, when it says it and the folder is there. */
+  async function publishedRoot(): Promise<string | null> {
+    const published = await readFile(join(verbale, DESTINATION_FILE), 'utf8')
+      .then((text) => JSON.parse(text) as { schemaVersion?: unknown; destination?: unknown })
+      .catch(() => null)
+    const destination = published?.destination
+    if (published?.schemaVersion !== DESTINATION_SCHEMA || typeof destination !== 'string') {
+      return null
+    }
+    return (await isFolder(destination)) ? shortened(destination) : null
+  }
+
+  const isFolder = (path: string): Promise<boolean> =>
+    stat(path).then(
+      (info) => info.isDirectory(),
+      () => false,
+    )
+
   return {
     async defaultRoot() {
+      const published = await publishedRoot()
+      if (published !== null) return published
+      // A Verbale that does not say it yet: its own sessions name the folder they went to.
       const folders = await readdir(sessions).catch(() => [])
       const manifests: Array<{ file: string; at: number }> = []
       for (const folder of folders) {
@@ -81,13 +132,14 @@ export function createFsMeetingExports(options: MeetingExportsOptions): MeetingE
           .then((text) => (JSON.parse(text) as { destination?: unknown }).destination)
           .catch(() => null)
         if (typeof destination !== 'string' || destination === '') continue
-        const isFolder = await stat(destination).then(
-          (info) => info.isDirectory(),
-          () => false,
-        )
-        if (isFolder) return shortened(destination)
+        if (await isFolder(destination)) return shortened(destination)
       }
       return null
+    },
+
+    async reading(root, folder) {
+      if (!isPlainName(folder)) throw new DomainError('source_config_invalid', folder)
+      return readingOf(expanded(root), folder)
     },
 
     portable: (root) => shortened(resolve(expanded(root))),
