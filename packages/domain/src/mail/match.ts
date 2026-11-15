@@ -76,11 +76,16 @@ export function keywordIn(message: MailMessage, keyword: string): boolean {
   return whole.test(body)
 }
 
-/** Whether a mail is taken: not an excluded sender, not a calendar answer, and about the project. */
-export function mailWanted(message: MailMessage, rules: MailRules): boolean {
+/** Whether a mail may be taken at all: not an excluded sender, not a calendar answer. */
+export function mailAllowed(message: MailMessage, rules: MailRules): boolean {
   if (message.calendarMethod === CALENDAR_REPLY) return false
   const sender = message.from?.email ?? ''
-  if (rules.excludeSenders.some((excluded) => lower(excluded) === lower(sender))) return false
+  return !rules.excludeSenders.some((excluded) => lower(excluded) === lower(sender))
+}
+
+/** Whether a mail is taken: not an excluded sender, not a calendar answer, and about the project. */
+export function mailWanted(message: MailMessage, rules: MailRules): boolean {
+  if (!mailAllowed(message, rules)) return false
   if (rules.keywords.length === 0) return true
   return rules.keywords.some((keyword) => keywordIn(message, keyword))
 }

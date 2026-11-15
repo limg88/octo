@@ -4,6 +4,8 @@ export type Project = {
   name: string
   folder: string
   addedAt: string
+  /** The id of the person who added it; absent in what was added before Octo had a sign-in. */
+  owner?: string | undefined
 }
 
 const PATH_SEPARATORS = /[\\/]+/

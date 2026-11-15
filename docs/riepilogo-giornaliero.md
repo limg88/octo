@@ -2,6 +2,8 @@
 
 Data: 15/11/2026. Documento di progetto: nessun file dell'app è stato modificato. L'implementazione parte, un incremento per volta, quando il PM la chiede.
 
+**Stato.** Scritto il 15/11/2026, tutti e sette gli incrementi: demo `demo/23-oggi`. Che cosa è stato fatto in modo diverso da qui, e che cosa non è stato fatto, è in `roadmap.md` alla voce «Oggi».
+
 **Come è stato fatto.** Dalla lettura del codice, delle demo e di `roadmap.md`, `valutazione-interfaccia.md` e `glossario.md`. L'app non è stata avviata e il progetto reale non è stato aperto: gli esempi vengono dal progetto finto «Aurora». Ciò che non è verificato è elencato al §12.
 
 ## Contesto

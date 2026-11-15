@@ -19,6 +19,23 @@ export interface MailMessage {
   readonly attachments: readonly string[]
   /** The method of a calendar part (`REQUEST`, `REPLY`, `CANCEL`), or null for an ordinary mail. */
   readonly calendarMethod: string | null
+  /** The `Message-ID` this mail answers, without its angle brackets; absent or null: none. */
+  readonly inReplyTo?: string | null
+  /** The `Message-ID`s of the conversation before this mail, oldest first. */
+  readonly references?: readonly string[]
+  /** The meeting a calendar part invites to; absent or null: none, or one that cannot be read. */
+  readonly meeting?: MailMeeting | null
+}
+
+/** A meeting as an invitation carries it. */
+export interface MailMeeting {
+  /** What tells this meeting from any other: a later invitation with the same id replaces it. */
+  readonly uid: string
+  readonly summary: string
+  /** When it starts and ends, as instants. */
+  readonly start: string
+  readonly end: string | null
+  readonly location: string
 }
 
 /** A mail as the archive of the mail program lists it: where it is filed and when it arrived. */

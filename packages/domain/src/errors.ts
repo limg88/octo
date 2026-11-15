@@ -71,6 +71,13 @@ export const DOMAIN_ERROR_CODES = [
   'private_host_ca_invalid',
   'private_host_ca_too_long',
   'private_host_ca_not_verified',
+  'not_signed_in',
+  'sign_in_not_configured',
+  'sign_in_failed',
+  'sign_in_refused',
+  'sign_in_cancelled',
+  'today_decision_invalid',
+  'risk_invalid',
 ] as const
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]

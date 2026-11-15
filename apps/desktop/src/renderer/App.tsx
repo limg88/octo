@@ -1,8 +1,9 @@
-import type { AgentStatus } from '@octo/application'
-import type { Project, RestoreOutcome } from '@octo/domain'
+import type { AgentStatus, SessionView } from '@octo/application'
+import type { Assignment, Project, RestoreOutcome } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AlignmentView } from './AlignmentView.tsx'
+import { AllProjectsView } from './AllProjectsView.tsx'
 import { AskView } from './AskView.tsx'
 import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
@@ -14,7 +15,9 @@ import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
 import { ProjectSettings } from './ProjectSettings.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
+import { SignIn } from './SignIn.tsx'
 import type { Section } from './sections.ts'
+import { TodayView } from './TodayView.tsx'
 
 type Props = {
   api: OctoApi
@@ -28,13 +31,27 @@ export function App({ api }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
-  const [tab, setTab] = useState<Section>('ask')
+  const [tab, setTab] = useState<Section>('today')
+  const [session, setSession] = useState<SessionView | null>(null)
+  /** The page above the projects, shown in place of a project. */
+  const [overview, setOverview] = useState(false)
+  const [assignment, setAssignment] = useState<Assignment>('unknown')
   const [dialog, setDialog] = useState<'add' | 'manage' | null>(null)
   const [backupNotes, setBackupNotes] = useState<string[]>([])
   /** The project just taken off the list, while it can still be put back with one click. */
   const [removed, setRemoved] = useState<Project | null>(null)
 
   useEffect(() => {
+    void api.session().then((result) => {
+      if (result.ok) setSession(result.value)
+      else setError(result.code)
+    })
+  }, [api])
+
+  const signedIn = session?.identity != null
+  // Nothing is asked of Octo before somebody is signed in: it would be refused.
+  useEffect(() => {
+    if (!signedIn) return
     void api.agentStatus().then((result) => {
       if (result.ok) setAgent(result.value)
     })
@@ -43,7 +60,37 @@ export function App({ api }: Props) {
       setProjects(result.value)
       setSelectedId(result.value[0]?.id ?? null)
     })
-  }, [api])
+  }, [api, signedIn])
+
+  // Whether the project is the person's in the company system: asked once per project.
+  useEffect(() => {
+    setAssignment('unknown')
+    if (!signedIn || selectedId === null) return
+    let current = true
+    void api.assignment(selectedId).then((result) => {
+      if (current && result.ok) setAssignment(result.value)
+    })
+    return () => {
+      current = false
+    }
+  }, [api, signedIn, selectedId])
+
+  async function signOut() {
+    setError(null)
+    const result = await api.signOut()
+    if (!result.ok) return setError(result.code)
+    setProjects([])
+    setSelectedId(null)
+    setOverview(false)
+    setTab('today')
+    setSession(result.value)
+  }
+
+  /** Choosing a project leaves the page of all the projects. */
+  function selectProject(projectId: string) {
+    setOverview(false)
+    setSelectedId(projectId)
+  }
 
   // Command or Control with a number goes to the project in that place of the list.
   useEffect(() => {
@@ -54,6 +101,7 @@ export function App({ api }: Props) {
       const project = projects[place - 1]
       if (!project) return
       event.preventDefault()
+      setOverview(false)
       setSelectedId(project.id)
     }
     window.addEventListener('keydown', onKey)
@@ -75,6 +123,7 @@ export function App({ api }: Props) {
     setDialog(null)
     setRemoved(null)
     setProjects((previous) => [...previous, project])
+    setOverview(false)
     setSelectedId(project.id)
     setTab('sources')
   }
@@ -139,6 +188,20 @@ export function App({ api }: Props) {
 
   const selected = projects.find((project) => project.id === selectedId) ?? null
 
+  if (!signedIn) {
+    return (
+      <SignIn
+        api={api}
+        session={session}
+        error={error}
+        onSignedIn={(next) => {
+          setError(null)
+          setSession(next)
+        }}
+      />
+    )
+  }
+
   return (
     <div className="shell">
       <nav className="sidebar" aria-label={messages.projects}>
@@ -147,12 +210,23 @@ export function App({ api }: Props) {
         <ProjectSwitcher
           projects={projects}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={selectProject}
           onAdd={() => openDialog('add')}
           onManage={() => openDialog('manage')}
+          onOverview={() => setOverview(true)}
         />
-        {selected && <SectionNav current={tab} onSelect={setTab} />}
-        {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
+        {selected && !overview && <SectionNav current={tab} onSelect={setTab} />}
+        <div className="sidebar-foot">
+          {session?.identity && (
+            <p className="agent">
+              {messages.session.signedInAs(session.identity.name)}{' '}
+              <button type="button" className="quiet" onClick={() => void signOut()}>
+                {messages.session.signOut}
+              </button>
+            </p>
+          )}
+          {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
+        </div>
       </nav>
       <main>
         {error && dialog === null && (
@@ -186,7 +260,15 @@ export function App({ api }: Props) {
             <p>{messages.agentMissingBody}</p>
           </div>
         )}
-        {selected ? (
+        {overview ? (
+          <AllProjectsView
+            api={api}
+            onOpen={(projectId) => {
+              selectProject(projectId)
+              setTab('today')
+            }}
+          />
+        ) : selected ? (
           <>
             <header className="project-header">
               <div>
@@ -194,7 +276,19 @@ export function App({ api }: Props) {
                 <p className="folder">{selected.folder}</p>
               </div>
             </header>
-            {tab === 'ask' ? (
+            {assignment === 'not_assigned' && (
+              <p className="warning" role="status">
+                {messages.assignment.notAssigned}
+              </p>
+            )}
+            {tab === 'today' ? (
+              <TodayView
+                api={api}
+                project={selected}
+                canJudge={agent?.available === true}
+                onOpenSection={setTab}
+              />
+            ) : tab === 'ask' ? (
               <AskView api={api} project={selected} />
             ) : tab === 'deliverables' ? (
               <DeliverablesView api={api} project={selected} />

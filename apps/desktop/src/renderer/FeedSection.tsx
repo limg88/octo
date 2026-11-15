@@ -84,6 +84,8 @@ function formOf(view: FeedView, now: Date): Form {
   const defaults: Form = {
     since: dayOf(new Date(now.getTime() - DEFAULT_DAYS_BACK * DAY_MS)),
     targetFolder: view.suggestedFolder,
+    // Who is signed in is whose reading it is: nothing to type.
+    ownerEmail: view.suggestedOwner ?? '',
   }
   const form: Form = {}
   for (const field of fieldsOf(view.feed)) {
@@ -178,7 +180,24 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
 
   /** Where what is picked from the search goes: the list of what the feed reads. */
   const listField: FieldKey = PICK_FIELD[feed]
-  const searchesSpaces = feed === 'confluence'
+  const searchText =
+    feed === 'confluence'
+      ? {
+          button: messages.feedChoicesSpaces,
+          title: messages.feedChoicesSpacesTitle,
+          none: messages.feedChoicesNoSpaces,
+        }
+      : feed === 'dwsi'
+        ? {
+            button: messages.feedChoicesCodes,
+            title: messages.feedChoicesCodesTitle,
+            none: messages.feedChoicesNoCodes,
+          }
+        : {
+            button: messages.feedChoices,
+            title: messages.feedChoicesProjects,
+            none: messages.feedChoicesNone,
+          }
   /** A project chosen names the one read (Azure DevOps) or joins those read (Jira). */
   const pickProject = (value: string) =>
     feed === 'ado' ? setForm({ ...form, project: value }) : addLine(listField, value)
@@ -274,25 +293,15 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
         </div>
         {missing.secret && <Missing />}
         <h4>{messages.feedSteps.scope}</h4>
-        {feed !== 'dwsi' && (
-          <div className="actions">
-            <button type="button" disabled={busy} onClick={() => void search()}>
-              {searchesSpaces ? messages.feedChoicesSpaces : messages.feedChoices}
-            </button>
-          </div>
-        )}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={() => void search()}>
+            {searchText.button}
+          </button>
+        </div>
         {choices && (
           <div className="preview">
-            {choices.projects.length === 0 && (
-              <p>{searchesSpaces ? messages.feedChoicesNoSpaces : messages.feedChoicesNone}</p>
-            )}
-            <ChoiceList
-              title={
-                searchesSpaces ? messages.feedChoicesSpacesTitle : messages.feedChoicesProjects
-              }
-              choices={choices.projects}
-              onPick={pickProject}
-            />
+            {choices.projects.length === 0 && <p>{searchText.none}</p>}
+            <ChoiceList title={searchText.title} choices={choices.projects} onPick={pickProject} />
             <ChoiceList
               title={messages.feedChoicesAreas}
               choices={choices.areas}

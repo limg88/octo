@@ -1,5 +1,6 @@
 // Stands in for the Claude Code executable in tests. The question, read from standard input,
 // chooses the behaviour; the events have the shape of `claude -p --output-format stream-json`.
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -29,6 +30,67 @@ emit({
   subtype: 'init',
   model: asked < 0 ? 'claude-fake-default' : `claude-${args[asked + 1]}-fake`,
 })
+
+const WORDS_QUOTED = 60
+
+/** What the author of a mail of the memory wrote: the first line after its header and title. */
+function firstLineOf(path) {
+  try {
+    const lines = readFileSync(join(process.cwd(), path), 'utf8').split('\n')
+    const body = lines.slice(lines.indexOf('---', 1) + 1)
+    const line = body.find((candidate) => candidate.trim() !== '' && !candidate.startsWith('#'))
+    return (line ?? '').trim().slice(0, WORDS_QUOTED).trim()
+  } catch {
+    return ''
+  }
+}
+
+// A run of the judge of the mail: every mail given is weighed, with words copied from its file.
+if (args.join(' ').includes('You rate the mail that waits for an answer')) {
+  const { mails } = JSON.parse(question)
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      mails: mails.map((mail) => {
+        const money = /budget|ordine|fattur/i.test(mail.subject)
+        return {
+          id: mail.id,
+          importance: money ? 'alta' : 'media',
+          reason: money
+            ? 'Riguarda il budget del progetto: va confermato al cliente.'
+            : 'Chiede una risposta, ma nulla si ferma nel frattempo.',
+          quote: firstLineOf(mail.path),
+          deadline: null,
+        }
+      }),
+    },
+  })
+  process.exit(0)
+}
+
+// A run of the judge of the risks: one risk, with its source in the project.
+if (args.join(' ').includes('You look for the risks of one project')) {
+  const { alreadyInTheRegister } = JSON.parse(question)
+  const title = 'La consegna del modulo ordini è a ridosso del collaudo'
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      risks: alreadyInTheRegister.includes(title)
+        ? []
+        : [
+            {
+              title,
+              why: 'Fra la consegna e il collaudo restano pochi giorni: un ritardo sulla consegna sposta il collaudo.',
+              path: 'wiki/stato.md',
+              quote: 'fissata al 12 dicembre 2026',
+            },
+          ],
+    },
+  })
+  process.exit(0)
+}
 
 // A run of the red team: it is told so in its system prompt, and reads the text on standard input.
 if (args.join(' ').includes('You attack the content of a deliverable')) {

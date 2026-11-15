@@ -118,6 +118,36 @@ const api: OctoApi = {
     ipcRenderer.on(CHANNELS.deliverablesProgress, handler)
     return () => ipcRenderer.removeListener(CHANNELS.deliverablesProgress, handler)
   },
+  session: () => ipcRenderer.invoke(CHANNELS.sessionGet),
+  signIn: () => ipcRenderer.invoke(CHANNELS.sessionSignIn),
+  cancelSignIn: () => ipcRenderer.invoke(CHANNELS.sessionCancel),
+  signOut: () => ipcRenderer.invoke(CHANNELS.sessionSignOut),
+  todayView: (projectId) => ipcRenderer.invoke(CHANNELS.todayView, { projectId }),
+  decideToday: (projectId, key, state, until) =>
+    ipcRenderer.invoke(CHANNELS.todayDecide, { projectId, key, state, until }),
+  muteTodayKind: (projectId, kind, muted) =>
+    ipcRenderer.invoke(CHANNELS.todayMute, { projectId, kind, muted }),
+  saveOwnAddresses: (projectId, addresses) =>
+    ipcRenderer.invoke(CHANNELS.todayAddresses, { projectId, addresses }),
+  evaluateToday: (projectId, all) => ipcRenderer.invoke(CHANNELS.todayEvaluate, { projectId, all }),
+  cancelEvaluateToday: (projectId) => ipcRenderer.invoke(CHANNELS.todayCancel, { projectId }),
+  onTodayProgress: (listener) => {
+    const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
+      listener(projectId, progress)
+    ipcRenderer.on(CHANNELS.todayProgress, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.todayProgress, handler)
+  },
+  todayOverview: () => ipcRenderer.invoke(CHANNELS.todayOverview),
+  risks: (projectId) => ipcRenderer.invoke(CHANNELS.risksGet, { projectId }),
+  proposeRisks: (projectId) => ipcRenderer.invoke(CHANNELS.risksPropose, { projectId }),
+  acceptRisk: (projectId, candidateId, title) =>
+    ipcRenderer.invoke(CHANNELS.risksAccept, { projectId, candidateId, title }),
+  dismissRisk: (projectId, candidateId) =>
+    ipcRenderer.invoke(CHANNELS.risksDismiss, { projectId, candidateId }),
+  addRisk: (projectId, title) => ipcRenderer.invoke(CHANNELS.risksAdd, { projectId, title }),
+  updateRisk: (projectId, riskId, change) =>
+    ipcRenderer.invoke(CHANNELS.risksUpdate, { projectId, riskId, change }),
+  assignment: (projectId) => ipcRenderer.invoke(CHANNELS.assignmentGet, { projectId }),
   onProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
       listener(projectId, progress)

@@ -8,10 +8,19 @@ type Props = {
   onSelect: (projectId: string) => void
   onAdd: () => void
   onManage: () => void
+  /** Opens the page of all the projects; without it the way there is not offered. */
+  onOverview?: () => void
 }
 
 /** The project the PM is working on, and the way to another one. */
-export function ProjectSwitcher({ projects, selectedId, onSelect, onAdd, onManage }: Props) {
+export function ProjectSwitcher({
+  projects,
+  selectedId,
+  onSelect,
+  onAdd,
+  onManage,
+  onOverview,
+}: Props) {
   const [open, setOpen] = useState(false)
   const selected = projects.find((project) => project.id === selectedId)
   const choose = (action: () => void) => () => {
@@ -58,6 +67,17 @@ export function ProjectSwitcher({ projects, selectedId, onSelect, onAdd, onManag
             </button>
           ))}
           {projects.length > 0 && <hr />}
+          {onOverview && projects.length > 1 && (
+            <button
+              type="button"
+              role="menuitem"
+              className="switcher-item"
+              onClick={choose(onOverview)}
+            >
+              <span aria-hidden="true">≡</span>
+              {messages.overview.open}
+            </button>
+          )}
           <button type="button" role="menuitem" className="switcher-item" onClick={choose(onAdd)}>
             <span aria-hidden="true">+</span>
             {messages.addProject}

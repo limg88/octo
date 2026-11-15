@@ -1,0 +1,789 @@
+import { describe, expect, it } from 'vitest'
+import {
+  type Alignment,
+  acceptCandidate,
+  addRisk,
+  alignmentItems,
+  applyDecisions,
+  assignmentOf,
+  type BugRow,
+  bugItems,
+  calendarItems,
+  candidateId,
+  cleanTodaySettings,
+  type Deliverable,
+  daysBetweenDays,
+  dismissCandidate,
+  draftItems,
+  type Forecast,
+  forecastItems,
+  hoursItems,
+  identityAddresses,
+  identityOf,
+  isMonthClosing,
+  isToDo,
+  mailItems,
+  mailThreads,
+  meetingItems,
+  meetingsOn,
+  monthDueItems,
+  monthPeriod,
+  NO_RISKS,
+  NO_TEAM,
+  NO_TODAY_SETTINGS,
+  orderToday,
+  parseInvite,
+  parseMailDocument,
+  previousMonth,
+  type Reconciliation,
+  requirementItems,
+  riskItems,
+  risksMarkdown,
+  romeDateString,
+  type StoredMail,
+  sourceItems,
+  type TodayItem,
+  threadSubject,
+  trackerAgeItems,
+  updateRisk,
+  withCandidates,
+  withDecision,
+  withoutDecision,
+  workdaysBetween,
+} from '../src/index.ts'
+
+const NOW = new Date('2026-11-16T09:00:00Z')
+/** A Monday in the middle of a month: the numbers of the month are not being closed. */
+const MID_MONTH = '2026-11-16'
+/** The second working day of a month: last month's numbers are due. */
+const MONTH_START = '2026-11-03'
+
+const item = (overrides: Partial<TodayItem> & Pick<TodayItem, 'key'>): TodayItem => ({
+  band: 'numbers',
+  facts: { kind: 'bugs_stuck', count: 1, stuckDays: 30, oldestDays: 40 },
+  weight: 1,
+  target: 'dashboard',
+  asOf: null,
+  ...overrides,
+})
+
+function reconciliation(overrides: Partial<Reconciliation> = {}): Reconciliation {
+  return {
+    rows: [
+      {
+        person: 'Bianchi Anna',
+        timesheetHours: 160,
+        worklogHours: 80,
+        deltaPct: -50,
+        status: 'outlier',
+      },
+      {
+        person: 'Neri Sara',
+        timesheetHours: 80,
+        worklogHours: 0,
+        deltaPct: -100,
+        status: 'no_worklog',
+      },
+      {
+        person: 'Ugo Gialli',
+        timesheetHours: 0,
+        worklogHours: 120,
+        deltaPct: null,
+        status: 'no_timesheet',
+      },
+      { person: 'Rossi Mario', timesheetHours: 160, worklogHours: 160, deltaPct: 0, status: 'ok' },
+      {
+        person: 'Costa Elena',
+        timesheetHours: 0,
+        worklogHours: 0,
+        deltaPct: null,
+        status: 'expected',
+      },
+    ],
+    totals: { timesheetHours: 400, worklogHours: 360, deltaPct: -10 },
+    excluded: {} as Reconciliation['excluded'],
+    possibleDuplicates: [],
+    tieOut: { approvedHours: 400, accountedHours: 400, ok: true },
+    ...overrides,
+  } as Reconciliation
+}
+
+describe('the days of the page', () => {
+  it('counts working days, months and where a month is being closed', () => {
+    // From a Friday to the Tuesday after: Monday and Tuesday.
+    expect(workdaysBetween('2026-11-13', '2026-11-17')).toBe(2)
+    expect(workdaysBetween('2026-11-17', '2026-11-13')).toBe(0)
+    expect(daysBetweenDays('2026-11-16', '2026-11-19')).toBe(3)
+    expect(previousMonth('2026-01-15')).toBe('2025-12')
+    expect(monthPeriod('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+    expect(isMonthClosing(MONTH_START)).toBe(true)
+    expect(isMonthClosing(MID_MONTH)).toBe(false)
+    // The last working days of a month close it too.
+    expect(isMonthClosing('2026-11-27')).toBe(true)
+  })
+})
+
+describe('the signals computed from the sections', () => {
+  it('says a source that failed, was never read, lacks its credential or is old', () => {
+    const run = (at: string, error: 'feed_unreachable' | null = null) => ({
+      cursor: null,
+      lastRun: { at, written: 0, unchanged: 0, error },
+    })
+    const items = sourceItems(
+      [
+        { source: 'Posta', state: run('2026-11-16T08:45:00Z'), hasSecret: true },
+        { source: 'Jira', state: run('2026-11-13T08:00:00Z'), hasSecret: true },
+        {
+          source: 'Azure DevOps',
+          state: run('2026-11-16T08:00:00Z', 'feed_unreachable'),
+          hasSecret: true,
+        },
+        { source: 'Confluence', state: { cursor: null, lastRun: null }, hasSecret: true },
+        { source: 'NetSuite', state: run('2026-11-16T08:00:00Z'), hasSecret: false },
+      ],
+      NOW,
+    )
+    expect(
+      items.map((entry) => [entry.key, entry.facts.kind === 'source' && entry.facts.reason]),
+    ).toEqual([
+      ['source:Jira', 'stale'],
+      ['source:Azure DevOps', 'error'],
+      ['source:Confluence', 'never'],
+      ['source:NetSuite', 'no_secret'],
+    ])
+    expect(items.every((entry) => entry.band === 'alert')).toBe(true)
+    expect(items[0]?.facts).toMatchObject({ days: 3 })
+  })
+
+  it('says the export of the tracker only when it is old enough to doubt its numbers', () => {
+    expect(trackerAgeItems('2026-11-11T09:00:00Z', 'stale', NOW)[0]?.facts).toEqual({
+      kind: 'tracker_old',
+      days: 5,
+    })
+    expect(trackerAgeItems('2026-11-15T09:00:00Z', 'warning', NOW)).toEqual([])
+    expect(trackerAgeItems(null, 'unknown', NOW)).toEqual([])
+  })
+
+  it('gathers the hours that do not add up in one signal for the month', () => {
+    const [signal] = hoursItems('2026-10', reconciliation(), MID_MONTH)
+    expect(signal?.key).toBe('hours:2026-10')
+    expect(signal?.band).toBe('numbers')
+    expect(signal?.facts).toMatchObject({
+      kind: 'hours',
+      people: [{ person: 'Bianchi Anna' }, { person: 'Neri Sara' }, { person: 'Ugo Gialli' }],
+      tieOutOk: true,
+    })
+    // While the month is being closed the same signal is due.
+    const due = hoursItems('2026-10', reconciliation(), MONTH_START)[0]
+    expect(due).toMatchObject({ band: 'due', dueBecause: 'month_end' })
+    // Nothing wrong, nothing said; a failed tie-out alone is said.
+    const clean = reconciliation({ rows: [] })
+    expect(hoursItems('2026-10', clean, MID_MONTH)).toEqual([])
+    const untied = { ...clean, tieOut: { approvedHours: 10, accountedHours: 8, ok: false } }
+    expect(hoursItems('2026-10', untied, MID_MONTH)).toHaveLength(1)
+  })
+
+  it('says what the forecast lacks and, while the month closes, that it is not written yet', () => {
+    const forecast = {
+      month: '2026-10',
+      gaps: [{ kind: 'no_rate', code: 'PRJ000101', person: 'Costa Elena', hours: 120 }],
+    } as Forecast
+    expect(forecastItems(forecast, MID_MONTH)[0]).toMatchObject({
+      key: 'forecast:2026-10',
+      weight: 1,
+    })
+    expect(forecastItems(forecast, MONTH_START)[0]?.band).toBe('due')
+    expect(forecastItems({ ...forecast, gaps: [] }, MID_MONTH)).toEqual([])
+    expect(monthDueItems('2026-10', false, MONTH_START)[0]?.key).toBe('due:forecast:2026-10')
+    expect(monthDueItems('2026-10', true, MONTH_START)).toEqual([])
+    expect(monthDueItems('2026-10', false, MID_MONTH)).toEqual([])
+  })
+
+  it('counts the bugs that stay too long and the unclear requirements, one signal each', () => {
+    const bug = (days: number | null): BugRow => ({ daysInState: days }) as BugRow
+    const [stuck] = bugItems([bug(45), bug(31), bug(3), bug(null)], 30, '2026-11-16T08:00:00Z')
+    expect(stuck?.facts).toEqual({ kind: 'bugs_stuck', count: 2, stuckDays: 30, oldestDays: 45 })
+    expect(stuck?.band).toBe('watch')
+    expect(bugItems([bug(3)], 30, null)).toEqual([])
+    const rows = ['2002', '2004'].map((id) => ({ id })) as unknown as Parameters<
+      typeof requirementItems
+    >[0]
+    expect(requirementItems(rows, null)[0]?.facts).toEqual({
+      kind: 'requirements',
+      count: 2,
+      ids: ['2002', '2004'],
+    })
+    expect(requirementItems([], null)).toEqual([])
+  })
+
+  it('says what the two trackers do not agree on, due when the sprint is ending', () => {
+    const alignment = {
+      missing: [{}],
+      needsUpdate: [],
+      duplicates: [{}],
+      orphans: [{}],
+    } as unknown as Alignment
+    const [signal] = alignmentItems('Sprint 28', alignment, null, NO_TEAM, MID_MONTH)
+    expect(signal).toMatchObject({ key: 'alignment:sprint 28', band: 'numbers', weight: 3 })
+    const team = {
+      people: [],
+      periods: [{ name: 'sprint 28', from: '2026-11-03', to: '2026-11-17' }],
+    }
+    expect(alignmentItems('Sprint 28', alignment, null, team, MID_MONTH)[0]).toMatchObject({
+      band: 'due',
+      dueBecause: 'sprint_end',
+    })
+    const aligned = {
+      missing: [],
+      needsUpdate: [],
+      duplicates: [],
+      orphans: [],
+    } as unknown as Alignment
+    expect(alignmentItems('Sprint 28', aligned, null, NO_TEAM, MID_MONTH)).toEqual([])
+  })
+
+  it('says the drafts that wait for the PM and the dates of the calendar that are near', () => {
+    const deliverable = (overrides: Partial<Deliverable>): Deliverable =>
+      ({
+        id: 'd-1',
+        title: 'Stato di avanzamento',
+        status: 'review',
+        createdAt: '2026-11-13T09:00:00Z',
+        readyAt: '2026-11-14T09:00:00Z',
+        redTeam: { verdict: 'fix_first', findings: [], holds: '' },
+        ...overrides,
+      }) as Deliverable
+    const drafts = draftItems(
+      [
+        deliverable({}),
+        deliverable({ id: 'd-2', status: 'approved' }),
+        deliverable({ id: 'd-3', status: 'failed', readyAt: null, redTeam: null }),
+      ],
+      NOW,
+    )
+    expect(drafts.map((entry) => entry.facts)).toEqual([
+      {
+        kind: 'draft',
+        id: 'd-1',
+        title: 'Stato di avanzamento',
+        status: 'review',
+        days: 2,
+        fixFirst: true,
+      },
+      {
+        kind: 'draft',
+        id: 'd-3',
+        title: 'Stato di avanzamento',
+        status: 'failed',
+        days: 3,
+        fixFirst: false,
+      },
+    ])
+    const person = { role: '', side: 'supplier' as const, from: '', allocation: null, note: '' }
+    const calendar = calendarItems(
+      {
+        people: [
+          { ...person, name: 'Neri Sara', to: '2026-11-20' },
+          { ...person, name: 'Rossi Mario', to: '' },
+          { ...person, name: 'Verdi Luca', to: '2026-12-31' },
+        ],
+        periods: [
+          { name: 'Sprint 28', from: '2026-11-03', to: '2026-11-16' },
+          { name: 'Sprint 29', from: '2026-11-17', to: '2026-11-30' },
+        ],
+      },
+      MID_MONTH,
+    )
+    expect(
+      calendar.map((entry) => [entry.band, entry.facts.kind === 'calendar' && entry.facts.name]),
+    ).toEqual([
+      ['due', 'Sprint 28'],
+      ['watch', 'Neri Sara'],
+    ])
+  })
+})
+
+describe('the order of the page', () => {
+  it('goes by band, then what was put off until today, the mail that matters, the heavier', () => {
+    const mail = (key: string, importance: 'alta' | 'bassa' | null): TodayItem =>
+      item({
+        key,
+        band: 'waiting',
+        facts: {
+          kind: 'mail_reply',
+          id: key,
+          path: '',
+          from: '',
+          subject: '',
+          days: 1,
+          judgement: importance
+            ? { importance, reason: '', quote: '', quoteVerified: true, deadline: null }
+            : null,
+        },
+      })
+    const ordered = orderToday([
+      item({ key: 'watch', band: 'watch' }),
+      mail('low', 'bassa'),
+      item({ key: 'light', weight: 1 }),
+      mail('none', null),
+      item({ key: 'heavy', weight: 9 }),
+      mail('high', 'alta'),
+      item({ key: 'alert', band: 'alert' }),
+      item({ key: 'back', band: 'due', returned: { why: 'later' } }),
+      item({ key: 'due', band: 'due', weight: 50 }),
+    ])
+    expect(ordered.map((entry) => entry.key)).toEqual([
+      'alert',
+      'back',
+      'due',
+      'high',
+      'none',
+      'low',
+      'heavy',
+      'light',
+      'watch',
+    ])
+    expect(ordered.filter(isToDo).map((entry) => entry.key)).not.toContain('alert')
+  })
+})
+
+describe('what the PM decided on a signal', () => {
+  const decision = (overrides: object) => ({
+    key: 'a',
+    kind: 'bugs_stuck' as const,
+    state: 'done' as const,
+    at: '2026-11-13',
+    until: null,
+    weight: 1,
+    ...overrides,
+  })
+
+  it('keeps away what is done, put off or muted, and brings it back with the reason', () => {
+    const items = [item({ key: 'a' }), item({ key: 'b' })]
+    const settings = (...decisions: ReturnType<typeof decision>[]) => ({
+      ...NO_TODAY_SETTINGS,
+      decisions,
+    })
+    // Done on Friday: away on Monday, back after three working days.
+    expect(applyDecisions(items, settings(decision({})), '2026-11-16')).toMatchObject({
+      items: [{ key: 'b' }],
+      hidden: 1,
+    })
+    expect(applyDecisions(items, settings(decision({})), '2026-11-18').items[0]).toMatchObject({
+      key: 'a',
+      returned: { why: 'still', since: '2026-11-13' },
+    })
+    // Worse than when it was put away: back at once.
+    const worse = applyDecisions(
+      [item({ key: 'a', weight: 4 })],
+      settings(decision({})),
+      '2026-11-16',
+    )
+    expect(worse.items[0]?.returned).toEqual({ why: 'worse', was: 1, now: 4 })
+    // Put off: away until its day, then on top among what is due.
+    const later = decision({ state: 'later', until: '2026-11-17' })
+    expect(applyDecisions(items, settings(later), '2026-11-16').hidden).toBe(1)
+    expect(applyDecisions(items, settings(later), '2026-11-17').items[0]).toMatchObject({
+      key: 'a',
+      band: 'due',
+      returned: { why: 'later' },
+    })
+    // Muted: away for good, however bad it gets.
+    const muted = settings(decision({ state: 'muted' }))
+    expect(applyDecisions([item({ key: 'a', weight: 99 })], muted, '2027-01-01').items).toEqual([])
+  })
+
+  it('offers to stop showing a kind put away three times, and hides the kinds muted', () => {
+    const muted = ['a', 'b', 'c'].map((key) => decision({ key, state: 'muted' }))
+    const settings = { ...NO_TODAY_SETTINGS, decisions: muted }
+    expect(applyDecisions([item({ key: 'd' })], settings, MID_MONTH).muteOffers).toEqual([
+      'bugs_stuck',
+    ])
+    const page = applyDecisions(
+      [item({ key: 'd' })],
+      { ...settings, mutedKinds: ['bugs_stuck'] },
+      MID_MONTH,
+    )
+    expect(page).toEqual({ items: [], hidden: 1, muteOffers: [] })
+  })
+
+  it('keeps the last word on each signal and cleans the addresses', () => {
+    const first = withDecision(NO_TODAY_SETTINGS, decision({}))
+    const second = withDecision(first, decision({ state: 'muted' }))
+    expect(second.decisions).toHaveLength(1)
+    expect(second.decisions[0]?.state).toBe('muted')
+    expect(withoutDecision(second, 'a').decisions).toEqual([])
+    expect(
+      cleanTodaySettings({
+        ...NO_TODAY_SETTINGS,
+        mutedKinds: ['hours', 'hours'],
+        ownAddresses: [' PM@Example.Test ', 'non un indirizzo', 'pm@example.test'],
+      }),
+    ).toMatchObject({ mutedKinds: ['hours'], ownAddresses: ['pm@example.test'] })
+  })
+})
+
+const stored = (overrides: Partial<StoredMail> & Pick<StoredMail, 'id'>): StoredMail => ({
+  path: `Posta/2026-11/${overrides.id}.md`,
+  subject: 'Aurora: budget',
+  from: 'Carla Bianchi <carla@cliente.example>',
+  to: 'Paola Verdi <pm@example.test>',
+  cc: '',
+  date: '2026-11-15T09:00:00Z',
+  inReplyTo: null,
+  references: [],
+  invite: null,
+  meeting: null,
+  asks: false,
+  ...overrides,
+})
+
+describe('the mail of the project read back', () => {
+  it('reads what the page needs from the file of a mail, and refuses any other file', () => {
+    const content = [
+      '---',
+      'tipo: "email"',
+      'oggetto: "R: Aurora: \\"budget\\""',
+      'da: "Paola Verdi <pm@example.test>"',
+      'a: "Carla Bianchi <carla@cliente.example>"',
+      'cc: ""',
+      'data: "2026-11-15T10:00:00.000Z"',
+      'id: "risposta@example.test"',
+      'risponde-a: "budget@cliente.example"',
+      'riferimenti: "primo@cliente.example budget@cliente.example"',
+      'invito: "REQUEST"',
+      'riunione: "Collaudo"',
+      'riunione-id: "uid-1"',
+      'riunione-inizio: "2026-11-16T14:00:00.000Z"',
+      'riunione-fine: ""',
+      'riunione-luogo: "Sala grande"',
+      '---',
+      '',
+      '# R: Aurora: "budget"',
+      '',
+      'Va bene per voi giovedì?',
+    ].join('\n')
+    expect(parseMailDocument('Posta/a.md', content)).toEqual({
+      id: 'risposta@example.test',
+      path: 'Posta/a.md',
+      subject: 'R: Aurora: "budget"',
+      from: 'Paola Verdi <pm@example.test>',
+      to: 'Carla Bianchi <carla@cliente.example>',
+      cc: '',
+      date: '2026-11-15T10:00:00.000Z',
+      inReplyTo: 'budget@cliente.example',
+      references: ['primo@cliente.example', 'budget@cliente.example'],
+      invite: 'REQUEST',
+      meeting: {
+        uid: 'uid-1',
+        summary: 'Collaudo',
+        start: '2026-11-16T14:00:00.000Z',
+        end: null,
+        location: 'Sala grande',
+      },
+      asks: true,
+    })
+    expect(parseMailDocument('a.md', '# Un documento')).toBeNull()
+    expect(parseMailDocument('a.md', '---\ntipo: "email"\n')).toBeNull()
+    expect(
+      parseMailDocument('a.md', '---\ntipo: "lettura-fonte"\nid: "x"\ndata: "2026-11-15"\n---\n'),
+    ).toBeNull()
+    expect(parseMailDocument('a.md', '---\ntipo: "email"\nid: "x"\ndata: "ieri"\n---\n')).toBeNull()
+    expect(parseMailDocument('a.md', '---\ntipo: "email"\nid: "x\ndata: "2026"\n---\n')).toBeNull()
+  })
+
+  it('tells who waits for whom from addresses, dates and references only', () => {
+    const own = ['PM@example.test']
+    const waiting = stored({ id: 'budget' })
+    const answered = stored({
+      id: 'collaudo',
+      subject: 'Aurora: collaudo',
+      date: '2026-11-14T09:00:00Z',
+    })
+    const reply = stored({
+      id: 'risposta',
+      subject: 'R: Aurora: collaudo',
+      from: 'Paola Verdi <pm@example.test>',
+      to: 'Carla Bianchi <carla@cliente.example>',
+      date: '2026-11-14T10:00:00Z',
+      inReplyTo: 'collaudo',
+    })
+    const alert = stored({ id: 'allarme', from: 'Monitor <avvisi@monitor.example>' })
+    const inCopy = stored({ id: 'copia', to: 'Altri <altri@example.test>', cc: 'pm@example.test' })
+    const old = stored({ id: 'vecchia', date: '2026-10-20T09:00:00Z' })
+    const invite = stored({ id: 'invito', invite: 'REQUEST' })
+    const asked = stored({
+      id: 'domanda',
+      subject: 'Aurora: ambiente di prova',
+      from: 'pm@example.test',
+      to: 'luca@cliente.example',
+      date: '2026-11-10T09:00:00Z',
+      asks: true,
+    })
+    const stated = stored({ ...asked, id: 'comunicazione', subject: 'Aurora: nota', asks: false })
+    const threads = mailThreads(
+      [waiting, answered, reply, alert, inCopy, old, invite, asked, stated],
+      own,
+      NOW,
+    )
+    expect(threads.awaitingMe.map((mail) => mail.id)).toEqual(['budget'])
+    expect(threads.awaitingThem.map((mail) => mail.id)).toEqual(['domanda'])
+    // An answer that lost its reference is still found by its subject.
+    const bySubject = mailThreads([answered, { ...reply, inReplyTo: null }], own, NOW)
+    expect(bySubject.awaitingMe).toEqual([])
+    // Somebody answered the question, or nobody knows who the PM is: nothing waits.
+    const answer = stored({
+      id: 'r',
+      subject: 'RE: Aurora: ambiente di prova',
+      date: '2026-11-11T09:00:00Z',
+      references: ['domanda'],
+    })
+    expect(mailThreads([asked, answer], own, NOW).awaitingThem).toEqual([])
+    expect(mailThreads([waiting], [], NOW)).toEqual({ awaitingMe: [], awaitingThem: [] })
+    expect(threadSubject(' R: RE: Fw:  Aurora:  Collaudo ')).toBe('aurora: collaudo')
+  })
+
+  it('turns the mail that waits into signals, with the judgement when there is one', () => {
+    const threads = mailThreads(
+      [stored({ id: 'budget' }), stored({ id: 'urgente', subject: 'Aurora: firma' })],
+      ['pm@example.test'],
+      NOW,
+    )
+    const judgement = {
+      importance: 'alta' as const,
+      reason: 'Serve una firma.',
+      quote: 'entro lunedì',
+      quoteVerified: true,
+      deadline: '2026-11-17',
+    }
+    const items = mailItems(threads, { urgente: judgement }, NOW, '2026-11-17')
+    expect(items.map((entry) => [entry.key, entry.band, entry.dueBecause])).toEqual([
+      ['mail:budget', 'waiting', undefined],
+      ['mail:urgente', 'due', 'deadline'],
+    ])
+    expect(items[1]?.facts).toMatchObject({ kind: 'mail_reply', days: 1, judgement })
+    const waiting = {
+      awaitingMe: [],
+      awaitingThem: [stored({ id: 'q', date: '2026-11-10T09:00:00Z' })],
+    }
+    expect(mailItems(waiting, {}, NOW, '2026-11-17')[0]).toMatchObject({
+      key: 'waiting:q',
+      band: 'watch',
+      facts: { kind: 'mail_waiting', days: 6 },
+    })
+  })
+})
+
+describe('the meetings of an invitation', () => {
+  const calendar = (lines: string[]) =>
+    [
+      'BEGIN:VCALENDAR',
+      'METHOD:REQUEST',
+      'BEGIN:VEVENT',
+      ...lines,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+
+  it('reads the first event: id, title, place and when, in the time of Italy', () => {
+    const meeting = parseInvite(
+      calendar([
+        'UID:uid-1',
+        'SUMMARY:Collaudo di Aurora\\, con il',
+        '  cliente',
+        'DTSTART;TZID=Europe/Rome:20261116T150000',
+        'DTEND;TZID=Europe/Rome:20261116T160000',
+        'LOCATION:Sala grande\\nPiano 2',
+      ]),
+    )
+    expect(meeting).toEqual({
+      uid: 'uid-1',
+      summary: 'Collaudo di Aurora, con il cliente',
+      start: '2026-11-16T14:00:00.000Z',
+      end: '2026-11-16T15:00:00.000Z',
+      location: 'Sala grande Piano 2',
+    })
+    // Universal time, and a whole day.
+    expect(parseInvite(calendar(['UID:u', 'DTSTART:20260716T130000Z']))?.start).toBe(
+      '2026-07-16T13:00:00.000Z',
+    )
+    expect(parseInvite(calendar(['UID:u', 'DTSTART;VALUE=DATE:20260716']))?.start).toBe(
+      '2026-07-15T22:00:00.000Z',
+    )
+  })
+
+  it('gives nothing for a calendar without an event, an id or a start it can read', () => {
+    expect(parseInvite('BEGIN:VCALENDAR\nEND:VCALENDAR')).toBeNull()
+    expect(parseInvite(calendar(['DTSTART:20261116T150000Z']))).toBeNull()
+    expect(parseInvite(calendar(['UID:u', 'DTSTART:domani']))).toBeNull()
+    expect(
+      parseInvite(calendar(['UID:u', 'DTSTART:20261340T150000Z', 'riga senza due punti'])),
+    ).toBeNull()
+  })
+
+  it('lists the meetings of a day once each, without those called off', () => {
+    const meeting = (uid: string, start: string) => ({
+      uid,
+      summary: uid,
+      start,
+      end: null,
+      location: '',
+    })
+    const mails = [
+      stored({
+        id: '1',
+        invite: 'REQUEST',
+        meeting: meeting('collaudo', '2026-11-16T14:00:00Z'),
+        date: '2026-11-10T09:00:00Z',
+      }),
+      // Moved to the morning by a later invitation with the same id.
+      stored({
+        id: '2',
+        invite: 'REQUEST',
+        meeting: meeting('collaudo', '2026-11-16T09:00:00Z'),
+        date: '2026-11-12T09:00:00Z',
+      }),
+      stored({
+        id: '3',
+        invite: 'REQUEST',
+        meeting: meeting('riesame', '2026-11-16T08:00:00Z'),
+        date: '2026-11-10T09:00:00Z',
+      }),
+      stored({
+        id: '4',
+        invite: 'CANCEL',
+        meeting: meeting('riesame', '2026-11-16T08:00:00Z'),
+        date: '2026-11-13T09:00:00Z',
+      }),
+      stored({ id: '5', invite: 'REQUEST', meeting: meeting('domani', '2026-11-17T08:00:00Z') }),
+      stored({ id: '6' }),
+    ]
+    const today = meetingsOn(mails, '2026-11-16', romeDateString)
+    expect(today.map((mail) => mail.id)).toEqual(['2'])
+    expect(meetingItems(today)[0]).toMatchObject({
+      key: 'meeting:collaudo:2026-11-16T09:00:00Z',
+      band: 'due',
+      facts: { kind: 'meeting', subject: 'collaudo' },
+    })
+    expect(meetingItems([stored({ id: '6' })])).toEqual([])
+  })
+})
+
+describe('the register of the risks', () => {
+  const source = { path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026', verified: true }
+  const proposal = { title: ' Consegna a ridosso del collaudo ', why: 'Pochi giorni.', source }
+
+  it('takes in what the PM accepts and never proposes again what was turned down', () => {
+    const proposed = withCandidates(
+      NO_RISKS,
+      [proposal, proposal, { ...proposal, title: ' ' }],
+      '2026-11-16T09:00:00Z',
+      'claude',
+    )
+    expect(proposed.candidates).toHaveLength(1)
+    const id = candidateId(source)
+    expect(proposed.candidates[0]).toMatchObject({ id, title: 'Consegna a ridosso del collaudo' })
+    expect(proposed).toMatchObject({ proposedAt: '2026-11-16T09:00:00Z', proposedBy: 'claude' })
+
+    const accepted = acceptCandidate(proposed, id, '', '2026-11-16')
+    expect(accepted.candidates).toEqual([])
+    expect(accepted.risks[0]).toMatchObject({
+      id,
+      title: 'Consegna a ridosso del collaudo',
+      state: 'open',
+      since: '2026-11-16',
+    })
+    // The same words in other spaces and letters are the same source.
+    const again = withCandidates(
+      accepted,
+      [{ ...proposal, source: { ...source, quote: 'Fissata  al 12 dicembre 2026' } }],
+      'x',
+      null,
+    )
+    expect(again.candidates).toEqual([])
+
+    const dismissed = dismissCandidate(proposed, id)
+    expect(dismissed.dismissed).toEqual([id])
+    expect(withCandidates(dismissed, [proposal], 'x', null).candidates).toEqual([])
+    // An id that is not among the candidates changes nothing.
+    expect(acceptCandidate(proposed, 'altro', 'x', '2026-11-16')).toBe(proposed)
+    expect(dismissCandidate(proposed, 'altro')).toBe(proposed)
+  })
+
+  it('keeps the risks the PM writes, their notes and their state, and writes them as a text', () => {
+    const empty = addRisk(NO_RISKS, '  ', '2026-11-16')
+    expect(empty).toBe(NO_RISKS)
+    const one = addRisk(NO_RISKS, 'Ambiente di prova non disponibile', '2026-11-16')
+    const id = one.risks[0]?.id ?? ''
+    const noted = updateRisk(one, id, { note: ' Lo segue il cliente ' })
+    expect(noted.risks[0]).toMatchObject({
+      note: 'Lo segue il cliente',
+      state: 'open',
+      source: null,
+    })
+    const withSource = acceptCandidate(
+      withCandidates(noted, [proposal], 'x', null),
+      candidateId(source),
+      'Consegna stretta',
+      '2026-11-16',
+    )
+    const closed = updateRisk(withSource, id, { state: 'closed' })
+    const text = risksMarkdown(closed)
+    expect(text).toContain('## Rischi aperti')
+    expect(text).toContain('- **Consegna stretta** — nel registro dal 16/11/2026')
+    expect(text).toContain('Fonte: `wiki/stato.md`: «fissata al 12 dicembre 2026»')
+    expect(text).toContain('## Rischi chiusi')
+    expect(text).toContain('Nota del PM: Lo segue il cliente')
+    expect(risksMarkdown(NO_RISKS)).toContain('Nessun rischio nel registro.')
+    // On the page: the open risks, and one signal for the candidates that wait.
+    const waiting = withCandidates(
+      closed,
+      [{ ...proposal, source: { ...source, quote: 'un’altra frase del file' } }],
+      'x',
+      null,
+    )
+    expect(riskItems(waiting).map((entry) => entry.facts.kind)).toEqual(['risk', 'risk_candidates'])
+    expect(riskItems(closed).map((entry) => entry.facts.kind)).toEqual(['risk'])
+  })
+})
+
+describe('who uses Octo', () => {
+  const claims = {
+    oid: 'u-1',
+    tid: 'T-1',
+    preferred_username: 'Paola.Verdi@example.test',
+    name: 'Paola Verdi',
+  }
+
+  it('reads the person from the claims of the sign-in, only of the organization expected', () => {
+    expect(identityOf(claims, 't-1')).toEqual({
+      id: 'u-1',
+      username: 'Paola.Verdi@example.test',
+      email: 'Paola.Verdi@example.test',
+      name: 'Paola Verdi',
+      tenant: 'T-1',
+    })
+    expect(identityOf({ ...claims, email: 'pm@example.test' }, 't-1')?.email).toBe(
+      'pm@example.test',
+    )
+    expect(identityOf({ sub: 's-1', tid: 't-1', upn: 'paola' }, 't-1')).toMatchObject({
+      id: 's-1',
+      email: '',
+      name: 'paola',
+    })
+    expect(identityOf(claims, 'altra')).toBeNull()
+    expect(identityOf({ tid: 't-1' }, 't-1')).toBeNull()
+    expect(identityOf({ oid: 'u-1' }, 't-1')).toBeNull()
+  })
+
+  it('knows the addresses of the person and whether a project is theirs', () => {
+    const identity = identityOf({ ...claims, email: 'pm@example.test' }, 't-1')
+    expect(identityAddresses(identity)).toEqual(['pm@example.test', 'paola.verdi@example.test'])
+    expect(identityAddresses(null)).toEqual([])
+    expect(assignmentOf(['PRJ000101', 'PRJ000202'], ['prj000202'])).toBe('assigned')
+    expect(assignmentOf(['PRJ000101'], ['PRJ000202'])).toBe('not_assigned')
+    expect(assignmentOf(['PRJ000101'], [])).toBe('not_assigned')
+    expect(assignmentOf([], ['PRJ000202'])).toBe('unknown')
+    expect(assignmentOf(['PRJ000101'], null)).toBe('unknown')
+  })
+})

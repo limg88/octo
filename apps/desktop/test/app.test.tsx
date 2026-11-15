@@ -6,8 +6,11 @@ import type {
   FeedingStep,
   FeedView,
   MailSourceView,
+  SessionView,
+  TodayView,
 } from '@octo/application'
 import {
+  type Assignment,
   DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
@@ -18,6 +21,7 @@ import {
   type DeliverableKind,
   type FeedName,
   type ModelSettings,
+  NO_RISKS,
   NO_TEAM,
   type Project,
   type ProjectTeam,
@@ -107,6 +111,30 @@ const mailView: MailSourceView = {
   config: null,
   suggestedFolder: 'Posta',
   state: { cursor: null, lastRun: null },
+}
+
+const signedIn: SessionView = {
+  identity: {
+    id: 'u-1',
+    username: 'pm@example.test',
+    email: 'pm@example.test',
+    name: 'Paola Verdi',
+    tenant: 't-1',
+  },
+  configured: true,
+}
+
+const emptyToday: TodayView = {
+  day: '2026-11-16',
+  items: [],
+  hidden: 0,
+  muteOffers: [],
+  mutedKinds: [],
+  freshness: [],
+  evaluation: { at: null, model: null },
+  evaluationDue: false,
+  ownAddresses: ['pm@example.test'],
+  addedAddresses: [],
 }
 
 function fakeApi(overrides: Partial<OctoApi> = {}) {
@@ -220,6 +248,25 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       code: 'tracker_export_not_set' as const,
     })),
     onDeliverableProgress: () => () => {},
+    session: vi.fn(async () => ok(signedIn)),
+    signIn: vi.fn(async () => ok(signedIn)),
+    cancelSignIn: vi.fn(async () => ok(null)),
+    signOut: vi.fn(async () => ok({ identity: null, configured: true })),
+    todayView: vi.fn(async () => ok(emptyToday)),
+    decideToday: vi.fn(async () => ok(emptyToday)),
+    muteTodayKind: vi.fn(async () => ok(emptyToday)),
+    saveOwnAddresses: vi.fn(async () => ok(emptyToday)),
+    evaluateToday: vi.fn(async () => ok(emptyToday)),
+    cancelEvaluateToday: vi.fn(async () => ok(null)),
+    onTodayProgress: () => () => {},
+    todayOverview: vi.fn(async () => ok([])),
+    risks: vi.fn(async () => ok(NO_RISKS)),
+    proposeRisks: vi.fn(async () => ok(NO_RISKS)),
+    acceptRisk: vi.fn(async () => ok(NO_RISKS)),
+    dismissRisk: vi.fn(async () => ok(NO_RISKS)),
+    addRisk: vi.fn(async () => ok(NO_RISKS)),
+    updateRisk: vi.fn(async () => ok(NO_RISKS)),
+    assignment: vi.fn(async () => ok<Assignment>('unknown')),
     previewMail: vi.fn(async () => ok({ count: 0, subjects: [] })),
     feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: false, feeds: [] })),
     fill: vi.fn(async () => ok<FeedingStep[]>([])),
@@ -236,7 +283,13 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
   return { api, emit: (projectId: string, step: AgentProgress) => emit(projectId, step) }
 }
 
+/** Octo opens on the page of the day: the questions are a section away. */
+async function openAsk() {
+  fireEvent.click(await screen.findByRole('tab', { name: messages.ask }))
+}
+
 async function askQuestion(text: string) {
+  await openAsk()
   fireEvent.change(await screen.findByPlaceholderText(messages.askPlaceholder), {
     target: { value: text },
   })
@@ -311,6 +364,7 @@ describe('App', () => {
     }
     const { api } = fakeApi({ listQuestions: async () => ok([failed, verified]) })
     render(<App api={api} />)
+    await openAsk()
 
     expect(await screen.findByText(messages.allVerified(1))).toBeTruthy()
     expect(screen.getByText(/Claude non ha un accesso attivo/)).toBeTruthy()
@@ -579,6 +633,7 @@ describe('App', () => {
   it('offers ready questions that fill the composer without asking', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)
+    await openAsk()
     const ready = await screen.findByRole('group', { name: messages.askReadyTitle })
     fireEvent.click(within(ready).getByRole('button', { name: 'Blocchi e rischi' }))
     const composer = screen.getByLabelText<HTMLTextAreaElement>(messages.askPlaceholder)
@@ -620,6 +675,7 @@ describe('App', () => {
       listQuestions: async () => ({ ok: false, code: 'project_not_found' }),
     })
     render(<App api={second.api} />)
+    await openAsk()
     expect(await screen.findByText('Questo progetto non è più in elenco.')).toBeTruthy()
   })
 })
@@ -662,6 +718,7 @@ describe('project tabs', () => {
       within(screen.getByRole('tablist', { name: title }))
         .getAllByRole('tab')
         .map((tab) => tab.textContent)
+    expect(group(messages.nav.daily)).toEqual([messages.todayTab])
     expect(group(messages.nav.work)).toEqual([
       messages.ask,
       messages.deliverablesTab,
@@ -680,15 +737,16 @@ describe('project tabs', () => {
       within(screen.getByRole('navigation', { name: messages.projects })).getByRole('tab', {
         selected: true,
       }).textContent
-    const ask = screen.getByRole('tab', { name: messages.ask })
-    expect(selected()).toBe(messages.ask)
+    const today = screen.getByRole('tab', { name: messages.todayTab })
+    // Octo opens on the page of the day.
+    expect(selected()).toBe(messages.todayTab)
     // Down goes to the next section whatever its group; up from the first goes to the last.
-    fireEvent.keyDown(ask, { key: 'ArrowDown' })
-    expect(selected()).toBe(messages.deliverablesTab)
-    expect(document.activeElement?.textContent).toBe(messages.deliverablesTab)
-    fireEvent.keyDown(ask, { key: 'ArrowUp' })
+    fireEvent.keyDown(today, { key: 'ArrowDown' })
+    expect(selected()).toBe(messages.ask)
+    expect(document.activeElement?.textContent).toBe(messages.ask)
+    fireEvent.keyDown(today, { key: 'ArrowUp' })
     expect(selected()).toBe(messages.sourcesTab)
-    fireEvent.keyDown(ask, { key: 'a' })
+    fireEvent.keyDown(today, { key: 'a' })
     expect(selected()).toBe(messages.sourcesTab)
   })
 

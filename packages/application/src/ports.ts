@@ -20,8 +20,10 @@ import type {
   ForecastSettings,
   HoursPeriod,
   HoursSettings,
+  Identity,
   JiraFeedConfig,
   LiveSource,
+  MailJudgement,
   MailMessage,
   ModelSettings,
   ProgressSettings,
@@ -29,11 +31,14 @@ import type {
   ProjectTeam,
   QuestionRecord,
   RedTeamReport,
+  RiskRegister,
   SheetGrid,
+  SignInConfig,
   SourceFileStamp,
   SourceState,
   SourcesConfig,
   StarterFile,
+  TodaySettings,
   TrackerHours,
   WarehouseFeedConfig,
 } from '@octo/domain'
@@ -412,4 +417,78 @@ export interface BackupFiles {
   read(file: string): Promise<Backup>
   /** Throws a DomainError `backup_not_written` when the file cannot be written there. */
   write(file: string, backup: Backup): Promise<void>
+}
+
+/** What Claude said of the mail that waits for the PM, kept with its date and its model. */
+export type TodayEvaluation = {
+  /** When Claude last judged; null when never. */
+  at: string | null
+  model: string | null
+  /** By the id of the mail. A mail judged once is not judged again. */
+  mails: Record<string, MailJudgement>
+}
+
+export const NO_EVALUATION: TodayEvaluation = { at: null, model: null, mails: {} }
+
+/** What the PM decided on the page of the day and what Claude judged, kept in the project. */
+export interface TodayStore {
+  load(projectFolder: string): Promise<TodaySettings>
+  save(projectFolder: string, settings: TodaySettings): Promise<void>
+  loadEvaluation(projectFolder: string): Promise<TodayEvaluation>
+  saveEvaluation(projectFolder: string, evaluation: TodayEvaluation): Promise<void>
+}
+
+/** The register of the risks of a project, kept with Octo's settings of the project. */
+export interface RiskRegisterStore {
+  load(projectFolder: string): Promise<RiskRegister>
+  save(projectFolder: string, register: RiskRegister): Promise<void>
+}
+
+/** A mail Claude is asked to weigh: where it is in the project, and what it is about. */
+export type MailToJudge = { id: string; path: string; subject: string }
+
+/** What Claude gives back for a mail: the quote is checked by the code afterwards. */
+export type ProposedJudgement = {
+  id: string
+  importance: MailJudgement['importance']
+  reason: string
+  quote: string
+  deadline: string | null
+}
+
+export type ProposedRisk = { title: string; why: string; path: string; quote: string }
+
+export type JudgeRequest = {
+  projectFolder: string
+  liveSources?: readonly LiveSource[]
+  model?: string | null
+  onModel?: (model: string) => void
+  onProgress?: (progress: AgentProgress) => void
+  signal?: AbortSignal
+}
+
+/**
+ * Claude as the one who judges, read-only on the project folder like whoever answers a question:
+ * how much a mail matters, which risks the memory shows. It never decides that a signal exists.
+ * Failures are DomainErrors with an `agent_*` code.
+ */
+export interface TodayJudge {
+  mails(request: JudgeRequest & { mails: readonly MailToJudge[] }): Promise<ProposedJudgement[]>
+  risks(request: JudgeRequest & { known: readonly string[] }): Promise<ProposedRisk[]>
+}
+
+/** What a sign-in gives: who the person is and what renews the sign-in without asking again. */
+export type SignedIn = { identity: Identity; refreshToken: string | null }
+
+/**
+ * The organization's own sign-in. Failures are DomainErrors with a `sign_in_*` code; a person of
+ * another organization is `sign_in_refused`.
+ */
+export interface IdentityProvider {
+  /** Whether Octo was told where the organization signs in. */
+  configured(): Promise<SignInConfig | null>
+  /** Asks the person to sign in, in the system's browser. */
+  signIn(signal: AbortSignal): Promise<SignedIn>
+  /** Renews a sign-in without asking; throws `sign_in_failed` when it cannot. */
+  renew(refreshToken: string): Promise<SignedIn>
 }

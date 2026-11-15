@@ -5,14 +5,23 @@ import {
   isDomainError,
   type MailPreview,
   type MailSourceConfig,
+  mailAllowed,
   mailDocument,
   mailWanted,
   type Project,
+  parseMailDocument,
   type SourceRun,
   type SourceState,
   startOfDay,
 } from '@octo/domain'
-import type { Clock, MailArchive, MemoryWriter, SourceSettings, SourceStates } from './ports.ts'
+import type {
+  Clock,
+  MailArchive,
+  MemoryWriter,
+  ProjectFiles,
+  SourceSettings,
+  SourceStates,
+} from './ports.ts'
 
 export type SourcesDeps = {
   settings: SourceSettings
@@ -20,6 +29,8 @@ export type SourcesDeps = {
   archive: MailArchive
   writer: MemoryWriter
   clock: Clock
+  /** With the files of the project, an answer to a mail already taken is taken too. */
+  files?: Pick<ProjectFiles, 'under' | 'readText'>
 }
 
 /** What the Sources page shows for the mail of a project. */
@@ -75,6 +86,18 @@ export function createSources(deps: SourcesDeps): Sources {
     return mail(project)
   }
 
+  /** The ids of the mail the project already holds, to recognise what answers it. */
+  async function knownIds(project: Project, config: MailSourceConfig): Promise<Set<string>> {
+    const ids = new Set<string>()
+    if (!deps.files) return ids
+    for (const path of await deps.files.under(project.folder, config.targetFolder)) {
+      const content = await deps.files.readText(project.folder, path)
+      const mail = content === null ? null : parseMailDocument(path, content)
+      if (mail) ids.add(mail.id)
+    }
+    return ids
+  }
+
   async function read(
     project: Project,
     config: MailSourceConfig,
@@ -83,11 +106,18 @@ export function createSources(deps: SourcesDeps): Sources {
   ): Promise<Pick<SourceRun, 'written' | 'unchanged'>> {
     const seen = new Set<string>()
     const counts = { written: 0, unchanged: 0 }
+    const known = await knownIds(project, config)
     for (const archived of await deps.archive.between(from, to)) {
       if (!folderWanted(archived.folder, config)) continue
       const message = await deps.archive.read(archived)
-      if (!message || !mailWanted(message, config)) continue
+      if (!message) continue
+      // An answer in a conversation of the project is of the project, whatever words it uses.
+      const answersKnown = [message.inReplyTo, ...(message.references ?? [])].some(
+        (id) => id != null && known.has(id),
+      )
+      if (!mailWanted(message, config) && !(answersKnown && mailAllowed(message, config))) continue
       const document = mailDocument(archived, message, config)
+      known.add(document.externalId)
       // A mail filed in several folders (received and sent) is one mail.
       if (seen.has(document.externalId)) continue
       seen.add(document.externalId)

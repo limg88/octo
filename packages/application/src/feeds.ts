@@ -1,4 +1,6 @@
 import {
+  type Assignment,
+  assignmentOf,
   cleanFeedConfig,
   DomainError,
   FEED_NAMES,
@@ -11,6 +13,7 @@ import {
   type FeedStep,
   feedNote,
   feedScope,
+  type Identity,
   isDomainError,
   type Project,
   type SourceRun,
@@ -36,6 +39,8 @@ export type FeedsDeps = {
   writer: MemoryWriter
   files: ProjectFiles
   clock: Clock
+  /** Who uses Octo: the company system is read as that person, not as an address typed by hand. */
+  identity?: () => Identity | null
 }
 
 /** What the Sources page shows for one feed of a project. */
@@ -46,6 +51,8 @@ export type FeedView<Name extends FeedName = FeedName> = {
   /** Whether a credential is kept on this computer. It is never shown again. */
   hasSecret: boolean
   state: SourceState
+  /** The address of who is signed in, proposed where a feed asks whose reading it is. */
+  suggestedOwner?: string
 }
 
 export type Feeds = {
@@ -74,22 +81,56 @@ export type Feeds = {
   sync(project: Project, feed: FeedName): Promise<SourceRun>
   /** The feeds configured for a project: those a periodic reading takes. */
   configured(project: Project): Promise<FeedName[]>
+  /** Where the project stands for who is signed in, by its codes in the company system. */
+  assignment(project: Project): Promise<Assignment>
 }
 
 /** Where the credential of a feed of a project is kept in the vault. */
 export const secretKey = (project: Project, feed: FeedName): string => `${project.id}/${feed}`
 
+/**
+ * The settings of the sources as the person signed in reads them: the company system is bound to
+ * who uses Octo, also for what reads its configuration without passing through the feeds.
+ */
+export function settingsOwnedBy(
+  settings: SourceSettings,
+  identity: () => Identity | null,
+): SourceSettings {
+  return {
+    ...settings,
+    async load(projectFolder) {
+      const config = await settings.load(projectFolder)
+      const email = identity()?.email || null
+      if (config.dwsi === null || email === null) return config
+      return { ...config, dwsi: { ...config.dwsi, ownerEmail: email } }
+    },
+  }
+}
+
 export function createFeeds(deps: FeedsDeps): Feeds {
   const running = new Set<string>()
+
+  const ownerEmail = (): string | null => deps.identity?.()?.email || null
+
+  /**
+   * The configuration as the person signed in: the reading of the company system is bound to
+   * who uses Octo, whatever address the configuration was saved with.
+   */
+  function owned<Config extends FeedConfig>(feed: FeedName, config: Config): Config {
+    const email = ownerEmail()
+    return feed === 'dwsi' && email !== null ? { ...config, ownerEmail: email } : config
+  }
 
   async function view<Name extends FeedName>(
     project: Project,
     feed: Name,
   ): Promise<FeedView<Name>> {
     const sources = await deps.settings.load(project.folder)
+    const stored = sources[feed] as FeedConfigs[Name] | null
     return {
       feed,
-      config: sources[feed] as FeedConfigs[Name] | null,
+      config: stored === null ? null : owned(feed, stored),
+      suggestedOwner: ownerEmail() ?? '',
       suggestedFolder: await deps.settings.suggestFeedFolder(project.folder, feed),
       hasSecret: (await deps.secrets.get(secretKey(project, feed))) !== null,
       state: await deps.states.get(project.id, feed),
@@ -109,7 +150,7 @@ export function createFeeds(deps: FeedsDeps): Feeds {
       await deps.secrets.remove(key)
       return view(project, feed)
     }
-    const cleaned = cleanFeedConfig(feed, config)
+    const cleaned = cleanFeedConfig(feed, owned(feed, config))
     const credential = secret?.trim() || (await deps.secrets.get(key))
     if (!credential) throw new DomainError('secret_missing', feed)
     // Nothing is saved until the system accepts the credential for what was named.
@@ -184,8 +225,9 @@ export function createFeeds(deps: FeedsDeps): Feeds {
   }
 
   async function sync(project: Project, feed: FeedName): Promise<SourceRun> {
-    const config = (await deps.settings.load(project.folder))[feed]
-    if (!config) throw new DomainError('source_not_configured', feed)
+    const stored = (await deps.settings.load(project.folder))[feed]
+    if (!stored) throw new DomainError('source_not_configured', feed)
+    const config = owned(feed, stored)
     const lock = secretKey(project, feed)
     if (running.has(lock)) throw new DomainError('source_busy', feed)
     running.add(lock)
@@ -219,10 +261,30 @@ export function createFeeds(deps: FeedsDeps): Feeds {
   ): Promise<FeedChoices> {
     const credential = secret?.trim() || (await deps.secrets.get(secretKey(project, feed)))
     if (!credential) throw new DomainError('secret_missing', feed)
-    return deps.reader.choices(feed, config, credential)
+    return deps.reader.choices(feed, owned(feed, config), credential)
   }
 
-  return { view, save, choices, sync, configured }
+  /**
+   * Whether the project is of who is signed in, by its project codes in the company system. When
+   * the system is not set up, has no credential here or cannot be reached, nothing can be said.
+   */
+  async function assignment(project: Project): Promise<Assignment> {
+    const stored = (await deps.settings.load(project.folder)).dwsi
+    const secret = await deps.secrets.get(secretKey(project, 'dwsi'))
+    if (stored === null || secret === null) return 'unknown'
+    try {
+      const mine = await deps.reader.choices('dwsi', owned('dwsi', stored), secret)
+      return assignmentOf(
+        stored.projectCodes,
+        mine.projects.map((choice) => choice.value),
+      )
+    } catch (error) {
+      if (!isDomainError(error)) throw error
+      return 'unknown'
+    }
+  }
+
+  return { view, save, choices, sync, configured, assignment }
 }
 
 type Counts = Pick<SourceRun, 'written' | 'unchanged'>

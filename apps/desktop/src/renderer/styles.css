@@ -1750,3 +1750,154 @@ details.advanced[open] > summary {
     grid-template-columns: 196px 1fr;
   }
 }
+
+/* The sign-in page: no sidebar, only the way in. */
+.shell-alone {
+  grid-template-columns: 1fr;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-foot .agent {
+  margin-top: 0;
+}
+
+/* The page of the day. */
+.today {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The page of all the projects brings its own header, flush with the edges like a project's. */
+.today > .project-header {
+  margin: -20px -24px 6px;
+}
+
+.today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.today-head h3::first-letter {
+  text-transform: uppercase;
+}
+
+.today-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.today-count {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.today-empty {
+  color: var(--muted);
+}
+
+.today-list,
+.today-watch,
+.today-first {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.today-list {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+}
+
+.today-list:empty {
+  display: none;
+}
+
+.today-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.today-item + .today-item {
+  border-top: 1px solid var(--line);
+}
+
+.today-item-title {
+  font-weight: 600;
+}
+
+.today-item-actions {
+  margin-top: 4px;
+  justify-content: space-between;
+}
+
+.today-decisions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.today-later {
+  border: 0;
+  padding: 0;
+}
+
+.today-judgement {
+  padding: 6px 10px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.today-evaluation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-large);
+}
+
+.today-watch li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.today-watch li + li {
+  border-top: 1px solid var(--line);
+}
+
+.today-first {
+  gap: 2px;
+  padding-left: 14px;
+  list-style: disc;
+}
+
+.today-risk-title {
+  font-weight: 600;
+}

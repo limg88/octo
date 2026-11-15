@@ -23,6 +23,11 @@ Le parole che Octo usa con chi lo usa. Una cosa ha un nome solo; i nomi tecnici 
 | deliverable | un testo o un file che esce dal progetto | output, artefatto |
 | istruzioni | come un deliverable va scritto | prompt |
 | impostazioni | ciò che si scrive una volta | configurazione, settings |
+| segnalazione | una cosa che Octo mostra in «Oggi»: che cosa c'è da fare, da dove viene, dove si risolve | voce (è l'elemento del tracker), task, alert |
+| valutazione | ciò che dice Claude di una mail o di un rischio, con la sua fonte | giudizio automatico, score |
+| registro dei rischi | i rischi del progetto che il PM ha accettato | risk log |
+| entrare, uscire | farsi riconoscere da Octo con l'utente aziendale, e smettere | login, logout, autenticarsi |
+| commessa assegnata | una commessa di cui in NetSuite sei il project manager | — |
 
 Regole:
 - Octo parla in prima persona («Leggo…», «Non ho salvato…») e dà del tu.

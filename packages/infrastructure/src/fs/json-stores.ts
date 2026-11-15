@@ -27,6 +27,7 @@ const projectSchema = z.object({
   name: z.string(),
   folder: z.string(),
   addedAt: z.string(),
+  owner: z.string().optional(),
 })
 
 const citationSchema = z.object({

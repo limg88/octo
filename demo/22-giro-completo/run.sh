@@ -68,6 +68,8 @@ start_fake jira OCTO_DEV_JIRA_URL
 start_fake confluence OCTO_DEV_CONFLUENCE_URL
 
 export OCTO_DATA_DIR="$work/dati"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_MAIL_ROOT="$work/Mail"
 # Demo only: the fake tokens are kept without the system keychain.
 export OCTO_DEMO_PLAIN_SECRETS=1

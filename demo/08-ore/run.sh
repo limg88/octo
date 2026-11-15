@@ -20,6 +20,8 @@ trap 'kill "$jira_pid" 2>/dev/null || true' EXIT
 for _ in $(seq 1 50); do [[ -s "$work/jira.url" ]] && break; sleep 0.1; done
 
 export OCTO_DATA_DIR="$work/dati"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_MAIL_ROOT="$work/Mail-assente"
 export OCTO_CLAUDE_PATH="$root/demo/lib/fake-claude"
 export OCTO_DEV_JIRA_URL="$(cat "$work/jira.url")"

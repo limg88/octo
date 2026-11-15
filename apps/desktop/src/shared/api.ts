@@ -17,11 +17,15 @@ import type {
   MailSourceView,
   ProgressFile,
   ProgressView,
+  ProjectOverview,
+  SessionView,
+  TodayView,
   TrackerHoursRun,
   TrackerSnapshotRun,
 } from '@octo/application'
 import type {
   AlignmentSettings,
+  Assignment,
   DashboardSettings,
   Deliverable,
   DeliverableKind,
@@ -41,8 +45,11 @@ import type {
   ProjectTeam,
   QuestionRecord,
   RestoreOutcome,
+  RiskRegister,
+  RiskState,
   SourceRun,
   SourceState,
+  TodayKind,
 } from '@octo/domain'
 
 /** A failure that is not one of the expected ones: the detail is in the app's log. */
@@ -126,6 +133,25 @@ export const CHANNELS = {
   backupSave: 'backup:save',
   backupRestore: 'backup:restore',
   sourcesChanged: 'sources:changed',
+  sessionGet: 'session:get',
+  sessionSignIn: 'session:sign-in',
+  sessionCancel: 'session:cancel',
+  sessionSignOut: 'session:sign-out',
+  todayView: 'today:view',
+  todayDecide: 'today:decide',
+  todayMute: 'today:mute',
+  todayAddresses: 'today:addresses',
+  todayEvaluate: 'today:evaluate',
+  todayCancel: 'today:cancel',
+  todayProgress: 'today:progress',
+  todayOverview: 'today:overview',
+  risksGet: 'risks:get',
+  risksPropose: 'risks:propose',
+  risksAccept: 'risks:accept',
+  risksDismiss: 'risks:dismiss',
+  risksAdd: 'risks:add',
+  risksUpdate: 'risks:update',
+  assignmentGet: 'assignment:get',
 } as const
 
 /** What the PM is asked to choose inside a project. */
@@ -311,4 +337,42 @@ export type OctoApi = {
   onProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Tells when a periodic reading has ended for a project. */
   onSourcesChanged(listener: (projectId: string) => void): () => void
+  /** Who is signed in. Every other request is refused while nobody is. */
+  session(): Promise<Result<SessionView>>
+  /** Opens the organization's sign-in in the system's browser and waits for it to come back. */
+  signIn(): Promise<Result<SessionView>>
+  cancelSignIn(): Promise<Result<null>>
+  signOut(): Promise<Result<SessionView>>
+  /** The page of the day of a project: what the code computed, with what Claude last judged. */
+  todayView(projectId: string): Promise<Result<TodayView>>
+  /** What the PM says of a signal; `open` shows it again. `until` is the day it comes back. */
+  decideToday(
+    projectId: string,
+    key: string,
+    state: TodayDecisionChoice,
+    until: string | null,
+  ): Promise<Result<TodayView>>
+  muteTodayKind(projectId: string, kind: TodayKind, muted: boolean): Promise<Result<TodayView>>
+  saveOwnAddresses(projectId: string, addresses: string[]): Promise<Result<TodayView>>
+  /** Asks Claude to weigh the mail that waits; `all` weighs again what was already weighed. */
+  evaluateToday(projectId: string, all: boolean): Promise<Result<TodayView>>
+  cancelEvaluateToday(projectId: string): Promise<Result<null>>
+  onTodayProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
+  /** Every project in brief; Claude is never asked. */
+  todayOverview(): Promise<Result<ProjectOverview[]>>
+  risks(projectId: string): Promise<Result<RiskRegister>>
+  proposeRisks(projectId: string): Promise<Result<RiskRegister>>
+  acceptRisk(projectId: string, candidateId: string, title: string): Promise<Result<RiskRegister>>
+  dismissRisk(projectId: string, candidateId: string): Promise<Result<RiskRegister>>
+  addRisk(projectId: string, title: string): Promise<Result<RiskRegister>>
+  updateRisk(
+    projectId: string,
+    riskId: string,
+    change: { state?: RiskState; note?: string },
+  ): Promise<Result<RiskRegister>>
+  /** Whether the project is of who is signed in, by its project codes in the company system. */
+  assignment(projectId: string): Promise<Result<Assignment>>
 }
+
+/** What the PM can say of a signal of the day. */
+export type TodayDecisionChoice = 'done' | 'later' | 'muted' | 'open'

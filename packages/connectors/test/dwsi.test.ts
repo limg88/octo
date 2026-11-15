@@ -75,11 +75,28 @@ function ctx(perimeter: string[], o: CtxOptions = {}): ConnectorContext<DwsiConf
     }),
     signal: new AbortController().signal,
     now: () => o.now ?? NOW,
-    // The PM who owns the source: Marta Neri manages Apollo and wrote hours on Borea.
+    // The PM who owns the source: Marta Neri manages Apollo. Borea is Luca Bassi's.
     owner: {
       email: o.owner === undefined ? 'marta.neri@example.test' : o.owner,
       upn: o.upn ?? null,
     },
+  }
+}
+
+/** The project manager of Borea, for what reads that project. */
+const LUCA = { owner: 'luca.bassi@example.test' }
+
+/** Runs with Marta Neri as the project manager of both projects, then puts Borea back. */
+async function managingBoth<T>(run: () => Promise<T>): Promise<T> {
+  await fake.exec(
+    `UPDATE dwsi.base_project SET projectmanager = 'Marta Neri' WHERE projectid = 'PRJ000202'`,
+  )
+  try {
+    return await run()
+  } finally {
+    await fake.exec(
+      `UPDATE dwsi.base_project SET projectmanager = 'Luca Bassi' WHERE projectid = 'PRJ000202'`,
+    )
   }
 }
 
@@ -404,7 +421,7 @@ describe('the DWSI perimeter', () => {
     await fake.exec(
       `INSERT INTO dwsi.base_project (projectid, "name") VALUES ('PRJ000303', 'Non dichiarato')`,
     )
-    expect(await dwsiConnector.perimeterOptions(ctx([]))).toEqual([
+    expect(await managingBoth(() => dwsiConnector.perimeterOptions(ctx([])))).toEqual([
       { id: APOLLO, label: 'PRJ000101 · Apollo' },
       { id: BOREA, label: 'PRJ000202 · Borea' },
     ])
@@ -412,7 +429,7 @@ describe('the DWSI perimeter', () => {
 
   it('reads only the chosen projects among the declared ones', async () => {
     const batch = await dwsiConnector.sync(
-      ctx([BOREA, 'prj:PRJ000303', 'area-x']),
+      ctx([BOREA, 'prj:PRJ000303', 'area-x'], LUCA),
       null,
       limits(10),
     )
@@ -426,18 +443,33 @@ describe('the DWSI perimeter', () => {
 describe('the DWSI perimeter bound to the PM who owns the source', () => {
   const ids = (options: { id: string }[]) => options.map((o) => o.id)
 
-  it('offers only the codes the PM manages or wrote hours on, never the name of another', async () => {
-    // Luca Bassi manages Borea only; Anna Riva wrote hours on Apollo only; the email is matched
-    // whatever its letter case.
+  it('offers only the codes the PM manages, never the name of another nor a code for hours written', async () => {
+    // Luca Bassi manages Borea only; the email is matched whatever its letter case. Anna Riva
+    // wrote hours on Apollo and Marta Neri on Borea: hours written bind nothing.
     const luca = await dwsiConnector.perimeterOptions(ctx([], { owner: 'Luca.Bassi@example.test' }))
     expect(luca).toEqual([{ id: BOREA, label: 'PRJ000202 · Borea' }])
     expect(JSON.stringify(luca)).not.toContain('Apollo')
     expect(
-      ids(await dwsiConnector.perimeterOptions(ctx([], { owner: 'anna.riva@example.test' }))),
-    ).toEqual([APOLLO])
+      await dwsiConnector.perimeterOptions(ctx([], { owner: 'anna.riva@example.test' })),
+    ).toEqual([])
+    expect(ids(await dwsiConnector.perimeterOptions(ctx([])))).toEqual([APOLLO])
     // Not bound to anything, or not known: nothing is offered.
     for (const owner of ['ugo@example.test', 'nobody@example.test', null]) {
       expect(await dwsiConnector.perimeterOptions(ctx([], { owner }))).toEqual([])
+    }
+  })
+
+  it('lists every code the PM is the project manager of, declared or not, and nothing of another', async () => {
+    // What the PM chooses from does not depend on the codes typed so far.
+    expect(await dwsiConnector.assigned(ctx([]))).toEqual([
+      { id: APOLLO, label: 'PRJ000101 · Apollo' },
+    ])
+    expect(await dwsiConnector.assigned(ctx([], LUCA))).toEqual([
+      { id: BOREA, label: 'PRJ000202 · Borea' },
+    ])
+    // Hours written on a project, an unknown address or none: nothing is listed.
+    for (const owner of ['anna.riva@example.test', 'nobody@example.test', null]) {
+      expect(await dwsiConnector.assigned(ctx([], { owner }))).toEqual([])
     }
   })
 
@@ -467,11 +499,11 @@ describe('the DWSI perimeter bound to the PM who owns the source', () => {
       }
       // The same person recorded twice with the same email still binds.
       await fake.exec(
-        `INSERT INTO dwsi.base_employee (internalid, "name", email) VALUES (92, 'Carla Fumi', 'CARLA.FUMI@example.test')`,
+        `INSERT INTO dwsi.base_employee (internalid, "name", email) VALUES (92, 'Marta Neri', 'MARTA.NERI@example.test')`,
       )
       expect(
-        ids(await dwsiConnector.perimeterOptions(ctx([], { owner: 'carla.fumi@example.test' }))),
-      ).toEqual([BOREA])
+        ids(await dwsiConnector.perimeterOptions(ctx([], { owner: 'marta.neri@example.test' }))),
+      ).toEqual([APOLLO])
     } finally {
       await fake.exec('DELETE FROM dwsi.base_employee WHERE internalid IN (90, 91, 92)')
     }
@@ -526,20 +558,13 @@ describe('the DWSI perimeter bound to the PM who owns the source', () => {
 
   it('checks the binding again at every sync: a code no longer bound is dropped and counted', async () => {
     const both = ctx([APOLLO, BOREA])
-    const first = await dwsiConnector.sync(both, null, limits(10))
+    const first = await managingBoth(() => dwsiConnector.sync(both, null, limits(10)))
     expect(new Set(first.items.map((i) => i.perimeter[0]))).toEqual(new Set([APOLLO, BOREA]))
     expect(first.skipped).toBeUndefined()
-    await fake.exec(`DELETE FROM dwsi.base_timesheet WHERE internalid = 9004`)
-    try {
-      const again = await dwsiConnector.sync(both, null, limits(10))
-      expect(again.items.map((i) => i.perimeter)).toEqual([[APOLLO], [APOLLO]])
-      expect(again.skipped).toEqual({ code_not_bound: 1 })
-    } finally {
-      await fake.exec(
-        `INSERT INTO dwsi.base_timesheet VALUES (9004, 'IT', 'Marta Neri', '2026-10-07', 'PRJ000202',
-         'Supporto', NULL, NULL, NULL, 'OR', 1.0000, 'Approved', 45.0000, 45.0000)`,
-      )
-    }
+    // Borea has another project manager again: the hours Marta Neri wrote on it do not keep it.
+    const again = await dwsiConnector.sync(both, null, limits(10))
+    expect(again.items.map((i) => i.perimeter)).toEqual([[APOLLO], [APOLLO]])
+    expect(again.skipped).toEqual({ code_not_bound: 1 })
   })
 })
 
@@ -695,7 +720,7 @@ describe('a DWSI extraction', () => {
   })
 
   it('differs from project to project, even without rows', async () => {
-    const borea = await dwsiConnector.sync(ctx([BOREA]), null, limits(10))
+    const borea = await dwsiConnector.sync(ctx([BOREA], LUCA), null, limits(10))
     expect(text(borea.items[1])).not.toEqual(text(batch.items[1]))
     expect(text(borea.items[1])).toContain('PRJ000202')
   })
@@ -712,7 +737,7 @@ describe('a DWSI extraction from a warehouse with the types of the real one', ()
         ('SO-90', 5, '2026-02-01', 'Billed', 'Servizi', 1, 10, 0, 'PRJ000202', NULL, NULL),
         ('SO-90', 6, '2026-02-01', 'Billed', 'Servizi', 1, 10, 0, 'PRJ000202', 'boh', NULL);`)
     try {
-      const batch = await dwsiConnector.sync(ctx([BOREA]), null, limits(10))
+      const batch = await dwsiConnector.sync(ctx([BOREA], LUCA), null, limits(10))
       const orders = batch.extractions?.find((e) => e.view === 'v_sales_order_all')?.rows
       expect(orders?.map((r) => [r.key, r.values.closed])).toEqual([
         ['SO-90|1', true],
@@ -735,7 +760,7 @@ describe('a DWSI extraction from a warehouse with the types of the real one', ()
         ('PRJ000202', 2026, 13, 'License', 1, 1, 2, 2, 92, 1),
         ('PRJ000202', 'NaN', 'NaN', 'Travel', 1, 1, 2, 2, 93, 1);`)
     try {
-      const batch = await dwsiConnector.sync(ctx([BOREA]), null, limits(10))
+      const batch = await dwsiConnector.sync(ctx([BOREA], LUCA), null, limits(10))
       const revenue = batch.extractions?.find((e) => e.view === 'v_project_revenue_all')?.rows
       expect(
         revenue?.map((r) => [r.values.itemgroup, r.values.anno, r.values.mese]).sort(),
@@ -760,7 +785,7 @@ describe('a DWSI extraction from a warehouse with the types of the real one', ()
         ('SO-91', 1, '2026-02-01', 'Open', 'Servizi', 3, 0.1::float8 + 0.2::float8,
          45000.1::float8 * 3, 'PRJ000202', 'F', NULL);`)
     try {
-      const batch = await dwsiConnector.sync(ctx([BOREA]), null, limits(10))
+      const batch = await dwsiConnector.sync(ctx([BOREA], LUCA), null, limits(10))
       const [line] = batch.extractions?.find((e) => e.view === 'v_sales_order_all')?.rows ?? []
       expect(line?.values).toMatchObject({ quantity: 3, amount: 0.3, invoiced: 135000.3 })
       const evidence = text(batch.items[1])
@@ -812,6 +837,9 @@ describe('a DWSI sync', () => {
 
   it('goes unit by unit within the batch limit, then starts a new round', async () => {
     const c = ctx([BOREA, APOLLO])
+    await fake.exec(
+      `UPDATE dwsi.base_project SET projectmanager = 'Marta Neri' WHERE projectid = 'PRJ000202'`,
+    )
     const first = await dwsiConnector.sync(c, null, limits(3))
     expect(first.items.map((i) => i.externalId)).toEqual([
       'dwsi:PRJ000101:timesheet',
@@ -825,6 +853,9 @@ describe('a DWSI sync', () => {
     const round = await dwsiConnector.sync(c, second.nextCursor, limits(1))
     expect(round.items.map((i) => i.externalId)).toEqual(['dwsi:PRJ000101:timesheet'])
     expect(round.nextCursor).toEqual({ done: ['PRJ000101:timesheet'] })
+    await fake.exec(
+      `UPDATE dwsi.base_project SET projectmanager = 'Luca Bassi' WHERE projectid = 'PRJ000202'`,
+    )
   })
 
   it('refuses a view with more rows than a query reads, never truncating it', async () => {
@@ -888,11 +919,10 @@ describe('a DWSI sync', () => {
   })
 
   it('reads the hours of a period for the bound projects, with the cost of each row', async () => {
-    const rows = await dwsiConnector.timesheets(ctx([APOLLO, BOREA]), {
-      from: '2026-10-06',
-      to: '2026-10-31',
-    })
-    // Marta Neri is bound to both; the row of 5 October is before the period.
+    const rows = await managingBoth(() =>
+      dwsiConnector.timesheets(ctx([APOLLO, BOREA]), { from: '2026-10-06', to: '2026-10-31' }),
+    )
+    // Marta Neri manages both here; the row of 5 October is before the period.
     expect(rows).toEqual([
       {
         internalid: '9002',

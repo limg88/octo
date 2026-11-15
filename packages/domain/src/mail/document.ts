@@ -50,6 +50,106 @@ export function slugOf(text: string): string {
 
 const headerValue = (value: string): string => JSON.stringify(value)
 
+/** What the mail answers, written only when it answers something: an old file stays as it was. */
+function threadLines(message: MailMessage): string[] {
+  const references = message.references ?? []
+  return [
+    ...(message.inReplyTo ? [`risponde-a: ${headerValue(message.inReplyTo)}`] : []),
+    ...(references.length > 0 ? [`riferimenti: ${headerValue(references.join(' '))}`] : []),
+  ]
+}
+
+/** The meeting of an invitation, and whether the invitation calls it or calls it off. */
+function meetingLines(message: MailMessage): string[] {
+  const meeting = message.meeting
+  if (!meeting) return []
+  return [
+    `invito: ${headerValue(message.calendarMethod ?? '')}`,
+    `riunione: ${headerValue(meeting.summary)}`,
+    `riunione-id: ${headerValue(meeting.uid)}`,
+    `riunione-inizio: ${headerValue(meeting.start)}`,
+    `riunione-fine: ${headerValue(meeting.end ?? '')}`,
+    `riunione-luogo: ${headerValue(meeting.location)}`,
+  ]
+}
+
+/** A mail of the memory read back from its file: what the page of the day needs of it. */
+export type StoredMail = {
+  id: string
+  /** Path inside the project folder. */
+  path: string
+  subject: string
+  from: string
+  to: string
+  cc: string
+  /** When it was sent, as an instant. */
+  date: string
+  inReplyTo: string | null
+  references: string[]
+  invite: string | null
+  meeting: {
+    uid: string
+    summary: string
+    start: string
+    end: string | null
+    location: string
+  } | null
+  /** Whether what its author wrote holds a question. */
+  asks: boolean
+}
+
+const HEADER_LINE = /^([a-z-]+): (".*")$/
+
+/** The mail a file of the memory holds, or null when the file is not one of Octo's mails. */
+export function parseMailDocument(path: string, content: string): StoredMail | null {
+  const lines = content.split('\n')
+  if (lines[0] !== '---') return null
+  const end = lines.indexOf('---', 1)
+  if (end < 0) return null
+  const header = new Map<string, string>()
+  for (const line of lines.slice(1, end)) {
+    const found = HEADER_LINE.exec(line)
+    if (!found) continue
+    try {
+      header.set(found[1] as string, String(JSON.parse(found[2] as string)))
+    } catch {
+      return null
+    }
+  }
+  const id = header.get('id')
+  const date = header.get('data')
+  if (header.get('tipo') !== 'email' || !id || !date || Number.isNaN(Date.parse(date))) return null
+  const start = header.get('riunione-inizio') ?? ''
+  const uid = header.get('riunione-id') ?? ''
+  return {
+    id,
+    path,
+    subject: header.get('oggetto') ?? '',
+    from: header.get('da') ?? '',
+    to: header.get('a') ?? '',
+    cc: header.get('cc') ?? '',
+    date,
+    inReplyTo: header.get('risponde-a') || null,
+    references: (header.get('riferimenti') ?? '').split(' ').filter((entry) => entry !== ''),
+    invite: header.get('invito') || null,
+    meeting:
+      uid !== '' && !Number.isNaN(Date.parse(start))
+        ? {
+            uid,
+            summary: header.get('riunione') ?? '',
+            start,
+            end: header.get('riunione-fine') || null,
+            location: header.get('riunione-luogo') ?? '',
+          }
+        : null,
+    asks: lines
+      .slice(end + 1)
+      .filter((line) => !line.startsWith('#'))
+      .join('\n')
+      .includes('?'),
+  }
+}
+
 /**
  * The mail as a Markdown file: a header of `key: "value"` lines a search can match, then what
  * its author wrote. One month per folder; the name starts with the day, so a listing is a
@@ -76,6 +176,8 @@ export function mailDocument(
     `cartella: ${headerValue(archived.folder)}`,
     `allegati: ${headerValue(message.attachments.join(', '))}`,
     `id: ${headerValue(externalId)}`,
+    ...threadLines(message),
+    ...meetingLines(message),
     '---',
   ]
   const body = options.keepQuoted ? message.text : ownText(message.text)

@@ -2,6 +2,8 @@
 
 Data: 15/11/2026. Documento di progetto: nessun file dell'app è stato modificato. Nasce dal riepilogo giornaliero (`riepilogo-giornaliero.md`), che ha mostrato che Octo non sa chi lo usa.
 
+**Stato.** Scritti il 15/11/2026 gli incrementi 0a, 0b e 0c: demo `demo/23-oggi`. Le differenze dal disegno (la credenziale dell'archivio resta del progetto) e ciò che non è verificato sono in `roadmap.md` alla voce «Accesso con Entra ID». Le deleghe aspettano il server.
+
 **Decisioni del PM (15/11/2026).**
 - Octo ha un **login con Entra ID**. Senza un login valido **non si apre**.
 - All'IT si chiede **la sola identità**: nessun permesso su posta o calendario.

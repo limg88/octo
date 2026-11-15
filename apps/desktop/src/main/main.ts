@@ -18,13 +18,18 @@ import {
   createModels,
   createProgress,
   createProjects,
+  createRisks,
+  createSession,
   createSourceMap,
   createSources,
   createTeam,
+  createToday,
   createTrackerSnapshots,
   type Feeding,
   type MailArchive,
   type Projects,
+  type Session,
+  settingsOwnedBy,
 } from '@octo/application'
 import { backupFileName, DomainError, type Project } from '@octo/domain'
 import {
@@ -32,9 +37,11 @@ import {
   createAppleMailArchive,
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
+  createClaudeTodayJudge,
   createConnectorFeedReader,
   createFeedRecords,
   createFileVault,
+  createFixedIdentityProvider,
   createFsAlignmentSettings,
   createFsDashboardSettings,
   createFsEvidenceReader,
@@ -47,8 +54,10 @@ import {
   createFsProjectFiles,
   createFsProjectScaffold,
   createFsQuestionLog,
+  createFsRiskRegisterStore,
   createFsSourceSettings,
   createFsTeamStore,
+  createFsTodayStore,
   createFsTrackerExports,
   createJiraHoursReader,
   createJsonBackupFiles,
@@ -56,14 +65,17 @@ import {
   createJsonProjectRegistry,
   createJsonSetAsideProjects,
   createJsonSourceStates,
+  createOidcIdentityProvider,
+  createSignInConfig,
   createWarehouseTimesheetReader,
   createWordRenderer,
   createWorkerTextExtractor,
   createXlsxModel,
+  fixedPersonOf,
   locateClaude,
   type SecretCipher,
 } from '@octo/infrastructure'
-import { app, BrowserWindow, safeStorage } from 'electron'
+import { app, BrowserWindow, safeStorage, shell } from 'electron'
 import { CHANNELS } from '../shared/api.ts'
 import { registerIpc } from './ipc.ts'
 
@@ -96,6 +108,16 @@ const DEV_ADO_VARIABLE = 'OCTO_DEV_ADO_URL'
  * Never set for real use: the file would hold the credentials in clear.
  */
 const DEMO_SECRETS_VARIABLE = 'OCTO_DEMO_PLAIN_SECRETS'
+/**
+ * Demos and tests only: `Name <address>` of a person who is signed in from the start, without
+ * any organization asked. Never set for real use: Octo would let anybody in under that name.
+ */
+const DEMO_IDENTITY_VARIABLE = 'OCTO_DEMO_IDENTITY'
+/** Where the organization signs in, when it is told by the environment and not by its file. */
+const ENTRA_TENANT_VARIABLE = 'OCTO_ENTRA_TENANT'
+const ENTRA_CLIENT_VARIABLE = 'OCTO_ENTRA_CLIENT'
+/** Demos and tests only: a sign-in on this computer instead of the organization's. */
+const DEV_ENTRA_VARIABLE = 'OCTO_DEV_ENTRA_URL'
 
 /** The operating system's own store (Keychain, DPAPI): only this user reads the secrets back. */
 function secretCipher(): SecretCipher {
@@ -126,8 +148,17 @@ function mailArchive(): MailArchive {
   return { between: missing, read: missing }
 }
 
-/** Feeds the memory of every project, one after the other, and tells the window. */
-async function feedAll(projects: Projects, feeding: Feeding, window: BrowserWindow): Promise<void> {
+/**
+ * Feeds the memory of every project of who is signed in, one after the other, and tells the
+ * window. While nobody is signed in nothing is read.
+ */
+async function feedAll(
+  session: Session,
+  projects: Projects,
+  feeding: Feeding,
+  window: BrowserWindow,
+): Promise<void> {
+  if (session.current() === null) return
   for (const project of await projects.list()) {
     try {
       await feeding.fill(project)
@@ -175,6 +206,26 @@ function start(): void {
     env: process.env,
   }
   const agent = createClaudeCliRunner(claude)
+  const secrets = createFileVault(dataFolder, secretCipher())
+  const demoPerson = fixedPersonOf(process.env[DEMO_IDENTITY_VARIABLE])
+  const session = createSession({
+    provider: demoPerson
+      ? createFixedIdentityProvider(demoPerson)
+      : createOidcIdentityProvider({
+          config: createSignInConfig({
+            dataFolder,
+            env: {
+              tenantId: process.env[ENTRA_TENANT_VARIABLE],
+              clientId: process.env[ENTRA_CLIENT_VARIABLE],
+              authority: process.env[DEV_ENTRA_VARIABLE],
+            },
+          }),
+          openBrowser: (url) => shell.openExternal(url),
+          allowLoopbackAuthority: process.env[DEV_ENTRA_VARIABLE] !== undefined,
+        }),
+    secrets,
+  })
+  const identity = () => session.current()
   const registry = createJsonProjectRegistry(dataFolder)
   const folders = createFsFolderProbe()
   const projects = createProjects({
@@ -184,18 +235,20 @@ function start(): void {
     scaffold: createFsProjectScaffold(),
     clock,
     ids,
+    identity,
   })
   const writer = createFsMemoryWriter()
-  const settings = createFsSourceSettings()
+  // The company system is read as who is signed in, wherever its settings are read from.
+  const settings = settingsOwnedBy(createFsSourceSettings(), identity)
+  const files = createFsProjectFiles()
   const sources = createSources({
     settings,
     states: sourceStates,
     archive: mailArchive(),
     writer,
     clock,
+    files,
   })
-  const files = createFsProjectFiles()
-  const secrets = createFileVault(dataFolder, secretCipher())
   const devEndpoints = {
     jira: process.env[DEV_JIRA_VARIABLE],
     ado: process.env[DEV_ADO_VARIABLE],
@@ -211,6 +264,7 @@ function start(): void {
     writer,
     files,
     clock,
+    identity,
   })
   const documents = createDocuments({
     files,
@@ -240,48 +294,87 @@ function start(): void {
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, feeds, documents })
   const liveSources = createSourceMap({ sources, feeds, hours: hoursSettings, files })
-  const periodic = () => void feedAll(projects, feeding, window)
-  setTimeout(periodic, FIRST_SYNC_DELAY_MS)
+  const periodic = () => void feedAll(session, projects, feeding, window)
+  // At every start the sign-in kept on this computer is renewed; a demo person is simply in.
+  void (demoPerson ? session.signIn() : session.resume())
+    .catch((error: unknown) => console.error('[octo] sign-in at start failed', error))
+    .then(() => setTimeout(periodic, FIRST_SYNC_DELAY_MS))
   setInterval(periodic, SYNC_INTERVAL_MS)
+  const deliverables = createDeliverables({
+    writer: createClaudeDeliverableWriter(claude),
+    renderer: createWordRenderer(),
+    evidence,
+    files,
+    memory: writer,
+    clock,
+    ids,
+    models: chosenModels,
+    liveSources,
+  })
+  const dashboard = createDashboard({
+    settings: dashboardSettings,
+    exports: trackerExports,
+    clock,
+    writer,
+  })
+  const alignments = createAlignments({
+    settings: createFsAlignmentSettings(),
+    dashboard: dashboardSettings,
+    exports: trackerExports,
+    sources: settings,
+    records: createFeedRecords(files),
+    writer,
+  })
+  const forecasts = createForecasts({
+    settings: createFsForecastSettings(),
+    files,
+    sheets,
+    timesheet: (project) => hours.timesheet(project),
+    writer,
+  })
+  const judge = createClaudeTodayJudge(claude)
+  const risks = createRisks({
+    store: createFsRiskRegisterStore(),
+    writer,
+    judge,
+    evidence,
+    clock,
+    models: chosenModels,
+    liveSources,
+  })
+  const today = createToday({
+    hours,
+    forecasts,
+    dashboard,
+    alignments,
+    deliverables,
+    sources,
+    feeds,
+    team,
+    risks,
+    files,
+    store: createFsTodayStore(),
+    judge,
+    evidence,
+    clock,
+    identity,
+    models: chosenModels,
+    liveSources,
+  })
   registerIpc({
     window,
+    session,
+    today,
+    risks,
     sources,
     feeds,
     documents,
     feeding,
-    deliverables: createDeliverables({
-      writer: createClaudeDeliverableWriter(claude),
-      renderer: createWordRenderer(),
-      evidence,
-      files,
-      memory: writer,
-      clock,
-      ids,
-      models: chosenModels,
-      liveSources,
-    }),
-    dashboard: createDashboard({
-      settings: dashboardSettings,
-      exports: trackerExports,
-      clock,
-      writer,
-    }),
-    alignments: createAlignments({
-      settings: createFsAlignmentSettings(),
-      dashboard: dashboardSettings,
-      exports: trackerExports,
-      sources: settings,
-      records: createFeedRecords(files),
-      writer,
-    }),
+    deliverables,
+    dashboard,
+    alignments,
     hours,
-    forecasts: createForecasts({
-      settings: createFsForecastSettings(),
-      files,
-      sheets,
-      timesheet: (project) => hours.timesheet(project),
-      writer,
-    }),
+    forecasts,
     progress: createProgress({ settings: createFsProgressSettings(), files, sheets, writer }),
     agent,
     projects,

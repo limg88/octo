@@ -1,5 +1,6 @@
 import {
   DomainError,
+  type Identity,
   type Project,
   projectFolderName,
   projectNameFromFolder,
@@ -16,6 +17,11 @@ export type ProjectsDeps = {
   scaffold: ProjectScaffold
   clock: Clock
   ids: IdGenerator
+  /**
+   * Who uses Octo. With it a project is of the person who added it: another person on the same
+   * computer does not see it. Without it every project is everybody's, as before the sign-in.
+   */
+  identity?: () => Identity | null
 }
 
 export type Projects = {
@@ -31,8 +37,28 @@ export type Projects = {
 }
 
 export function createProjects(deps: ProjectsDeps): Projects {
+  const owner = (): string | undefined => deps.identity?.()?.id
+
+  /**
+   * The projects of who is signed in. A project added before Octo had a sign-in has no owner: it
+   * becomes of the first person who signs in.
+   */
+  async function list(): Promise<Project[]> {
+    const all = await deps.registry.list()
+    const me = owner()
+    if (me === undefined) return all
+    if (all.some((project) => project.owner === undefined)) {
+      const claimed = all.map((project) =>
+        project.owner === undefined ? { ...project, owner: me } : project,
+      )
+      await deps.registry.save(claimed)
+      return claimed.filter((project) => project.owner === me)
+    }
+    return all.filter((project) => project.owner === me)
+  }
+
   async function get(id: string): Promise<Project> {
-    const project = (await deps.registry.list()).find((candidate) => candidate.id === id)
+    const project = (await list()).find((candidate) => candidate.id === id)
     if (!project) throw new DomainError('project_not_found', id)
     return project
   }
@@ -51,11 +77,15 @@ export function createProjects(deps: ProjectsDeps): Projects {
       (candidate) =>
         sameFolder(candidate.folder, folder) && !projects.some(({ id }) => id === candidate.id),
     )
-    const project: Project = known ?? {
-      id: deps.ids.next(),
-      name: projectNameFromFolder(folder),
-      folder,
-      addedAt: deps.clock.now().toISOString(),
+    const me = owner()
+    const project: Project = {
+      ...(known ?? {
+        id: deps.ids.next(),
+        name: projectNameFromFolder(folder),
+        folder,
+        addedAt: deps.clock.now().toISOString(),
+      }),
+      ...(me === undefined ? {} : { owner: me }),
     }
     await deps.registry.save([...projects, project])
     if (known) await deps.setAside.save(setAside.filter(({ id }) => id !== known.id))
@@ -89,5 +119,5 @@ export function createProjects(deps: ProjectsDeps): Projects {
     return add(await deps.scaffold.create(parent, folderName, starterFiles(folderName)))
   }
 
-  return { list: () => deps.registry.list(), get, add, create, remove, restore }
+  return { list, get, add, create, remove, restore }
 }

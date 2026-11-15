@@ -20,6 +20,8 @@ trap 'kill "$ado_pid" 2>/dev/null || true' EXIT
 for _ in $(seq 1 50); do [[ -s "$work/ado.url" ]] && break; sleep 0.1; done
 
 export OCTO_DATA_DIR="$work/dati"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_MAIL_ROOT="$work/Mail"
 export OCTO_DEV_ADO_URL="$(cat "$work/ado.url")"
 # Demo only: the fake token is kept without the system keychain.

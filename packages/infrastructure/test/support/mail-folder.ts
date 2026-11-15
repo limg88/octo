@@ -24,6 +24,10 @@ export interface FakeMail {
     text?: string
     /** A calendar part with this method (`REPLY` for the answer to an invitation). */
     calendarMethod?: string
+    /** The calendar part itself; without it an empty calendar is written. */
+    calendar?: string
+    /** The `Message-ID` this mail answers, without angle brackets. */
+    inReplyTo?: string
   }
   deleted?: boolean
   partial?: boolean
@@ -43,6 +47,9 @@ function rfc822(mail: FakeMail): string {
     : `text/${message.html === undefined ? 'plain' : 'html'}; charset=utf-8`
   return [
     ...(message.messageId ? [`Message-ID: <${message.messageId}>`] : []),
+    ...(message.inReplyTo
+      ? [`In-Reply-To: <${message.inReplyTo}>`, `References: <${message.inReplyTo}>`]
+      : []),
     `From: ${message.from}`,
     `To: ${message.to ?? 'Paola Verdi <pm@example.test>'}`,
     ...(message.cc ? [`Cc: ${message.cc}`] : []),
@@ -51,7 +58,7 @@ function rfc822(mail: FakeMail): string {
     `Content-Type: ${type}`,
     '',
     message.calendarMethod
-      ? 'BEGIN:VCALENDAR\nEND:VCALENDAR'
+      ? (message.calendar ?? 'BEGIN:VCALENDAR\nEND:VCALENDAR')
       : (message.html ?? message.text ?? ''),
     '',
   ].join('\n')

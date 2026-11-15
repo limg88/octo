@@ -1,4 +1,11 @@
-import { htmlToText, type MailMessage, type MailPerson, tidyText } from '@octo/domain'
+import {
+  htmlToText,
+  type MailMeeting,
+  type MailMessage,
+  type MailPerson,
+  parseInvite,
+  tidyText,
+} from '@octo/domain'
 import PostalMime, { type Address } from 'postal-mime'
 
 /** A file that is not what Mail writes: no length line, or a length past its end. */
@@ -31,6 +38,22 @@ function people(addresses: readonly Address[] | undefined): MailPerson[] {
 
 const unbracketed = (id: string): string => id.trim().replace(/^<|>$/g, '')
 
+/** The ids a `References` header lists, oldest first, without their angle brackets. */
+const idsOf = (header: string | undefined): string[] =>
+  (header ?? '')
+    .split(/\s+/)
+    .map(unbracketed)
+    .filter((id) => id !== '')
+
+/** The meeting of a calendar part, whatever way the part was decoded. */
+function meetingOf(content: unknown): MailMeeting | null {
+  if (typeof content === 'string') return parseInvite(content)
+  if (content instanceof ArrayBuffer || ArrayBuffer.isView(content)) {
+    return parseInvite(new TextDecoder().decode(content as ArrayBuffer))
+  }
+  return null
+}
+
 /** Reads an `.emlx` file as Mail writes it (also a partial one, whose attachments are elsewhere). */
 export async function parseEmlx(file: Uint8Array): Promise<MailMessage> {
   const mail = await PostalMime.parse(messageBytes(file))
@@ -46,5 +69,8 @@ export async function parseEmlx(file: Uint8Array): Promise<MailMessage> {
     text: mail.text ? tidyText(mail.text) : htmlToText(mail.html ?? ''),
     attachments: mail.attachments.map((part) => part.filename ?? '').filter((name) => name !== ''),
     calendarMethod: calendar?.method?.toUpperCase() ?? null,
+    inReplyTo: mail.inReplyTo ? unbracketed(mail.inReplyTo) : null,
+    references: idsOf(mail.references),
+    meeting: calendar ? meetingOf(calendar.content) : null,
   }
 }

@@ -234,9 +234,9 @@ export const DWSI_RELATIONS: readonly string[] = [
 
 /**
  * The project codes, among `$2`, bound to the person whose addresses (UPN and email, in lower
- * case) are `$1`: those whose project manager (`v_project.projectmanager`) or one of whose
- * timesheet employees (`v_timesheet_all.employee`) bears a name of that person in
- * `v_dw_employee`. A name is the person's only when every employee of that name has one of
+ * case) are `$1`: those whose project manager (`v_project.projectmanager`) bears a name of that
+ * person in `v_dw_employee`. Having written hours on a project binds nothing: a project is of
+ * its project manager. A name is the person's only when every employee of that name has one of
  * those addresses: a namesake with another address (or none) makes it ambiguous, and it binds
  * nothing (the views name people by name, not by id). The names are computed once (`me`) and
  * never come out: only codes do.
@@ -247,9 +247,19 @@ export const BOUND_CODES_QUERY =
   `HAVING bool_and(coalesce(lower(e."email") = ANY ($1::text[]), false))) ` +
   `SELECT p."projectid" FROM ${DWSI_SCHEMA}."v_project" AS p ` +
   `WHERE p."projectid" = ANY ($2::text[]) AND p."projectmanager" IN (SELECT "name" FROM me) ` +
-  `UNION SELECT s."projectid" FROM ${DWSI_SCHEMA}."v_timesheet_all" AS s ` +
-  `WHERE s."projectid" = ANY ($2::text[]) AND s."employee" IN (SELECT "name" FROM me) ` +
   `ORDER BY 1`
+
+/**
+ * Every project code whose project manager is the person whose addresses are `$1`, with its
+ * name: what that person is asked to choose from. The same rule on names as `BOUND_CODES_QUERY`;
+ * a project of somebody else never comes out, not even its code.
+ */
+export const ASSIGNED_CODES_QUERY =
+  `WITH me AS (SELECT e."name" FROM ${DWSI_SCHEMA}."${EMPLOYEE_VIEW.name}" AS e ` +
+  `WHERE e."name" IS NOT NULL GROUP BY e."name" ` +
+  `HAVING bool_and(coalesce(lower(e."email") = ANY ($1::text[]), false))) ` +
+  `SELECT p."projectid", p."name" FROM ${DWSI_SCHEMA}."v_project" AS p ` +
+  `WHERE p."projectmanager" IN (SELECT "name" FROM me) ORDER BY 1`
 
 /** The kind of the evidence of an extraction: system data, classified so at ingestion. */
 export const CATEGORY_KIND: Record<DwsiCategory, DocumentKind> = {

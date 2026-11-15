@@ -37,6 +37,7 @@ function feeding(options: {
       view: never,
       save: never,
       choices: never,
+      assignment: never,
       configured: async () => options.feeds,
       sync: async (_project, feed) => {
         calls.push(feed)

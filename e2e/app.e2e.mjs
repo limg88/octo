@@ -59,6 +59,8 @@ const launch = (dataFolder = `${work}/dati`) =>
       OCTO_DEV_JIRA_URL: jira.server.origin,
       OCTO_DEV_CONFLUENCE_URL: confluence.server.origin,
       OCTO_DEMO_PLAIN_SECRETS: '1',
+      // A person already signed in: the sign-in itself is shown by its own demo.
+      OCTO_DEMO_IDENTITY: 'Paola Verdi <pm@example.test>',
     },
   })
 
@@ -77,10 +79,16 @@ try {
   assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
   assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Ore', 'Previsionale', 'Avanzamento'])
   assert.deepEqual(await nav21('Progetto').allInnerTexts(), ['Impostazioni'])
-  await page.getByRole('tab', { name: 'Chiedi' }).focus()
+  // Demo 23: Octo opens on the page of the day, the first section, for who is signed in.
+  assert.deepEqual(await nav21('Ogni giorno').allInnerTexts(), ['Oggi'])
+  await page.getByRole('region', { name: 'Oggi' }).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('Sei Paola Verdi').waitFor()
+  await page.getByRole('tab', { name: 'Oggi' }).focus()
   await page.keyboard.press('ArrowUp')
   await page.getByRole('region', { name: 'Avvio del progetto' }).waitFor({ timeout: TIMEOUT_MS })
   await page.keyboard.press('ArrowDown')
+  await page.getByRole('region', { name: 'Oggi' }).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
   await page.getByPlaceholder('Chiedi qualcosa su questo progetto…').waitFor()
   // The list of the projects opens from the name of the one in use.
   const openProjects = () => page.locator('.switcher-button').click()
@@ -680,6 +688,7 @@ try {
   await app.close()
   app = await launch()
   page = await app.firstWindow()
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
 
   // Demo 17: the model that answers is chosen for the project and written beside the answer.
@@ -764,6 +773,7 @@ try {
   await page.getByText(/Rimetti le credenziali/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
   // The questions came with the folder, the readings with the backup.
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
   const readings = (dataFolder) =>
     JSON.parse(readFileSync(`${work}/${dataFolder}/feeds/demo-aurora/ado.json`, 'utf8'))

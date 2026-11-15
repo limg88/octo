@@ -35,7 +35,6 @@ import {
   type FeedStep,
   type JiraFeedConfig,
   MAX_ITEMS_PER_DELIVERY,
-  NO_CHOICES,
   type PullSourceKind,
   recordBody,
   rowsBody,
@@ -56,6 +55,11 @@ export type ConnectorFeedOptions = {
   allowLoopback?: boolean
   /** Tests only: how the name of the warehouse becomes addresses, instead of the system's DNS. */
   resolveHost?: NetGuardOptions['resolve']
+  /**
+   * The addresses of who is signed in. With them the warehouse is read as that person, whatever
+   * address the configuration carries; null or absent: the address of the configuration.
+   */
+  owner?: () => { email: string; upn: string } | null
 }
 
 /** Batches one reading takes at most; the next reading goes on from the saved cursor. */
@@ -126,6 +130,10 @@ const trackerOf = {
 }
 
 const PROJECT_OPTION_PREFIX = 'project:'
+const PRJ_OPTION_PREFIX = prjOption('')
+const PRJ_CODE = /^PRJ\d{6}$/
+/** A well-formed code no project has: it opens a session that reads no project. */
+const NO_CODE_YET = 'PRJ000000'
 const AREA_OPTION_PREFIX = 'area:'
 const KEY_IN_LABEL = /\(([^()]+)\)$/
 
@@ -245,7 +253,7 @@ function warehouseContext(
     }),
     signal: new AbortController().signal,
     now: () => new Date(),
-    owner: { email: config.ownerEmail },
+    owner: options.owner?.() ?? { email: config.ownerEmail },
   }
 }
 
@@ -441,7 +449,25 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
   return {
     async choices(feed, config, secret) {
       try {
-        if (feed === 'dwsi') return NO_CHOICES
+        if (feed === 'dwsi') {
+          // The project codes the person is the project manager of: nothing of anybody else.
+          const warehouse = config as WarehouseFeedConfig
+          // The listing does not depend on the codes typed so far: a session needs one to open.
+          const codes = warehouse.projectCodes.filter((code) => PRJ_CODE.test(code))
+          const ctx = warehouseContext(
+            { ...warehouse, projectCodes: codes.length > 0 ? codes : [NO_CODE_YET] },
+            secret,
+            options,
+          )
+          const assigned = await dwsiConnector.assigned(ctx)
+          return {
+            projects: assigned.map((option) => ({
+              value: option.id.slice(PRJ_OPTION_PREFIX.length),
+              label: option.label,
+            })),
+            areas: [],
+          }
+        }
         if (feed === 'confluence') {
           return await confluence.choices(config as ConfluenceFeedConfig, secret)
         }

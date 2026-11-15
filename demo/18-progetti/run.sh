@@ -21,6 +21,8 @@ JSON
 fi
 
 export OCTO_DATA_DIR="$work/dati"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_MAIL_ROOT="$work/Mail"
 export OCTO_CLAUDE_PATH="$root/demo/lib/fake-claude"
 

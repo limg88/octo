@@ -14,6 +14,8 @@ mkdir -p "$work/Chiavetta" "$work/Nuovo computer"
 
 export OCTO_MAIL_ROOT="$work/Mail-assente"
 export OCTO_CLAUDE_PATH="$root/demo/lib/fake-claude"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 
 echo "== Vecchio computer =="
 echo "Cartella dove salvare la copia: $work/Chiavetta"

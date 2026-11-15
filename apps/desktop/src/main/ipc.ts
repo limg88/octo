@@ -17,8 +17,11 @@ import type {
   Progress,
   Projects,
   QuestionLog,
+  Risks,
+  Session,
   Sources,
   Team,
+  Today,
   TrackerSnapshots,
 } from '@octo/application'
 import {
@@ -29,7 +32,9 @@ import {
   MODEL_CHOICES,
   PHASES,
   pathInProject,
+  RISK_STATES,
   TEAM_SIDES,
+  type TodayKind,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
@@ -62,6 +67,9 @@ export type IpcDeps = {
   models: Models
   trackerSnapshots: TrackerSnapshots
   backupDialogs: BackupDialogs
+  session: Session
+  today: Today
+  risks: Risks
 }
 
 /** The words of the dialogs of a backup: they are the interface's, not this file's. */
@@ -311,9 +319,115 @@ const choosePathInput = byProject.extend({
   extensions: z.array(z.string().regex(/^[a-z0-9]{1,8}$/)).max(MAX_EXTENSIONS),
 })
 
-/** Every request from the interface is validated here, and every failure leaves as a code. */
+const MAX_KEY_LENGTH = 600
+const MAX_ADDRESSES = 20
+const key = z.string().min(1).max(MAX_KEY_LENGTH)
+const todayDecideInput = byProject.extend({
+  key,
+  state: z.enum(['done', 'later', 'muted', 'open']),
+  until: rule.nullable(),
+})
+const todayMuteInput = byProject.extend({ kind: rule, muted: z.boolean() })
+const todayAddressesInput = byProject.extend({ addresses: z.array(rule).max(MAX_ADDRESSES) })
+const todayEvaluateInput = byProject.extend({ all: z.boolean() })
+const riskCandidateInput = byProject.extend({ candidateId: id })
+const riskAcceptInput = riskCandidateInput.extend({ title: rule })
+const riskAddInput = byProject.extend({ title: rule })
+const riskUpdateInput = byProject.extend({
+  riskId: id,
+  change: z.object({
+    state: z.enum(RISK_STATES).optional(),
+    note: z.string().max(MAX_INPUT_LENGTH).optional(),
+  }),
+})
+
+/**
+ * Every request from the interface is validated here, and every failure leaves as a code. But for
+ * the sign-in itself, nothing is done while nobody is signed in.
+ */
 export function registerIpc(deps: IpcDeps): void {
   const running = new Map<string, AbortController>()
+  const handle = handler(() => {
+    deps.session.require()
+  })
+  const open = handler(() => {})
+
+  open(CHANNELS.sessionGet, none, () => deps.session.view())
+  open(CHANNELS.sessionSignIn, none, () => deps.session.signIn())
+  open(CHANNELS.sessionCancel, none, async () => {
+    deps.session.cancelSignIn()
+    return null
+  })
+  handle(CHANNELS.sessionSignOut, none, () => deps.session.signOut())
+
+  handle(CHANNELS.todayView, byProject, async ({ projectId }) =>
+    deps.today.view(await deps.projects.get(projectId)),
+  )
+  handle(CHANNELS.todayDecide, todayDecideInput, async ({ projectId, ...input }) =>
+    deps.today.decide(await deps.projects.get(projectId), input),
+  )
+  handle(CHANNELS.todayMute, todayMuteInput, async ({ projectId, kind, muted }) =>
+    deps.today.muteKind(await deps.projects.get(projectId), kind as TodayKind, muted),
+  )
+  handle(CHANNELS.todayAddresses, todayAddressesInput, async ({ projectId, addresses }) =>
+    deps.today.saveAddresses(await deps.projects.get(projectId), addresses),
+  )
+  /** One run of Claude per project at a time, that the PM can stop. */
+  async function judging<T>(projectId: string, run: (signal: AbortSignal) => Promise<T>) {
+    const lock = `today:${projectId}`
+    running.get(lock)?.abort()
+    const abort = new AbortController()
+    running.set(lock, abort)
+    try {
+      return await run(abort.signal)
+    } finally {
+      if (running.get(lock) === abort) running.delete(lock)
+    }
+  }
+  const tellProgress = (projectId: string) => (progress: unknown) => {
+    if (!deps.window.isDestroyed()) {
+      deps.window.webContents.send(CHANNELS.todayProgress, projectId, progress)
+    }
+  }
+  handle(CHANNELS.todayEvaluate, todayEvaluateInput, async ({ projectId, all }) => {
+    const project = await deps.projects.get(projectId)
+    return judging(projectId, (signal) =>
+      deps.today.evaluate(project, { all, signal, onProgress: tellProgress(projectId) }),
+    )
+  })
+  handle(CHANNELS.todayCancel, byProject, async ({ projectId }) => {
+    running.get(`today:${projectId}`)?.abort()
+    return null
+  })
+  handle(CHANNELS.todayOverview, none, async () => deps.today.overview(await deps.projects.list()))
+
+  handle(CHANNELS.risksGet, byProject, async ({ projectId }) =>
+    deps.risks.register(await deps.projects.get(projectId)),
+  )
+  handle(CHANNELS.risksPropose, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    return judging(projectId, (signal) =>
+      deps.risks.propose(project, { signal, onProgress: tellProgress(projectId) }),
+    )
+  })
+  handle(CHANNELS.risksAccept, riskAcceptInput, async ({ projectId, candidateId, title }) =>
+    deps.risks.accept(await deps.projects.get(projectId), candidateId, title),
+  )
+  handle(CHANNELS.risksDismiss, riskCandidateInput, async ({ projectId, candidateId }) =>
+    deps.risks.dismiss(await deps.projects.get(projectId), candidateId),
+  )
+  handle(CHANNELS.risksAdd, riskAddInput, async ({ projectId, title }) =>
+    deps.risks.add(await deps.projects.get(projectId), title),
+  )
+  handle(CHANNELS.risksUpdate, riskUpdateInput, async ({ projectId, riskId, change }) =>
+    deps.risks.update(await deps.projects.get(projectId), riskId, {
+      ...(change.state ? { state: change.state } : {}),
+      ...(change.note !== undefined ? { note: change.note } : {}),
+    }),
+  )
+  handle(CHANNELS.assignmentGet, byProject, async ({ projectId }) =>
+    deps.feeds.assignment(await deps.projects.get(projectId)),
+  )
 
   handle(CHANNELS.agentStatus, none, () => deps.agent.status())
   handle(CHANNELS.projectsList, none, () => deps.projects.list())
@@ -712,18 +826,22 @@ export function registerIpc(deps: IpcDeps): void {
   })
 }
 
-function handle<Input, Output>(
-  channel: string,
-  schema: z.ZodType<Input>,
-  run: (input: Input) => Promise<Output>,
-): void {
-  ipcMain.handle(channel, async (_event, raw: unknown): Promise<Result<Output>> => {
-    try {
-      return { ok: true, value: await run(schema.parse(raw)) }
-    } catch (error) {
-      if (isDomainError(error)) return { ok: false, code: error.code }
-      console.error(`[octo] ${channel} failed`, error)
-      return { ok: false, code: UNEXPECTED_ERROR }
-    }
-  })
+/** Makes the function that answers a channel, after `guard` has let the request through. */
+function handler(guard: () => void) {
+  return function handle<Input, Output>(
+    channel: string,
+    schema: z.ZodType<Input>,
+    run: (input: Input) => Promise<Output>,
+  ): void {
+    ipcMain.handle(channel, async (_event, raw: unknown): Promise<Result<Output>> => {
+      try {
+        guard()
+        return { ok: true, value: await run(schema.parse(raw)) }
+      } catch (error) {
+        if (isDomainError(error)) return { ok: false, code: error.code }
+        console.error(`[octo] ${channel} failed`, error)
+        return { ok: false, code: UNEXPECTED_ERROR }
+      }
+    })
+  }
 }

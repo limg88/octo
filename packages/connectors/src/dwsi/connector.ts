@@ -26,6 +26,7 @@ import {
 } from './timesheets.ts'
 import { columnValue } from './values.ts'
 import {
+  ASSIGNED_CODES_QUERY,
   BOUND_CODES_QUERY,
   CATEGORIES,
   CATEGORY_KIND,
@@ -271,7 +272,7 @@ function ownerAddresses(ctx: ConnectorContext<DwsiConfig>): string[] {
 
 /**
  * The codes among `codes` bound in the warehouse to the PM who owns the source: the PM is their
- * project manager or wrote hours on them (`BOUND_CODES_QUERY`), known by their UPN or email.
+ * project manager (`BOUND_CODES_QUERY`), known by their UPN or email.
  * None without either.
  */
 async function boundCodes(
@@ -295,8 +296,8 @@ const older = (a: Date, b: Date | null) => (b !== null && b.getTime() < a.getTim
 /**
  * The read-only NetSuite connector, through the DWSI data warehouse (Postgres). A source is a
  * warehouse and the project codes a PM declared; the PM chooses the perimeter among the declared
- * codes bound in the warehouse to the PM who owns the source (project manager, or hours written
- * on it: `BOUND_CODES_QUERY`), checked again at every batch. A sync extracts, for each chosen project, its hours (timesheet) and
+ * codes bound in the warehouse to the PM who owns the source (their project manager:
+ * `BOUND_CODES_QUERY`), checked again at every batch. A sync extracts, for each chosen project, its hours (timesheet) and
  * its economics (project, orders, invoices, revenue, P&L, backlog, progress) with fixed,
  * parametrized queries on the closed list of views and declared columns. Each extraction gives
  * an «Estrazione DWSI» evidence (a `timesheet` or an `economics_export`, system data, internal by
@@ -314,6 +315,11 @@ export type DwsiConnector = Connector<DwsiConfig, DwsiCursor> & {
     ctx: ConnectorContext<DwsiConfig>,
     period: TimesheetPeriod,
   ): Promise<DwsiTimesheetRow[]>
+  /**
+   * Every project code the PM who owns the source is the project manager of, with its name:
+   * what that person chooses from, whatever codes the source declares. None without an address.
+   */
+  assigned(ctx: ConnectorContext<DwsiConfig>): Promise<PerimeterOption[]>
 }
 
 export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiConnector {
@@ -370,6 +376,22 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
   return {
     kind: 'netsuite_dwsi',
     parseConfig: parseDwsiConfig,
+
+    async assigned(ctx) {
+      const addresses = ownerAddresses(ctx)
+      if (addresses.length === 0) return []
+      return withSession(ctx, async (session) => {
+        const rows = await session.query(ASSIGNED_CODES_QUERY, [addresses])
+        if (rows.length > maxRows) throw new ConnectorError('response_too_large')
+        return rows
+          .filter((r) => typeof r.projectid === 'string')
+          .map((r) => {
+            const code = r.projectid as string
+            const name = typeof r.name === 'string' ? cutToCharacters(r.name.trim(), 200) : ''
+            return { id: prjOption(code), label: name ? `${code} · ${name}` : code }
+          })
+      })
+    },
 
     async timesheets(ctx, period) {
       const { from, to } = checkedTimesheetPeriod(period)

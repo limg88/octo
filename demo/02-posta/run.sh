@@ -16,6 +16,8 @@ if [[ "${KEEP:-0}" != "1" || ! -d "$work/dati" ]]; then
 fi
 
 export OCTO_DATA_DIR="$work/dati"
+# Demo only: a person already signed in, without asking any organization.
+export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_MAIL_ROOT="$work/Mail"
 if [[ "${REAL:-0}" != "1" ]]; then
   export OCTO_CLAUDE_PATH="$root/demo/lib/fake-claude"
