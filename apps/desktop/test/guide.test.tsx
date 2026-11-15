@@ -28,7 +28,9 @@ describe('SetupGuide', () => {
     let step: (projectId: string, step: FeedingStep) => void = () => {}
     let changed: (projectId: string) => void = () => {}
     const api: GuideApi = {
-      feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: true, feeds: ['ado'] })),
+      feedingStatus: vi.fn(async () =>
+        ok<FeedingStatus>({ mail: true, meetings: true, feeds: ['ado'] }),
+      ),
       fill: vi.fn(async () => ok<FeedingStep[]>([])),
       onFeedingStep: (listener) => {
         step = listener
@@ -51,8 +53,8 @@ describe('SetupGuide', () => {
     const { api, changed } = fakeApi()
     render(<SetupGuide api={api} project={project} />)
 
-    // Posta and one system out of the five sources: the rows below say which.
-    expect(await screen.findByText(messages.guideLinked(2, 5))).toBeTruthy()
+    // Posta, the meetings and one system out of the six sources: the rows below say which.
+    expect(await screen.findByText(messages.guideLinked(3, 6))).toBeTruthy()
 
     act(() => changed('altro'))
     act(() => changed('p-1'))
@@ -60,9 +62,11 @@ describe('SetupGuide', () => {
   })
 
   it('says where to start when nothing is linked yet', async () => {
-    const { api } = fakeApi({ feedingStatus: async () => ok({ mail: false, feeds: [] }) })
+    const { api } = fakeApi({
+      feedingStatus: async () => ok({ mail: false, meetings: false, feeds: [] }),
+    })
     render(<SetupGuide api={api} project={project} />)
-    expect(await screen.findByText(messages.guideLinked(0, 5))).toBeTruthy()
+    expect(await screen.findByText(messages.guideLinked(0, 6))).toBeTruthy()
   })
 
   it('fills the memory from everything linked and tells each step as it ends', async () => {

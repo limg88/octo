@@ -43,6 +43,7 @@ import {
   type TodayItem,
   type TodayKind,
   trackerAgeItems,
+  unassignedMeetingItems,
   withDecision,
   withoutDecision,
 } from '@octo/domain'
@@ -52,6 +53,7 @@ import type { Deliverables } from './deliverables.ts'
 import type { Feeds } from './feeds.ts'
 import { FORECAST_FOLDER, type Forecasts } from './forecast.ts'
 import type { Hours } from './hours.ts'
+import type { Meetings } from './meetings.ts'
 import type {
   AgentProgress,
   Clock,
@@ -73,6 +75,8 @@ export type TodayDeps = {
   deliverables: Pick<Deliverables, 'list'>
   sources: Pick<Sources, 'mail'>
   feeds: Pick<Feeds, 'view'>
+  /** With the meetings, those recorded that no project could be told for wait on the page. */
+  meetings?: Pick<Meetings, 'view' | 'unassigned'>
   team: Pick<Team, 'get'>
   risks: Pick<Risks, 'register' | 'propose'>
   files: Pick<ProjectFiles, 'under' | 'readText'>
@@ -148,6 +152,8 @@ const WEEK_MS = 7 * DAY_MS
 const TREND_WEEKS = 8
 /** The signals of a project shown in the page of all the projects. */
 export const OVERVIEW_ITEMS = 3
+/** The meetings as the page of the day names their source. */
+export const MEETINGS_SOURCE = 'Riunioni (Verbale)'
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const dayOf = (instant: Date): string => instant.toISOString().slice(0, 10)
 
@@ -168,6 +174,10 @@ export function createToday(deps: TodayDeps): Today {
     const found: SourceReading[] = []
     const mail = await deps.sources.mail(project)
     if (mail.config) found.push({ source: 'Posta', state: mail.state, hasSecret: true })
+    const meetings = await deps.meetings?.view(project)
+    if (meetings?.config) {
+      found.push({ source: MEETINGS_SOURCE, state: meetings.state, hasSecret: true })
+    }
     for (const feed of FEED_NAMES) {
       const view = await deps.feeds.view(project, feed)
       if (view.config) {
@@ -255,6 +265,9 @@ export function createToday(deps: TodayDeps): Today {
       Promise.resolve(mailItems(threads, evaluation.mails, now, tomorrow)),
       Promise.resolve(meetingItems(meetingsOn(mails, today, romeDateString))),
       attempt(async () => riskItems(await deps.risks.register(project))),
+      attempt(async () =>
+        unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
+      ),
     ])
     const page = applyDecisions(groups.flat(), settings, today)
     const unjudged = threads.awaitingMe.filter((mail) => evaluation.mails[mail.id] === undefined)

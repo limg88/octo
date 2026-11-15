@@ -1,0 +1,142 @@
+// @vitest-environment jsdom
+import type { MeetingsSourceView } from '@octo/application'
+import type { Project, SourceRun } from '@octo/domain'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MeetingsSection } from '../src/renderer/MeetingsSection.tsx'
+import { dateTimeText, errorText, messages } from '../src/renderer/messages.ts'
+import type { OctoApi, Result } from '../src/shared/api.ts'
+
+const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
+const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
+const run: SourceRun = { at: '2026-11-14T10:00:00.000Z', written: 2, unchanged: 5, error: null }
+const empty: MeetingsSourceView = {
+  config: null,
+  suggestedRoot: '~/Documents/Verbale',
+  targetFolder: '_octo/riunioni',
+  state: { cursor: null, lastRun: null },
+}
+const linked: MeetingsSourceView = {
+  config: { root: '~/Documents/Verbale' },
+  suggestedRoot: null,
+  targetFolder: '_octo/riunioni',
+  state: { cursor: run.at, lastRun: run },
+}
+
+type MeetingsApi = Pick<
+  OctoApi,
+  | 'meetingsSource'
+  | 'saveMeetingsSource'
+  | 'syncMeetings'
+  | 'chooseMeetingsRoot'
+  | 'onSourcesChanged'
+>
+
+function fakeApi(overrides: Partial<MeetingsApi> = {}) {
+  let changed: (projectId: string) => void = () => {}
+  const api: MeetingsApi = {
+    meetingsSource: vi.fn(async () => ok(linked)),
+    saveMeetingsSource: vi.fn(async () => ok(linked)),
+    syncMeetings: vi.fn(async () => ok(run)),
+    chooseMeetingsRoot: vi.fn(async () => ok<string | null>('/Volumes/Riunioni')),
+    onSourcesChanged: (listener) => {
+      changed = listener
+      return () => {}
+    },
+    ...overrides,
+  }
+  return { api: api as OctoApi, changed: (projectId: string) => changed(projectId) }
+}
+
+const show = (api: OctoApi, open = true) =>
+  render(<MeetingsSection api={api} project={project} open={open} onToggle={() => {}} />)
+const rootField = () => screen.getByLabelText<HTMLInputElement>(messages.meetingsRoot)
+
+afterEach(cleanup)
+
+describe('MeetingsSection', () => {
+  it('proposes the folder Verbale uses on this computer and links it', async () => {
+    const { api } = fakeApi({ meetingsSource: vi.fn(async () => ok(empty)) })
+    show(api)
+
+    expect(await screen.findByText(messages.meetingsNotConfigured)).toBeTruthy()
+    expect(rootField().value).toBe('~/Documents/Verbale')
+    expect(screen.getByText(messages.meetingsRootFound)).toBeTruthy()
+    expect(screen.getByText(messages.meetingsTarget('_octo/riunioni'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSave }))
+
+    expect(await screen.findByText(messages.meetingsSaved)).toBeTruthy()
+    expect(api.saveMeetingsSource).toHaveBeenCalledWith('p-1', { root: '~/Documents/Verbale' })
+    expect(screen.queryByText(messages.meetingsRootFound)).toBeNull()
+  })
+
+  it('asks to choose the folder when Verbale does not tell it, from the whole computer', async () => {
+    const { api } = fakeApi({
+      meetingsSource: vi.fn(async () => ok({ ...empty, suggestedRoot: null })),
+    })
+    show(api)
+
+    expect(await screen.findByText(messages.meetingsRootMissing)).toBeTruthy()
+    const save = screen.getByRole<HTMLButtonElement>('button', { name: messages.meetingsSave })
+    expect(save.disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(messages.choosePath) }))
+
+    await waitFor(() => expect(rootField().value).toBe('/Volumes/Riunioni'))
+    expect(save.disabled).toBe(false)
+  })
+
+  it('says when it was last read, reads again on request and follows a periodic reading', async () => {
+    const { api, changed } = fakeApi()
+    show(api, false)
+
+    const last = messages.meetingsLastRun(dateTimeText(run.at), 2, 5)
+    expect(await screen.findByText(last)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSync }))
+    await waitFor(() => expect(api.syncMeetings).toHaveBeenCalledWith('p-1'))
+    await waitFor(() => expect(api.meetingsSource).toHaveBeenCalledTimes(2))
+
+    act(() => changed('altro'))
+    act(() => changed('p-1'))
+    await waitFor(() => expect(api.meetingsSource).toHaveBeenCalledTimes(3))
+  })
+
+  it('says a folder never read, one that cannot be opened and what it could not do', async () => {
+    const never = fakeApi({
+      meetingsSource: vi.fn(async () => ok({ ...linked, state: { cursor: null, lastRun: null } })),
+    })
+    show(never.api)
+    expect(await screen.findByText(messages.meetingsNever)).toBeTruthy()
+    cleanup()
+
+    const failed: SourceRun = { ...run, error: 'meetings_root_unreadable' }
+    const unreadable = fakeApi({
+      meetingsSource: vi.fn(async () =>
+        ok({ ...linked, state: { cursor: null, lastRun: failed } }),
+      ),
+      saveMeetingsSource: vi.fn(async () => ({
+        ok: false as const,
+        code: 'source_config_invalid' as const,
+      })),
+      syncMeetings: vi.fn(async () => ({ ok: false as const, code: 'source_busy' as const })),
+      chooseMeetingsRoot: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    })
+    show(unreadable.api)
+    expect(await screen.findByText(errorText('meetings_root_unreadable'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSave }))
+    expect(await screen.findByText(errorText('source_config_invalid'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSync }))
+    expect(await screen.findByText(errorText('source_busy'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(messages.choosePath) }))
+    expect(await screen.findByText(errorText('unexpected'))).toBeTruthy()
+    cleanup()
+
+    const closed = fakeApi({
+      meetingsSource: vi.fn(async () => ({
+        ok: false as const,
+        code: 'project_not_found' as const,
+      })),
+    })
+    show(closed.api)
+    expect(await screen.findByText(errorText('project_not_found'))).toBeTruthy()
+  })
+})

@@ -12,7 +12,8 @@ export type DeliverableAudience = 'client' | 'internal'
 export type DeliverableField = {
   key: string
   label: string
-  kind: 'text' | 'long' | 'date'
+  /** `meeting`: one of the meetings the project holds, or words that tell which one. */
+  kind: 'text' | 'long' | 'date' | 'meeting'
   required: boolean
   hint?: string
 }

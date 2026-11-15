@@ -698,6 +698,7 @@ describe('the sign-in', () => {
     const dwsi = { ownerEmail: 'scritto@a.mano', projectCodes: ['PRJ000101'] } as never
     const settings = memorySourceSettings({
       mail: null,
+      meetings: null,
       ado: null,
       jira: null,
       confluence: null,

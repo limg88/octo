@@ -2,17 +2,20 @@ import {
   FEED_NAMES,
   feedLabel,
   type LiveSource,
+  MEETINGS_FOLDER,
   type Project,
   type SourceState,
   TRACKER_SUMMARY_PATH,
 } from '@octo/domain'
 import type { Feeds } from './feeds.ts'
 import { NETSUITE_TIMESHEET_FOLDER, TRACKER_HOURS_FOLDER } from './hours.ts'
+import type { Meetings } from './meetings.ts'
 import type { HoursSettingsStore, ProjectFiles } from './ports.ts'
 import type { Sources } from './sources.ts'
 
 export type SourceMapDeps = {
   sources: Pick<Sources, 'mail'>
+  meetings: Pick<Meetings, 'view'>
   feeds: Pick<Feeds, 'view'>
   hours: HoursSettingsStore
   files: Pick<ProjectFiles, 'readText'>
@@ -43,6 +46,15 @@ export function createSourceMap(deps: SourceMapDeps): SourceMap {
         path: mail.config.targetFolder,
         what: 'one file per message about the project',
         readAt: readAt(mail.state),
+      })
+    }
+    const meetings = await deps.meetings.view(project)
+    if (meetings.config) {
+      live.push({
+        system: 'Meetings recorded with Verbale',
+        path: MEETINGS_FOLDER,
+        what: 'one folder per meeting: transcript.md (cite it by passage), notes.md, _meta.md with date, duration and participants',
+        readAt: readAt(meetings.state),
       })
     }
     for (const feed of FEED_NAMES) {

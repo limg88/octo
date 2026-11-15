@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { OctoApi } from '../shared/api.ts'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
+import { MeetingsSection } from './MeetingsSection.tsx'
 import { ModelsSection } from './ModelsSection.tsx'
 import { messages } from './messages.ts'
 import { SetupGuide } from './SetupGuide.tsx'
@@ -16,7 +17,7 @@ type Part = (typeof PARTS)[number]
 /** Where the arrow keys go from a part: the one before or after it, round the row. */
 const PART_STEPS: Readonly<Record<string, number>> = { ArrowRight: 1, ArrowLeft: -1 }
 /** The source whose settings are open: one at a time, so the list stays a list. */
-type Source = 'mail' | FeedName
+type Source = 'mail' | 'meetings' | FeedName
 
 /** What is set once for a project: what feeds it, who works on it, and the rest. */
 export function ProjectSettings({ api, project }: Props) {
@@ -66,6 +67,12 @@ export function ProjectSettings({ api, project }: Props) {
             project={project}
             open={open === 'mail'}
             onToggle={toggle('mail')}
+          />
+          <MeetingsSection
+            api={api}
+            project={project}
+            open={open === 'meetings'}
+            onToggle={toggle('meetings')}
           />
           {FEED_NAMES.map((feed) => (
             <FeedSection

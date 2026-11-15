@@ -5,6 +5,7 @@ import {
   type Deliverable,
   type DeliverableKind,
   type Project,
+  type StoredMeeting,
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -106,6 +107,7 @@ type DeliverablesApi = Pick<
   | 'chooseDeckModel'
   | 'removeDeckModel'
   | 'openEvidence'
+  | 'importedMeetings'
 >
 
 function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
@@ -131,6 +133,7 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
     chooseDeckModel: vi.fn(async () => ok(true)),
     removeDeckModel: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
+    importedMeetings: vi.fn(async () => ok<StoredMeeting[]>([])),
     ...overrides,
   }
   return { api: api as OctoApi, progress: (id: string, step: AgentProgress) => progress(id, step) }
@@ -389,6 +392,37 @@ describe('DeliverablesView', () => {
 
     expect(await screen.findByText(messages.deliverableInstructionsSaved)).toBeTruthy()
     expect(api.saveDeliverableInstructions).toHaveBeenCalledWith('p-1', 'verbale', 'Dai del tu.')
+  })
+
+  it('offers the meetings imported from Verbale for the minutes, or any other told in words', async () => {
+    const folder = '_octo/riunioni/2026-11-10_kickoff-aurora_ab12cd34'
+    const kickoff: StoredMeeting = {
+      id: 'ab12cd34-0000-4000-8000-000000000001',
+      title: 'Kickoff Aurora',
+      started: '2026-11-10T09:00:00.000Z',
+      minutes: 45,
+      participants: ['Anna'],
+      folder,
+    }
+    const { api } = fakeApi({ importedMeetings: vi.fn(async () => ok([kickoff])) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Verbale di riunione/ }))
+
+    const list = await screen.findByLabelText<HTMLSelectElement>(messages.meetingField.imported)
+    expect(list.options[1]?.textContent).toContain('Kickoff Aurora')
+    // Another meeting is told in words, in the field under the list.
+    const words = screen.getByRole<HTMLInputElement>('textbox', { name: /Quale riunione/ })
+    fireEvent.change(words, { target: { value: 'Standup del 13/11' } })
+    expect(words.value).toBe('Standup del 13/11')
+    fireEvent.change(list, { target: { value: folder } })
+    // Once a meeting is chosen the list is the field: there is nothing left to type.
+    expect(screen.getByRole<HTMLSelectElement>('combobox').value).toBe(folder)
+    expect(screen.queryByRole('textbox', { name: /Quale riunione/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableWrite }))
+
+    await waitFor(() =>
+      expect(api.startDeliverable).toHaveBeenCalledWith('p-1', 'verbale', { riunione: folder }),
+    )
   })
 
   it('explains a draft that failed, a change that failed and a list it cannot load', async () => {

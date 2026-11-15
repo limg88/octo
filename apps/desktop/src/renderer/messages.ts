@@ -17,6 +17,7 @@ export const messages = {
   shell: { folder: 'Cartella del progetto', project: (name: string) => `Progetto ${name}` },
   wait: {
     opening: 'Apro…',
+    assigning: 'Assegno…',
     asking: 'Chiedo…',
     writing: 'Scrivo…',
     changing: 'Modifico…',
@@ -89,6 +90,8 @@ export const messages = {
     },
     undo: 'Annulla',
     askAboutMail: 'Chiedi di questa mail',
+    assignMeeting: 'Assegna a questo progetto',
+    notThisProject: 'Non è di questo progetto',
     mailSeed: (who: string, subject: string) =>
       `Che cosa chiede ${who} nella mail «${subject}», entro quando, e che cosa serve per rispondere? Cita le fonti.`,
     showing: (shown: number, all: number) =>
@@ -172,6 +175,7 @@ export const messages = {
       draft: 'Deliverable in bozza',
       calendar: 'Calendario',
       meeting: 'Riunioni',
+      meeting_unassigned: 'Riunioni da assegnare',
       risk: 'Rischi',
       risk_candidates: 'Rischi proposti',
     },
@@ -1123,6 +1127,7 @@ export const messages = {
   guideStepFailed: (label: string) => `${label}: non riuscito.`,
   guideSources: {
     mail: 'Posta',
+    meetings: 'Riunioni (Verbale)',
     ado: 'Azure DevOps',
     jira: 'Jira',
     confluence: 'Confluence',
@@ -1148,6 +1153,27 @@ export const messages = {
   feedChoicesCodesTitle: 'Commesse di cui sei project manager (clic per aggiungere):',
   feedChoicesNoCodes:
     'In NetSuite non risulti project manager di nessuna commessa con questo indirizzo.',
+  meetingsTitle: 'Riunioni (Verbale)',
+  meetingsIntro:
+    'Octo legge la cartella in cui Verbale esporta le riunioni e porta nel progetto quelle concluse: trascrizione, appunti e riepilogo, senza audio né immagini. Una riunione entra da sola se un invito già in memoria cade alla stessa ora, o se il titolo o gli appunti nominano il progetto; le altre aspettano nella pagina «Oggi», dove le assegni tu.',
+  meetingsRoot: 'Cartella in cui Verbale esporta',
+  meetingsRootFound:
+    'È la cartella che Verbale usa su questo computer: salvala, o scegline un’altra.',
+  meetingsRootMissing: 'Non riesco a ricavare la cartella da Verbale: sceglila tu.',
+  meetingsTarget: (folder: string) =>
+    `Le riunioni vengono scritte in ${folder}, una cartella per riunione; ciò che viene saltato è annotato in _lettura.md.`,
+  meetingsSave: 'Salva',
+  meetingsSaved: 'Salvato.',
+  meetingsSync: 'Leggi ora',
+  meetingsSyncing: 'Sto leggendo le riunioni…',
+  meetingsNever: 'Mai lette.',
+  meetingsNotConfigured: 'Le riunioni di questo progetto non sono ancora collegate.',
+  meetingsLastRun: (at: string, written: number, unchanged: number) =>
+    `Ultima lettura ${at}: ${written} nuove o aggiornate, ${unchanged} invariate.`,
+  meetingField: {
+    imported: 'Riunioni importate da Verbale',
+    other: 'Un’altra riunione (la indico qui sotto)',
+  },
   documentsTitle: 'Documenti',
   documentsIntro:
     'Octo rende leggibile il testo di Word, Excel, PowerPoint e PDF della cartella, così nelle risposte può cercarlo e citarlo. Gli originali non vengono toccati.',
@@ -1260,6 +1286,9 @@ const errors: Record<ErrorCode, string> = {
   mail_archive_unreadable:
     'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo.',
   mail_reader_missing: 'Su questo sistema la lettura della posta non è ancora disponibile.',
+  meetings_root_unreadable:
+    'Non riesco ad aprire la cartella in cui Verbale esporta. Controlla in «Impostazioni» che sia quella giusta e che esista su questo computer.',
+  meeting_not_found: 'Questa riunione non è più da assegnare: forse è già in un progetto.',
   secret_missing: 'Serve la credenziale: su questo computer non ce n’è una salvata.',
   secret_store_unavailable:
     'Questo computer non offre un archivio sicuro per le credenziali: non posso salvarla.',

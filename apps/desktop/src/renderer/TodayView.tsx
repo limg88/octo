@@ -42,6 +42,7 @@ type TodayApi = Pick<
   | 'dismissRisk'
   | 'addRisk'
   | 'updateRisk'
+  | 'assignMeeting'
 >
 
 type Props = {
@@ -257,7 +258,20 @@ export function TodayView({
     if (!result.ok) setError(result.code)
   }
 
+  /** Takes into the project a recorded meeting that had none: the PM says whose it is. */
+  async function assign(key: string, meetingId: string) {
+    const projectId = project.id
+    setOpening(key)
+    setError(null)
+    const result = await api.assignMeeting(projectId, meetingId)
+    if (live.current !== projectId) return
+    setOpening((current) => (current === key ? null : current))
+    if (result.ok) show(result.value)
+    else setError(result.code)
+  }
+
   function open(item: TodayItem) {
+    if (item.facts.kind === 'meeting_unassigned') return void assign(item.key, item.facts.id)
     const section = SECTION_OF[item.target]
     const path = pathOf(item)
     if (item.facts.kind === 'bugs_stuck' && onOpenBugs) onOpenBugs('stuck')
@@ -617,6 +631,7 @@ function SignalDetail(props: DetailProps) {
   const facts = item.facts
   const asOf = asOfText(item)
   const returned = item.returned
+  const unassigned = facts.kind === 'meeting_unassigned'
   return (
     <>
       <div className="panel-head">
@@ -683,10 +698,10 @@ function SignalDetail(props: DetailProps) {
           <BusyButton
             className="primary"
             busy={props.opening}
-            busyLabel={messages.wait.opening}
+            busyLabel={unassigned ? messages.wait.assigning : messages.wait.opening}
             onClick={props.onOpen}
           >
-            {text.open[item.target]}
+            {unassigned ? text.assignMeeting : text.open[item.target]}
           </BusyButton>
           {facts.kind === 'mail_reply' && props.onAsk && (
             <button
@@ -710,7 +725,11 @@ function SignalDetail(props: DetailProps) {
             {text.later}
           </button>
           <button type="button" className="quiet" onClick={() => props.onDecide('muted')}>
-            {facts.kind === 'mail_reply' ? text.noAnswerNeeded : text.mute}
+            {facts.kind === 'mail_reply'
+              ? text.noAnswerNeeded
+              : unassigned
+                ? text.notThisProject
+                : text.mute}
           </button>
         </div>
         {props.choosingLater && (

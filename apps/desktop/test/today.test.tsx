@@ -10,11 +10,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AllProjectsView } from '../src/renderer/AllProjectsView.tsx'
 import { App } from '../src/renderer/App.tsx'
-import { messages } from '../src/renderer/messages.ts'
+import { errorText, messages } from '../src/renderer/messages.ts'
 import { RiskRegister } from '../src/renderer/RiskRegister.tsx'
 import { SignIn } from '../src/renderer/SignIn.tsx'
 import { TodayView } from '../src/renderer/TodayView.tsx'
-import { personOf, signalText } from '../src/renderer/today-text.ts'
+import { ageText, personOf, signalText } from '../src/renderer/today-text.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const aurora: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -128,6 +128,7 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
     },
     fill: vi.fn(async () => ok([])),
     openEvidence: vi.fn(async () => ok(null)),
+    assignMeeting: vi.fn(async () => ok(first)),
     risks: vi.fn(async () => ok<Register>(NO_RISKS)),
     proposeRisks: vi.fn(async () => ok<Register>(NO_RISKS)),
     acceptRisk: vi.fn(async () => ok<Register>(NO_RISKS)),
@@ -489,6 +490,17 @@ describe('the page of the day', () => {
         path: '',
       }).detail,
     ).toBe('Dove: Sala 2')
+    const waiting = item('k', 'waiting', {
+      kind: 'meeting_unassigned',
+      id: 'm-1',
+      title: 'Allineamento',
+      start: '2026-11-13T14:00:00.000Z',
+      minutes: 30,
+      days: 3,
+    })
+    expect(signalText(waiting).title).toBe('«Allineamento» è registrata ma non ha un progetto')
+    expect(signalText(waiting).detail).toContain('venerdì 13 novembre, 30 minuti')
+    expect(ageText(waiting)).toBe('da 3 giorni')
     expect(
       words({ kind: 'risk', id: 'r', title: 'Consegna stretta', since: '2026-11-16' }).detail,
     ).toContain('16/11/2026')
@@ -900,6 +912,40 @@ describe('the day as a list with its detail', () => {
     await act(async () => finish(ok(view({ items: [hours] }))))
     expect(screen.queryByText(/le ore di 3 persone/)).toBeNull()
     expect(rows()).toHaveLength(1)
+  })
+
+  it('gives a recorded meeting without a project to this one, when the PM says so', async () => {
+    const waiting = item(
+      'meeting-unassigned:m-1',
+      'waiting',
+      {
+        kind: 'meeting_unassigned',
+        id: 'm-1',
+        title: 'Allineamento',
+        start: '2026-11-13T14:00:00.000Z',
+        minutes: 30,
+        days: 3,
+      },
+      { target: 'sources' },
+    )
+    const assignMeeting = vi
+      .fn<OctoApi['assignMeeting']>()
+      .mockResolvedValueOnce({ ok: false, code: 'meeting_not_found' })
+      .mockResolvedValue(ok(view({ items: [] })))
+    const { api } = todayApi(view({ items: [waiting] }), { assignMeeting })
+    const onOpenSection = vi.fn()
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={onOpenSection} />)
+
+    const assign = await screen.findByRole('button', { name: text.assignMeeting })
+    expect(screen.getByRole('button', { name: text.notThisProject })).toBeTruthy()
+    fireEvent.click(assign)
+    expect(await screen.findByText(errorText('meeting_not_found'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.assignMeeting }))
+
+    await waitFor(() => expect(screen.queryByText(/Allineamento/)).toBeNull())
+    expect(assignMeeting).toHaveBeenCalledWith('p-1', 'm-1')
+    // The meeting is placed from the page itself: no other section is opened.
+    expect(onOpenSection).not.toHaveBeenCalled()
   })
 
   it('says that a file is being opened on the button that opens it, without changing its place', async () => {

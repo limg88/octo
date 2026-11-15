@@ -100,22 +100,35 @@ export type StoredMail = {
 
 const HEADER_LINE = /^([a-z-]+): (".*")$/
 
-/** The mail a file of the memory holds, or null when the file is not one of Octo's mails. */
-export function parseMailDocument(path: string, content: string): StoredMail | null {
+/**
+ * The `key: "value"` lines a file of the memory starts with, and the line they end at; null when
+ * the file has no such header or one of its values cannot be read.
+ */
+export function documentHeader(
+  content: string,
+): { fields: Map<string, string>; end: number; lines: string[] } | null {
   const lines = content.split('\n')
   if (lines[0] !== '---') return null
   const end = lines.indexOf('---', 1)
   if (end < 0) return null
-  const header = new Map<string, string>()
+  const fields = new Map<string, string>()
   for (const line of lines.slice(1, end)) {
     const found = HEADER_LINE.exec(line)
     if (!found) continue
     try {
-      header.set(found[1] as string, String(JSON.parse(found[2] as string)))
+      fields.set(found[1] as string, String(JSON.parse(found[2] as string)))
     } catch {
       return null
     }
   }
+  return { fields, end, lines }
+}
+
+/** The mail a file of the memory holds, or null when the file is not one of Octo's mails. */
+export function parseMailDocument(path: string, content: string): StoredMail | null {
+  const parsed = documentHeader(content)
+  if (!parsed) return null
+  const { fields: header, end, lines } = parsed
   const id = header.get('id')
   const date = header.get('data')
   if (header.get('tipo') !== 'email' || !id || !date || Number.isNaN(Date.parse(date))) return null

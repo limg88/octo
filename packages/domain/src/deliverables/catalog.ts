@@ -115,9 +115,9 @@ const minutes: DeliverableKind = {
     {
       key: 'riunione',
       label: 'Quale riunione',
-      kind: 'text',
+      kind: 'meeting',
       required: true,
-      hint: 'Titolo e data, o il nome del file della trascrizione',
+      hint: 'Una riunione importata da Verbale; oppure titolo e data, o il nome del file della trascrizione',
     },
     { key: 'note', label: 'Altro da sapere', kind: 'long', required: false },
   ],
@@ -132,6 +132,10 @@ Sections, with these headings in the language of the PM's request:
 Rules:
 - The source is the transcript or the notes of the meeting. An automatic summary made by the
   meeting tool is not a source.
+- When the meeting given is a folder under \`_octo/riunioni/\`, it is a meeting recorded with
+  Verbale and it is the main source: read its \`transcript.md\` and cite its passages;
+  \`notes.md\` holds the notes taken during the meeting; \`_meta.md\` gives date, duration and
+  participants; \`report.md\` is the automatic summary of the tool, so it is not a source.
 - Every decision and every action cites the passage it comes from.
 - An owner or a deadline is written only if it was said in the meeting; otherwise write
   "[DA CONFERMARE]" in its place.

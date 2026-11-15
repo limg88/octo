@@ -15,6 +15,7 @@ import type {
   HoursCandidates,
   HoursView,
   MailSourceView,
+  MeetingsSourceView,
   ProgressFile,
   ProgressView,
   ProjectOverview,
@@ -38,6 +39,7 @@ import type {
   HoursSettings,
   MailPreview,
   MailSourceConfig,
+  MeetingsSourceConfig,
   ModelSettings,
   OwnKindInput,
   Preferences,
@@ -50,6 +52,7 @@ import type {
   RiskState,
   SourceRun,
   SourceState,
+  StoredMeeting,
   TodayKind,
 } from '@octo/domain'
 
@@ -75,6 +78,12 @@ export const CHANNELS = {
   mailSave: 'sources:mail:save',
   mailSync: 'sources:mail:sync',
   mailPreview: 'sources:mail:preview',
+  meetingsGet: 'sources:meetings:get',
+  meetingsSave: 'sources:meetings:save',
+  meetingsSync: 'sources:meetings:sync',
+  meetingsChooseRoot: 'sources:meetings:choose-root',
+  meetingsImported: 'sources:meetings:imported',
+  meetingsAssign: 'sources:meetings:assign',
   feedChoices: 'sources:feed:choices',
   feedingStatus: 'feeding:status',
   feedingFill: 'feeding:fill',
@@ -198,6 +207,20 @@ export type OctoApi = {
   syncMail(projectId: string): Promise<Result<SourceRun>>
   /** What these rules would bring in from the mail archive, without writing anything. */
   previewMail(projectId: string, config: MailSourceConfig): Promise<Result<MailPreview>>
+  meetingsSource(projectId: string): Promise<Result<MeetingsSourceView>>
+  /** Null switches the meetings of the project off. */
+  saveMeetingsSource(
+    projectId: string,
+    config: MeetingsSourceConfig | null,
+  ): Promise<Result<MeetingsSourceView>>
+  /** Reads Verbale's folder now. A failure of the reading is in the run, not in the result. */
+  syncMeetings(projectId: string): Promise<Result<SourceRun>>
+  /** Opens the dialog of the system on the whole computer; null when the PM closes it. */
+  chooseMeetingsRoot(): Promise<Result<string | null>>
+  /** The meetings the project holds, the newest first. */
+  importedMeetings(projectId: string): Promise<Result<StoredMeeting[]>>
+  /** Takes into the project a recorded meeting that had none; gives the page of the day back. */
+  assignMeeting(projectId: string, meetingId: string): Promise<Result<TodayView>>
   /** Which sources of the project are set up. */
   feedingStatus(projectId: string): Promise<Result<FeedingStatus>>
   /** Feeds the project from everything set up, one source after the other. */

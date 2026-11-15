@@ -96,6 +96,14 @@ export type TodayFacts =
       inDays: number
     }
   | { kind: 'meeting'; subject: string; start: string; location: string; path: string }
+  | {
+      kind: 'meeting_unassigned'
+      id: string
+      title: string
+      start: string
+      minutes: number
+      days: number
+    }
   | { kind: 'risk'; id: string; title: string; since: string }
   | { kind: 'risk_candidates'; count: number }
 

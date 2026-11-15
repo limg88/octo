@@ -4,6 +4,7 @@ import type { FeedIndexes, MemoryWriter, SourceSettings, SourceStates } from '@o
 import {
   cleanFeedConfig,
   cleanMailSource,
+  cleanMeetingsSource,
   DOMAIN_ERROR_CODES,
   DomainError,
   type FeedName,
@@ -27,6 +28,8 @@ const mailSchema = z.object({
   keepQuoted: z.boolean(),
   targetFolder: z.string(),
 })
+
+const meetingsSchema = z.object({ root: z.string() })
 
 const feedBase = { since: z.string(), targetFolder: z.string() }
 const adoSchema = z.object({
@@ -61,6 +64,7 @@ const dwsiSchema = z.object({
 // A file written before a source existed simply does not name it.
 const sourcesSchema = z.object({
   mail: mailSchema.nullable().default(null),
+  meetings: meetingsSchema.nullable().default(null),
   ado: adoSchema.nullable().default(null),
   jira: jiraSchema.nullable().default(null),
   confluence: confluenceSchema.nullable().default(null),
@@ -165,9 +169,10 @@ export function createFsSourceSettings(): SourceSettings {
     async load(projectFolder): Promise<SourcesConfig> {
       const parsed = sourcesSchema.safeParse(await readJsonOr(fileOf(projectFolder), NO_SOURCES))
       if (!parsed.success) throw new DomainError('source_config_invalid', SOURCES_FILE)
-      const { mail, ado, jira, confluence, dwsi } = parsed.data
+      const { mail, meetings, ado, jira, confluence, dwsi } = parsed.data
       return {
         mail: mail ? cleanMailSource(mail) : null,
+        meetings: meetings ? cleanMeetingsSource(meetings) : null,
         ado: ado ? cleanFeedConfig('ado', ado) : null,
         jira: jira ? cleanFeedConfig('jira', jira) : null,
         confluence: confluence ? cleanFeedConfig('confluence', confluence) : null,

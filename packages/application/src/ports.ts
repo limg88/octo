@@ -25,6 +25,7 @@ import type {
   LiveSource,
   MailJudgement,
   MailMessage,
+  MeetingReading,
   ModelSettings,
   Preferences,
   ProgressSettings,
@@ -123,6 +124,28 @@ export interface MailArchive {
   read(mail: ArchivedMail): Promise<MailMessage | null>
 }
 
+/**
+ * The meetings Verbale exported on this computer, one folder each under a root the PM chose.
+ * Only read: nothing is ever written there.
+ */
+export interface MeetingExports {
+  /** The folder Verbale exports to, when this computer tells it; null when it has to be chosen. */
+  defaultRoot(): Promise<string | null>
+  /**
+   * A root in the one form it is kept and compared in: `~` for the home of who uses Octo. Two
+   * projects that read the same folder have the same root, however each was typed.
+   */
+  portable(root: string): string
+  /**
+   * Every export folder under the root, in the order of their names: a finished meeting, or one
+   * left out with its reason. Throws a DomainError `meetings_root_unreadable` when the root
+   * cannot be opened.
+   */
+  list(root: string): Promise<MeetingReading[]>
+  /** The text of a file of an export folder; null when the export has no such file. */
+  read(root: string, folder: string, file: string): Promise<string | null>
+}
+
 export type WriteOutcome = 'written' | 'unchanged'
 
 /** Writes a file of the memory inside the project folder, and nowhere else. */
@@ -147,7 +170,7 @@ export interface SourceSettings {
   suggestFeedFolder(projectFolder: string, feed: FeedName): Promise<string>
 }
 
-export type SourceName = 'mail' | 'documents' | FeedName
+export type SourceName = 'mail' | 'meetings' | 'documents' | FeedName
 
 /** What each source did last on this computer, and where its next reading starts. */
 export interface SourceStates {

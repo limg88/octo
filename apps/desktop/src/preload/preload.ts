@@ -21,6 +21,14 @@ const api: OctoApi = {
   previewMail: (projectId, config) =>
     ipcRenderer.invoke(CHANNELS.mailPreview, { projectId, config }),
   feedingStatus: (projectId) => ipcRenderer.invoke(CHANNELS.feedingStatus, { projectId }),
+  meetingsSource: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsGet, { projectId }),
+  saveMeetingsSource: (projectId, config) =>
+    ipcRenderer.invoke(CHANNELS.meetingsSave, { projectId, config }),
+  syncMeetings: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsSync, { projectId }),
+  chooseMeetingsRoot: () => ipcRenderer.invoke(CHANNELS.meetingsChooseRoot),
+  importedMeetings: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsImported, { projectId }),
+  assignMeeting: (projectId, meetingId) =>
+    ipcRenderer.invoke(CHANNELS.meetingsAssign, { projectId, meetingId }),
   fill: (projectId) => ipcRenderer.invoke(CHANNELS.feedingFill, { projectId }),
   onFeedingStep: (listener) => {
     const handler = (_event: unknown, projectId: string, step: FeedingStep) =>

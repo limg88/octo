@@ -72,8 +72,13 @@ export function keywordIn(message: MailMessage, keyword: string): boolean {
       lower(body).includes(lower(keyword))
     )
   }
-  const whole = new RegExp(`(?<![\\p{L}\\p{N}])${escaped(keyword)}(?![\\p{L}\\p{N}])`, 'iu')
-  return whole.test(body)
+  return phraseIn(body, keyword)
+}
+
+/** Whether a word or a phrase is in a text as a whole, never inside a longer word. */
+export function phraseIn(text: string, phrase: string): boolean {
+  const whole = new RegExp(`(?<![\\p{L}\\p{N}])${escaped(phrase)}(?![\\p{L}\\p{N}])`, 'iu')
+  return whole.test(text)
 }
 
 /** Whether a mail may be taken at all: not an excluded sender, not a calendar answer. */

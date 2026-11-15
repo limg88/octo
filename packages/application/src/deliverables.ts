@@ -22,6 +22,8 @@ import {
   jobPath,
   LETTERHEAD_PATH,
   type LiveSource,
+  MEETING_META_FILE,
+  MEETINGS_FOLDER,
   type ModelSettings,
   mapDeckStrings,
   OWN_KINDS_FOLDER,
@@ -29,10 +31,12 @@ import {
   ownKind,
   ownKindPath,
   type Project,
+  parseMeetingMeta,
   projectInstructionsPath,
   REGISTER_PATH,
   registerMarkdown,
   reviewTimeSince,
+  romeDateString,
   withEstimate,
   withoutMarkers,
 } from '@octo/domain'
@@ -259,11 +263,31 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     }
   }
 
+  /** The title and the day of the imported meeting the PM chose; null when none was chosen. */
+  async function meetingTitle(
+    project: Project,
+    kind: DeliverableKind,
+    inputs: Readonly<Record<string, string>>,
+  ): Promise<string | null> {
+    for (const field of kind.fields) {
+      const folder = inputs[field.key] ?? ''
+      if (field.kind !== 'meeting' || !folder.startsWith(`${MEETINGS_FOLDER}/`)) continue
+      const path = `${folder}/${MEETING_META_FILE}`
+      const meta = await deps.files.readText(project.folder, path)
+      const meeting = meta === null ? null : parseMeetingMeta(path, meta)
+      if (meeting) return `${meeting.title} · ${romeDateString(new Date(meeting.started))}`
+    }
+    return null
+  }
+
   async function start(project: Project, input: StartInput): Promise<Deliverable> {
     const kind = await kindOf(project, input.kindId)
     const inputs = cleanInputs(kind, input.inputs)
     await deps.memory.claim(project.folder)
-    const title = TITLE_FIELDS.map((key) => inputs[key]).find(Boolean) ?? kind.title
+    const title =
+      (await meetingTitle(project, kind, inputs)) ??
+      TITLE_FIELDS.map((key) => inputs[key]).find(Boolean) ??
+      kind.title
     const created: Deliverable = {
       id: deps.ids.next(),
       projectId: project.id,

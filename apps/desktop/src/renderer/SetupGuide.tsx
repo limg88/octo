@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { errorText, messages } from './messages.ts'
 
+/** The sources that are not systems of record: the mail and the meetings. */
+const LOCAL_SOURCES = 2
+
 type Props = {
   api: OctoApi
   project: Project
@@ -56,13 +59,13 @@ export function SetupGuide({ api, project }: Props) {
     setFinished(true)
   }
 
-  const linked = (status?.mail ? 1 : 0) + (status?.feeds.length ?? 0)
+  const linked = (status?.mail ? 1 : 0) + (status?.meetings ? 1 : 0) + (status?.feeds.length ?? 0)
 
   return (
     <section className="sources guide" aria-label={messages.guideTitle}>
       <h3>{messages.guideTitle}</h3>
       <p className="hint">{messages.guideIntro}</p>
-      {status && <p>{messages.guideLinked(linked, FEED_NAMES.length + 1)}</p>}
+      {status && <p>{messages.guideLinked(linked, FEED_NAMES.length + LOCAL_SOURCES)}</p>}
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}

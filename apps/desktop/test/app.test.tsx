@@ -160,6 +160,19 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       return () => {}
     },
     mailSource: vi.fn(async () => ok(mailView)),
+    meetingsSource: vi.fn(async () =>
+      ok({
+        config: null,
+        suggestedRoot: null,
+        targetFolder: '_octo/riunioni',
+        state: { cursor: null, lastRun: null },
+      }),
+    ),
+    saveMeetingsSource: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    syncMeetings: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    chooseMeetingsRoot: vi.fn(async () => ok(null)),
+    importedMeetings: vi.fn(async () => ok([])),
+    assignMeeting: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
     saveMailSource: vi.fn(async () => ok(mailView)),
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
@@ -271,7 +284,9 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     updateRisk: vi.fn(async () => ok(NO_RISKS)),
     assignment: vi.fn(async () => ok<Assignment>('unknown')),
     previewMail: vi.fn(async () => ok({ count: 0, subjects: [] })),
-    feedingStatus: vi.fn(async () => ok<FeedingStatus>({ mail: false, feeds: [] })),
+    feedingStatus: vi.fn(async () =>
+      ok<FeedingStatus>({ mail: false, meetings: false, feeds: [] }),
+    ),
     fill: vi.fn(async () => ok<FeedingStep[]>([])),
     onFeedingStep: () => () => {},
     feedChoices: vi.fn(async () => ok({ projects: [], areas: [] })),

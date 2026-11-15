@@ -17,6 +17,7 @@ import { AnswerView } from './AnswerView.tsx'
 import type { OpenSource } from './CitationPanel.tsx'
 import type { Handoff } from './context.ts'
 import { citedPaths, handoffField, handoffText } from './handoff-text.ts'
+import { MeetingField } from './MeetingField.tsx'
 import { dateText, errorText, messages, progressText } from './messages.ts'
 import { BusyButton, Waiting } from './Spinner.tsx'
 
@@ -356,7 +357,15 @@ function KindForm({
           return (
             <label key={field.key} htmlFor={id}>
               {field.label}
-              {field.kind === 'long' ? (
+              {field.kind === 'meeting' ? (
+                <MeetingField
+                  api={api}
+                  projectId={project.id}
+                  id={id}
+                  value={inputs[field.key] ?? ''}
+                  onChange={(value) => setInputs({ ...inputs, [field.key]: value })}
+                />
+              ) : field.kind === 'long' ? (
                 <textarea rows={field.key === filledField ? 10 : 3} {...control} />
               ) : (
                 <input type="text" {...control} />

@@ -15,6 +15,8 @@ export const DOMAIN_ERROR_CODES = [
   'source_busy',
   'mail_archive_unreadable',
   'mail_reader_missing',
+  'meetings_root_unreadable',
+  'meeting_not_found',
   'secret_missing',
   'secret_store_unavailable',
   'feed_credential_refused',

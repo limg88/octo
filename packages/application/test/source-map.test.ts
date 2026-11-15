@@ -4,6 +4,7 @@ import {
   type DomainErrorCode,
   type FeedName,
   type HoursSettings,
+  MEETINGS_FOLDER,
   type Project,
   type SourceState,
   TRACKER_SUMMARY_PATH,
@@ -32,6 +33,7 @@ const ado: AdoFeedConfig = {
 
 function mapWith(options: {
   mail?: boolean
+  meetings?: SourceState
   feeds?: Partial<Record<FeedName, SourceState>>
   summary?: string | null
   hours?: Partial<HoursSettings>
@@ -51,6 +53,14 @@ function mapWith(options: {
           : null,
         suggestedFolder: '_octo/posta',
         state: read('2026-11-15T07:00:00.000Z'),
+      }),
+    },
+    meetings: {
+      view: async () => ({
+        config: options.meetings ? { root: '~/Verbale' } : null,
+        suggestedRoot: null,
+        targetFolder: MEETINGS_FOLDER,
+        state: options.meetings ?? NEVER,
       }),
     },
     feeds: {
@@ -101,6 +111,13 @@ describe('what Octo reads directly for a project', () => {
     ])
     expect(live.filter((source) => source.computed).map((source) => source.path)).toEqual([
       TRACKER_SUMMARY_PATH,
+    ])
+  })
+
+  it('names the meetings recorded with Verbale, with the time of their last good reading', async () => {
+    const live = await mapWith({ meetings: read('2026-11-15T11:00:00.000Z') })(project)
+    expect(live.map((source) => [source.system, source.path, source.readAt])).toEqual([
+      ['Meetings recorded with Verbale', MEETINGS_FOLDER, '2026-11-15T11:00:00.000Z'],
     ])
   })
 

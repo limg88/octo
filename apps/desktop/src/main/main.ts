@@ -15,6 +15,7 @@ import {
   createFeeds,
   createForecasts,
   createHours,
+  createMeetings,
   createModels,
   createPreferences,
   createProgress,
@@ -49,6 +50,7 @@ import {
   createFsFolderProbe,
   createFsForecastSettings,
   createFsHoursSettings,
+  createFsMeetingExports,
   createFsMemoryWriter,
   createFsModelSettings,
   createFsProgressSettings,
@@ -86,6 +88,7 @@ const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 const LETTERHEAD_DIALOG_TITLE = 'Scegli il documento Word da usare come carta intestata'
 const DECK_MODEL_DIALOG_TITLE = 'Scegli la presentazione da usare come modello'
 const NEW_PROJECT_DIALOG_TITLE = 'Scegli dove creare la cartella del progetto'
+const MEETINGS_DIALOG_TITLE = 'Scegli la cartella in cui Verbale esporta le riunioni'
 const BACKUP_DIALOGS = {
   saveTitle: 'Scegli dove scrivere la copia di sicurezza',
   openTitle: 'Scegli la copia di sicurezza da ripristinare',
@@ -97,6 +100,8 @@ const BACKUP_DIALOGS = {
 const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 /** Points the mail reader at another Mail folder: a demo's fake archive. */
 const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
+/** Demos and tests only: a folder that stands for Verbale's own sessions on this computer. */
+const VERBALE_SESSIONS_VARIABLE = 'OCTO_VERBALE_SESSIONS'
 const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
@@ -258,6 +263,19 @@ function start(): void {
     clock,
     files,
   })
+  const verbaleSessions = process.env[VERBALE_SESSIONS_VARIABLE]
+  const meetings = createMeetings({
+    settings,
+    states: sourceStates,
+    exports: createFsMeetingExports({
+      home: homedir(),
+      ...(verbaleSessions ? { sessionsFolder: verbaleSessions } : {}),
+    }),
+    projects: () => projects.list(),
+    files,
+    writer,
+    clock,
+  })
   const devEndpoints = {
     jira: process.env[DEV_JIRA_VARIABLE],
     ado: process.env[DEV_ADO_VARIABLE],
@@ -301,8 +319,8 @@ function start(): void {
   const dashboardSettings = createFsDashboardSettings()
   const trackerExports = createFsTrackerExports()
   const window = createWindow()
-  const feeding = createFeeding({ writer, sources, feeds, documents })
-  const liveSources = createSourceMap({ sources, feeds, hours: hoursSettings, files })
+  const feeding = createFeeding({ writer, sources, meetings, feeds, documents })
+  const liveSources = createSourceMap({ sources, meetings, feeds, hours: hoursSettings, files })
   const periodic = () => void feedAll(session, projects, feeding, window)
   // At every start the sign-in kept on this computer is renewed; a demo person is simply in.
   void (demoPerson ? session.signIn() : session.resume())
@@ -359,6 +377,7 @@ function start(): void {
     deliverables,
     sources,
     feeds,
+    meetings,
     team,
     risks,
     files,
@@ -377,6 +396,7 @@ function start(): void {
     risks,
     sources,
     feeds,
+    meetings,
     documents,
     feeding,
     deliverables,
@@ -404,6 +424,7 @@ function start(): void {
     letterheadDialogTitle: LETTERHEAD_DIALOG_TITLE,
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
     newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
+    meetingsDialogTitle: MEETINGS_DIALOG_TITLE,
     team,
     trackerSnapshots: createTrackerSnapshots({
       settings: dashboardSettings,

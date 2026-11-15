@@ -33,6 +33,7 @@ export const GROUP_OF: Readonly<Record<TodayKind, TodayGroup>> = {
   draft: 'work',
   calendar: 'calendar',
   meeting: 'calendar',
+  meeting_unassigned: 'calendar',
   risk: 'risks',
   risk_candidates: 'risks',
   source: 'sources',

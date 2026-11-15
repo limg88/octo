@@ -5,6 +5,8 @@ import {
   DomainError,
   type DraftAnswer,
   MAX_REVIEW_PAUSE_MS,
+  MEETINGS_FOLDER,
+  meetingMeta,
   type Project,
   type RedTeamReport,
 } from '@octo/domain'
@@ -415,5 +417,29 @@ describe('approving a deliverable', () => {
     const all: Deliverable[] = await service.list(project)
 
     expect(all.map((deliverable) => deliverable.title)).toEqual(['Standup del 13/11', 'Collaudo'])
+  })
+
+  it('names the minutes after the imported meeting the PM chose, and hands its folder to the writer', async () => {
+    const { service, memory, requests } = setup()
+    const folder = `${MEETINGS_FOLDER}/2026-11-10_kickoff-aurora_ab12cd34`
+    const meeting = {
+      id: 'ab12cd34-0000-4000-8000-000000000001',
+      title: 'Kickoff Aurora',
+      started: '2026-11-10T09:00:00.000Z',
+      timezone: 'Europe/Rome',
+      durationSeconds: 2700,
+      participants: [],
+    }
+    await memory.write(project.folder, `${folder}/_meta.md`, meetingMeta(meeting, 'export', []))
+
+    const chosen = await service.start(project, { kindId: 'verbale', inputs: { riunione: folder } })
+    // A folder of the meetings that holds no meeting is taken as the words it is.
+    const gone = `${MEETINGS_FOLDER}/sparita`
+    const other = await service.start(project, { kindId: 'verbale', inputs: { riunione: gone } })
+
+    expect(chosen.title).toBe('Kickoff Aurora · 2026-11-10')
+    expect(requests[0]?.inputs).toEqual({ riunione: folder })
+    expect(requests[0]?.kind.instructions).toContain('_octo/riunioni/')
+    expect(other.title).toBe(gone)
   })
 })

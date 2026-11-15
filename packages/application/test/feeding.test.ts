@@ -15,6 +15,7 @@ const never = async (): Promise<never> => {
 
 function feeding(options: {
   mail: boolean
+  meetings?: boolean
   feeds: Array<'ado' | 'jira'>
   busy?: boolean
   broken?: boolean
@@ -31,6 +32,13 @@ function feeding(options: {
         calls.push('mail')
         if (options.busy) throw new DomainError('source_busy')
         return run(2)
+      },
+    },
+    meetings: {
+      configured: async () => options.meetings ?? false,
+      sync: async () => {
+        calls.push('meetings')
+        return run(3)
       },
     },
     feeds: {
@@ -71,7 +79,21 @@ describe('filling a project from all its sources', () => {
       ['documents', 1],
     ])
     expect(told).toEqual(steps)
-    expect(await service.status(project)).toEqual({ mail: true, feeds: ['ado', 'jira'] })
+    expect(await service.status(project)).toEqual({
+      mail: true,
+      meetings: false,
+      feeds: ['ado', 'jira'],
+    })
+  })
+
+  it('reads the meetings after the mail, whose invitations tell whose a meeting is', async () => {
+    const { service, calls } = feeding({ mail: true, meetings: true, feeds: ['ado'] })
+
+    const steps = await service.fill(project)
+
+    expect(calls).toEqual(['claim', 'mail', 'meetings', 'ado', 'documents'])
+    expect(steps[1]).toEqual({ source: 'meetings', run: run(3), error: null })
+    expect((await service.status(project)).meetings).toBe(true)
   })
 
   it('converts the documents even when nothing else is set up', async () => {

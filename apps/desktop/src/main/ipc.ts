@@ -14,6 +14,7 @@ import type {
   Feeds,
   Forecasts,
   Hours,
+  Meetings,
   Models,
   Progress,
   Projects,
@@ -52,6 +53,7 @@ export type IpcDeps = {
   evidence: EvidenceReader
   askQuestion: AskQuestion
   sources: Sources
+  meetings: Meetings
   documents: Documents
   feeds: Feeds
   feeding: Feeding
@@ -66,6 +68,7 @@ export type IpcDeps = {
   letterheadDialogTitle: string
   deckModelDialogTitle: string
   newProjectDialogTitle: string
+  meetingsDialogTitle: string
   backups: Backups
   models: Models
   preferences: AppPreferences
@@ -107,6 +110,11 @@ const mailConfig = z.object({
 })
 const mailSaveInput = byProject.extend({ config: mailConfig.nullable() })
 const mailPreviewInput = byProject.extend({ config: mailConfig })
+const MAX_PATH_LENGTH = 4000
+const meetingsSaveInput = byProject.extend({
+  config: z.object({ root: z.string().max(MAX_PATH_LENGTH) }).nullable(),
+})
+const meetingAssignInput = byProject.extend({ meetingId: z.string().min(1).max(MAX_RULE_LENGTH) })
 
 const MAX_SECRET_LENGTH = 4000
 const rule = z.string().max(MAX_RULE_LENGTH)
@@ -581,6 +589,40 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.mailPreview, mailPreviewInput, async ({ projectId, config }) =>
     deps.sources.previewMail(await deps.projects.get(projectId), config),
   )
+
+  handle(CHANNELS.meetingsGet, byProject, async ({ projectId }) =>
+    deps.meetings.view(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.meetingsSave, meetingsSaveInput, async ({ projectId, config }) => {
+    const view = await deps.meetings.save(await deps.projects.get(projectId), config)
+    sourcesChanged(projectId)
+    return view
+  })
+
+  handle(CHANNELS.meetingsSync, byProject, async ({ projectId }) =>
+    deps.meetings.sync(await deps.projects.get(projectId)),
+  )
+
+  // Verbale exports wherever its user chose: the folder is picked on the whole computer.
+  handle(CHANNELS.meetingsChooseRoot, none, async () => {
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.meetingsDialogTitle,
+      properties: ['openDirectory'],
+    })
+    return choice.canceled ? null : (choice.filePaths[0] ?? null)
+  })
+
+  handle(CHANNELS.meetingsImported, byProject, async ({ projectId }) =>
+    deps.meetings.imported(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.meetingsAssign, meetingAssignInput, async ({ projectId, meetingId }) => {
+    const project = await deps.projects.get(projectId)
+    await deps.meetings.assign(project, meetingId)
+    sourcesChanged(projectId)
+    return deps.today.view(project)
+  })
 
   handle(CHANNELS.feedingStatus, byProject, async ({ projectId }) =>
     deps.feeding.status(await deps.projects.get(projectId)),
