@@ -226,6 +226,13 @@ function start(): void {
     secrets,
   })
   const identity = () => session.current()
+  // The company system is read as who is signed in, by the mail address and the sign-in name.
+  // Somebody signed in without either is bound to nothing: the address of a project never
+  // stands in for a person.
+  const owner = () => {
+    const person = session.current()
+    return person === null ? null : { email: person.email, upn: person.username }
+  }
   const registry = createJsonProjectRegistry(dataFolder)
   const folders = createFsFolderProbe()
   const projects = createProjects({
@@ -260,7 +267,7 @@ function start(): void {
     states: sourceStates,
     indexes,
     secrets,
-    reader: createConnectorFeedReader({ devEndpoints }),
+    reader: createConnectorFeedReader({ devEndpoints, owner }),
     writer,
     files,
     clock,
@@ -283,7 +290,7 @@ function start(): void {
     sources: settings,
     secrets,
     tracker: createJiraHoursReader({ devEndpoints }),
-    timesheets: createWarehouseTimesheetReader(),
+    timesheets: createWarehouseTimesheetReader({ owner }),
     writer,
     clock,
     team: (project) => team.get(project),

@@ -148,6 +148,17 @@ describe('the company system read as who is signed in', () => {
     expect(seen).toEqual(['scritto@a.mano'])
   })
 
+  it('never reads as the address kept in the project when who is signed in has none', async () => {
+    const { feeds, seen } = setup({ identity: { ...paola, email: '' } })
+    expect((await feeds.view(project, 'dwsi')).config?.ownerEmail).toBe('')
+    // Nothing is saved for a person the company system cannot know.
+    await expect(feeds.save(project, 'dwsi', dwsi, 'password')).rejects.toMatchObject({
+      code: 'source_config_invalid',
+    })
+    await feeds.choices(project, 'dwsi', dwsi, 'password')
+    expect(seen).toEqual([''])
+  })
+
   it('says whether the project is the person’s, or that it cannot tell', async () => {
     const mine = setup({ assigned: ['PRJ000101', 'PRJ000303'] })
     mine.secrets.all.set('p-1/dwsi', 'password')

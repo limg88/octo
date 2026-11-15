@@ -706,6 +706,9 @@ describe('the sign-in', () => {
     let who: Identity | null = paola
     const owned = settingsOwnedBy(settings, () => who)
     expect((await owned.load('/x')).dwsi?.ownerEmail).toBe('pm@example.test')
+    // Signed in without an address: bound to nothing, never to the address kept in the project.
+    who = { ...paola, email: '' }
+    expect((await owned.load('/x')).dwsi?.ownerEmail).toBe('')
     who = null
     expect((await owned.load('/x')).dwsi?.ownerEmail).toBe('scritto@a.mano')
   })

@@ -100,9 +100,11 @@ export function settingsOwnedBy(
     ...settings,
     async load(projectFolder) {
       const config = await settings.load(projectFolder)
-      const email = identity()?.email || null
-      if (config.dwsi === null || email === null) return config
-      return { ...config, dwsi: { ...config.dwsi, ownerEmail: email } }
+      const person = identity()
+      if (config.dwsi === null || person === null) return config
+      // Somebody is signed in: the address kept in the project is never used in their place.
+      // Without an address of their own, nothing of the company system is theirs.
+      return { ...config, dwsi: { ...config.dwsi, ownerEmail: person.email } }
     },
   }
 }
@@ -110,7 +112,8 @@ export function settingsOwnedBy(
 export function createFeeds(deps: FeedsDeps): Feeds {
   const running = new Set<string>()
 
-  const ownerEmail = (): string | null => deps.identity?.()?.email || null
+  /** The address of who is signed in; null only when nobody is, never when they have none. */
+  const ownerEmail = (): string | null => deps.identity?.()?.email ?? null
 
   /**
    * The configuration as the person signed in: the reading of the company system is bound to
