@@ -40,7 +40,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 
 | Tappa | Contenuto | Criterio di uscita |
 |---|---|---|
-| **T1** | integrazione con «Verbale» per Teams; verbali; condivisione della cartella su SharePoint | due persone sullo stesso progetto; le riunioni entrano senza intervento |
+| **T1** | integrazione con «Verbale» per Teams (fatta: le riunioni esportate da Verbale entrano nel progetto, demo 25); verbali (fatti: il deliverable «verbale» parte dalla riunione importata); condivisione della cartella su SharePoint (da fare) | due persone sullo stesso progetto; le riunioni entrano senza intervento |
 | **T2** | cruscotto economico; server del distillato; deleghe del project manager su una commessa (`docs/identita-e-login.md`) | i numeri coincidono con NetSuite; una domanda su 3 progetti con risposta citata |
 | **T3** | aggiornamento automatico; 3-5 PM | metriche dei 90 giorni raggiunte |
 
@@ -53,13 +53,14 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 
 ## Stato
 
-| Fetta | Stato |
+| Fetta o tappa | Stato |
 |---|---|
 | F1 | codice chiuso il 14/11/2026, demo `demo/01-app-e-chiedi`. Provata su DEEM con cinque domande reali a confronto con la Suite v0: alla pari o meglio sul contenuto della cartella, indietro su tutto ciò che viene dalla posta. Da verificare sul PC Windows del pilota |
 | F2 | in corso. Posta da Mail su Mac: fatta il 14/11/2026, demo `demo/02-posta`. Documenti Office e PDF convertiti in testo: fatti il 14/11/2026, demo `demo/03-documenti`. Azure DevOps, Jira e NetSuite/DWSI: fatti il 14/11/2026, demo `demo/04-sistemi`. Resta: posta su Windows. Criterio di uscita (tre giorni senza alimentare DEEM a mano) da verificare sui sistemi reali |
 | F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
 | F4 | codice chiuso il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale, stima), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Aggiunti stima, registro e carta intestata. Criterio di uscita da verificare su due deliverable reali |
 | F5 | in corso. Fatti il 14/11/2026: tipi di deliverable definiti dal PM a parole. Non fattibile oggi: i connettori del PM dentro Chiedi (vedi sotto). Fatti poi: Excel e PowerPoint su modello (previsionale, modulo di avanzamento, presentazione: demo 09, 10, 11) e la cartella di un progetto nuovo creata da Octo con un posto per contratti, documenti, riunioni e tracker (demo 14). Restano le prove su un progetto vero |
+| T1 | in corso. Riunioni da Verbale: fatte il 16/11/2026, demo `demo/25-riunioni-verbale` (fonte «Riunioni (Verbale)», assegnazione al progetto per invito o parole chiave, altrimenti segnalazione in «Oggi»; verbale dalla riunione scelta). Limiti e richieste per Verbale in `docs/verbale-richieste.md`. Restano: condivisione della cartella su SharePoint e la prova con due persone sullo stesso progetto. Criterio «le riunioni entrano senza intervento» da verificare su riunioni vere |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:

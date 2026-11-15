@@ -1,6 +1,6 @@
 // Stands in for the Claude Code executable in tests. The question, read from standard input,
 // chooses the behaviour; the events have the shape of `claude -p --output-format stream-json`.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -248,6 +248,29 @@ if (args.join(' ').includes('Write an estimate of effort in days')) {
   process.exit(0)
 }
 
+const MEETINGS_FOLDER = '_octo/riunioni'
+
+/**
+ * The first passage of the transcript of a meeting of the memory: the one whose folder the
+ * request names or, for a question marked `#riunione`, the first the project holds.
+ */
+function meetingPassage(request) {
+  try {
+    const named = /_octo\/riunioni\/([^\s"/]+)/.exec(request)?.[1]
+    const folder =
+      named ??
+      (request.includes('#riunione')
+        ? readdirSync(join(process.cwd(), MEETINGS_FOLDER)).find((name) => !name.startsWith('_'))
+        : undefined)
+    if (!folder) return null
+    const path = `${MEETINGS_FOLDER}/${folder}/transcript.md`
+    const said = /\*\*: (.+)/.exec(readFileSync(join(process.cwd(), path), 'utf8'))?.[1]
+    return said ? { path, quote: said.trim() } : null
+  } catch {
+    return null
+  }
+}
+
 console.log('not json at all')
 
 if (question.includes('#lento')) {
@@ -264,6 +287,11 @@ if (question.includes('#lento')) {
 } else if (question.includes('#forma')) {
   emit({ type: 'result', is_error: false, structured_output: { text: 42 } })
 } else {
+  const passage = meetingPassage(question)
+  if (passage) {
+    answer.text = `In riunione è stato detto: «${passage.quote}» [1].`
+    answer.citations = [{ n: 1, ...passage }]
+  }
   toolUse('Grep', { pattern: 'consegna' })
   toolUse('Glob', { pattern: '**/*.md' })
   toolUse('Read', { file_path: join(process.cwd(), 'wiki', 'stato.md') })
