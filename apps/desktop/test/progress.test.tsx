@@ -105,19 +105,32 @@ afterEach(cleanup)
 
 describe('what the PM types for a progress request', () => {
   it('reads positions, the map of the form and its table, and writes them back', () => {
-    const positions = positionsOf('00001; 100.000,50\n\nsenza importo\n; 5\n00002; 60000')
-    expect(positions).toEqual([
+    const positions = positionsOf(
+      '00001; 100.000,50\n\nsenza importo\n; 5\n00002; 60000\n00003; mille\n00004; 1; 2',
+    )
+    expect(positions.values).toEqual([
       { code: '00001', amount: 100000.5 },
       { code: '00002', amount: 60000 },
     ])
-    expect(positionLines(positions)).toBe('00001; 100000,5\n00002; 60000')
-    const fields = fieldsOf('D2 = {n}\nA10 = Oggetto = DEEM\nsenza uguale')
-    expect(fields).toEqual([
+    // A line that is not a position is never dropped in silence: it is told, with its place.
+    expect(positions.problems).toEqual([
+      { line: 3, text: 'senza importo', reason: 'shape' },
+      { line: 4, text: '; 5', reason: 'shape' },
+      { line: 6, text: '00003; mille', reason: 'amount' },
+      { line: 7, text: '00004; 1; 2', reason: 'shape' },
+    ])
+    expect(positionLines(positions.values)).toBe('00001; 100000,5\n00002; 60000')
+    const fields = fieldsOf('d2 = {n}\nA10 = Oggetto = DEEM\nsenza uguale\nNumero = 5')
+    expect(fields.values).toEqual([
       { ref: 'D2', text: '{n}' },
       { ref: 'A10', text: 'Oggetto = DEEM' },
     ])
-    expect(fieldLines(fields)).toBe('D2 = {n}\nA10 = Oggetto = DEEM')
-    const table = tableOf('14; 6; A; B; C; D')
+    expect(fields.problems).toEqual([
+      { line: 3, text: 'senza uguale', reason: 'shape' },
+      { line: 4, text: 'Numero = 5', reason: 'cell' },
+    ])
+    expect(fieldLines(fields.values)).toBe('D2 = {n}\nA10 = Oggetto = DEEM')
+    const table = tableOf('14; 6; a; B; C; D').values[0] ?? null
     expect(table).toEqual({
       firstRow: 14,
       rows: 6,
@@ -127,7 +140,14 @@ describe('what the PM types for a progress request', () => {
       period: 'D',
     })
     expect(tableLine(table)).toBe('14; 6; A; B; C; D')
-    expect(tableOf('14; 6; A')).toBeNull()
+    expect(tableOf('').values).toEqual([])
+    expect(tableOf('').problems).toEqual([])
+    for (const wrong of ['14; 6; A', 'x; 6; A; B; C; D', '14; 6; A; B; C; 4', '0; 6; A; B; C; D']) {
+      expect(tableOf(wrong)).toEqual({
+        values: [],
+        problems: [{ line: 1, text: wrong, reason: 'shape' }],
+      })
+    }
     expect(tableLine(null)).toBe('')
     expect(listOf(' 1, ,2 ')).toEqual(['1', '2'])
   })
@@ -232,6 +252,22 @@ describe('progress requests', () => {
     fill(1, text.note, 'Fattura 1')
     fill(2, text.amount, 'abc')
     fill(3, text.amount, '300')
+    // Nothing is saved while something typed is not understood: each problem is under its field.
+    type(text.total, 'mille')
+    type(text.positions, '1; 600\n2; 400\npippo')
+    type(text.fields, 'senza uguale')
+    type(text.table, '14; 6')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(api.saveProgressSettings).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('alert')).toHaveLength(5)
+    expect(
+      screen.getByText(messages.lines.line(3, 'pippo', 'shape', text.shapes.positions)),
+    ).toBeTruthy()
+    expect(screen.getByText(messages.lines.single.shape(text.shapes.table))).toBeTruthy()
+    expect(screen.getAllByText(messages.lines.single.amount())).toHaveLength(2)
+    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
+    type(text.total, '1.000')
+    type(text.positions, '1; 600\n2; 400')
     fill(3, text.requestPositions, '2, 1')
     fireEvent.click(screen.getByRole('button', { name: text.removeRequest(2) }))
     // The request added after the first one starts where that one ends.
@@ -242,6 +278,7 @@ describe('progress requests', () => {
     type(text.table, '14; 6; A; B; C; D')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveProgressSettings).toHaveBeenCalled())
+    expect(screen.queryByRole('status')).toBeNull()
     expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', {
       modelPath: 'Moduli/Richiesta SAL.xlsx',
       order: 'ORD-77',

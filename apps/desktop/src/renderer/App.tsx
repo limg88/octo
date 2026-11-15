@@ -251,9 +251,9 @@ export function App({ api }: Props) {
             ) : tab === 'deliverables' ? (
               <DeliverablesView api={api} project={selected} />
             ) : tab === 'dashboard' ? (
-              <DashboardView api={api} project={selected} />
+              <DashboardView api={api} project={selected} onOpenSources={() => setTab('sources')} />
             ) : tab === 'hours' ? (
-              <HoursView api={api} project={selected} />
+              <HoursView api={api} project={selected} onOpenSources={() => setTab('sources')} />
             ) : tab === 'forecast' ? (
               <ForecastView api={api} project={selected} />
             ) : tab === 'progress' ? (

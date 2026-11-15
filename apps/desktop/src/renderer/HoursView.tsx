@@ -2,7 +2,10 @@ import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { LineProblems } from './LineProblems.tsx'
+import { type LineProblem, type Lines, readLines } from './lines.ts'
 import { dateText, dateTimeText, errorText, messages } from './messages.ts'
+import { Unlinked } from './Unlinked.tsx'
 
 type HoursApi = Pick<
   OctoApi,
@@ -19,6 +22,8 @@ type Props = {
   project: Project
   /** The present moment; a test passes its own. */
   now?: () => Date
+  /** Takes the PM to where the systems are linked. */
+  onOpenSources?: () => void
 }
 
 const text = messages.hours
@@ -46,7 +51,7 @@ export function monthPeriod(month: string): HoursPeriod | null {
 }
 
 /** Timesheet hours against the hours logged on the tracker, computed by the app. */
-export function HoursView({ api, project, now = () => new Date() }: Props) {
+export function HoursView({ api, project, now = () => new Date(), onOpenSources }: Props) {
   const [settings, setSettings] = useState<HoursSettings | null>(null)
   const [candidates, setCandidates] = useState<HoursCandidates>(NO_CANDIDATES)
   const [view, setView] = useState<View | null>(null)
@@ -56,6 +61,8 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
   const [run, setRun] = useState<TrackerHoursRun | null>(null)
   const [readingTimesheets, setReadingTimesheets] = useState(false)
   const [timesheetRun, setTimesheetRun] = useState<TrackerHoursRun | null>(null)
+  /** The system a reading asked for and that is not linked yet. */
+  const [unlinked, setUnlinked] = useState<'netsuite' | 'jira' | null>(null)
 
   const ready = (candidate: HoursSettings) =>
     candidate.timesheetPath !== '' && candidate.worklogPath !== ''
@@ -96,8 +103,10 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
     setReadingTimesheets(true)
     setError(null)
     setTimesheetRun(null)
+    setUnlinked(null)
     const result = await api.readTimesheets(project.id, period)
     setReadingTimesheets(false)
+    if (!result.ok && result.code === 'source_not_configured') return setUnlinked('netsuite')
     if (!result.ok) return setError(result.code)
     setTimesheetRun(result.value)
     // The reading points the comparison at the timesheets it wrote: the settings are read again.
@@ -115,6 +124,9 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
         <p className="progress" role="status">
           {text.readingTimesheets}
         </p>
+      )}
+      {unlinked === 'netsuite' && (
+        <Unlinked text={text.netsuiteUnlinked} onOpenSources={onOpenSources} />
       )}
       {timesheetRun && (
         <p className="badge badge-ok">
@@ -137,8 +149,10 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
     setReading(true)
     setError(null)
     setRun(null)
+    setUnlinked(null)
     const result = await api.readTrackerHours(project.id, period)
     setReading(false)
+    if (!result.ok && result.code === 'source_not_configured') return setUnlinked('jira')
     if (!result.ok) return setError(result.code)
     setRun(result.value)
     // The reading points the comparison at the hours it wrote: the settings are read again.
@@ -157,6 +171,7 @@ export function HoursView({ api, project, now = () => new Date() }: Props) {
           {text.readingTracker}
         </p>
       )}
+      {unlinked === 'jira' && <Unlinked text={text.jiraUnlinked} onOpenSources={onOpenSources} />}
       {run && (
         <p className="badge badge-ok">
           {text.trackerRead(run.entries, run.months.join(', '), dateTimeText(run.at))}
@@ -369,10 +384,14 @@ const aliasLines = (settings: HoursSettings): string =>
   settings.aliases
     .map((alias) => `${alias.worklog} ${ALIAS_SEPARATOR} ${alias.timesheet}`)
     .join('\n')
-const aliasesOf = (lines: string): HoursSettings['aliases'] =>
-  lines.split('\n').flatMap((line) => {
-    const [worklog, timesheet] = line.split(ALIAS_SEPARATOR)
-    return worklog && timesheet ? [{ worklog: worklog.trim(), timesheet: timesheet.trim() }] : []
+/** `name on the tracker = name in the timesheet` per line. */
+export const aliasesOf = (lines: string): Lines<HoursSettings['aliases'][number]> =>
+  readLines(lines, (line) => {
+    const [worklog = '', timesheet = '', ...rest] = line
+      .split(ALIAS_SEPARATOR)
+      .map((name) => name.trim())
+    if (worklog === '' || timesheet === '' || rest.length > 0) return { reason: 'shape' }
+    return { value: { worklog, timesheet } }
   })
 
 type Draft = {
@@ -409,6 +428,7 @@ function SettingsForm({
   onSave: (settings: HoursSettings) => Promise<void>
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
+  const [unread, setUnread] = useState<LineProblem[]>([])
   useEffect(() => setDraft(draftOf(settings)), [settings])
   // The only place found is proposed without asking.
   useEffect(() => {
@@ -450,6 +470,9 @@ function SettingsForm({
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
+        const aliases = aliasesOf(draft.aliases)
+        setUnread(aliases.problems)
+        if (aliases.problems.length > 0) return
         void onSave({
           timesheetPath: draft.timesheetPath,
           worklogPath: draft.worklogPath,
@@ -458,7 +481,7 @@ function SettingsForm({
           cutoff: draft.cutoff,
           noWorklogExpected: listOf(draft.noWorklogExpected),
           noTimesheetExpected: listOf(draft.noTimesheetExpected),
-          aliases: aliasesOf(draft.aliases),
+          aliases: aliases.values,
         })
       }}
     >
@@ -485,6 +508,7 @@ function SettingsForm({
           }}
         />
       </label>
+      <LineProblems problems={unread} shape={text.shapes.aliases} />
       <div className="actions">
         <button
           type="submit"
@@ -492,6 +516,14 @@ function SettingsForm({
         >
           {text.save}
         </button>
+        {(draft.timesheetPath.trim() === '' || draft.worklogPath.trim() === '') && (
+          <span className="hint">{text.saveNeeds}</span>
+        )}
+        {unread.length > 0 && (
+          <span className="field-problems" role="status">
+            {messages.lines.notSaved}
+          </span>
+        )}
       </div>
     </form>
   )

@@ -50,7 +50,7 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
    Dimostra: non serve più esportare a mano; Octo legge con il tuo token di sola lettura, tiene solo persona, giorno, ore e issue, e non scrive su Jira.
 
 10. **Chiedi i timesheet a NetSuite.** Sempre in «Ore» premi «Leggi i timesheet da NetSuite».
-    Atteso: «Questa fonte non è ancora configurata.» Nella demo NetSuite non c'è: serve un database, e la lettura vera è provata dai test contro un database di prova.
+    Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.» Nella demo NetSuite non c'è: serve un database, e la lettura vera è provata dai test contro un database di prova.
     Dimostra: con NetSuite collegato in «Fonti» lo stesso pulsante legge le ore delle commesse per i mesi del periodo, le scrive in `_octo/ore/netsuite/timesheet_<mese>.json` e il confronto parte da lì, senza file esportati a mano. Di ogni riga restano persona, giorno, ore, commessa e stato di approvazione: mai il costo.
 
 10. **Controlla dove sono le scelte.** Nel terminale:

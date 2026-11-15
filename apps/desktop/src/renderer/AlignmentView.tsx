@@ -2,6 +2,8 @@ import type { AlignmentFile, AlignmentView as View } from '@octo/application'
 import type { AlignedPair, AlignmentSettings, Project, StateGroup } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { LineProblems } from './LineProblems.tsx'
+import { type LineProblem, type Lines, readLines } from './lines.ts'
 import { dateText, errorText, messages } from './messages.ts'
 import { listOf, listText } from './progress-text.ts'
 
@@ -21,12 +23,13 @@ const GROUP_NAME_SEPARATOR = ':'
 const GROUP_SIDES_SEPARATOR = '='
 
 /** `name: client states = ticket states`, one group per line. */
-export function stateGroupsOf(typed: string): StateGroup[] {
-  return typed.split('\n').flatMap((line) => {
+export function stateGroupsOf(typed: string): Lines<StateGroup> {
+  return readLines(typed, (line) => {
     const at = line.indexOf(GROUP_NAME_SEPARATOR)
-    const [item = '', ticket = ''] = line.slice(at + 1).split(GROUP_SIDES_SEPARATOR)
-    if (at < 0 || ticket === '') return []
-    return [{ name: line.slice(0, at).trim(), item: listOf(item), ticket: listOf(ticket) }]
+    const [item = '', ticket = '', ...rest] = line.slice(at + 1).split(GROUP_SIDES_SEPARATOR)
+    const group = { name: line.slice(0, at).trim(), item: listOf(item), ticket: listOf(ticket) }
+    const whole = at > 0 && rest.length === 0 && group.item.length > 0 && group.ticket.length > 0
+    return whole ? { value: group } : { reason: 'shape' }
   })
 }
 
@@ -346,6 +349,7 @@ function SettingsForm({
   onSave: (settings: AlignmentSettings) => Promise<void>
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
+  const [unread, setUnread] = useState<LineProblem[]>([])
   useEffect(() => setDraft(draftOf(settings)), [settings])
   const set = (name: keyof Draft, value: string) =>
     setDraft((current) => ({ ...current, [name]: value }))
@@ -372,6 +376,9 @@ function SettingsForm({
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
+        const stateGroups = stateGroupsOf(draft.stateGroups)
+        setUnread(stateGroups.problems)
+        if (stateGroups.problems.length > 0) return
         void onSave({
           ...settings,
           sprint: draft.sprint,
@@ -380,7 +387,7 @@ function SettingsForm({
           exportPath: draft.exportPath,
           ticketFolder: draft.ticketFolder,
           referencePrefixes: listOf(draft.referencePrefixes),
-          stateGroups: stateGroupsOf(draft.stateGroups),
+          stateGroups: stateGroups.values,
         })
       }}
     >
@@ -395,6 +402,7 @@ function SettingsForm({
           onChange={(event) => set('stateGroups', event.target.value)}
         />
       </label>
+      <LineProblems problems={unread} shape={text.shapes.stateGroups} />
       <p className="hint">{text.stateGroupsHint}</p>
       {input('exportPath', text.exportPath)}
       {input('ticketFolder', text.ticketFolder)}
@@ -402,6 +410,12 @@ function SettingsForm({
         <button type="submit" disabled={draft.sprint.trim() === ''}>
           {text.save}
         </button>
+        {draft.sprint.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
+        {unread.length > 0 && (
+          <span className="field-problems" role="status">
+            {messages.lines.notSaved}
+          </span>
+        )}
       </div>
     </form>
   )

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Demo 20: a line that is not understood is told under its field, and errors say what to do.
+# KEEP=1 keeps the project and the app state of a previous run.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+work="$root/.tmp/demo-20"
+source "$root/demo/lib/project.sh"
+
+cd "$root"
+pnpm install --frozen-lockfile >/dev/null
+pnpm build >/dev/null
+if [[ "${KEEP:-0}" != "1" || ! -d "$work/dati" ]]; then
+  make_demo_project "$work"
+  node demo/lib/fake-progress.ts "$work/Aurora"
+fi
+
+export OCTO_DATA_DIR="$work/dati"
+export OCTO_MAIL_ROOT="$work/Mail-assente"
+export OCTO_CLAUDE_PATH="$root/demo/lib/fake-claude"
+
+echo "Progetto di prova: $work/Aurora"
+echo "Apro Octo: segui demo/20-righe-ed-errori/COPIONE.md. Chiudi la finestra per finire."
+pnpm --filter @octo/desktop exec electron .

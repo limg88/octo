@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import {
-  amountOf,
+  amountField,
   amountText,
   externalLines,
   externalRateLines,
@@ -19,6 +19,8 @@ import {
   rateLines,
   ratesOf,
 } from './forecast-text.ts'
+import { LineProblems } from './LineProblems.tsx'
+import { type Lines, noProblems } from './lines.ts'
 import { errorText, messages } from './messages.ts'
 
 type ForecastApi = Pick<
@@ -312,21 +314,27 @@ function InputsForm({
   onSave: (inputs: ForecastRowInputs) => Promise<void>
 }) {
   const [draft, setDraft] = useState<InputsDraft>(() => inputsDraft(inputs))
+  const [unread, setUnread] = useState<Partial<
+    Record<AmountField | 'externals', Lines<unknown>>
+  > | null>(null)
   useEffect(() => setDraft(inputsDraft(inputs)), [inputs])
 
   const amount = (name: AmountField, label: string) => (
-    <label>
-      {label}
-      <input
-        type="text"
-        inputMode="decimal"
-        value={draft[name]}
-        onChange={(event) => {
-          const { value } = event.target
-          setDraft((current) => ({ ...current, [name]: value }))
-        }}
-      />
-    </label>
+    <>
+      <label>
+        {label}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft[name]}
+          onChange={(event) => {
+            const { value } = event.target
+            setDraft((current) => ({ ...current, [name]: value }))
+          }}
+        />
+      </label>
+      <LineProblems problems={unread?.[name]?.problems ?? []} shape="" single />
+    </>
   )
 
   return (
@@ -335,12 +343,22 @@ function InputsForm({
       aria-label={text.inputsTitle(code)}
       onSubmit={(event) => {
         event.preventDefault()
-        void onSave({
+        const read = {
           externals: externalsOf(draft.externals),
-          toInvoice: amountOf(draft.toInvoice),
-          revenue: amountOf(draft.revenue),
-          budgetCosts: amountOf(draft.budgetCosts),
-          totalCosts: amountOf(draft.totalCosts),
+          toInvoice: amountField(draft.toInvoice),
+          revenue: amountField(draft.revenue),
+          budgetCosts: amountField(draft.budgetCosts),
+          totalCosts: amountField(draft.totalCosts),
+        }
+        // A figure that is not understood is told: saved as empty, it would change the forecast.
+        if (!noProblems(...Object.values(read))) return setUnread(read)
+        setUnread(null)
+        void onSave({
+          externals: read.externals.values,
+          toInvoice: read.toInvoice.values[0] ?? null,
+          revenue: read.revenue.values[0] ?? null,
+          budgetCosts: read.budgetCosts.values[0] ?? null,
+          totalCosts: read.totalCosts.values[0] ?? null,
           totalCostsBeforeMonth: draft.totalCostsBeforeMonth,
           note: draft.note,
         })
@@ -356,6 +374,7 @@ function InputsForm({
           }}
         />
       </label>
+      <LineProblems problems={unread?.externals?.problems ?? []} shape={text.shapes.externals} />
       {amount('toInvoice', text.toInvoice)}
       {amount('revenue', text.revenue)}
       {amount('budgetCosts', text.budgetCosts)}
@@ -384,6 +403,11 @@ function InputsForm({
       </label>
       <div className="actions">
         <button type="submit">{text.saveInputs}</button>
+        {unread && (
+          <span className="field-problems" role="status">
+            {messages.lines.notSaved}
+          </span>
+        )}
       </div>
     </form>
   )
@@ -408,6 +432,10 @@ function SettingsForm({
   onSave: (settings: ForecastSettings) => Promise<void>
 }) {
   const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraft(settings))
+  const [unread, setUnread] = useState<{
+    rates: Lines<unknown>
+    externals: Lines<unknown>
+  } | null>(null)
   useEffect(() => setDraft(settingsDraft(settings)), [settings])
   // The only model found is proposed without asking.
   useEffect(() => {
@@ -422,12 +450,15 @@ function SettingsForm({
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
+        const read = { rates: ratesOf(draft.rates), externals: externalRatesOf(draft.externals) }
+        if (!noProblems(read.rates, read.externals)) return setUnread(read)
+        setUnread(null)
         void onSave({
           ...settings,
           modelPath: draft.modelPath,
           hoursPerDay: Number(draft.hoursPerDay),
-          rates: ratesOf(draft.rates),
-          externals: externalRatesOf(draft.externals),
+          rates: read.rates.values,
+          externals: read.externals.values,
         })
       }}
     >
@@ -471,6 +502,7 @@ function SettingsForm({
           }}
         />
       </label>
+      <LineProblems problems={unread?.rates.problems ?? []} shape={text.shapes.rates} />
       <p className="hint">{text.ratesHint}</p>
       <label>
         {text.externalRates}
@@ -482,11 +514,18 @@ function SettingsForm({
           }}
         />
       </label>
+      <LineProblems problems={unread?.externals.problems ?? []} shape={text.shapes.externalRates} />
       <p className="hint">{text.externalRatesHint}</p>
       <div className="actions">
         <button type="submit" disabled={draft.modelPath.trim() === ''}>
           {text.save}
         </button>
+        {draft.modelPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
+        {unread && (
+          <span className="field-problems" role="status">
+            {messages.lines.notSaved}
+          </span>
+        )}
       </div>
     </form>
   )

@@ -190,6 +190,17 @@ describe('hours', () => {
       target: { value: 'anna.b = Bianchi Anna\nriga senza segno' },
     })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
+    // The line that is not a pair of names is told, and nothing is saved until it is right.
+    expect(
+      await screen.findByText(
+        messages.lines.line(2, 'riga senza segno', 'shape', text.shapes.aliases),
+      ),
+    ).toBeTruthy()
+    expect(api.saveHoursSettings).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText(text.aliases), {
+      target: { value: 'anna.b = Bianchi Anna' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalled())
     expect(vi.mocked(api.saveHoursSettings).mock.calls[0]?.[1]).toMatchObject({
       timesheetPath: 'ore/Timesheets',
@@ -255,6 +266,19 @@ describe('hours', () => {
     expect(api.readTimesheets).toHaveBeenLastCalledWith('p-1', JUNE)
     // The comparison is computed from what was read.
     expect(await screen.findByText('Bianchi Anna')).toBeTruthy()
+  })
+
+  it('names the system that is not linked and takes the PM to the sources', async () => {
+    const unlinked = async () => ({ ok: false as const, code: 'source_not_configured' as const })
+    const api = fakeApi({ readTimesheets: unlinked, readTrackerHours: unlinked })
+    const onOpenSources = vi.fn()
+    render(<HoursView api={api} project={project} now={now} onOpenSources={onOpenSources} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.readTimesheets }))
+    expect((await screen.findByRole('alert')).textContent).toContain(text.netsuiteUnlinked)
+    fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(text.jiraUnlinked))
+    fireEvent.click(screen.getByRole('button', { name: messages.openSources }))
+    expect(onOpenSources).toHaveBeenCalledTimes(1)
   })
 
   it('says when the numbers cannot be used and explains a failure', async () => {

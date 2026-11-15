@@ -1351,3 +1351,16 @@ fieldset > button {
 .kind-card .actions {
   flex-wrap: wrap;
 }
+
+/* Under a field: what in it was not understood. */
+.field-problems {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}

@@ -11,6 +11,7 @@ import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
 import { dateText, dateTimeText, errorText, messages } from './messages.ts'
 import { TrendChart } from './TrendChart.tsx'
+import { Unlinked } from './Unlinked.tsx'
 
 type DashboardApi = Pick<
   OctoApi,
@@ -26,6 +27,8 @@ type Props = {
   project: Project
   /** The present moment; a test passes its own. */
   now?: () => Date
+  /** Takes the PM to where the systems are linked. */
+  onOpenSources?: () => void
 }
 
 const text = messages.dashboard
@@ -33,7 +36,7 @@ const DEFAULT_PRESET: RangePreset = 'w8'
 const NO_CANDIDATES: ExportCandidates = { exports: [], histories: [] }
 
 /** Bugs and requirements of the project, computed by the app from the tracker export. */
-export function DashboardView({ api, project, now = () => new Date() }: Props) {
+export function DashboardView({ api, project, now = () => new Date(), onOpenSources }: Props) {
   const [settings, setSettings] = useState<DashboardSettings | null>(null)
   const [candidates, setCandidates] = useState<ExportCandidates>(NO_CANDIDATES)
   const [view, setView] = useState<View | null>(null)
@@ -78,12 +81,17 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
     if (result.value.exportPath !== '') await loadView(range)
   }
 
+  /** The reading was asked while Azure DevOps is not linked. */
+  const [unlinked, setUnlinked] = useState(false)
+
   async function readTracker() {
     setReading(true)
     setError(null)
     setRun(null)
+    setUnlinked(false)
     const result = await api.readTrackerSnapshot(project.id)
     setReading(false)
+    if (!result.ok && result.code === 'source_not_configured') return setUnlinked(true)
     if (!result.ok) return setError(result.code)
     setRun(result.value)
     // The reading points the dashboard at the file it wrote: the settings are read again.
@@ -102,6 +110,7 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
           {text.readingTracker}
         </p>
       )}
+      {unlinked && <Unlinked text={text.adoUnlinked} onOpenSources={onOpenSources} />}
       {run && (
         <p className="badge badge-ok">
           {text.trackerRead(run.items, run.withHistory, dateTimeText(run.at))}

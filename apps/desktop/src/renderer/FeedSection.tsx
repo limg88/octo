@@ -20,7 +20,7 @@ type Props = {
 
 type FieldKey = keyof typeof messages.feedFields
 type FieldKind = 'text' | 'list' | 'number' | 'date' | 'tls'
-type Field = { key: FieldKey; kind: FieldKind; initial?: string }
+type Field = { key: FieldKey; kind: FieldKind; initial?: string; optional?: true }
 /** What the PM types, as text: lists are one item per line. */
 type Form = Partial<Record<FieldKey, string>>
 
@@ -34,7 +34,7 @@ const FIELDS: Readonly<Record<FeedName, Field[]>> = {
   ado: [
     { key: 'organization', kind: 'text' },
     { key: 'project', kind: 'text' },
-    { key: 'areas', kind: 'list' },
+    { key: 'areas', kind: 'list', optional: true },
   ],
   jira: [
     { key: 'site', kind: 'text' },
@@ -54,6 +54,7 @@ const FIELDS: Readonly<Record<FeedName, Field[]>> = {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const DEFAULT_DAYS_BACK = 30
+const NOTHING_MISSING = { fields: [], secret: false }
 const systemNow = (): Date => new Date()
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 const fieldsOf = (feed: FeedName): Field[] => [...FIELDS[feed], ...SHARED]
@@ -96,6 +97,8 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
   const [saved, setSaved] = useState(false)
   const [choices, setChoices] = useState<FeedChoices | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
+  /** What the last attempt to save found empty. */
+  const [missing, setMissing] = useState<{ fields: FieldKey[]; secret: boolean }>(NOTHING_MISSING)
 
   const show = useCallback(
     (next: FeedView, resetForm: boolean) => {
@@ -120,6 +123,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
     setSaved(false)
     setSecret('')
     setChoices(null)
+    setMissing(NOTHING_MISSING)
     void reload(true)
     return api.onSourcesChanged((projectId) => {
       if (projectId === project.id) void reload(false)
@@ -178,6 +182,13 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
   }
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    const empty = fieldsOf(feed)
+      .filter((field) => !field.optional && (form[field.key] ?? '').trim() === '')
+      .map((field) => field.key)
+    const secretMissing = !view.hasSecret && secret === ''
+    setMissing({ fields: empty, secret: secretMissing })
+    // Asked with a field empty, the system would answer with an error about something else.
+    if (empty.length > 0 || secretMissing) return
     void save(configOf(feed, form))
   }
 
@@ -193,6 +204,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
             key={field.key}
             field={field}
             value={form[field.key] ?? ''}
+            missing={missing.fields.includes(field.key)}
             onChange={(value) => setForm({ ...form, [field.key]: value })}
           />
         ))}
@@ -208,6 +220,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
             {view.hasSecret ? messages.feedSecretKept : messages.feedSecretHint}
           </span>
         </label>
+        {missing.secret && <Missing />}
         <div className="actions">
           <button type="submit" disabled={busy}>
             {messages.feedSave}
@@ -226,6 +239,11 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
             </button>
           )}
           {saved && <span className="hint">{messages.feedSaved}</span>}
+          {(missing.fields.length > 0 || missing.secret) && (
+            <span className="field-problems" role="status">
+              {messages.feedMissingFields}
+            </span>
+          )}
         </div>
       </form>
       {choices && (
@@ -278,22 +296,35 @@ function Freshness({ view, busy, now }: { view: FeedView; busy: boolean; now: Da
   )
 }
 
+function Missing() {
+  return (
+    <span className="field-problems" role="alert">
+      {messages.feedFieldMissing}
+    </span>
+  )
+}
+
 function FieldInput({
   field,
   value,
+  missing,
   onChange,
 }: {
   field: Field
   value: string
+  missing: boolean
   onChange: (value: string) => void
 }) {
   const label = messages.feedFields[field.key]
   if (field.kind === 'list') {
     return (
-      <label>
-        {label}
-        <textarea value={value} rows={2} onChange={(event) => onChange(event.target.value)} />
-      </label>
+      <>
+        <label>
+          {label}
+          <textarea value={value} rows={2} onChange={(event) => onChange(event.target.value)} />
+        </label>
+        {missing && <Missing />}
+      </>
     )
   }
   if (field.kind === 'tls') {
@@ -312,10 +343,13 @@ function FieldInput({
   }
   const type = field.kind === 'text' ? 'text' : field.kind
   return (
-    <label>
-      {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
+    <>
+      <label>
+        {label}
+        <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      </label>
+      {missing && <Missing />}
+    </>
   )
 }
 

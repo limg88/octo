@@ -41,6 +41,10 @@ describe('people and calendar as typed', () => {
     expect(dayOf('31-12-26')).toBe('2026-12-31')
     expect(dayOf(' 2026-03-01 ')).toBe('2026-03-01')
     expect(dayOf('marzo')).toBe('')
+    // A day that the calendar does not have is not a day.
+    expect(dayOf('32/13/2026')).toBe('')
+    expect(dayOf('31/02/2026')).toBe('')
+    expect(dayOf('2026-02-30')).toBe('')
     expect(dayOf('')).toBe('')
   })
 
@@ -48,8 +52,9 @@ describe('people and calendar as typed', () => {
     const people = peopleOf(
       'Rossi Mario; sviluppatore; nostra; 01/03/2026\n\nCarla Bianchi; referente; Cliente; ; ; dare del lei; prima la richiesta\nSolo Nome',
     )
-    expect(people.slice(0, 2)).toEqual(team.people)
-    expect(people[2]).toEqual({
+    expect(people.problems).toEqual([])
+    expect(people.values.slice(0, 2)).toEqual(team.people)
+    expect(people.values[2]).toEqual({
       name: 'Solo Nome',
       role: '',
       side: 'supplier',
@@ -60,9 +65,24 @@ describe('people and calendar as typed', () => {
     expect(peopleLines(team.people)).toBe(
       'Rossi Mario; sviluppatore; nostra; 01/03/2026; ; \nCarla Bianchi; referente; cliente; ; ; dare del lei; prima la richiesta',
     )
-    expect(periodsOf('Sprint 28; 26/10/2026; 13/11/2026\nSenza date')).toEqual([
-      ...team.periods,
-      { name: 'Senza date', from: '', to: '' },
+    expect(
+      periodsOf('Sprint 28; 26/10/2026; 13/11/2026\nSenza date\nSprint 1; ieri; domani'),
+    ).toEqual({
+      values: team.periods,
+      problems: [
+        { line: 2, text: 'Senza date', reason: 'shape' },
+        { line: 3, text: 'Sprint 1; ieri; domani', reason: 'date' },
+      ],
+    })
+    // A side that is neither ours nor the client's, and a day that does not exist, are told.
+    expect(
+      peopleOf('Mario; dev; boh\nAnna; pm; fornitore; 32/13/2026\n; ruolo').problems.map(
+        ({ line, reason }) => [line, reason],
+      ),
+    ).toEqual([
+      [1, 'side'],
+      [2, 'date'],
+      [3, 'shape'],
     ])
     expect(periodLines(team.periods)).toBe('Sprint 28; 26/10/2026; 13/11/2026')
   })
@@ -77,6 +97,24 @@ describe('the section of people and calendar', () => {
     render(<TeamSection api={api} project={project} />)
     const people = (await screen.findByLabelText(text.people)) as HTMLTextAreaElement
     expect(people.value).toContain('Carla Bianchi; referente; cliente')
+    // A line that is not understood is told under its field, and nothing is saved.
+    fireEvent.change(people, { target: { value: 'Mario Rossi; sviluppatore; boh' } })
+    fireEvent.change(screen.getByLabelText(text.periods), {
+      target: { value: 'Sprint 1; ieri; domani' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(
+      await screen.findByText(
+        messages.lines.line(1, 'Mario Rossi; sviluppatore; boh', 'side', text.shapes.people),
+      ),
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        messages.lines.line(1, 'Sprint 1; ieri; domani', 'date', text.shapes.periods),
+      ),
+    ).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
+    expect(api.saveTeam).not.toHaveBeenCalled()
     fireEvent.change(people, { target: { value: 'Verdi Luca; ; ; ; 31/05/2026' } })
     fireEvent.change(screen.getByLabelText(text.periods), {
       target: { value: 'Sprint 29; 16/11/2026; 04/12/2026' },

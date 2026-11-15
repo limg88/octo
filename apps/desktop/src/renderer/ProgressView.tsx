@@ -7,9 +7,11 @@ import type {
   ProgressWarning,
   Project,
 } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { amountOf, amountText } from './forecast-text.ts'
+import { amountField, amountText } from './forecast-text.ts'
+import { LineProblems } from './LineProblems.tsx'
+import { type Lines, noProblems } from './lines.ts'
 import { dateText, errorText, messages } from './messages.ts'
 import {
   fieldLines,
@@ -69,6 +71,13 @@ export function ProgressView({ api, project }: Props) {
     })
   }, [api, project.id])
 
+  // What is wrong is corrected in the form: it opens by itself instead of hiding the fields.
+  const details = useRef<HTMLDetailsElement>(null)
+  const blocked = view !== null && !view.computation.ok
+  useEffect(() => {
+    if (blocked && details.current) details.current.open = true
+  }, [blocked])
+
   async function save(next: ProgressSettings) {
     setError(null)
     const result = await api.saveProgressSettings(project.id, next)
@@ -104,7 +113,7 @@ export function ProgressView({ api, project }: Props) {
         />
       )}
       {configured ? (
-        <details className="dashboard-settings">
+        <details className="dashboard-settings" ref={details}>
           <summary>{text.orderTitle}</summary>
           <SettingsForm settings={settings} candidates={candidates} onSave={save} />
         </details>
@@ -296,21 +305,37 @@ const draftOf = (settings: ProgressSettings): Draft => ({
   table: tableLine(settings.form.table),
 })
 
-const settingsOf = (draft: Draft): ProgressSettings => ({
+/** What the form holds, field by field, with what could not be read in each. */
+const readingOf = (draft: Draft) => ({
+  total: amountField(draft.total),
+  positions: positionsOf(draft.positions),
+  amounts: draft.requests.map((request) => amountField(request.amount)),
+  fields: fieldsOf(draft.fields),
+  table: tableOf(draft.table),
+})
+
+type Reading = ReturnType<typeof readingOf>
+
+const readable = (reading: Reading): boolean =>
+  noProblems(reading.total, reading.positions, reading.fields, reading.table, ...reading.amounts)
+
+const settingsOf = (draft: Draft, reading: Reading): ProgressSettings => ({
   modelPath: draft.modelPath,
   order: draft.order,
-  total: amountOf(draft.total),
-  positions: positionsOf(draft.positions),
+  total: reading.total.values[0] ?? null,
+  positions: reading.positions.values,
   requests: draft.requests.map((request, index) => ({
     n: index + 1,
     from: request.from,
     to: request.to,
-    amount: amountOf(request.amount) ?? 0,
+    amount: reading.amounts[index]?.values[0] ?? 0,
     positions: listOf(request.positions),
     note: request.note,
   })),
-  form: { fields: fieldsOf(draft.fields), table: tableOf(draft.table) },
+  form: { fields: reading.fields.values, table: reading.table.values[0] ?? null },
 })
+
+const problemsOf = (field: Lines<unknown> | undefined) => field?.problems ?? []
 
 type TextField = 'order' | 'total' | 'positions' | 'modelPath' | 'fields' | 'table'
 
@@ -324,7 +349,14 @@ function SettingsForm({
   onSave: (settings: ProgressSettings) => Promise<void>
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
+  /** What the last attempt to save could not read; null when nothing is wrong. */
+  const [unread, setUnread] = useState<Reading | null>(null)
   useEffect(() => setDraft(draftOf(settings)), [settings])
+  // The form is long: the first thing to correct is brought into view.
+  const form = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    if (unread) form.current?.querySelector('[role="alert"]')?.scrollIntoView?.({ block: 'center' })
+  }, [unread])
   // The only form found is proposed without asking.
   useEffect(() => {
     setDraft((current) => ({
@@ -354,6 +386,13 @@ function SettingsForm({
       <textarea value={draft[name]} onChange={(event) => set(name, event.target.value)} />
     </label>
   )
+  const submit = () => {
+    const reading = readingOf(draft)
+    // Nothing is saved while a line is not understood: a dropped line would change the figures.
+    if (!readable(reading)) return setUnread(reading)
+    setUnread(null)
+    void onSave(settingsOf(draft, reading))
+  }
   const requestInput = (
     index: number,
     name: keyof RequestDraft,
@@ -372,15 +411,18 @@ function SettingsForm({
 
   return (
     <form
+      ref={form}
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
-        void onSave(settingsOf(draft))
+        submit()
       }}
     >
       {input('order', text.order)}
       {input('total', text.total)}
+      <LineProblems problems={problemsOf(unread?.total)} shape="" single />
       {area('positions', text.positions)}
+      <LineProblems problems={problemsOf(unread?.positions)} shape={text.shapes.positions} />
       <h4>{text.requestsTitle}</h4>
       {draft.requests.map((_request, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a request is its place in the order of time.
@@ -389,6 +431,7 @@ function SettingsForm({
           {requestInput(index, 'from', text.from, 'date')}
           {requestInput(index, 'to', text.to, 'date')}
           {requestInput(index, 'amount', text.amount)}
+          <LineProblems problems={problemsOf(unread?.amounts[index])} shape="" single />
           {requestInput(index, 'positions', text.requestPositions)}
           {requestInput(index, 'note', text.note)}
           <button
@@ -441,10 +484,17 @@ function SettingsForm({
         )}
       </label>
       {area('fields', text.fields)}
+      <LineProblems problems={problemsOf(unread?.fields)} shape={text.shapes.fields} />
       <p className="hint">{text.fieldsHint}</p>
       {input('table', text.table)}
+      <LineProblems problems={problemsOf(unread?.table)} shape={text.shapes.table} single />
       <div className="actions">
         <button type="submit">{text.save}</button>
+        {unread && (
+          <span className="field-problems" role="status">
+            {messages.lines.notSaved}
+          </span>
+        )}
       </div>
     </form>
   )

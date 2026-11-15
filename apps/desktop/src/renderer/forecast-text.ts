@@ -1,4 +1,5 @@
 import type { ForecastExternal, ForecastExternalRate, ForecastRate } from '@octo/domain'
+import { type Lines, readLines, readValue } from './lines.ts'
 
 const FIELD_SEPARATOR = ';'
 
@@ -17,33 +18,42 @@ export function amountOf(typed: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
+/** An amount typed in a field of its own; nothing typed is no amount, not a problem. */
+export const amountField = (text: string): Lines<number> =>
+  readValue(text, (typed) => {
+    const value = amountOf(typed)
+    return value === null ? { reason: 'amount' } : { value }
+  })
+
 /** An amount back in the form it is typed in; empty for none. */
 export const amountText = (value: number | null): string =>
   value === null ? '' : String(value).replace('.', ',')
 
-const fieldsOf = (text: string): string[][] =>
-  text
-    .split('\n')
-    .map((line) => line.split(FIELD_SEPARATOR).map((field) => field.trim()))
-    .filter((fields) => (fields[0] ?? '') !== '')
+const pieces = (typed: string): string[] =>
+  typed.split(FIELD_SEPARATOR).map((field) => field.trim())
 
 const line = (...fields: string[]): string => fields.join(`${FIELD_SEPARATOR} `)
 
 /**
  * `name; rate` for the rate of a person wherever they work, `name; project code; rate` for one
  * code only. A line as it was written when the cost was typed too (`name; cost; rate`) is read
- * for its rate; a line without a rate is not one.
+ * for its rate.
  */
-export function ratesOf(text: string): ForecastRate[] {
-  return fieldsOf(text).flatMap(([person = '', second = '', third]): ForecastRate[] => {
+export function ratesOf(text: string): Lines<ForecastRate> {
+  return readLines(text, (typed) => {
+    const [person = '', second = '', third, ...rest] = pieces(typed)
+    if (person === '' || rest.length > 0) return { reason: 'shape' }
     if (third === undefined) {
+      if (second === '') return { reason: 'shape' }
       const ratePerDay = amountOf(second)
-      return ratePerDay === null ? [] : [{ person, code: null, ratePerDay }]
+      return ratePerDay === null
+        ? { reason: 'amount' }
+        : { value: { person, code: null, ratePerDay } }
     }
     const ratePerDay = amountOf(third)
-    if (ratePerDay === null) return []
+    if (ratePerDay === null) return { reason: third === '' ? 'shape' : 'amount' }
     const writtenWithCost = second === '' || amountOf(second) !== null
-    return [{ person, code: writtenWithCost ? null : second.toUpperCase(), ratePerDay }]
+    return { value: { person, code: writtenWithCost ? null : second.toUpperCase(), ratePerDay } }
   })
 }
 
@@ -56,13 +66,17 @@ export const rateLines = (rates: readonly ForecastRate[]): string =>
     )
     .join('\n')
 
-/** `name; project code; cost; rate` per line; a line that lacks one of them is left out. */
-export function externalRatesOf(text: string): ForecastExternalRate[] {
-  return fieldsOf(text).flatMap(([name = '', code = '', cost = '', rate = '']) => {
+/** `name; project code; cost; rate` per line. */
+export function externalRatesOf(text: string): Lines<ForecastExternalRate> {
+  return readLines(text, (typed) => {
+    const [name = '', code = '', cost = '', rate = '', ...rest] = pieces(typed)
+    if (name === '' || code === '' || cost === '' || rate === '' || rest.length > 0) {
+      return { reason: 'shape' }
+    }
     const costPerDay = amountOf(cost)
     const ratePerDay = amountOf(rate)
-    if (code === '' || costPerDay === null || ratePerDay === null) return []
-    return [{ name, code: code.toUpperCase(), costPerDay, ratePerDay }]
+    if (costPerDay === null || ratePerDay === null) return { reason: 'amount' }
+    return { value: { name, code: code.toUpperCase(), costPerDay, ratePerDay } }
   })
 }
 
@@ -79,10 +93,12 @@ export const externalRateLines = (externals: readonly ForecastExternalRate[]): s
     .join('\n')
 
 /** `name; hours` per line: what an external worked in the month. */
-export function externalsOf(text: string): ForecastExternal[] {
-  return fieldsOf(text).flatMap(([name = '', worked = '']) => {
+export function externalsOf(text: string): Lines<ForecastExternal> {
+  return readLines(text, (typed) => {
+    const [name = '', worked = '', ...rest] = pieces(typed)
+    if (name === '' || worked === '' || rest.length > 0) return { reason: 'shape' }
     const hours = amountOf(worked)
-    return hours === null ? [] : [{ name, hours }]
+    return hours === null ? { reason: 'amount' } : { value: { name, hours } }
   })
 }
 

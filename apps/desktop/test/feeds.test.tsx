@@ -116,11 +116,24 @@ describe('FeedSection', () => {
     type(fields.projectCodes, 'PRJ000101')
     fireEvent.change(screen.getByLabelText(fields.tls), { target: { value: 'plaintext' } })
     fireEvent.click(screen.getByRole('button', { name: messages.feedSave }))
+    // What is empty is said field by field, before the system is asked anything.
+    expect(screen.getAllByText(messages.feedFieldMissing)).toHaveLength(5)
+    expect(screen.getByRole('status').textContent).toBe(messages.feedMissingFields)
+    expect(api.saveFeed).not.toHaveBeenCalled()
+    type(fields.host, 'dwh')
+    type(fields.database, 'dwsi')
+    type(fields.user, 'lettore')
+    type(fields.ownerEmail, 'pm@example.test')
+    fireEvent.change(screen.getByLabelText(new RegExp(`^${messages.feedSecret.dwsi}`)), {
+      target: { value: 'segreto' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.feedSave }))
 
     await waitFor(() => expect(api.saveFeed).toHaveBeenCalled())
+    expect(screen.queryByText(messages.feedFieldMissing)).toBeNull()
     const sent = vi.mocked(api.saveFeed).mock.calls[0]
     expect(sent?.[2]).toMatchObject({ port: 5432, projectCodes: ['PRJ000101'], tls: 'plaintext' })
-    expect(sent?.[3]).toBeNull()
+    expect(sent?.[3]).toBe('segreto')
   })
 
   it('warns when the data are stale, never read, or the last reading failed', async () => {

@@ -328,7 +328,9 @@ try {
   })
   // Without the NetSuite source the timesheets cannot be read from it, and the app says why.
   await page.getByRole('button', { name: 'Leggi i timesheet da NetSuite' }).click()
-  await page.getByText('Questa fonte non è ancora configurata.').waitFor({ timeout: TIMEOUT_MS })
+  await page
+    .getByText(/^NetSuite non è collegato a questo progetto/)
+    .waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('button', { name: 'Leggi le ore da Jira' }).click()
   await page.getByText(/^Lette 100 registrazioni di ore/).waitFor({ timeout: TIMEOUT_MS })
   const fromJira = readdirSync(`${work}/Aurora/_octo/ore/jira`)
@@ -723,6 +725,42 @@ try {
     .waitFor()
   await openProjects()
   await page.screenshot({ path: `${work}/progetti.png` })
+  await page.keyboard.press('Escape')
+
+  // Demo 20: a line that is not understood is told under its field, and nothing is saved.
+  const team20 = page.getByRole('region', { name: 'Persone e calendario' })
+  const teamFile = () => readFileSync(`${movedFolder}/_octo/.impostazioni/team.json`, 'utf8')
+  const teamBefore = teamFile()
+  await team20.getByLabel(/^Persone:/).fill('Mario Rossi; sviluppatore; boh')
+  await team20.getByLabel(/^Calendario:/).fill('Sprint 1; ieri; domani')
+  await team20.getByRole('button', { name: 'Salva persone e calendario' }).click()
+  await team20
+    .getByText('Riga 1, «Mario Rossi; sviluppatore; boh»: la parte è «nostra» oppure «cliente».')
+    .waitFor({ timeout: TIMEOUT_MS })
+  await team20.getByText(/Riga 1, «Sprint 1; ieri; domani»: c’è una data che non esiste/).waitFor()
+  await team20.getByText(/^Non ho salvato/).waitFor()
+  assert.equal(teamFile(), teamBefore)
+  await team20.getByRole('button', { name: 'Salva persone e calendario' }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: `${work}/righe.png` })
+
+  await page.getByRole('tab', { name: 'Avanzamento' }).click()
+  await page.locator('.dashboard-settings summary').click()
+  await page.getByLabel(/^Posizioni dell’ordine/).fill('00001; 100000\npippo\n00002; mille')
+  await page.getByRole('button', { name: 'Salva', exact: true }).click()
+  await page.getByText('Riga 2, «pippo»: scrivila nella forma «codice; importo».').waitFor()
+  await page.getByText(/Riga 3, «00002; mille»: c’è un numero che non capisco/).waitFor()
+  // The shares shown are still those of the order as it was saved.
+  await page.getByRole('region', { name: 'Richiesta 2' }).getByText('00004').waitFor()
+  await page.screenshot({ path: `${work}/righe-avanzamento.png` })
+
+  // A reading asked from a system that is not linked names it and leads to the sources.
+  await page.getByRole('tab', { name: 'Ore' }).click()
+  await page.getByRole('button', { name: 'Leggi i timesheet da NetSuite' }).click()
+  await page
+    .getByText(/^NetSuite non è collegato a questo progetto/)
+    .waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Apri «Fonti»' }).click()
+  await page.getByRole('region', { name: 'Avvio del progetto' }).waitFor({ timeout: TIMEOUT_MS })
   console.log('e2e: ok')
 } finally {
   await app.close()

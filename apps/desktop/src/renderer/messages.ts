@@ -9,6 +9,23 @@ export const messages = {
   project: 'Progetto',
   addProject: 'Aggiungi un progetto…',
   close: 'Chiudi',
+  openSources: 'Apri «Fonti»',
+  lines: {
+    notSaved: 'Non ho salvato: correggi ciò che è segnalato sotto i campi.',
+    line: (
+      line: number,
+      text: string,
+      reason: 'shape' | 'amount' | 'date' | 'side' | 'cell',
+      shape: string,
+    ) => `Riga ${line}, «${text}»: ${lineReasons[reason](shape)}`,
+    single: {
+      shape: (shape: string) => `Scrivilo nella forma «${shape}».`,
+      amount: () => 'Non è un numero che capisco: scrivi solo cifre, per esempio 12.500,50.',
+      date: () => 'La data non esiste o non è scritta come giorno/mese/anno.',
+      side: () => 'Scrivi «nostra» oppure «cliente».',
+      cell: () => 'Una cella si scrive con lettere e numero, per esempio D2.',
+    },
+  },
   cancel: 'Annulla',
   addDialog: {
     title: 'Aggiungi un progetto',
@@ -83,6 +100,8 @@ export const messages = {
   feedSecretHint:
     'Resta su questo computer, cifrata dal sistema. Non finisce nella cartella del progetto.',
   feedSave: 'Prova e salva',
+  feedFieldMissing: 'Manca: va compilato per collegare il sistema.',
+  feedMissingFields: 'Non ho provato il collegamento: compila i campi segnalati.',
   feedSaved: 'Collegamento riuscito e salvato.',
   feedSync: 'Leggi ora',
   feedSyncing: 'Sto leggendo…',
@@ -118,6 +137,10 @@ export const messages = {
     title: 'Persone e calendario',
     intro:
       'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Octo li scrive anche come testo del progetto: risposte e deliverable li leggono e li citano. Chi non era sul progetto in un periodo non viene segnalato per le ore che mancano.',
+    shapes: {
+      people: 'nome; ruolo; nostra o cliente; dal; al; come scrivergli',
+      periods: 'nome; dal; al',
+    },
     people: 'Persone: una riga ciascuna, «nome; ruolo; nostra o cliente; dal; al; come scrivergli»',
     peopleHint:
       'Solo il nome è obbligatorio. Le date sono giorno/mese/anno; vuote se la persona c’è dall’inizio o c’è ancora. Esempio: «Carla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta».',
@@ -189,6 +212,8 @@ export const messages = {
   alignmentTab: 'Allineamento',
   alignment: {
     loading: 'Confronto i due tracker…',
+    shapes: { stateGroups: 'nome: stati del cliente = stati dei ticket' },
+    saveNeeds: 'Per salvare indica lo sprint.',
     intro:
       'Confronto le voci del tracker del cliente in uno sprint con i ticket del tuo tracker. Una voce e un ticket sono collegati quando la voce porta fra i tag la chiave del ticket, oppure il titolo del ticket nomina l’id della voce, per esempio «[AZDO 123]». Leggo l’esportazione usata dal cruscotto e i ticket che Octo ha già letto: non scrivo in nessuno dei due tracker.',
     settings: 'Che cosa confronto',
@@ -248,6 +273,11 @@ export const messages = {
   progressTab: 'Avanzamento',
   progress: {
     loading: 'Preparo l’avanzamento…',
+    shapes: {
+      positions: 'codice; importo',
+      fields: 'cella = testo',
+      table: 'prima riga; numero di righe; colonna posizione; precedente; attuale; di periodo',
+    },
     intro:
       'Compilo il modulo con cui si chiede al cliente di riconoscere una quota dell’ordine: una richiesta per fattura. Le percentuali per posizione vengono dagli importi dell’ordine e delle richieste che scrivi qui: nessuna cifra è presa altrove. Scrivo una copia del modulo: quello vuoto non lo tocco.',
     orderTitle: 'Ordine e richieste',
@@ -317,6 +347,12 @@ export const messages = {
   forecastTab: 'Previsionale',
   forecast: {
     loading: 'Preparo il previsionale…',
+    shapes: {
+      rates: 'nome; tariffa',
+      externalRates: 'nome; commessa; costo al giorno; tariffa al giorno',
+      externals: 'nome; ore',
+    },
+    saveNeeds: 'Per salvare indica il file del modello.',
     setupTitle: 'Il modello dell’amministrazione',
     setupIntro:
       'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. I costi interni vengono dal costo che NetSuite scrive su ogni riga di timesheet approvata; i ricavi dalle stesse ore e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
@@ -393,6 +429,12 @@ export const messages = {
   hoursTab: 'Ore',
   hours: {
     loading: 'Leggo le ore…',
+    shapes: { aliases: 'nome sul tracker = nome nel timesheet' },
+    saveNeeds: 'Per salvare indica dove sono i timesheet e le ore del tracker.',
+    netsuiteUnlinked:
+      'NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.',
+    jiraUnlinked:
+      'Jira non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere le ore.',
     setupTitle: 'Da dove leggo le ore',
     setupIntro:
       'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Le leggo io da NetSuite e da Jira con i pulsanti qui sotto, oppure indichi due esportazioni che hai già nella cartella del progetto. Non scrivo in nessun sistema.',
@@ -467,6 +509,9 @@ export const messages = {
   dashboardTab: 'Cruscotto',
   dashboard: {
     loading: 'Leggo l’esportazione del tracker…',
+    adoUnlinked:
+      'Azure DevOps non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere.',
+    saveNeeds: 'Per salvare indica il file dell’esportazione.',
     setupTitle: 'Da dove leggo bug e requisiti',
     setupIntro:
       'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da Azure DevOps qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.',
@@ -697,6 +742,14 @@ export const messages = {
   agentReady: (version: string) => `Claude ${version}`,
 } as const
 
+const lineReasons = {
+  shape: (shape: string) => `scrivila nella forma «${shape}».`,
+  amount: () => 'c’è un numero che non capisco. Scrivi solo cifre, per esempio 12.500,50.',
+  date: () => 'c’è una data che non esiste o non è scritta come giorno/mese/anno.',
+  side: () => 'la parte è «nostra» oppure «cliente».',
+  cell: () => 'una cella si scrive con lettere e numero, per esempio D2.',
+}
+
 const citationStatus: Record<CitationStatus, string> = {
   verified: 'Controllata',
   quote_not_found: 'La frase non è nel file',
@@ -783,7 +836,7 @@ const errors: Record<ErrorCode, string> = {
   progress_settings_invalid:
     'Le impostazioni dell’avanzamento non sono valide: il modulo deve stare nella cartella del progetto.',
   progress_not_computable:
-    'Le percentuali non si possono calcolare, o le posizioni sono più delle righe della tabella del modulo: correggi i dati segnalati.',
+    'Non posso compilare il modulo. O c’è un problema segnalato qui sopra da correggere, o l’ordine ha più posizioni delle righe che hai indicato per la tabella del modulo: in quel caso aumenta il «numero di righe».',
   progress_request_missing: 'Questa richiesta non c’è più.',
   forecast_timesheet_not_set: 'Indica prima, nella scheda «Ore», dove sono i timesheet.',
   hours_settings_invalid:

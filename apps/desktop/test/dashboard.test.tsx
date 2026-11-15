@@ -140,6 +140,28 @@ describe('dashboard', () => {
     expect(api.readTrackerSnapshot).toHaveBeenLastCalledWith('p-1')
   })
 
+  it('says that Azure DevOps is not linked, with or without the way to the sources', async () => {
+    const api = fakeApi({
+      dashboardSettings: async () => ok({ ...configured, exportPath: '' }),
+      readTrackerSnapshot: async () => ({ ok: false, code: 'source_not_configured' }),
+    })
+    const onOpenSources = vi.fn()
+    const view = render(
+      <DashboardView api={api} project={project} now={now} onOpenSources={onOpenSources} />,
+    )
+    expect(await screen.findByText(text.saveNeeds)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
+    expect((await screen.findByRole('alert')).textContent).toContain(text.adoUnlinked)
+    fireEvent.click(screen.getByRole('button', { name: messages.openSources }))
+    expect(onOpenSources).toHaveBeenCalledTimes(1)
+    view.unmount()
+
+    render(<DashboardView api={api} project={project} now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.readTracker }))
+    expect((await screen.findByRole('alert')).textContent).toContain(text.adoUnlinked)
+    expect(screen.queryByRole('button', { name: messages.openSources })).toBeNull()
+  })
+
   it('reads a longer period by month, or the one the PM chooses', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)

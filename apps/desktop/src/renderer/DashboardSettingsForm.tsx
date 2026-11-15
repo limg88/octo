@@ -147,6 +147,7 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
         <button type="submit" disabled={saving || draft.exportPath.trim() === ''}>
           {text.save}
         </button>
+        {draft.exportPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
       </div>
     </form>
   )

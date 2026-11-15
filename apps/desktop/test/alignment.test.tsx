@@ -113,11 +113,15 @@ describe('groups of states as typed', () => {
     const groups = stateGroupsOf(
       'in corso: In Progress, Active = In corso\nsenza uguale: x\nsenza nome\nchiuso: Closed = Completata, Chiusa',
     )
-    expect(groups).toEqual([
+    expect(groups.values).toEqual([
       { name: 'in corso', item: ['In Progress', 'Active'], ticket: ['In corso'] },
       { name: 'chiuso', item: ['Closed'], ticket: ['Completata', 'Chiusa'] },
     ])
-    expect(stateGroupLines(groups)).toBe(
+    expect(groups.problems).toEqual([
+      { line: 2, text: 'senza uguale: x', reason: 'shape' },
+      { line: 3, text: 'senza nome', reason: 'shape' },
+    ])
+    expect(stateGroupLines(groups.values)).toBe(
       'in corso: In Progress, Active = In corso\nchiuso: Closed = Completata, Chiusa',
     )
   })
@@ -190,6 +194,7 @@ describe('the alignment', () => {
     render(<AlignmentView api={api} project={project} />)
     const save = (await screen.findByRole('button', { name: text.save })) as HTMLButtonElement
     expect(save.disabled).toBe(true)
+    expect(screen.getByText(text.saveNeeds)).toBeTruthy()
     expect(api.alignmentView).not.toHaveBeenCalled()
     const type = (label: string, value: string) =>
       fireEvent.change(screen.getByLabelText(label), { target: { value } })
@@ -197,6 +202,14 @@ describe('the alignment', () => {
     type(text.period, 'PI7')
     type(text.tags, 'Squadra, Altri')
     type(text.referencePrefixes, 'AZDO')
+    type(text.stateGroups, 'in corso: In Progress')
+    fireEvent.click(save)
+    expect(
+      screen.getByText(
+        messages.lines.line(1, 'in corso: In Progress', 'shape', text.shapes.stateGroups),
+      ),
+    ).toBeTruthy()
+    expect(api.saveAlignmentSettings).not.toHaveBeenCalled()
     type(text.stateGroups, 'in corso: In Progress = In corso')
     type(text.ticketFolder, 'ticket')
     type(text.exportPath, 'dati/sprint.json')
