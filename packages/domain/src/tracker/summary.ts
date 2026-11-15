@@ -43,10 +43,41 @@ function bySprint(items: readonly TrackerItem[]): string[] {
     })
 }
 
+/** Tags with fewer items than this are left out: a slip of the pen, not a team. */
+const MIN_TAG_ITEMS = 5
+
+/**
+ * The whole tracker tag by tag, whatever the perimeter: how many items, open bugs and stories each
+ * tag has. It answers «how many of ours» even before the perimeter of the dashboard is set.
+ */
+function byTag(items: readonly TrackerItem[], settings: DashboardSettings): string[] {
+  const tags = new Map<string, { items: number; openBugs: number; stories: number }>()
+  for (const item of items) {
+    const bug = isOfType(item, settings.bugTypes)
+    const open = bug && phaseOf(item.state, settings) !== 'closed'
+    for (const tag of new Set(item.tags)) {
+      const counted = tags.get(tag) ?? { items: 0, openBugs: 0, stories: 0 }
+      counted.items += 1
+      if (open) counted.openBugs += 1
+      if (isOfType(item, settings.storyTypes)) counted.stories += 1
+      tags.set(tag, counted)
+    }
+  }
+  return [...tags.entries()]
+    .filter(([, counted]) => counted.items >= MIN_TAG_ITEMS)
+    .sort(([a, x], [b, y]) => y.items - x.items || numeric(a, b))
+    .map(([tag, c]) => `| ${tag} | ${c.items} | ${c.openBugs} | ${c.stories} |`)
+}
+
 const table = (rows: readonly string[]): string[] =>
   rows.length === 0
     ? ['Nessuno.', '']
     : ['| Sprint | Totale | Per stato |', '|---|---|---|', ...rows, '']
+
+const tagTable = (rows: readonly string[]): string[] =>
+  rows.length === 0
+    ? ['Nessun tag.', '']
+    : ['| Tag | Elementi | Bug aperti | Storie |', '|---|---|---|---|', ...rows, '']
 
 /**
  * The tracker in numbers, as a text of the project: what is in scope, the bugs by phase, and
@@ -93,5 +124,10 @@ export function trackerSummary(
     '### Storie per sprint e stato',
     '',
     ...table(bySprint(stories)),
+    '## Tutto il tracker, tag per tag',
+    '',
+    'Qualunque sia il perimetro: quanti elementi, bug aperti e storie porta ogni tag.',
+    '',
+    ...tagTable(byTag(data.items, settings)),
   ].join('\n')
 }

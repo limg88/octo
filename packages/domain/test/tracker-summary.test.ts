@@ -57,6 +57,9 @@ describe('the tracker in numbers', () => {
     expect(text).toContain('| Sprint 28 | 2 | 04 - In Progress: 1; 06 - Ready for Test: 1 |')
     expect(text).toContain('| Sprint 27 | 3 | Closed: 1; Demo: 2 |')
     expect(text).toContain('| (nessuno) | 1 | To Do: 1 |')
+    // Tag by tag over the whole tracker, whatever the perimeter; a tag of one item is left out.
+    expect(text).toContain('| Squadra | 9 | 2 | 4 |')
+    expect(text).not.toContain('| Altri |')
     expect(TRACKER_SUMMARY_PATH).toBe('_octo/cruscotto/riepilogo.md')
   })
 
@@ -65,6 +68,7 @@ describe('the tracker in numbers', () => {
     expect(empty).toContain('- Dati del tracker al: data non dichiarata')
     expect(empty).toContain('- Perimetro: tutti gli elementi')
     expect(empty.match(/^Nessuno\.$/gm)).toHaveLength(2)
+    expect(empty).toContain('Nessun tag.')
     expect(trackerSummary(data, DEFAULT_DASHBOARD_SETTINGS)).toContain('- Bug nel perimetro: 5')
   })
 })
