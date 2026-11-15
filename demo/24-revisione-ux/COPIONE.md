@@ -66,6 +66,8 @@ Gli stessi passi da 3 a 8 valgono su un progetto già collegato: lancia `pnpm de
 - un titolo lungo vada a capo dentro la sua riga e un commento lungo scorra dentro il suo riquadro;
 - una risposta con molte citazioni si percorra con «‹» e «›», e il pannello dica quando lo stesso file è citato più volte.
 
+Il progetto vero va aperto a mano, non da uno strumento che guida la finestra: Playwright avvia Electron con un portachiavi finto, con cui le credenziali salvate non si leggono (Octo dice «manca la credenziale») e l'accesso va rifatto.
+
 Su un progetto vero «Fatto», «Rimanda» e «Non mi interessa» si annullano subito con «Annulla»; una nota su un bug e l'approvazione di un deliverable restano scritte. Per provare, usa un titolo che dica che è un collaudo e non approvare ciò che non deve uscire.
 
 ## Test e copertura
