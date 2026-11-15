@@ -22,7 +22,7 @@ Durata: 4 minuti. Mostra il cruscotto calcolato da Octo da un'esportazione del t
    Atteso: «Dati aggiornati»; Bug aperti **15** su 30 nel perimetro; In lavorazione **10**; In verifica **5**; Validati, in attesa di rilascio **2**; Fermi da oltre 30 giorni **11**.
    Dimostra: i 6 bug dell'altro fornitore restano fuori; «aperto» vuol dire che qualcuno deve ancora fare qualcosa prima del rilascio.
 
-4. **Guarda l'andamento.** Sotto «Andamento» ci sono le ultime 8 settimane: barre per entrati e usciti, linea per gli aperti a fine settimana, e la stessa cosa in tabella.
+4. **Guarda l'andamento.** Sotto «Andamento» ci sono le ultime 8 settimane: barre per entrati e usciti, linea per gli aperti a fine settimana, e, aprendo «Mostra i numeri», la stessa cosa in tabella.
    Premi «12 mesi».
    Atteso: il grafico passa a dodici passi mensili.
    Premi «Scelgo io», cambia «Dal» e il «Passo».

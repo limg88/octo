@@ -165,6 +165,29 @@ describe('dashboard', () => {
     expect(screen.queryByRole('button', { name: messages.openSources })).toBeNull()
   })
 
+  it('keeps the reading beside the age of the data, and the numbers of the trend folded', async () => {
+    const api = fakeApi()
+    render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.openTitle })
+    // Newer data are one click away, without opening the settings.
+    const read = screen.getByRole('button', { name: text.readTracker })
+    expect(read.closest('details')).toBeNull()
+    fireEvent.click(read)
+    await waitFor(() => expect(api.readTrackerSnapshot).toHaveBeenCalledWith('p-1'))
+    expect(screen.getByText(text.trendNumbers).closest('details')?.open).toBe(false)
+  })
+
+  it('offers the reading first and the file second, folded when no export is found', async () => {
+    const api = fakeApi({
+      dashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
+      dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    const read = await screen.findByRole('button', { name: text.readTracker })
+    expect(read.className).toBe('primary')
+    expect(screen.getByText(text.haveExport).closest('details')?.open).toBe(false)
+  })
+
   it('reads a longer period by month, or the one the PM chooses', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)

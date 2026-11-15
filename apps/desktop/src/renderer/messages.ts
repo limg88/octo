@@ -294,6 +294,8 @@ export const messages = {
     sprint: 'Sprint, come lo chiamano i due tracker',
     period: 'Periodo di pianificazione delle voci del cliente',
     periodAny: 'Qualunque',
+    sprintNow: 'Sprint a confronto',
+    nothingIn: (lists: string) => `Niente da segnalare in: ${lists}.`,
     sprintChoose: 'Scegli lo sprint…',
     tags: 'Tag delle voci che sono della tua squadra (nessuno: tutte)',
     exportPath:
@@ -597,6 +599,13 @@ export const messages = {
     removeAlias: (row: number) => `Togli la riga ${row}`,
     aliasWrong: (n: number) => `Riga ${n}: servono tutti e due i nomi.`,
     saveNeeds: 'Per salvare indica dove sono i timesheet e le ore del tracker.',
+    firstTime:
+      'Per confrontare le ore servono due letture del mese scelto: i timesheet e le ore segnate sul tracker. Octo le fa da solo.',
+    steps: { timesheets: '1 · Timesheet da NetSuite', tracker: '2 · Ore da Jira' },
+    haveExports: 'Ho già le esportazioni nella cartella',
+    refreshTitle: 'Leggi di nuovo le ore',
+    refreshHint: 'Leggono i mesi interi del periodo scelto.',
+    include: 'Conta anche questo codice',
     netsuiteUnlinked:
       'NetSuite non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere i timesheet.',
     jiraUnlinked:
@@ -673,6 +682,8 @@ export const messages = {
   dashboardTab: 'Cruscotto',
   dashboard: {
     loading: 'Leggo l’esportazione del tracker…',
+    haveExport: 'Ho già un file di esportazione',
+    trendNumbers: 'Mostra i numeri',
     adoUnlinked:
       'Azure DevOps non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere.',
     saveNeeds: 'Per salvare indica il file dell’esportazione.',

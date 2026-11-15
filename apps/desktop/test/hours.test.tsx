@@ -145,6 +145,38 @@ describe('hours', () => {
     expect(screen.getByLabelText<HTMLInputElement>('P9').type).toBe('checkbox')
   })
 
+  it('counts a code left out among those of the project, from where it is said', async () => {
+    const api = fakeApi()
+    render(<HoursView api={api} project={project} now={now} />)
+    await screen.findByText('Bianchi Anna', { selector: 'td' })
+    fireEvent.click(screen.getByRole('button', { name: `${text.include}: P9` }))
+    await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.saveHoursSettings).mock.calls[0]?.[1].projects).toEqual([
+      ...configured.projects,
+      'P9',
+    ])
+    // The two readings are beside the period, with what they read.
+    const refresh = within(screen.getByRole('region', { name: text.refreshTitle }))
+    expect(refresh.getByRole('button', { name: text.readTimesheets })).toBeTruthy()
+    expect(refresh.getByRole('button', { name: text.readTracker })).toBeTruthy()
+  })
+
+  it('starts from the two readings, numbered, with the month they will read', async () => {
+    const api = fakeApi({
+      hoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
+      hoursCandidates: vi.fn(async () => ok({ timesheets: [], worklogs: [] })),
+    })
+    render(<HoursView api={api} project={project} now={now} />)
+    expect(await screen.findByText(text.firstTime)).toBeTruthy()
+    expect(screen.getByLabelText(text.month)).toBeTruthy()
+    expect(screen.getByText(text.steps.timesheets)).toBeTruthy()
+    expect(screen.getByText(text.steps.tracker)).toBeTruthy()
+    expect(screen.getByRole('button', { name: text.readTimesheets }).className).toBe('primary')
+    // Typing the paths is the other way: folded while nothing was found in the folder.
+    const other = screen.getByText(text.haveExports).closest('details')
+    expect(other?.open).toBe(false)
+  })
+
   it('chooses codes and people among those found, and steps from month to month', async () => {
     const api = fakeApi()
     render(<HoursView api={api} project={project} now={now} />)

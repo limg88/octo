@@ -119,10 +119,8 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
     if (ready(saved.value)) await loadView(period)
   }
 
-  const timesheets = (
-    <section aria-label={text.timesheetsTitle}>
-      <h3>{text.timesheetsTitle}</h3>
-      <p className="hint">{text.timesheetsIntro}</p>
+  const timesheetsStatus = (
+    <>
       {readingTimesheets && (
         <p className="progress" role="status">
           {text.readingTimesheets}
@@ -140,12 +138,17 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
           )}
         </p>
       )}
-      <div className="actions">
-        <button type="button" disabled={readingTimesheets} onClick={() => void readTimesheets()}>
-          {text.readTimesheets}
-        </button>
-      </div>
-    </section>
+    </>
+  )
+  const timesheetsButton = (main: boolean) => (
+    <button
+      type="button"
+      className={main ? 'primary' : undefined}
+      disabled={readingTimesheets}
+      onClick={() => void readTimesheets()}
+    >
+      {text.readTimesheets}
+    </button>
   )
 
   async function readTracker() {
@@ -165,10 +168,8 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
     if (ready(saved.value)) await loadView(period)
   }
 
-  const tracker = (
-    <section aria-label={text.trackerTitle}>
-      <h3>{text.trackerTitle}</h3>
-      <p className="hint">{text.trackerIntro}</p>
+  const trackerStatus = (
+    <>
       {reading && (
         <p className="progress" role="status">
           {text.readingTracker}
@@ -180,12 +181,27 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
           {text.trackerRead(run.entries, run.months.join(', '), dateTimeText(run.at))}
         </p>
       )}
-      <div className="actions">
-        <button type="button" disabled={reading} onClick={() => void readTracker()}>
-          {text.readTracker}
-        </button>
-      </div>
-    </section>
+    </>
+  )
+  const trackerButton = (main: boolean) => (
+    <button
+      type="button"
+      className={main ? 'primary' : undefined}
+      disabled={reading}
+      onClick={() => void readTracker()}
+    >
+      {text.readTracker}
+    </button>
+  )
+  const month = (
+    <MonthField
+      label={text.month}
+      value={period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''}
+      onChange={(value) => {
+        const chosen = monthPeriod(value)
+        if (chosen) changePeriod(chosen)
+      }}
+    />
   )
 
   /** The exports are kept in a folder of the project: chosen from the dialog of the system. */
@@ -207,23 +223,41 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
   }
 
   if (!ready(settings)) {
+    const found = candidates.timesheets.length + candidates.worklogs.length > 0
     return (
       <div className="dashboard">
         {error && <Failure code={error} />}
-        <section aria-label={text.setupTitle}>
-          <h3>{text.setupTitle}</h3>
-          <p className="hint">{text.setupIntro}</p>
-          <SettingsForm
-            settings={settings}
-            candidates={candidates}
-            codes={[]}
-            people={[]}
-            onSave={save}
-            onChooseFolder={chooseFolder}
-          />
+        <p className="hint">{text.firstTime}</p>
+        <div className="range-fields">{month}</div>
+        {/* The two readings come first: they fill in the paths by themselves. */}
+        <section aria-label={text.timesheetsTitle}>
+          <h3>{text.steps.timesheets}</h3>
+          <p className="hint">{text.timesheetsIntro}</p>
+          {timesheetsStatus}
+          <div className="actions">{timesheetsButton(true)}</div>
         </section>
-        {timesheets}
-        {tracker}
+        <section aria-label={text.trackerTitle}>
+          <h3>{text.steps.tracker}</h3>
+          <p className="hint">{text.trackerIntro}</p>
+          {trackerStatus}
+          <div className="actions">{trackerButton(true)}</div>
+        </section>
+        {/* The other way, for who already keeps the exports in the folder: open when found. */}
+        <details className="dashboard-settings" open={found || undefined}>
+          <summary>{text.haveExports}</summary>
+          <section aria-label={text.setupTitle}>
+            <h3>{text.setupTitle}</h3>
+            <p className="hint">{text.setupIntro}</p>
+            <SettingsForm
+              settings={settings}
+              candidates={candidates}
+              codes={[]}
+              people={[]}
+              onSave={save}
+              onChooseFolder={chooseFolder}
+            />
+          </section>
+        </details>
       </div>
     )
   }
@@ -250,14 +284,7 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
         />
       </details>
       <div className="range-fields">
-        <MonthField
-          label={text.month}
-          value={period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''}
-          onChange={(value) => {
-            const month = monthPeriod(value)
-            if (month) changePeriod(month)
-          }}
-        />
+        {month}
         <label>
           {text.from}
           <input
@@ -275,14 +302,41 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
           />
         </label>
       </div>
-      {view && <Comparison view={view} onExpect={expect} />}
-      {timesheets}
-      {tracker}
+      {/* Reading the hours again is what is done every month: beside the period, not below. */}
+      <section aria-label={text.refreshTitle}>
+        <div className="actions">
+          {timesheetsButton(false)}
+          {trackerButton(false)}
+          <span className="hint">{text.refreshHint}</span>
+        </div>
+        {timesheetsStatus}
+        {trackerStatus}
+      </section>
+      {view && (
+        <Comparison
+          view={view}
+          onExpect={expect}
+          onInclude={
+            settings.projects.length > 0
+              ? (code) => void save({ ...settings, projects: [...settings.projects, code] })
+              : undefined
+          }
+        />
+      )}
     </div>
   )
 }
 
-function Comparison({ view, onExpect }: { view: View; onExpect: (row: HoursRow) => void }) {
+function Comparison({
+  view,
+  onExpect,
+  onInclude,
+}: {
+  view: View
+  onExpect: (row: HoursRow) => void
+  /** Counts a project code left out among those of the project; absent when all are counted. */
+  onInclude?: ((code: string) => void) | undefined
+}) {
   const { rows, totals, tieOut, excluded } = view.reconciliation
   const { sources } = view
   const day = (value: string | null) => (value ? dateText(value) : text.noDay)
@@ -293,9 +347,6 @@ function Comparison({ view, onExpect }: { view: View; onExpect: (row: HoursRow) 
         text.amount(excluded.partialTimesheetHours),
         text.amount(excluded.partialWorklogHours),
       ),
-    ...excluded.otherProjects.map((other) =>
-      text.otherProject(other.project, text.amount(other.hours)),
-    ),
     ...sources.unreadable.map(text.unreadable),
   ].filter((line): line is string => typeof line === 'string')
   return (
@@ -374,12 +425,27 @@ function Comparison({ view, onExpect }: { view: View; onExpect: (row: HoursRow) 
       )}
       <section aria-label={text.excludedTitle}>
         <h3>{text.excludedTitle}</h3>
-        {left.length === 0 ? (
+        {left.length + excluded.otherProjects.length === 0 ? (
           <p className="hint">{text.nothingExcluded}</p>
         ) : (
           <ul className="missing">
             {left.map((line) => (
               <li key={line}>{line}</li>
+            ))}
+            {excluded.otherProjects.map((other) => (
+              <li key={other.project}>
+                {text.otherProject(other.project, text.amount(other.hours))}
+                {onInclude && other.project !== '' && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-label={`${text.include}: ${other.project}`}
+                    onClick={() => onInclude(other.project)}
+                  >
+                    {text.include}
+                  </button>
+                )}
+              </li>
             ))}
           </ul>
         )}

@@ -112,10 +112,9 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
     await loadView(range)
   }
 
-  const tracker = (
-    <section aria-label={text.trackerTitle}>
-      <h3>{text.trackerTitle}</h3>
-      <p className="hint">{text.trackerIntro}</p>
+  /** How the reading asked from Azure DevOps is going, or how it went. */
+  const reader = (
+    <>
       {reading && (
         <p className="progress" role="status">
           {text.readingTracker}
@@ -127,12 +126,17 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
           {text.trackerRead(run.items, run.withHistory, dateTimeText(run.at))}
         </p>
       )}
-      <div className="actions">
-        <button type="button" disabled={reading} onClick={() => void readTracker()}>
-          {text.readTracker}
-        </button>
-      </div>
-    </section>
+    </>
+  )
+  const readButton = (main: boolean) => (
+    <button
+      type="button"
+      className={main ? 'primary' : undefined}
+      disabled={reading}
+      onClick={() => void readTracker()}
+    >
+      {text.readTracker}
+    </button>
   )
 
   function choosePreset(next: RangePreset) {
@@ -161,18 +165,28 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
     return (
       <div className="dashboard">
         {error && <Failure code={error} />}
-        {tracker}
-        <section aria-label={text.setupTitle}>
-          <h3>{text.setupTitle}</h3>
-          <p className="hint">{text.setupIntro}</p>
-          <DashboardSettingsForm
-            settings={settings}
-            candidates={candidates}
-            view={null}
-            onSave={save}
-            onChooseFile={chooseFile}
-          />
+        {/* The first thing to do: Octo reads the tracker by itself. */}
+        <section aria-label={text.trackerTitle}>
+          <h3>{text.trackerTitle}</h3>
+          <p className="hint">{text.trackerIntro}</p>
+          {reader}
+          <div className="actions">{readButton(true)}</div>
         </section>
+        {/* The other way, for who already keeps an export in the folder: open when one is found. */}
+        <details className="dashboard-settings" open={candidates.exports.length > 0 || undefined}>
+          <summary>{text.haveExport}</summary>
+          <section aria-label={text.setupTitle}>
+            <h3>{text.setupTitle}</h3>
+            <p className="hint">{text.setupIntro}</p>
+            <DashboardSettingsForm
+              settings={settings}
+              candidates={candidates}
+              view={null}
+              onSave={save}
+              onChooseFile={chooseFile}
+            />
+          </section>
+        </details>
       </div>
     )
   }
@@ -182,7 +196,6 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
       {error && <Failure code={error} />}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
-        {tracker}
         <DashboardSettingsForm
           settings={settings}
           candidates={candidates}
@@ -239,8 +252,9 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
         )}
       </section>
       {loading && !view && <p className="progress">{text.loading}</p>}
-      {view && (
-        <>
+      {/* How old the data are, and the way to newer ones, side by side. */}
+      <div className="actions">
+        {view && (
           <p className={view.age === 'fresh' ? 'badge badge-ok' : 'badge badge-warning'}>
             {view.exportedAt
               ? text.exportedAt(dateTimeText(view.exportedAt))
@@ -248,6 +262,12 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
             {' · '}
             {text.age[view.age]}
           </p>
+        )}
+        {readButton(false)}
+      </div>
+      {reader}
+      {view && (
+        <>
           <Figures view={view} stuckDays={settings.stuckDays} />
           <section aria-label={text.trendTitle}>
             <h3>{text.trendTitle}</h3>

@@ -1704,3 +1704,15 @@ details.advanced[open] > summary {
 .remedy input.amount {
   width: 140px;
 }
+
+.trend-numbers > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.trend-numbers[open] > summary {
+  margin-bottom: 8px;
+}

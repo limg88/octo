@@ -35,7 +35,7 @@ Durata: 3 minuti. Mostra che il cruscotto non dipende più da un file esportato 
    Atteso: la data dei dati, il perimetro, i bug per fase e storie e bug per sprint e stato.
    Dimostra: i conteggi li fa il codice. Chi risponde in «Chiedi» e chi scrive un deliverable li cita da qui, con la loro data, al posto di contare o di usare un'esportazione vecchia trovata nella cartella.
 
-7. **Rileggi quando vuoi.** Apri «Impostazioni del cruscotto» e premi di nuovo «Leggi da Azure DevOps».
+7. **Rileggi quando vuoi.** Premi di nuovo «Leggi da Azure DevOps»: ora è accanto alla riga «Tracker letto il…», in alto, senza aprire le impostazioni.
    Atteso: una nuova lettura, con la nuova ora. Tag, periodi e note che avevi messo restano.
 
 ## Che cosa dimostra

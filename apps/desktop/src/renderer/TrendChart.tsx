@@ -61,26 +61,29 @@ export function TrendChart({ trend }: { trend: TrendBucket[] }) {
         <li className="legend-closed">{text.closedInStep}</li>
         <li className="legend-open">{text.openAtEnd}</li>
       </ul>
-      <table className="data">
-        <thead>
-          <tr>
-            <th>{text.stepFrom}</th>
-            <th className="number">{text.entered}</th>
-            <th className="number">{text.closedInStep}</th>
-            <th className="number">{text.openAtEnd}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trend.map((step) => (
-            <tr key={step.from}>
-              <td>{dateText(step.from)}</td>
-              <td className="number">{step.entered}</td>
-              <td className="number">{step.closed}</td>
-              <td className="number">{step.openAtEnd}</td>
+      <details className="trend-numbers">
+        <summary>{text.trendNumbers}</summary>
+        <table className="data">
+          <thead>
+            <tr>
+              <th>{text.stepFrom}</th>
+              <th className="number">{text.entered}</th>
+              <th className="number">{text.closedInStep}</th>
+              <th className="number">{text.openAtEnd}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {trend.map((step) => (
+              <tr key={step.from}>
+                <td>{dateText(step.from)}</td>
+                <td className="number">{step.entered}</td>
+                <td className="number">{step.closed}</td>
+                <td className="number">{step.openAtEnd}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   )
 }

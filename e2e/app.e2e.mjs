@@ -593,6 +593,8 @@ try {
     await cell(groups13, `Stati dei ticket (separati da virgola), riga ${index + 1}`).fill(ticket)
   }
   await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
+  // What is read for reference is one line with its count: it opens with a click.
+  await page.getByText(/^Collegate \(3\)$/).click()
   await list13('Collegate').getByText('Diversi', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('button', { name: 'Scrivi il file di import dei ticket mancanti' }).click()
   await page

@@ -124,7 +124,8 @@ describe('the alignment', () => {
     expect(screen.getByText(text.adds)).toBeTruthy()
     expect(screen.getByText(/42 ticket letti/)).toBeTruthy()
     const section = (title: string) => within(screen.getByRole('region', { name: title }))
-    expect(section(text.linkedTitle).getByText(`${text.linkedTitle} (3)`)).toBeTruthy()
+    // A list read for reference is one line with its count, which opens.
+    expect(screen.getByText(`${text.linkedTitle} (3)`).closest('summary')).toBeTruthy()
     expect(section(text.linkedTitle).getByText(text.coherent.yes)).toBeTruthy()
     expect(section(text.linkedTitle).getByText(text.coherent.no)).toBeTruthy()
     expect(section(text.linkedTitle).getByText('AUR-3, AUR-4')).toBeTruthy()
@@ -153,8 +154,24 @@ describe('the alignment', () => {
     )
     expect((await screen.findByRole('alert')).textContent).toBe(text.doesNotAdd)
     expect(screen.getByText(new RegExp(text.noDate))).toBeTruthy()
-    expect(screen.getAllByText(text.none)).toHaveLength(3)
+    // The empty list of what to act upon says so; the other empty ones share one line.
+    expect(screen.getAllByText(text.none)).toHaveLength(1)
+    expect(
+      screen.getByText(text.nothingIn(`${text.orphansTitle}, ${text.suggestionsTitle}`)),
+    ).toBeTruthy()
+    expect(screen.queryByRole('region', { name: text.orphansTitle })).toBeNull()
     expect(screen.queryByRole('button', { name: text.exportMissing })).toBeNull()
+  })
+
+  it('changes sprint from the top of the page, without opening the settings', async () => {
+    const api = fakeApi()
+    render(<AlignmentView api={api} project={project} />)
+    const sprint = await screen.findByLabelText<HTMLSelectElement>(text.sprintNow)
+    await waitFor(() => expect(sprint.options.length).toBeGreaterThan(1))
+    fireEvent.change(sprint, { target: { value: 'Sprint 27' } })
+    await waitFor(() => expect(api.saveAlignmentSettings).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.saveAlignmentSettings).mock.calls[0]?.[1].sprint).toBe('Sprint 27')
+    await waitFor(() => expect(api.alignmentView).toHaveBeenCalledTimes(2))
   })
 
   it('writes the import file of the missing tickets and opens it', async () => {

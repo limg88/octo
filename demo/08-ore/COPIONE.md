@@ -49,7 +49,7 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
    Atteso: `worklog_<mese>.csv`. In «Impostazioni delle ore» il percorso delle ore del tracker è diventato `_octo/ore/jira`.
    Dimostra: non serve più esportare a mano; Octo legge con il tuo token di sola lettura, tiene solo persona, giorno, ore e issue, e non scrive su Jira.
 
-10. **Chiedi i timesheet a NetSuite.** Sempre in «Ore» premi «Leggi i timesheet da NetSuite».
+10. **Chiedi i timesheet a NetSuite.** Sempre in «Ore» premi «Leggi i timesheet da NetSuite»: i due pulsanti di lettura stanno sotto il periodo, in alto.
     Atteso: «NetSuite non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere i timesheet.» Nella demo NetSuite non c'è: serve un database, e la lettura vera è provata dai test contro un database di prova.
     Dimostra: con NetSuite collegato in «Impostazioni» lo stesso pulsante legge le ore delle commesse per i mesi del periodo, le scrive in `_octo/ore/netsuite/timesheet_<mese>.json` e il confronto parte da lì, senza file esportati a mano. Di ogni riga restano persona, giorno, ore, commessa e stato di approvazione: mai il costo.
 

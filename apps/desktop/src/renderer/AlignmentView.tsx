@@ -117,15 +117,34 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
       {view ? (
         <details className="dashboard-settings">
           <summary>{text.settings}</summary>
+          <p className="hint">{text.intro}</p>
           {form}
         </details>
       ) : (
         <section aria-label={text.settings}>
           <h3>{text.settings}</h3>
+          <p className="hint">{text.intro}</p>
           {form}
         </section>
       )}
-      <p className="hint">{text.intro}</p>
+      {/* The sprint is what changes every time: chosen here, without opening the settings. */}
+      {view && choices.sprints.length > 0 && (
+        <div className="range-fields">
+          <label>
+            {text.sprintNow}
+            <select
+              value={settings.sprint}
+              onChange={(event) => void save({ ...settings, sprint: event.target.value })}
+            >
+              {withCurrent(choices.sprints, settings.sprint).map((sprint) => (
+                <option key={sprint} value={sprint}>
+                  {sprint}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {view && (
         <Result
           view={view}
@@ -143,43 +162,57 @@ function List({
   intro,
   columns,
   rows,
+  folded = false,
   children,
 }: {
   title: string
   intro?: string
   columns: string[]
   rows: Array<{ key: string; cells: ReactNode[] }>
+  /** A list read for reference, not acted upon: one line that opens. */
+  folded?: boolean
   children?: ReactNode
 }) {
+  const table = (
+    <table className="data">
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th key={column}>{column}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key}>
+            {row.cells.map((cell, at) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a cell is its column.
+              <td key={at}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+  if (folded) {
+    return (
+      <details className="request">
+        <summary>
+          <strong>
+            {title} ({rows.length})
+          </strong>
+        </summary>
+        <section aria-label={title}>{table}</section>
+      </details>
+    )
+  }
   return (
     <section aria-label={title}>
       <h3>
         {title} ({rows.length})
       </h3>
       {intro && rows.length > 0 && <p className="hint">{intro}</p>}
-      {rows.length === 0 ? (
-        <p className="hint">{text.none}</p>
-      ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key}>
-                {row.cells.map((cell, at) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a cell is its column.
-                  <td key={at}>{cell}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {rows.length === 0 ? <p className="hint">{text.none}</p> : table}
       {children}
     </section>
   )
@@ -227,6 +260,12 @@ function Result({
     text.columnTicket,
     text.columnStates,
     text.columnCoherent,
+  ]
+  /** The lists of things to look at that hold nothing: said in one line, not one each. */
+  const quiet = [
+    ...(alignment.duplicates.length === 0 ? [text.duplicatesTitle] : []),
+    ...(alignment.orphans.length === 0 ? [text.orphansTitle] : []),
+    ...(alignment.suggestions.length === 0 ? [text.suggestionsTitle] : []),
   ]
   return (
     <>
@@ -279,47 +318,56 @@ function Result({
           pairRow(pair, [pair.tickets.map((ticket) => ticket.sprint ?? text.noSprint).join(', ')]),
         )}
       />
+      {alignment.duplicates.length > 0 && (
+        <List
+          title={text.duplicatesTitle}
+          columns={[text.columnItem, text.columnTitle, text.columnTicket]}
+          rows={alignment.duplicates.map((pair) => ({
+            key: pair.item.id,
+            cells: [pair.item.id, pair.item.title, keysOf(pair)],
+          }))}
+        />
+      )}
+      {alignment.orphans.length > 0 && (
+        <List
+          title={text.orphansTitle}
+          columns={[text.columnTicket, text.columnTitle, text.columnIds, text.columnReason]}
+          rows={alignment.orphans.map((orphan) => ({
+            key: orphan.ticket.key,
+            cells: [
+              orphan.ticket.key,
+              orphan.ticket.title,
+              orphan.ids.join(', '),
+              text.reason[orphan.reason],
+            ],
+          }))}
+        />
+      )}
+      {alignment.suggestions.length > 0 && (
+        <List
+          title={text.suggestionsTitle}
+          intro={text.suggestionsIntro}
+          columns={[text.columnItem, text.columnTitle, text.columnTicket, text.columnScore]}
+          rows={alignment.suggestions.map((suggestion) => ({
+            key: suggestion.item.id,
+            cells: [
+              suggestion.item.id,
+              suggestion.item.title,
+              `${suggestion.ticket.key} · ${suggestion.ticket.title}`,
+              `${Math.round(suggestion.score * 100)}% (${text.confidence[suggestion.confidence]})`,
+            ],
+          }))}
+        />
+      )}
+      {quiet.length > 0 && <p className="hint">{text.nothingIn(quiet.join(', '))}</p>}
       <List
+        folded
         title={text.linkedTitle}
         columns={pairColumns}
         rows={alignment.linked.map((pair) => pairRow(pair))}
       />
       <List
-        title={text.duplicatesTitle}
-        columns={[text.columnItem, text.columnTitle, text.columnTicket]}
-        rows={alignment.duplicates.map((pair) => ({
-          key: pair.item.id,
-          cells: [pair.item.id, pair.item.title, keysOf(pair)],
-        }))}
-      />
-      <List
-        title={text.orphansTitle}
-        columns={[text.columnTicket, text.columnTitle, text.columnIds, text.columnReason]}
-        rows={alignment.orphans.map((orphan) => ({
-          key: orphan.ticket.key,
-          cells: [
-            orphan.ticket.key,
-            orphan.ticket.title,
-            orphan.ids.join(', '),
-            text.reason[orphan.reason],
-          ],
-        }))}
-      />
-      <List
-        title={text.suggestionsTitle}
-        intro={text.suggestionsIntro}
-        columns={[text.columnItem, text.columnTitle, text.columnTicket, text.columnScore]}
-        rows={alignment.suggestions.map((suggestion) => ({
-          key: suggestion.item.id,
-          cells: [
-            suggestion.item.id,
-            suggestion.item.title,
-            `${suggestion.ticket.key} · ${suggestion.ticket.title}`,
-            `${Math.round(suggestion.score * 100)}% (${text.confidence[suggestion.confidence]})`,
-          ],
-        }))}
-      />
-      <List
+        folded
         title={text.unreferencedTitle}
         columns={[text.columnTicket, text.columnTitle, text.columnState]}
         rows={alignment.unreferenced.map((ticket) => ({

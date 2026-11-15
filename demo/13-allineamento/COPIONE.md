@@ -25,7 +25,7 @@ Durata: 4 minuti. Mostra il confronto fra le voci del tracker del cliente in uno
 4. **Leggi le liste.**
    - «Senza ticket»: le voci 105 e 106.
    - «Ticket da spostare nello sprint»: la 103, il cui ticket `AUR-3` è rimasto nello Sprint 27.
-   - «Collegate»: la 101 per l'id nel titolo del ticket (`[AZDO 101]`), la 102 perché porta `AUR-7` fra i tag, la 104 con due ticket.
+   - «Collegate (3)», in fondo, è una riga che si apre con un clic, perché si legge per riscontro e non chiede nulla: la 101 per l'id nel titolo del ticket (`[AZDO 101]`), la 102 perché porta `AUR-7` fra i tag, la 104 con due ticket.
    - «Voci con più di un ticket»: la 104 (`AUR-4, AUR-5`).
    - «Ticket che nominano una voce che non c'è»: `AUR-8`, che nomina la 999.
    - «Forse sono la stessa cosa»: la voce 106 e il ticket `AUR-6`, titoli quasi uguali ma nessun riferimento. Octo li propone, non li collega.
