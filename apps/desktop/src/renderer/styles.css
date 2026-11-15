@@ -1107,10 +1107,12 @@ main > .warning {
 
 /* Dashboard */
 .dashboard {
+  /* The space above the content: a table heading that stays in view sits over it. */
+  --page-top: 20px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 24px 32px;
+  padding: var(--page-top) 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -1212,10 +1214,22 @@ table.data th {
   color: var(--muted);
 }
 
+/*
+ * The heading of a table stays in view while its rows scroll: against the top of the page, over
+ * the space the page leaves there, and told apart from the rows by its ground and its line.
+ */
 table.data thead th {
   position: sticky;
-  top: 0;
-  background: var(--bg);
+  top: calc(-1 * var(--page-top, 0px));
+  z-index: 1;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow:
+    inset 0 -1px 0 var(--line),
+    0 2px 4px rgba(0, 0, 0, 0.12);
 }
 
 table.data tbody tr:hover {
