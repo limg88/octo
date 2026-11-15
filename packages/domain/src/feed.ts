@@ -29,7 +29,13 @@ export type DocumentKind = (typeof DOCUMENT_KINDS)[number]
 export const PUSH_SOURCE_KINDS = ['m365', 'dwsi', 'files'] as const
 /** Read by the worker with a sealed credential. */
 export const PULL_SOURCE_KINDS = ['jira', 'ado'] as const
-export const SOURCE_KINDS = [...PUSH_SOURCE_KINDS, ...PULL_SOURCE_KINDS] as const
+/** Read page by page by a connector of its own, on the PM's computer. */
+export const PAGE_SOURCE_KINDS = ['confluence'] as const
+export const SOURCE_KINDS = [
+  ...PUSH_SOURCE_KINDS,
+  ...PULL_SOURCE_KINDS,
+  ...PAGE_SOURCE_KINDS,
+] as const
 export type PushSourceKind = (typeof PUSH_SOURCE_KINDS)[number]
 export type PullSourceKind = (typeof PULL_SOURCE_KINDS)[number]
 export type SourceKind = (typeof SOURCE_KINDS)[number]

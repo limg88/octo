@@ -39,6 +39,7 @@ export const SYNC_STATE_FILE = 'state.json'
 /** The subfolder of a synchronized folder that holds the items of each kind of source. */
 export const SYNC_SUBFOLDERS: Readonly<Record<SourceKind, string>> = {
   jira: 'jira',
+  confluence: 'confluence',
   ado: 'ado',
   m365: 'm365',
   dwsi: 'netsuite',

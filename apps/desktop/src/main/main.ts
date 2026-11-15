@@ -89,6 +89,7 @@ const SYNC_INTERVAL_MS = 15 * 60 * 1000
 const FIRST_SYNC_DELAY_MS = 10 * 1000
 /** Demos and tests only: a fake Jira or Azure DevOps on this computer instead of the real one. */
 const DEV_JIRA_VARIABLE = 'OCTO_DEV_JIRA_URL'
+const DEV_CONFLUENCE_VARIABLE = 'OCTO_DEV_CONFLUENCE_URL'
 const DEV_ADO_VARIABLE = 'OCTO_DEV_ADO_URL'
 /**
  * Demos and tests only: credentials kept without the system's store, so a run needs no keychain.
@@ -195,7 +196,11 @@ function start(): void {
   })
   const files = createFsProjectFiles()
   const secrets = createFileVault(dataFolder, secretCipher())
-  const devEndpoints = { jira: process.env[DEV_JIRA_VARIABLE], ado: process.env[DEV_ADO_VARIABLE] }
+  const devEndpoints = {
+    jira: process.env[DEV_JIRA_VARIABLE],
+    ado: process.env[DEV_ADO_VARIABLE],
+    confluence: process.env[DEV_CONFLUENCE_VARIABLE],
+  }
   const indexes = createJsonFeedIndexes(dataFolder)
   const feeds = createFeeds({
     settings,

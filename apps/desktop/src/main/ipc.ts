@@ -104,6 +104,7 @@ const secret = z.string().max(MAX_SECRET_LENGTH).nullable()
 const feedConfigs = {
   ado: z.object({ ...feedBase, organization: rule, project: rule, areas: ruleList }),
   jira: z.object({ ...feedBase, site: rule, email: rule, projects: ruleList }),
+  confluence: z.object({ ...feedBase, site: rule, email: rule, spaces: ruleList }),
   dwsi: z.object({
     ...feedBase,
     host: rule,
@@ -118,11 +119,17 @@ const feedConfigs = {
 const feedChoicesInput = z.discriminatedUnion('feed', [
   byProject.extend({ feed: z.literal('ado'), secret, config: feedConfigs.ado }),
   byProject.extend({ feed: z.literal('jira'), secret, config: feedConfigs.jira }),
+  byProject.extend({ feed: z.literal('confluence'), secret, config: feedConfigs.confluence }),
   byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi }),
 ])
 const feedSaveInput = z.discriminatedUnion('feed', [
   byProject.extend({ feed: z.literal('ado'), secret, config: feedConfigs.ado.nullable() }),
   byProject.extend({ feed: z.literal('jira'), secret, config: feedConfigs.jira.nullable() }),
+  byProject.extend({
+    feed: z.literal('confluence'),
+    secret,
+    config: feedConfigs.confluence.nullable(),
+  }),
   byProject.extend({ feed: z.literal('dwsi'), secret, config: feedConfigs.dwsi.nullable() }),
 ])
 

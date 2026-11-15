@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createFeeds, type SecretVault } from '@octo/application'
 import {
   type AdoFeedConfig,
+  type ConfluenceFeedConfig,
   type JiraFeedConfig,
   type Project,
   parseTimesheetExport,
@@ -15,6 +16,10 @@ import {
 } from '@octo/domain'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { type FakeAdo, startFakeAdo, workItem } from '../../connectors/test/support/fake-ado.ts'
+import {
+  type FakeConfluence,
+  startFakeConfluence,
+} from '../../connectors/test/support/fake-confluence.ts'
 import { type FakeDwsi, startFakeDwsi } from '../../connectors/test/support/fake-dwsi.ts'
 import { type FakeJira, jiraIssue, startFakeJira } from '../../connectors/test/support/fake-jira.ts'
 import {
@@ -208,6 +213,94 @@ describe('Azure DevOps as files of the project', () => {
     })
     await expect(save({ project: 'Inesistente' })).rejects.toMatchObject({ code: 'feed_not_found' })
     await expect(save({ areas: ['Team Z'] })).rejects.toMatchObject({ code: 'feed_not_found' })
+  })
+})
+
+describe('Confluence as files of the project', () => {
+  const aurora = { id: '100', key: 'AUR', name: 'Aurora' }
+  const zefiro = { id: '200', key: 'ZEF', name: 'Zefiro' }
+  const config: ConfluenceFeedConfig = {
+    site: 'contoso.atlassian.net',
+    email: 'pm@example.test',
+    spaces: ['AUR'],
+    since: SINCE,
+    targetFolder: 'Fonti/Confluence',
+  }
+  const page = (id: string, spaceId: string, changedAt: string, title: string, body: string) => ({
+    id,
+    spaceId,
+    title,
+    changedAt,
+    version: 1,
+    paragraphs: [body],
+  })
+  let fake: FakeConfluence
+  afterEach(() => fake?.server.close())
+
+  async function start() {
+    fake = await startFakeConfluence({
+      email: config.email,
+      token: PAT,
+      spaces: [aurora, zefiro],
+      pages: [
+        page('1', aurora.id, '2026-10-20T10:00:00.000Z', 'Vecchia', 'Prima del primo giorno.'),
+        page(
+          '2',
+          aurora.id,
+          '2026-11-04T10:00:00.000Z',
+          'Decisioni',
+          'Il collaudo è il 17 dicembre.',
+        ),
+        page('3', zefiro.id, '2026-11-05T10:00:00.000Z', 'Altro spazio', 'Non richiesto.'),
+      ],
+    })
+    return setup({ devEndpoints: { confluence: fake.server.origin } })
+  }
+
+  it('writes one file per page of the spaces named, changed since the first day, then only what changes', async () => {
+    const { feeds, project, names, text } = await start()
+    await feeds.save(project, 'confluence', config, PAT)
+    expect((await feeds.sync(project, 'confluence')).error).toBeNull()
+
+    const pages = async () =>
+      (await names('Fonti/Confluence')).filter((name) => !name.startsWith('_'))
+    const files = await pages()
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatch(/^2026-11-04-decisioni-/)
+    const written = await text(`Fonti/Confluence/${files[0]}`)
+    expect(written).toContain('Il collaudo è il 17 dicembre.')
+    expect(written).toContain('/wiki/spaces/100/pages/2')
+    expect(await text('Fonti/Confluence/_lettura.md')).toContain('fonte: "Confluence"')
+
+    fake.options.pages.push(
+      page('4', aurora.id, '2026-11-10T09:00:00.000Z', 'Verbale', 'Azioni assegnate.'),
+    )
+    const again = await feeds.sync(project, 'confluence')
+    expect(again).toMatchObject({ error: null, written: 1 })
+    expect(await pages()).toHaveLength(2)
+    // Never a write, never a page of a space that was not named.
+    expect(fake.server.received.every((request) => request.method === 'GET')).toBe(true)
+    expect(fake.server.received.some((request) => request.url.includes('/spaces/200/'))).toBe(false)
+  })
+
+  it('lists the spaces of the account by their key, and refuses what it cannot read', async () => {
+    const { feeds, project } = await start()
+    expect(await feeds.choices(project, 'confluence', config, PAT)).toEqual({
+      projects: [
+        { value: 'AUR', label: 'Aurora (AUR)' },
+        { value: 'ZEF', label: 'Zefiro (ZEF)' },
+      ],
+      areas: [],
+    })
+    await expect(feeds.save(project, 'confluence', config, 'sbagliato')).rejects.toMatchObject({
+      code: 'feed_credential_refused',
+    })
+    await expect(
+      feeds.save(project, 'confluence', { ...config, spaces: ['Inesistente'] }, PAT),
+    ).rejects.toMatchObject({ code: 'feed_not_found' })
+    await expect(
+      feeds.save(project, 'confluence', { ...config, spaces: [] }, PAT),
+    ).rejects.toMatchObject({ code: 'source_config_invalid' })
   })
 })
 

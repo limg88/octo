@@ -9,7 +9,7 @@ import type { SecretValue } from './secret-value.ts'
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
 /** The source systems a connector reads. */
-export const CONNECTOR_KINDS = ['jira', 'ado', 'netsuite_dwsi'] as const
+export const CONNECTOR_KINDS = ['jira', 'ado', 'netsuite_dwsi', 'confluence'] as const
 export type ConnectorKind = (typeof CONNECTOR_KINDS)[number]
 
 /** What a connector works with, built by the job for one source. */

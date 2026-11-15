@@ -30,13 +30,14 @@ const empty: FeedView = {
 }
 const linked: FeedView = { ...empty, config, hasSecret: true, state: { cursor: 'x', lastRun: run } }
 
-type FeedApi = Pick<OctoApi, 'feed' | 'saveFeed' | 'syncFeed' | 'onSourcesChanged'>
+type FeedApi = Pick<OctoApi, 'feed' | 'saveFeed' | 'syncFeed' | 'onSourcesChanged' | 'feedChoices'>
 
 function fakeApi(overrides: Partial<FeedApi> = {}) {
   let changed: (projectId: string) => void = () => {}
   const api: FeedApi = {
     feed: vi.fn(async () => ok(linked)),
     saveFeed: vi.fn(async () => ok(linked)),
+    feedChoices: vi.fn(async () => ok({ projects: [], areas: [] })),
     syncFeed: vi.fn(async () => ok(run)),
     onSourcesChanged: (listener) => {
       changed = listener
@@ -134,6 +135,49 @@ describe('FeedSection', () => {
     expect(screen.queryByRole('note')).toBeNull()
     // The credential keeps its own name: the guide is beside the label, not inside it.
     expect(secretInput().type).toBe('password')
+  })
+
+  it('links Confluence by its spaces, searched and picked with a click', async () => {
+    const confluence: FeedView = {
+      ...empty,
+      feed: 'confluence',
+      suggestedFolder: '_octo/fonti/Confluence',
+    }
+    const { api } = fakeApi({
+      feed: vi.fn(async () => ok(confluence)),
+      feedChoices: vi.fn(async () =>
+        ok({ projects: [{ value: 'AUR', label: 'Aurora (AUR)' }], areas: [] }),
+      ),
+    })
+    render(<FeedSection api={api} project={project} feed="confluence" now={now} />)
+    await screen.findByText(messages.feedIntro.confluence)
+    type(fields.site, 'contoso')
+    type(fields.email, 'pm@example.test')
+    fireEvent.change(screen.getByLabelText(new RegExp(`^${messages.feedSecret.confluence}`)), {
+      target: { value: 'token' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.feedChoicesSpaces }))
+    expect(await screen.findByText(messages.feedChoicesSpacesTitle)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Aurora (AUR)' }))
+    expect(screen.getByLabelText<HTMLTextAreaElement>(fields.spaces).value).toBe('AUR')
+    fireEvent.click(screen.getByRole('button', { name: messages.feedSave }))
+    await waitFor(() => expect(api.saveFeed).toHaveBeenCalled())
+    expect(vi.mocked(api.saveFeed).mock.calls[0]?.slice(1)).toMatchObject([
+      'confluence',
+      { site: 'contoso', email: 'pm@example.test', spaces: ['AUR'] },
+      'token',
+    ])
+  })
+
+  it('says when the account sees no space', async () => {
+    const confluence: FeedView = { ...empty, feed: 'confluence' }
+    const { api } = fakeApi({
+      feed: vi.fn(async () => ok(confluence)),
+      feedChoices: vi.fn(async () => ok({ projects: [], areas: [] })),
+    })
+    render(<FeedSection api={api} project={project} feed="confluence" now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.feedChoicesSpaces }))
+    expect(await screen.findByText(messages.feedChoicesNoSpaces)).toBeTruthy()
   })
 
   it('is one row of a list when folded: its state, a reading, and the way in', async () => {

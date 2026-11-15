@@ -38,6 +38,7 @@ export const messages = {
   feedHelpTitle: {
     ado: 'Come ottengo il token?',
     jira: 'Come ottengo il token?',
+    confluence: 'Come ottengo il token?',
     dwsi: 'Dove trovo utente e password?',
   },
   feedHelp: {
@@ -57,6 +58,14 @@ export const messages = {
         'Copia subito il token e incollalo qui: si vede una volta sola.',
       ],
       note: 'Il token vede ciò che vedi tu; Octo lo usa solo per leggere.',
+    },
+    confluence: {
+      steps: [
+        'Confluence usa lo stesso account di Jira: se hai già un token per Jira, va bene lo stesso.',
+        'Altrimenti apri id.atlassian.com/manage-profile/security/api-tokens e premi «Crea token API».',
+        'Copia subito il token e incollalo qui: si vede una volta sola.',
+      ],
+      note: 'Octo legge solo le pagine degli spazi che indichi, mai un sito intero.',
     },
     dwsi: {
       steps: [
@@ -142,9 +151,16 @@ export const messages = {
   feedIntro: {
     ado: 'Le voci del tracker del progetto (bug, storie, attività), una per file, lette con il tuo token personale di sola lettura.',
     jira: 'I ticket dei progetti indicati, uno per file, letti con la tua email e un token di sola lettura.',
+    confluence:
+      'Le pagine degli spazi indicati, una per file, con il loro testo: lette con la stessa email e lo stesso tipo di token di Jira. Allegati e commenti non vengono letti.',
     dwsi: 'Ore, ordini, fatture e ricavi delle commesse indicate, letti dall’archivio dei dati aziendali con il tuo utente di sola lettura. La connessione resta su questo computer.',
   },
-  feedSecret: { ado: 'Personal Access Token', jira: 'API token', dwsi: 'Password' },
+  feedSecret: {
+    ado: 'Personal Access Token',
+    jira: 'API token',
+    confluence: 'API token',
+    dwsi: 'Password',
+  },
   feedSecretKept: 'Già salvata su questo computer: lascia vuoto per tenerla.',
   feedSecretHint:
     'Resta su questo computer, cifrata dal sistema. Non finisce nella cartella del progetto.',
@@ -165,7 +181,8 @@ export const messages = {
     project: 'Progetto',
     areas: 'Aree (una per riga; vuoto: tutto il progetto)',
     site: 'Sito (es. contoso.atlassian.net)',
-    email: 'La tua email su Jira',
+    email: 'La tua email su Atlassian',
+    spaces: 'Spazi (chiave o nome, uno per riga)',
     projects: 'Progetti (chiave o nome, uno per riga)',
     host: 'Server (nome, non indirizzo)',
     port: 'Porta',
@@ -881,6 +898,7 @@ export const messages = {
     mail: 'Posta',
     ado: 'Azure DevOps',
     jira: 'Jira',
+    confluence: 'Confluence',
     dwsi: 'NetSuite',
     documents: 'Documenti',
   },
@@ -896,6 +914,9 @@ export const messages = {
   feedChoicesProjects: 'Progetti che vedi (clic per scegliere):',
   feedChoicesAreas: 'Aree del progetto (clic per aggiungere):',
   feedChoicesNone: 'Nessun progetto visibile con questa credenziale.',
+  feedChoicesSpaces: 'Cerca gli spazi',
+  feedChoicesSpacesTitle: 'Spazi che vedi (clic per aggiungere):',
+  feedChoicesNoSpaces: 'Nessuno spazio visibile con questa credenziale.',
   documentsTitle: 'Documenti',
   documentsIntro:
     'Octo rende leggibile il testo di Word, Excel, PowerPoint e PDF della cartella, così nelle risposte può cercarlo e citarlo. Gli originali non vengono toccati.',

@@ -41,6 +41,12 @@ const jiraSchema = z.object({
   email: z.string(),
   projects: z.array(z.string()),
 })
+const confluenceSchema = z.object({
+  ...feedBase,
+  site: z.string(),
+  email: z.string(),
+  spaces: z.array(z.string()),
+})
 const dwsiSchema = z.object({
   ...feedBase,
   host: z.string(),
@@ -57,6 +63,7 @@ const sourcesSchema = z.object({
   mail: mailSchema.nullable().default(null),
   ado: adoSchema.nullable().default(null),
   jira: jiraSchema.nullable().default(null),
+  confluence: confluenceSchema.nullable().default(null),
   dwsi: dwsiSchema.nullable().default(null),
 })
 
@@ -88,6 +95,7 @@ const FEEDS_FOLDER = `${OCTO_FOLDER}/fonti`
 const FEED_FOLDERS: Readonly<Record<FeedName, string>> = {
   ado: 'ADO',
   jira: 'Jira',
+  confluence: 'Confluence',
   dwsi: 'NetSuite',
 }
 const INDEXES_FOLDER = 'feeds'
@@ -157,11 +165,12 @@ export function createFsSourceSettings(): SourceSettings {
     async load(projectFolder): Promise<SourcesConfig> {
       const parsed = sourcesSchema.safeParse(await readJsonOr(fileOf(projectFolder), NO_SOURCES))
       if (!parsed.success) throw new DomainError('source_config_invalid', SOURCES_FILE)
-      const { mail, ado, jira, dwsi } = parsed.data
+      const { mail, ado, jira, confluence, dwsi } = parsed.data
       return {
         mail: mail ? cleanMailSource(mail) : null,
         ado: ado ? cleanFeedConfig('ado', ado) : null,
         jira: jira ? cleanFeedConfig('jira', jira) : null,
+        confluence: confluence ? cleanFeedConfig('confluence', confluence) : null,
         dwsi: dwsi ? cleanFeedConfig('dwsi', dwsi) : null,
       }
     },

@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import { DEMO_ADO, extraItem, startDemoAdo } from '../demo/lib/fake-ado.ts'
+import { DEMO_CONFLUENCE, startDemoConfluence } from '../demo/lib/fake-confluence.ts'
 import { DEMO_JIRA, startDemoJira } from '../demo/lib/fake-jira.ts'
 import { readDeckOutline } from '../packages/infrastructure/src/office/deck-model.ts'
 
@@ -25,6 +26,7 @@ execFileSync('node', [`${root}demo/lib/fake-hours.ts`, `${work}/Aurora`])
 
 const ado = await startDemoAdo()
 const jira = await startDemoJira()
+const confluence = await startDemoConfluence()
 
 // OCTO_E2E_EXECUTABLE points the same steps at an installed or packaged app.
 const packaged = process.env.OCTO_E2E_EXECUTABLE
@@ -55,6 +57,7 @@ const launch = (dataFolder = `${work}/dati`) =>
       OCTO_MAIL_ROOT: `${work}/Mail`,
       OCTO_DEV_ADO_URL: ado.server.origin,
       OCTO_DEV_JIRA_URL: jira.server.origin,
+      OCTO_DEV_CONFLUENCE_URL: confluence.server.origin,
       OCTO_DEMO_PLAIN_SECRETS: '1',
     },
   })
@@ -115,7 +118,7 @@ try {
   await mail.getByLabel('Mittenti da escludere').fill('avvisi@monitor.example')
   await mail.getByRole('button', { name: 'Salva', exact: true }).click()
   await mail.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
-  await guide.getByText(/^1 su 4 collegati/).waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^1 su 5 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await mail.getByRole('button', { name: 'Leggi ora' }).click()
   // The periodic reading may have run just before the click: either way two mails are there.
   await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
@@ -205,7 +208,7 @@ try {
   await assertEventually(() => workItems().length === 4)
 
   // Demo 05: one button reads everything that is linked.
-  await guide.getByText(/^2 su 4 collegati/).waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^2 su 5 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await guide.getByRole('button', { name: 'Riempi la memoria ora' }).click()
   await guide.getByText('Fatto. Ora puoi fare domande').waitFor({ timeout: TIMEOUT_MS })
   for (const source of ['Posta', 'Azure DevOps', 'Documenti']) {
@@ -354,11 +357,36 @@ try {
   const jiraSection = page.getByRole('region', { name: 'Jira', exact: true })
   await openSource('Collega', 'Jira')
   await jiraSection.getByLabel(/^Sito/).fill(DEMO_JIRA.site)
-  await jiraSection.getByLabel('La tua email su Jira').fill(DEMO_JIRA.email)
+  await jiraSection.getByLabel('La tua email su Atlassian').fill(DEMO_JIRA.email)
   await jiraSection.getByLabel(/^API token/).fill(DEMO_JIRA.token)
   await jiraSection.getByLabel(/^Progetti/).fill(DEMO_JIRA.key)
   await jiraSection.getByRole('button', { name: 'Prova e salva' }).click()
   await jiraSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
+  // Confluence is a source like the others: same account as Jira, its spaces picked from a search.
+  const wiki = page.getByRole('region', { name: 'Confluence', exact: true })
+  await openSource('Collega', 'Confluence')
+  await wiki.getByLabel(/^Sito/).fill(DEMO_CONFLUENCE.site)
+  await wiki.getByLabel('La tua email su Atlassian').fill(DEMO_CONFLUENCE.email)
+  await wiki.getByLabel(/^API token/).fill(DEMO_CONFLUENCE.token)
+  await wiki.getByRole('button', { name: 'Cerca gli spazi' }).click()
+  await wiki.getByRole('button', { name: 'Aurora (AUR)', exact: true }).click()
+  assert.equal(await wiki.getByLabel(/^Spazi/).inputValue(), DEMO_CONFLUENCE.space)
+  await wiki.getByRole('button', { name: 'Prova e salva' }).click()
+  await wiki.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
+  await wiki.getByRole('button', { name: 'Leggi ora' }).click()
+  await wiki
+    .getByText(/Ultima lettura .* aggiornati, \d+ invariati/)
+    .waitFor({ timeout: TIMEOUT_MS })
+  const wikiPages = readdirSync(`${work}/Aurora/_octo/fonti/Confluence`).filter(
+    (name) => !name.startsWith('_'),
+  )
+  assert.equal(wikiPages.length, 2)
+  const wikiDecisions = wikiPages.find((name) => name.includes('decisioni-di-progetto'))
+  assert.match(
+    readFileSync(`${work}/Aurora/_octo/fonti/Confluence/${wikiDecisions}`, 'utf8'),
+    /collaudo del modulo ordini è confermato per il 17 dicembre 2026/,
+  )
+  await page.screenshot({ path: `${work}/confluence.png` })
   await page.getByRole('tab', { name: 'Ore' }).click()
   await page.getByText('Quadratura: 664 ore approvate, tutte nel confronto').waitFor({
     timeout: TIMEOUT_MS,
@@ -842,4 +870,5 @@ try {
   await app.close()
   ado.server.close()
   jira.server.close()
+  confluence.server.close()
 }

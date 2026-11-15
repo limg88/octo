@@ -2,7 +2,7 @@ import { DomainError } from './errors.ts'
 import { cleanTargetFolder, startOfDay } from './sources.ts'
 
 /** The systems of record a project is fed from, beside mail and documents. */
-export const FEED_NAMES = ['ado', 'jira', 'dwsi'] as const
+export const FEED_NAMES = ['ado', 'jira', 'confluence', 'dwsi'] as const
 export type FeedName = (typeof FEED_NAMES)[number]
 
 type FeedBase = {
@@ -27,6 +27,14 @@ export type JiraFeedConfig = FeedBase & {
   projects: string[]
 }
 
+export type ConfluenceFeedConfig = FeedBase & {
+  /** `contoso` or `contoso.atlassian.net`: the same site as Jira. */
+  site: string
+  email: string
+  /** Space keys or names: at least one, a whole site is never read. */
+  spaces: string[]
+}
+
 export const WAREHOUSE_TLS_MODES = ['verify_full', 'unverified', 'plaintext'] as const
 export type WarehouseTls = (typeof WAREHOUSE_TLS_MODES)[number]
 
@@ -45,6 +53,7 @@ export type WarehouseFeedConfig = FeedBase & {
 export type FeedConfigs = {
   ado: AdoFeedConfig
   jira: JiraFeedConfig
+  confluence: ConfluenceFeedConfig
   dwsi: WarehouseFeedConfig
 }
 export type FeedConfig = FeedConfigs[FeedName]
@@ -111,6 +120,16 @@ const cleaners: { [Name in FeedName]: (config: FeedConfigs[Name]) => FeedConfigs
     email: required(config.email, 'email'),
     projects: list(config.projects),
   }),
+  confluence: (config) => {
+    const spaces = list(config.spaces)
+    if (spaces.length === 0) throw invalid('spaces')
+    return {
+      ...base(config),
+      site: required(config.site, 'site'),
+      email: required(config.email, 'email'),
+      spaces,
+    }
+  },
   dwsi: (config) => {
     const projectCodes = list(config.projectCodes).map((code) => code.toUpperCase())
     if (projectCodes.length === 0 || !projectCodes.every((code) => PRJ_CODE.test(code))) {
@@ -148,7 +167,7 @@ export function cleanFeedConfig<Name extends FeedName>(
 export function feedScope(config: FeedConfig): string {
   const { targetFolder: _folder, ...settings } = config
   // An issue tracker read for more fields than before is another reading: it starts over once.
-  const what = 'site' in config ? { ...settings, fields: ISSUE_FIELDS_REVISION } : settings
+  const what = 'projects' in config ? { ...settings, fields: ISSUE_FIELDS_REVISION } : settings
   return JSON.stringify(what, Object.keys(what).sort())
 }
 
@@ -158,6 +177,7 @@ const ISSUE_FIELDS_REVISION = 2
 const FEED_LABELS: Readonly<Record<FeedName, string>> = {
   ado: 'Azure DevOps',
   jira: 'Jira',
+  confluence: 'Confluence',
   dwsi: 'NetSuite',
 }
 

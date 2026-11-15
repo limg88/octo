@@ -5,10 +5,13 @@ import type {
   TrackerSnapshotReader,
 } from '@octo/application'
 import {
+  type ConfluenceCursor,
   ConnectorError,
   type ConnectorReader,
+  createConfluenceConnector,
   createConnectorReader,
   createNetGuard,
+  createSafeHttp,
   dwsiConnector,
   type NetGuardOptions,
   type PerimeterOption,
@@ -20,6 +23,7 @@ import {
 } from '@octo/connectors'
 import {
   type AdoFeedConfig,
+  type ConfluenceFeedConfig,
   type Delivery,
   DomainError,
   type DomainErrorCode,
@@ -43,7 +47,11 @@ import {
 
 export type ConnectorFeedOptions = {
   /** Demos and tests only: a fake Jira or Azure DevOps on this computer instead of the real one. */
-  devEndpoints?: { jira?: string | undefined; ado?: string | undefined }
+  devEndpoints?: {
+    jira?: string | undefined
+    ado?: string | undefined
+    confluence?: string | undefined
+  }
   /** Demos and tests only: lets the warehouse be a database on this computer. */
   allowLoopback?: boolean
   /** Tests only: how the name of the warehouse becomes addresses, instead of the system's DNS. */
@@ -241,14 +249,134 @@ function warehouseContext(
   }
 }
 
+/** A space is named by its key, which its label carries in brackets, or by its whole name. */
+function spaceInScope(option: PerimeterOption, scope: readonly string[]): boolean {
+  const label = option.label.toLowerCase()
+  return scope.some((raw) => {
+    const wanted = raw.trim().toLowerCase()
+    return wanted !== '' && (label === wanted || label.endsWith(`(${wanted})`))
+  })
+}
+
 /**
- * Azure DevOps, Jira and the NetSuite warehouse through the read-only connectors, on the PM's
+ * Confluence through its read-only connector: the same safe HTTP client as the trackers
+ * (allowlisted paths, no redirects), with the site and the account of Jira.
+ */
+function confluenceReader(options: ConnectorFeedOptions) {
+  const local = options.devEndpoints?.confluence
+  const connector = createConfluenceConnector(
+    local
+      ? {
+          endpoint: () => ({
+            origin: local,
+            host: new URL(local).host,
+            prefix: ['wiki'],
+            browse: local,
+          }),
+        }
+      : {},
+  )
+  const allowLoopback = Boolean(local)
+  const onBlocked = async () => {}
+
+  /** Runs `work` with the context of one configuration; the HTTP client is closed afterwards. */
+  async function withContext<T>(
+    config: ConfluenceFeedConfig,
+    secret: string,
+    perimeter: readonly string[],
+    signal: AbortSignal,
+    work: (ctx: Parameters<typeof connector.sync>[0]) => Promise<T>,
+  ): Promise<T> {
+    const parsed = connector.parseConfig({
+      site: jiraSite(config.site),
+      email: config.email,
+      readOnlyToken: true,
+    })
+    const http = createSafeHttp({
+      rules: connector.rules(parsed),
+      onBlocked,
+      allowLoopbackHttp: allowLoopback,
+      signal,
+    })
+    try {
+      return await work({
+        config: parsed,
+        perimeter,
+        secret: new SecretValue(secret),
+        http,
+        net: createNetGuard({ privateHosts: [], onBlocked, allowLoopback }),
+        signal,
+        now: () => new Date(),
+      })
+    } finally {
+      http.close()
+    }
+  }
+
+  /** Checks the credential, then lists the spaces it sees. */
+  const spaces = (config: ConfluenceFeedConfig, secret: string): Promise<PerimeterOption[]> =>
+    withContext(config, secret, [], new AbortController().signal, async (ctx) => {
+      const check = await connector.test(ctx)
+      if (!check.ok) throw new ConnectorError(check.code)
+      return connector.perimeterOptions(ctx)
+    })
+
+  /** The spaces the configuration names, among those the credential sees: never none. */
+  async function chosen(config: ConfluenceFeedConfig, secret: string): Promise<string[]> {
+    const found = (await spaces(config, secret)).filter((space) =>
+      spaceInScope(space, config.spaces),
+    )
+    if (found.length === 0) throw new ConnectorError('source_not_configured')
+    return found.map((space) => space.id)
+  }
+
+  return {
+    async choices(config: ConfluenceFeedConfig, secret: string): Promise<FeedChoices> {
+      const listed = await spaces(config, secret)
+      return {
+        projects: listed.map((space) => ({
+          value: KEY_IN_LABEL.exec(space.label)?.[1] ?? space.label,
+          label: space.label,
+        })),
+        areas: [],
+      }
+    },
+    async check(config: ConfluenceFeedConfig, secret: string): Promise<void> {
+      await chosen(config, secret)
+    },
+    async *read(
+      config: ConfluenceFeedConfig,
+      secret: string,
+      cursor: unknown,
+      signal: AbortSignal,
+    ): AsyncGenerator<FeedStep> {
+      const perimeter = await chosen(config, secret)
+      const start = startOfDay(config.since).toISOString()
+      let from: ConfluenceCursor =
+        cursor === null || cursor === undefined
+          ? { since: start, space: 0, next: null, seen: start }
+          : connector.parseCursor(cursor)
+      for (let batch = 0; batch < MAX_BATCHES_PER_READING; batch++) {
+        const read = await withContext(config, secret, perimeter, signal, (ctx) =>
+          connector.sync(ctx, from, { maxItems: MAX_ITEMS_PER_DELIVERY, signal }),
+        )
+        from = read.nextCursor
+        yield stepOf('confluence', toDelivery(read, new Set(perimeter)), from)
+        if (read.done) return
+      }
+    },
+  }
+}
+
+/**
+ * Azure DevOps, Jira, Confluence and the NetSuite warehouse through the read-only connectors, on the PM's
  * computer and with the PM's own credential. What they give becomes files of the memory.
  */
 export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): FeedReader {
   const trackers: ConnectorReader = createConnectorReader(
     options.devEndpoints ? { devEndpoints: options.devEndpoints } : {},
   )
+  const confluence = confluenceReader(options)
 
   const tracker = (feed: FeedName, config: FeedConfig): Tracker =>
     feed === 'ado'
@@ -313,7 +441,11 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
   return {
     async choices(feed, config, secret) {
       try {
-        return feed === 'dwsi' ? NO_CHOICES : await trackerChoices(feed, config, secret)
+        if (feed === 'dwsi') return NO_CHOICES
+        if (feed === 'confluence') {
+          return await confluence.choices(config as ConfluenceFeedConfig, secret)
+        }
+        return await trackerChoices(feed, config, secret)
       } catch (error) {
         throw failure(error)
       }
@@ -326,6 +458,9 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
           if (!outcome.ok) throw new ConnectorError(outcome.code)
           return
         }
+        if (feed === 'confluence') {
+          return await confluence.check(config as ConfluenceFeedConfig, secret)
+        }
         const { kind, config: raw, scope } = tracker(feed, config)
         await trackers.connect(kind, raw, secret, scope)
       } catch (error) {
@@ -334,9 +469,10 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
     },
     async *read(feed, config, secret, cursor, signal) {
       try {
-        yield* feed === 'dwsi'
-          ? readWarehouse(config as WarehouseFeedConfig, secret)
-          : readTracker(feed, config, secret, cursor, signal)
+        if (feed === 'dwsi') yield* readWarehouse(config as WarehouseFeedConfig, secret)
+        else if (feed === 'confluence') {
+          yield* confluence.read(config as ConfluenceFeedConfig, secret, cursor, signal)
+        } else yield* readTracker(feed, config, secret, cursor, signal)
       } catch (error) {
         throw failure(error)
       }

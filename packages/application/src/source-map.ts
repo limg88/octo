@@ -25,6 +25,7 @@ const SUMMARY_DATE = /^- Dati del tracker al: (\S+)$/m
 const FEED_CONTENT: Readonly<Record<(typeof FEED_NAMES)[number], string>> = {
   ado: 'one file per work item, with state, sprint, tags and description',
   jira: 'one file per issue, with status, sprint, assignee and comments',
+  confluence: 'one file per page of the chosen spaces, with its title and its text',
   dwsi: 'hours, orders, invoices and revenue of the project codes',
 }
 

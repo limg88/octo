@@ -51,8 +51,8 @@ describe('SetupGuide', () => {
     const { api, changed } = fakeApi()
     render(<SetupGuide api={api} project={project} />)
 
-    // Posta and one system out of four: the rows below say which.
-    expect(await screen.findByText(messages.guideLinked(2, 4))).toBeTruthy()
+    // Posta and one system out of the five sources: the rows below say which.
+    expect(await screen.findByText(messages.guideLinked(2, 5))).toBeTruthy()
 
     act(() => changed('altro'))
     act(() => changed('p-1'))
@@ -62,7 +62,7 @@ describe('SetupGuide', () => {
   it('says where to start when nothing is linked yet', async () => {
     const { api } = fakeApi({ feedingStatus: async () => ok({ mail: false, feeds: [] }) })
     render(<SetupGuide api={api} project={project} />)
-    expect(await screen.findByText(messages.guideLinked(0, 4))).toBeTruthy()
+    expect(await screen.findByText(messages.guideLinked(0, 5))).toBeTruthy()
   })
 
   it('fills the memory from everything linked and tells each step as it ends', async () => {

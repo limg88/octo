@@ -48,6 +48,11 @@ const FIELDS: Readonly<Record<FeedName, Field[]>> = {
     { key: 'email', kind: 'text', step: 'access' },
     { key: 'projects', kind: 'list', step: 'scope' },
   ],
+  confluence: [
+    { key: 'site', kind: 'text', step: 'access' },
+    { key: 'email', kind: 'text', step: 'access' },
+    { key: 'spaces', kind: 'list', step: 'scope' },
+  ],
   dwsi: [
     { key: 'host', kind: 'text', step: 'access' },
     { key: 'port', kind: 'number', step: 'access', initial: DEFAULT_WAREHOUSE_PORT },
@@ -57,6 +62,14 @@ const FIELDS: Readonly<Record<FeedName, Field[]>> = {
     { key: 'ownerEmail', kind: 'text', step: 'scope' },
     { key: 'projectCodes', kind: 'list', step: 'scope' },
   ],
+}
+
+/** The list a choice of the search is added to, for each system. */
+const PICK_FIELD: Readonly<Record<FeedName, FieldKey>> = {
+  ado: 'areas',
+  jira: 'projects',
+  confluence: 'spaces',
+  dwsi: 'projectCodes',
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -163,7 +176,9 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
     else setError(result.code)
   }
 
-  const listField: FieldKey = feed === 'ado' ? 'areas' : 'projects'
+  /** Where what is picked from the search goes: the list of what the feed reads. */
+  const listField: FieldKey = PICK_FIELD[feed]
+  const searchesSpaces = feed === 'confluence'
   /** A project chosen names the one read (Azure DevOps) or joins those read (Jira). */
   const pickProject = (value: string) =>
     feed === 'ado' ? setForm({ ...form, project: value }) : addLine(listField, value)
@@ -262,15 +277,19 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
         {feed !== 'dwsi' && (
           <div className="actions">
             <button type="button" disabled={busy} onClick={() => void search()}>
-              {messages.feedChoices}
+              {searchesSpaces ? messages.feedChoicesSpaces : messages.feedChoices}
             </button>
           </div>
         )}
         {choices && (
           <div className="preview">
-            {choices.projects.length === 0 && <p>{messages.feedChoicesNone}</p>}
+            {choices.projects.length === 0 && (
+              <p>{searchesSpaces ? messages.feedChoicesNoSpaces : messages.feedChoicesNone}</p>
+            )}
             <ChoiceList
-              title={messages.feedChoicesProjects}
+              title={
+                searchesSpaces ? messages.feedChoicesSpacesTitle : messages.feedChoicesProjects
+              }
               choices={choices.projects}
               onPick={pickProject}
             />

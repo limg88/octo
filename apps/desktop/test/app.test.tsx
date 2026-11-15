@@ -716,9 +716,9 @@ describe('project tabs', () => {
     expect(screen.getByText(messages.mailIntro)).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: `${messages.sourceLink}: Jira` }))
     expect(formOf(messages.mailExclude)?.hidden).toBe(true)
-    expect(formOf(messages.feedFields.site)?.hidden).toBe(false)
+    expect(formOf(messages.feedFields.projects)?.hidden).toBe(false)
     fireEvent.click(toggle(messages.close, 'Jira'))
-    expect(formOf(messages.feedFields.site)?.hidden).toBe(true)
+    expect(formOf(messages.feedFields.projects)?.hidden).toBe(true)
 
     // The parts of the settings are moved through with the arrows too, round the row.
     const links = screen.getByRole('tab', { name: messages.settingsParts.links })

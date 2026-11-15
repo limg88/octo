@@ -15,6 +15,15 @@ export type {
   AdoTrackerItem,
   AdoTrackerSnapshot,
 } from './ado/tracker.ts'
+export {
+  type ConfluenceConfig,
+  type ConfluenceEndpoint,
+  confluenceRules,
+} from './confluence/config.ts'
+export {
+  type ConfluenceCursor,
+  createConfluenceConnector,
+} from './confluence/connector.ts'
 export { type ConnectorDelivery, toDelivery } from './delivery.ts'
 export { type DwsiConfig, parseDwsiConfig, prjOption } from './dwsi/config.ts'
 export {
