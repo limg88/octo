@@ -5,10 +5,18 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AlignmentView } from './AlignmentView.tsx'
 import { AllProjectsView } from './AllProjectsView.tsx'
 import { AskView } from './AskView.tsx'
+import {
+  type DashboardFocus,
+  type Handoff,
+  NO_DASHBOARD_FOCUS,
+  NO_TODAY_FOCUS,
+  type TodayFocus,
+} from './context.ts'
 import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
 import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
+import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
@@ -16,8 +24,10 @@ import { ProjectSettings } from './ProjectSettings.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
 import { SignIn } from './SignIn.tsx'
-import type { Section } from './sections.ts'
+import { SECTION_LABELS, type Section } from './sections.ts'
+import { ThemeToggle } from './ThemeToggle.tsx'
 import { TodayView } from './TodayView.tsx'
+import { useTheme } from './use-theme.ts'
 
 type Props = {
   api: OctoApi
@@ -40,6 +50,21 @@ export function App({ api }: Props) {
   const [backupNotes, setBackupNotes] = useState<string[]>([])
   /** The project just taken off the list, while it can still be put back with one click. */
   const [removed, setRemoved] = useState<Project | null>(null)
+  const theme = useTheme(api)
+  /** What goes with the PM from a section to the next one, inside the same project. */
+  const [askSeed, setAskSeed] = useState<string | null>(null)
+  const [handoff, setHandoff] = useState<Handoff | null>(null)
+  const [todayFocus, setTodayFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
+  const [dashboardFocus, setDashboardFocus] = useState<DashboardFocus>(NO_DASHBOARD_FOCUS)
+
+  // Nothing of a project follows the PM into another one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the project is what is watched.
+  useEffect(() => {
+    setAskSeed(null)
+    setHandoff(null)
+    setTodayFocus(NO_TODAY_FOCUS)
+    setDashboardFocus(NO_DASHBOARD_FOCUS)
+  }, [selectedId])
 
   useEffect(() => {
     void api.session().then((result) => {
@@ -188,6 +213,12 @@ export function App({ api }: Props) {
 
   const selected = projects.find((project) => project.id === selectedId) ?? null
 
+  /** Opens «Chiedi» with a question about something of the project, for the PM to send. */
+  function askAbout(question: string) {
+    setAskSeed(question)
+    setTab('ask')
+  }
+
   if (!signedIn) {
     return (
       <SignIn
@@ -205,7 +236,11 @@ export function App({ api }: Props) {
   return (
     <div className="shell">
       <nav className="sidebar" aria-label={messages.projects}>
-        <h1>{messages.appName}</h1>
+        <div className="brand">
+          <Logo />
+          <h1>{messages.brand}</h1>
+          <ThemeToggle shown={theme.shown} onChoose={theme.choose} />
+        </div>
         <h2>{messages.project}</h2>
         <ProjectSwitcher
           projects={projects}
@@ -271,10 +306,14 @@ export function App({ api }: Props) {
         ) : selected ? (
           <>
             <header className="project-header">
-              <div>
-                <h2>{selected.name}</h2>
-                <p className="folder">{selected.folder}</p>
+              <div className="page-title">
+                <h2 className="eyebrow">{selected.name}</h2>
+                <h3 className="page-heading">{SECTION_LABELS[tab]}</h3>
               </div>
+              <details className="folder-detail">
+                <summary>{messages.shell.folder}</summary>
+                <p className="folder mono">{selected.folder}</p>
+              </details>
             </header>
             {assignment === 'not_assigned' && (
               <p className="warning" role="status">
@@ -287,13 +326,41 @@ export function App({ api }: Props) {
                 project={selected}
                 canJudge={agent?.available === true}
                 onOpenSection={setTab}
+                onOpenBugs={(filter) => {
+                  setDashboardFocus({ filter, bugId: null })
+                  setTab('dashboard')
+                }}
+                onAsk={askAbout}
+                focus={todayFocus}
+                onFocus={setTodayFocus}
               />
             ) : tab === 'ask' ? (
-              <AskView api={api} project={selected} />
+              <AskView
+                api={api}
+                project={selected}
+                seed={askSeed}
+                onSeedUsed={() => setAskSeed(null)}
+                onDraft={(next) => {
+                  setHandoff(next)
+                  setTab('deliverables')
+                }}
+              />
             ) : tab === 'deliverables' ? (
-              <DeliverablesView api={api} project={selected} />
+              <DeliverablesView
+                api={api}
+                project={selected}
+                handoff={handoff}
+                onHandoffDone={() => setHandoff(null)}
+              />
             ) : tab === 'dashboard' ? (
-              <DashboardView api={api} project={selected} onOpenSources={() => setTab('sources')} />
+              <DashboardView
+                api={api}
+                project={selected}
+                onOpenSources={() => setTab('sources')}
+                onAsk={askAbout}
+                focus={dashboardFocus}
+                onFocus={setDashboardFocus}
+              />
             ) : tab === 'hours' ? (
               <HoursView api={api} project={selected} onOpenSources={() => setTab('sources')} />
             ) : tab === 'forecast' ? (

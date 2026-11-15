@@ -8,9 +8,11 @@ import {
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
+import { handoffField, handoffText } from '../src/renderer/handoff-text.ts'
 import { messages } from '../src/renderer/messages.ts'
-import type { OctoApi, Result } from '../src/shared/api.ts'
+import { DELIVERABLE_INPUT_LIMIT, type OctoApi, type Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
@@ -205,9 +207,11 @@ describe('DeliverablesView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '2026-11-14_email-cliente_collaudo.docx' }))
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', approved.files[1])
-    const [source] = screen.getAllByRole('button', { name: 'posta/a.md' })
-    if (source) fireEvent.click(source)
-    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md')
+    // A source of the draft is shown beside it; the original is one click further.
+    const panel = screen.getByRole('complementary', { name: messages.citation.panel })
+    expect(within(panel).getByText('posta/a.md')).toBeTruthy()
+    fireEvent.click(within(panel).getByRole('button', { name: messages.citation.open }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md'))
   })
 
   it('shows the draft formatted: headings, tables and the lines of an email', async () => {
@@ -428,5 +432,123 @@ describe('DeliverablesView', () => {
     })
     render(<DeliverablesView api={broken.api} project={project} />)
     expect(await screen.findByText('Qualcosa non ha funzionato. Riprova.')).toBeTruthy()
+  })
+})
+
+describe('a deliverable started from an answer', () => {
+  const handoff: Handoff = {
+    question: 'Quando è il collaudo?',
+    answer: review.draft as NonNullable<Deliverable['draft']>,
+  }
+
+  it('fills the notes of the kind with the question, the sources and the answer', async () => {
+    const { api } = fakeApi()
+    const done = vi.fn()
+    render(<DeliverablesView api={api} project={project} handoff={handoff} onHandoffDone={done} />)
+    const context = await screen.findByRole('region', { name: messages.handoff.title })
+    expect(context.textContent).toContain('Quando è il collaudo?')
+    // The same file cited twice is one source.
+    expect(context.textContent).toContain(messages.handoff.sources(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /Email al cliente/ }))
+    expect(screen.getByText(messages.handoff.filled)).toBeTruthy()
+    type('A chi scrivi', 'Carla Bianchi')
+    type(/^Di che cosa/, 'Collaudo')
+    type(/^Che cosa chiedi/, 'Conferma la data')
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableWrite }))
+
+    await waitFor(() => expect(api.startDeliverable).toHaveBeenCalled())
+    const inputs = vi.mocked(api.startDeliverable).mock.calls[0]?.[2]
+    expect(inputs?.note).toContain('Domanda: Quando è il collaudo?')
+    expect(inputs?.note).toContain('- posta/a.md')
+    expect(inputs?.note).toContain('- Chi firma il verbale')
+    expect(inputs?.note).toContain('Il collaudo è il 17 dicembre')
+    // Once written, the context is used: the next deliverable starts empty.
+    await waitFor(() => expect(done).toHaveBeenCalled())
+  })
+
+  it('lets the PM put the context aside', async () => {
+    const { api } = fakeApi()
+    const done = vi.fn()
+    render(<DeliverablesView api={api} project={project} handoff={handoff} onHandoffDone={done} />)
+    fireEvent.click(await screen.findByRole('button', { name: messages.handoff.drop }))
+    expect(done).toHaveBeenCalled()
+  })
+
+  it('cuts an answer longer than the field holds, keeping the question and the sources', () => {
+    const long: Handoff = {
+      question: 'Domanda lunga?',
+      answer: { ...handoff.answer, text: 'parola '.repeat(2000) },
+    }
+    const filled = handoffText(long)
+    expect(filled.length).toBeLessThanOrEqual(DELIVERABLE_INPUT_LIMIT)
+    expect(filled).toContain('Domanda: Domanda lunga?')
+    expect(filled).toContain('- posta/a.md')
+    expect(filled.endsWith('…')).toBe(true)
+    // A kind without a long field takes no context.
+    expect(handoffField({ ...OWN_KIND, fields: [] })).toBeNull()
+    expect(handoffField(OWN_KIND)).toBe('domanda-1')
+    expect(
+      handoffText({ ...long, answer: { ...long.answer, citations: [], missing: [] } }, 30),
+    ).toHaveLength(30)
+  })
+})
+
+describe('the review beside the draft', () => {
+  it('marks a finding as seen for the draft in view only, and names who the text is for', async () => {
+    const again: Deliverable = {
+      ...review,
+      rounds: [
+        ...review.rounds,
+        {
+          at: '2026-11-14T10:05:00.000Z',
+          request: 'Togli il budget',
+          durationMs: 1000,
+          error: null,
+        },
+      ],
+    }
+    const { api } = fakeApi({
+      listDeliverables: vi.fn(async () => ok([review])),
+      reviseDeliverable: vi.fn(async () => ok(again)),
+    })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    const panel = () => screen.getByRole('complementary', { name: messages.review.panel })
+    expect(screen.getAllByText(messages.deliverableFor.client).length).toBeGreaterThan(0)
+    expect(within(panel()).getByText(messages.review.left(1))).toBeTruthy()
+
+    fireEvent.click(within(panel()).getByRole('button', { name: messages.review.seen }))
+    expect(within(panel()).getByText(messages.review.left(0))).toBeTruthy()
+    fireEvent.click(within(panel()).getByRole('button', { name: /Rivisto/ }))
+    expect(within(panel()).getByText(messages.review.left(1))).toBeTruthy()
+    fireEvent.click(within(panel()).getByRole('button', { name: messages.review.seen }))
+
+    // Another draft was written: what was seen was seen on the one before.
+    type(messages.deliverableChange, 'Togli il budget')
+    const change = screen.getByRole('button', {
+      name: new RegExp(messages.deliverableChangeSubmit),
+    })
+    fireEvent.click(change)
+    await waitFor(() => expect(api.reviseDeliverable).toHaveBeenCalled())
+    await waitFor(() => expect(within(panel()).getByText(messages.review.left(1))).toBeTruthy())
+  })
+
+  it('shows nothing of a project the PM has left, whenever its draft comes back', async () => {
+    let finish: (result: Result<Deliverable>) => void = () => {}
+    const { api } = fakeApi({
+      listDeliverables: vi.fn(async (projectId: string) => ok(projectId === 'p-1' ? [review] : [])),
+      approveDeliverable: vi.fn(
+        () => new Promise<Result<Deliverable>>((resolve) => (finish = resolve)),
+      ),
+    })
+    const { rerender } = render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableApprove }))
+    rerender(<DeliverablesView api={api} project={{ ...project, id: 'p-2', name: 'Boreale' }} />)
+    expect(await screen.findByText(messages.deliverableNone)).toBeTruthy()
+    await act(async () => finish(ok(approved)))
+    expect(screen.queryByText(messages.deliverableFiles)).toBeNull()
+    expect(screen.getByText(messages.deliverableNone)).toBeTruthy()
   })
 })

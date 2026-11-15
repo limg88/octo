@@ -40,6 +40,7 @@ import type {
   MailSourceConfig,
   ModelSettings,
   OwnKindInput,
+  Preferences,
   ProgressSettings,
   Project,
   ProjectTeam,
@@ -152,7 +153,12 @@ export const CHANNELS = {
   risksAdd: 'risks:add',
   risksUpdate: 'risks:update',
   assignmentGet: 'assignment:get',
+  preferencesGet: 'preferences:get',
+  preferencesSave: 'preferences:save',
 } as const
+
+/** How long a value typed for a deliverable, or a change asked of one, can be. */
+export const DELIVERABLE_INPUT_LIMIT = 4000
 
 /** What the PM is asked to choose inside a project. */
 export type PathKind = 'file' | 'folder'
@@ -372,6 +378,9 @@ export type OctoApi = {
   ): Promise<Result<RiskRegister>>
   /** Whether the project is of who is signed in, by its project codes in the company system. */
   assignment(projectId: string): Promise<Result<Assignment>>
+  /** What the person set for the app on this computer; answered also before the sign-in. */
+  preferences(): Promise<Result<Preferences>>
+  savePreferences(preferences: Preferences): Promise<Result<Preferences>>
 }
 
 /** What the PM can say of a signal of the day. */

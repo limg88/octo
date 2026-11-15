@@ -9,11 +9,21 @@ import {
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi, TodayDecisionChoice } from '../shared/api.ts'
+import {
+  type BugFilter,
+  GROUP_OF,
+  NO_TODAY_FOCUS,
+  TODAY_GROUPS,
+  type TodayFocus,
+  type TodayGroup,
+} from './context.ts'
 import { Failure } from './Failure.tsx'
 import { dateTimeText, messages, progressText } from './messages.ts'
 import { RiskRegister } from './RiskRegister.tsx'
+import { BusyButton, Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
-import { asOfText, dayText, signalText } from './today-text.ts'
+import { ageText, asOfText, dayText, personOf, signalText } from './today-text.ts'
+import { useSelection } from './use-selection.ts'
 
 type TodayApi = Pick<
   OctoApi,
@@ -41,6 +51,13 @@ type Props = {
   /** False when Claude Code is not on this computer: nothing is judged, the page still works. */
   canJudge: boolean
   onOpenSection: (section: Section) => void
+  /** Opens the dashboard on a part of the bugs; without it the dashboard opens as it was. */
+  onOpenBugs?: (filter: BugFilter) => void
+  /** Takes a question about a signal to «Chiedi», written and not yet asked. */
+  onAsk?: (question: string) => void
+  /** The filter and the row in view, kept by who shows the page while the PM is elsewhere. */
+  focus?: TodayFocus
+  onFocus?: (focus: TodayFocus) => void
 }
 
 const text = messages.today
@@ -58,6 +75,9 @@ const SECTION_OF: Partial<Record<TodayTarget, Section>> = {
   deliverables: 'deliverables',
 }
 
+/** What the PM just decided of a signal, while it can still be taken back. */
+type Decided = { key: string; title: string; state: Exclude<TodayDecisionChoice, 'open'> }
+
 const plusDays = (day: string, days: number): string =>
   new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10)
 
@@ -71,7 +91,16 @@ const pathOf = (item: TodayItem): string | null =>
   'path' in item.facts && typeof item.facts.path === 'string' ? item.facts.path : null
 
 /** The page the PM opens every morning: what to do today, where it comes from, where it is put right. */
-export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
+export function TodayView({
+  api,
+  project,
+  canJudge,
+  onOpenSection,
+  onOpenBugs,
+  onAsk,
+  focus: givenFocus,
+  onFocus,
+}: Props) {
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [all, setAll] = useState(false)
@@ -81,8 +110,26 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
   const [step, setStep] = useState<AgentProgress | null>(null)
   const [showRisks, setShowRisks] = useState(false)
   const [addresses, setAddresses] = useState('')
+  const [ownFocus, setOwnFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
+  const [decided, setDecided] = useState<Decided | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
   /** The day and project Claude was already asked for by this page: never twice by itself. */
   const asked = useRef<string | null>(null)
+  /** The project on the page now: an answer that comes back for another one is dropped. */
+  const live = useRef<string | null>(project.id)
+  live.current = project.id
+  useEffect(
+    () => () => {
+      live.current = null
+    },
+    [],
+  )
+
+  const focus = givenFocus ?? ownFocus
+  const setFocus = (next: TodayFocus) => {
+    setOwnFocus(next)
+    onFocus?.(next)
+  }
 
   const show = useCallback((next: View) => {
     setView(next)
@@ -91,10 +138,12 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
 
   const evaluate = useCallback(
     async (everything: boolean) => {
+      const projectId = project.id
       setJudging(true)
       setStep(null)
       setError(null)
-      const result = await api.evaluateToday(project.id, everything)
+      const result = await api.evaluateToday(projectId, everything)
+      if (live.current !== projectId) return
       setJudging(false)
       if (result.ok) show(result.value)
       // Stopped by the PM: nothing to explain.
@@ -108,10 +157,12 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
    * time a mail it has not weighed waits there: at the opening, or after a reading brought it.
    */
   const load = useCallback(async () => {
-    const result = await api.todayView(project.id)
+    const projectId = project.id
+    const result = await api.todayView(projectId)
+    if (live.current !== projectId) return
     if (!result.ok) return setError(result.code)
     show(result.value)
-    const mark = `${project.id}:${result.value.day}`
+    const mark = `${projectId}:${result.value.day}`
     if (!result.value.evaluationDue || !canJudge || asked.current === mark) return
     asked.current = mark
     void evaluate(false)
@@ -124,6 +175,12 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
     setAll(false)
     setLater(null)
     setShowRisks(false)
+    setReading(false)
+    setJudging(false)
+    setStep(null)
+    setDecided(null)
+    setOpening(null)
+    setOwnFocus(NO_TODAY_FOCUS)
     void load()
   }, [project.id])
 
@@ -143,45 +200,81 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
     [api, project.id],
   )
 
-  async function decide(key: string, state: TodayDecisionChoice, until: string | null = null) {
+  async function decide(
+    item: Pick<Decided, 'key' | 'title'>,
+    state: TodayDecisionChoice,
+    until: string | null = null,
+  ) {
+    const projectId = project.id
     setError(null)
     setLater(null)
-    const result = await api.decideToday(project.id, key, state, until)
-    if (result.ok) show(result.value)
-    else setError(result.code)
+    const result = await api.decideToday(projectId, item.key, state, until)
+    if (live.current !== projectId) return
+    if (!result.ok) return setError(result.code)
+    show(result.value)
+    // What was put away can be taken back with one click, until something else is decided.
+    setDecided(state === 'open' ? null : { ...item, state })
+    if (state === 'open') setFocus({ ...focus, key: item.key })
   }
 
   async function mute(kind: TodayKind, muted: boolean) {
+    const projectId = project.id
     setError(null)
-    const result = await api.muteTodayKind(project.id, kind, muted)
+    const result = await api.muteTodayKind(projectId, kind, muted)
+    if (live.current !== projectId) return
     if (result.ok) show(result.value)
     else setError(result.code)
   }
 
   async function readNow() {
+    const projectId = project.id
     setReading(true)
     setError(null)
-    const result = await api.fill(project.id)
+    const result = await api.fill(projectId)
+    if (live.current !== projectId) return
     setReading(false)
     if (!result.ok) setError(result.code)
     await load()
   }
 
   async function saveAddresses() {
+    const projectId = project.id
     setError(null)
     const lines = addresses.split('\n').filter((line) => line.trim() !== '')
-    const result = await api.saveOwnAddresses(project.id, lines)
+    const result = await api.saveOwnAddresses(projectId, lines)
+    if (live.current !== projectId) return
     if (result.ok) show(result.value)
     else setError(result.code)
+  }
+
+  /** Hands a file of the project to the system; the row says so while the system takes it. */
+  async function openFile(key: string, path: string) {
+    const projectId = project.id
+    setOpening(key)
+    const result = await api.openEvidence(projectId, path)
+    if (live.current !== projectId) return
+    setOpening((current) => (current === key ? null : current))
+    if (!result.ok) setError(result.code)
   }
 
   function open(item: TodayItem) {
     const section = SECTION_OF[item.target]
     const path = pathOf(item)
-    if (section) onOpenSection(section)
+    if (item.facts.kind === 'bugs_stuck' && onOpenBugs) onOpenBugs('stuck')
+    else if (section) onOpenSection(section)
     else if (item.target === 'risks') setShowRisks(true)
-    else if (path) void api.openEvidence(project.id, path)
+    else if (path) void openFile(item.key, path)
   }
+
+  const allItems = view?.items ?? []
+  const toDo = allItems.filter(isToDo)
+  const inGroup =
+    focus.group === 'all' ? toDo : toDo.filter((item) => GROUP_OF[item.facts.kind] === focus.group)
+  const shown = all ? inGroup : inGroup.slice(0, TODAY_LIMIT)
+  const selectedKey = useSelection(
+    shown.map((item) => item.key),
+    focus.key,
+  )
 
   if (showRisks) {
     return (
@@ -197,38 +290,57 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
     )
   }
   if (view === null) {
-    return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+    return error ? (
+      <Failure code={error} />
+    ) : (
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
+    )
   }
 
   const alerts = view.items.filter((item) => item.band === 'alert')
-  const toDo = view.items.filter(isToDo)
   const watch = view.items.filter((item) => item.band === 'watch')
-  const shown = all ? toDo : toDo.slice(0, TODAY_LIMIT)
+  const groups = TODAY_GROUPS.map((group) => ({
+    group,
+    count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
+  })).filter((entry) => entry.count > 0)
+  const selected = shown.find((item) => item.key === selectedKey) ?? null
 
   return (
-    <section className="today" aria-label={messages.todayTab}>
+    <section className="today" aria-label={messages.todayTab} aria-busy={reading || undefined}>
       <header className="today-head">
-        <h3>{text.title(dayText(view.day))}</h3>
+        <div className="today-day">
+          <h3>{text.title(dayText(view.day))}</h3>
+          {view.freshness.length > 0 && (
+            <p className="hint today-freshness">
+              {view.freshness
+                .map(
+                  (entry) =>
+                    `${entry.source}: ${entry.readAt ? dateTimeText(entry.readAt) : text.freshnessNever}`,
+                )
+                .join(' · ')}
+            </p>
+          )}
+        </div>
         <div className="actions">
           <button type="button" onClick={() => setShowRisks(true)}>
             {messages.risks.title}
           </button>
-          <button type="button" disabled={reading} onClick={() => void readNow()}>
+          <BusyButton
+            busy={reading}
+            busyLabel={messages.wait.reading}
+            onClick={() => void readNow()}
+          >
             {text.readNow}
-          </button>
+          </BusyButton>
         </div>
       </header>
-      {view.freshness.length > 0 && (
-        <p className="hint today-freshness">
-          {view.freshness
-            .map(
-              (entry) =>
-                `${entry.source}: ${entry.readAt ? dateTimeText(entry.readAt) : text.freshnessNever}`,
-            )
-            .join(' · ')}
+      {reading && (
+        <p className="hint" role="status">
+          {text.refreshing}
         </p>
       )}
-      {reading && <p className="progress">{text.reading}</p>}
       {error && <Failure code={error} onOpen={onOpenSection} />}
 
       {alerts.map((item) => {
@@ -245,10 +357,19 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
         )
       })}
 
+      {decided && (
+        <div className="notice-bar">
+          <p role="status">{text.decided[decided.state](decided.title)}</p>
+          <button type="button" onClick={() => void decide(decided, 'open')}>
+            {text.undo}
+          </button>
+        </div>
+      )}
+
       <h4 className="today-title">
         {text.toDo}
         {toDo.length > 0 && (
-          <span className="today-count">{text.toDoCount(shown.length, toDo.length)}</span>
+          <span className="today-count">{text.toDoCount(shown.length, inGroup.length)}</span>
         )}
       </h4>
       {view.items.length === 0 ? (
@@ -256,26 +377,78 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
       ) : toDo.length === 0 ? (
         <p className="today-empty">{text.nothingToDo}</p>
       ) : (
-        <ul className="today-list">
-          {shown.map((item) => (
-            <Signal
-              key={item.key}
-              item={item}
-              day={view.day}
-              choosingLater={later === item.key}
-              onOpen={() => open(item)}
-              onDone={() => void decide(item.key, 'done')}
-              onMute={() => void decide(item.key, 'muted')}
-              onAskLater={() => setLater(later === item.key ? null : item.key)}
-              onLater={(until) => void decide(item.key, 'later', until)}
-            />
-          ))}
-        </ul>
-      )}
-      {toDo.length > TODAY_LIMIT && (
-        <button type="button" className="quiet" onClick={() => setAll(!all)}>
-          {all ? text.fewer : text.more(toDo.length - TODAY_LIMIT)}
-        </button>
+        <>
+          {groups.length > 1 && (
+            <fieldset className="chips" aria-label={text.filters}>
+              <FilterChip
+                label={text.filterAll}
+                count={toDo.length}
+                pressed={focus.group === 'all'}
+                onPress={() => setFocus({ ...focus, group: 'all' })}
+              />
+              {groups.map(({ group, count }) => (
+                <FilterChip
+                  key={group}
+                  label={text.groups[group]}
+                  count={count}
+                  pressed={focus.group === group}
+                  onPress={() => setFocus({ ...focus, group })}
+                />
+              ))}
+            </fieldset>
+          )}
+          <div className="split">
+            <div className="split-list">
+              {shown.length === 0 ? (
+                <p className="today-empty">{text.noneInFilter}</p>
+              ) : (
+                <ul className="entries" aria-label={text.list}>
+                  {shown.map((item) => (
+                    <li key={item.key}>
+                      <SignalRow
+                        item={item}
+                        selected={item.key === selectedKey}
+                        judging={judging}
+                        onSelect={() => {
+                          setLater(null)
+                          setFocus({ ...focus, key: item.key })
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {inGroup.length > TODAY_LIMIT && (
+                <button type="button" className="quiet" onClick={() => setAll(!all)}>
+                  {all ? text.fewer : text.more(inGroup.length - TODAY_LIMIT)}
+                </button>
+              )}
+            </div>
+            <section className="panel split-detail" aria-label={text.detailTitle}>
+              {selected ? (
+                <SignalDetail
+                  item={selected}
+                  day={view.day}
+                  judging={judging}
+                  opening={opening === selected.key}
+                  choosingLater={later === selected.key}
+                  onOpen={() => open(selected)}
+                  onAsk={onAsk}
+                  onDecide={(state, until) =>
+                    void decide(
+                      { key: selected.key, title: signalText(selected).title },
+                      state,
+                      until,
+                    )
+                  }
+                  onAskLater={() => setLater(later === selected.key ? null : selected.key)}
+                />
+              ) : (
+                <p className="hint panel-body">{messages.detail.none}</p>
+              )}
+            </section>
+          </div>
+        </>
       )}
 
       <Judgement
@@ -309,7 +482,7 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
                       type="button"
                       className="quiet"
                       aria-label={`${text.mute}: ${words.title}`}
-                      onClick={() => void decide(item.key, 'muted')}
+                      onClick={() => void decide({ key: item.key, title: words.title }, 'muted')}
                     >
                       ×
                     </button>
@@ -373,75 +546,159 @@ export function TodayView({ api, project, canJudge, onOpenSection }: Props) {
   )
 }
 
-type SignalProps = {
-  item: TodayItem
-  day: string
-  choosingLater: boolean
-  onOpen: () => void
-  onDone: () => void
-  onMute: () => void
-  onAskLater: () => void
-  onLater: (until: string) => void
+function FilterChip(props: {
+  label: string
+  count: number
+  pressed: boolean
+  onPress: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={props.pressed ? 'chip chip-selected' : 'chip'}
+      aria-pressed={props.pressed}
+      onClick={props.onPress}
+    >
+      {props.label} <span className="chip-count">{props.count}</span>
+    </button>
+  )
 }
 
-/** One thing to do: what it is, where it comes from, why it is here, and what the PM can do. */
-function Signal(props: SignalProps) {
+/** One thing to do in the list: what it is, where it comes from, how long it has waited. */
+function SignalRow(props: {
+  item: TodayItem
+  selected: boolean
+  judging: boolean
+  onSelect: () => void
+}) {
+  const { item } = props
+  const facts = item.facts
+  const age = ageText(item)
+  const judgement = facts.kind === 'mail_reply' ? facts.judgement : null
+  return (
+    <button
+      type="button"
+      className={props.selected ? 'entry entry-selected' : 'entry'}
+      aria-pressed={props.selected}
+      onClick={props.onSelect}
+    >
+      <span className="entry-meta">
+        {item.dueBecause && (
+          <span className="pill pill-warning">{text.dueShort[item.dueBecause]}</span>
+        )}
+        <span className="pill pill-source">{text.kinds[facts.kind]}</span>
+        {age !== '' && <span>{age}</span>}
+        {judgement && <span>· Claude: {text.judgement.importance[judgement.importance]}</span>}
+        {facts.kind === 'mail_reply' && !judgement && props.judging && (
+          <span>· {text.judging}</span>
+        )}
+      </span>
+      <strong className="entry-title">{signalText(item).title}</strong>
+    </button>
+  )
+}
+
+type DetailProps = {
+  item: TodayItem
+  day: string
+  judging: boolean
+  opening: boolean
+  choosingLater: boolean
+  onOpen: () => void
+  onAsk: ((question: string) => void) | undefined
+  onDecide: (state: TodayDecisionChoice, until?: string | null) => void
+  onAskLater: () => void
+}
+
+/** The signal in view: why it is here, what it stands on, and what the PM can do about it. */
+function SignalDetail(props: DetailProps) {
   const { item, day } = props
   const words = signalText(item)
   const facts = item.facts
   const asOf = asOfText(item)
   const returned = item.returned
   return (
-    <li className="today-item">
-      <p className="today-item-title">{words.title}</p>
-      <p className="today-item-detail">
-        <span className="badge">{text.kinds[facts.kind]}</span> {words.detail}
-        {asOf !== '' && <span className="hint"> · {asOf}</span>}
-      </p>
-      {item.dueBecause && <p className="hint">{text.because[item.dueBecause]}</p>}
-      {returned && (
-        <p className="hint" role="note">
-          {returned.why === 'later'
-            ? text.returned.later
-            : returned.why === 'still'
-              ? text.returned.still(returned.since.split('-').reverse().join('/'))
-              : text.returned.worse(returned.was, returned.now)}
+    <>
+      <div className="panel-head">
+        <span className="eyebrow">{text.computed}</span>
+        <span className="pill pill-source">{text.kinds[facts.kind]}</span>
+      </div>
+      <div className="panel-body">
+        <h4 className="detail-title">{words.title}</h4>
+        <p className="today-item-detail">
+          {words.detail}
+          {asOf !== '' && <span className="hint"> · {asOf}</span>}
         </p>
-      )}
-      {facts.kind === 'mail_reply' && (
-        <p className="today-judgement">
-          {facts.judgement ? (
-            <>
-              <strong>{text.judgement.title}:</strong>{' '}
-              {text.judgement.importance[facts.judgement.importance]}. {facts.judgement.reason} «
-              {facts.judgement.quote}»{' '}
-              <span
-                className={facts.judgement.quoteVerified ? 'badge badge-ok' : 'badge badge-warning'}
-              >
-                {facts.judgement.quoteVerified
-                  ? text.judgement.verified
-                  : text.judgement.unverified}
+        {item.dueBecause && (
+          <p className="box box-warning">
+            <strong>{text.dueShort[item.dueBecause]}.</strong> {text.because[item.dueBecause]}
+          </p>
+        )}
+        {returned && (
+          <p className="hint" role="note">
+            {returned.why === 'later'
+              ? text.returned.later
+              : returned.why === 'still'
+                ? text.returned.still(returned.since.split('-').reverse().join('/'))
+                : text.returned.worse(returned.was, returned.now)}
+          </p>
+        )}
+        {facts.kind === 'mail_reply' && (
+          <div className="box today-judgement">
+            {facts.judgement ? (
+              <>
+                <p>
+                  <strong>{text.judgement.title}:</strong>{' '}
+                  {text.judgement.importance[facts.judgement.importance]}. {facts.judgement.reason}
+                </p>
+                <blockquote>«{facts.judgement.quote}»</blockquote>
+                <p>
+                  <span
+                    className={
+                      facts.judgement.quoteVerified ? 'badge badge-ok' : 'badge badge-warning'
+                    }
+                  >
+                    {facts.judgement.quoteVerified
+                      ? text.judgement.verified
+                      : text.judgement.unverified}
+                  </span>
+                  {facts.judgement.deadline && (
+                    <span className="hint">
+                      {' '}
+                      {text.judgement.deadline(dayText(facts.judgement.deadline))}
+                    </span>
+                  )}
+                </p>
+              </>
+            ) : props.judging ? (
+              <Waiting>{text.judging}</Waiting>
+            ) : (
+              <span className="hint">
+                {text.judgement.title}: {text.judgement.none}
               </span>
-              {facts.judgement.deadline && (
-                <span className="hint">
-                  {' '}
-                  {text.judgement.deadline(dayText(facts.judgement.deadline))}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="hint">
-              {text.judgement.title}: {text.judgement.none}
-            </span>
+            )}
+          </div>
+        )}
+        <div className="actions today-item-actions">
+          <BusyButton
+            className="primary"
+            busy={props.opening}
+            busyLabel={messages.wait.opening}
+            onClick={props.onOpen}
+          >
+            {text.open[item.target]}
+          </BusyButton>
+          {facts.kind === 'mail_reply' && props.onAsk && (
+            <button
+              type="button"
+              onClick={() => props.onAsk?.(text.mailSeed(personOf(facts.from), facts.subject))}
+            >
+              {text.askAboutMail}
+            </button>
           )}
-        </p>
-      )}
-      <div className="actions today-item-actions">
-        <button type="button" onClick={props.onOpen}>
-          {text.open[item.target]}
-        </button>
-        <span className="today-decisions">
-          <button type="button" className="quiet" onClick={props.onDone}>
+        </div>
+        <div className="actions today-decisions">
+          <button type="button" className="quiet" onClick={() => props.onDecide('done')}>
             {text.done}
           </button>
           <button
@@ -452,29 +709,29 @@ function Signal(props: SignalProps) {
           >
             {text.later}
           </button>
-          <button type="button" className="quiet" onClick={props.onMute}>
+          <button type="button" className="quiet" onClick={() => props.onDecide('muted')}>
             {facts.kind === 'mail_reply' ? text.noAnswerNeeded : text.mute}
           </button>
-        </span>
+        </div>
+        {props.choosingLater && (
+          <fieldset className="actions today-later">
+            <legend className="hint">{text.laterTitle}</legend>
+            <button type="button" onClick={() => props.onDecide('later', plusDays(day, 1))}>
+              {text.laterTomorrow}
+            </button>
+            <button type="button" onClick={() => props.onDecide('later', nextMonday(day))}>
+              {text.laterMonday}
+            </button>
+            <button type="button" onClick={() => props.onDecide('later', plusDays(day, WEEK_DAYS))}>
+              {text.laterWeek}
+            </button>
+            <button type="button" className="quiet" onClick={props.onAskLater}>
+              {text.laterCancel}
+            </button>
+          </fieldset>
+        )}
       </div>
-      {props.choosingLater && (
-        <fieldset className="actions today-later">
-          <legend className="hint">{text.laterTitle}</legend>
-          <button type="button" onClick={() => props.onLater(plusDays(day, 1))}>
-            {text.laterTomorrow}
-          </button>
-          <button type="button" onClick={() => props.onLater(nextMonday(day))}>
-            {text.laterMonday}
-          </button>
-          <button type="button" onClick={() => props.onLater(plusDays(day, WEEK_DAYS))}>
-            {text.laterWeek}
-          </button>
-          <button type="button" className="quiet" onClick={props.onAskLater}>
-            {text.laterCancel}
-          </button>
-        </fieldset>
-      )}
-    </li>
+    </>
   )
 }
 
@@ -501,7 +758,7 @@ function Judgement({ view, canJudge, judging, step, hasMail, ...actions }: Judge
       <p className="hint">{text.judgement.explain}</p>
       {judging ? (
         <>
-          <p className="progress">{step ? progressText(step) : text.judgement.running}</p>
+          <Waiting>{step ? progressText(step) : text.judgement.running}</Waiting>
           <div className="actions">
             <button type="button" onClick={actions.onStop}>
               {text.judgement.stop}

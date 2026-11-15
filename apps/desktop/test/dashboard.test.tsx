@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { DashboardView as View } from '@octo/application'
 import { type DashboardSettings, DEFAULT_DASHBOARD_SETTINGS, type Project } from '@octo/domain'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DashboardView } from '../src/renderer/DashboardView.tsx'
 import { presetRange, wholeDays } from '../src/renderer/dashboard-range.ts'
@@ -37,6 +37,36 @@ const view: View = {
         daysInState: 45,
         stuck: true,
         lastComment: { by: 'Dev', at: '2026-06-01', text: '<p>In attesa del dato</p>' },
+        note: null,
+      },
+    ],
+    validated: [
+      {
+        id: '201',
+        title: 'Data nel PDF',
+        state: '10 - Validated',
+        phase: 'validated',
+        assignee: 'Luca',
+        severity: null,
+        environment: null,
+        createdAt: '2026-04-01T08:00:00Z',
+        daysInState: 12,
+        stuck: false,
+        lastComment: null,
+        note: null,
+      },
+      {
+        id: '202',
+        title: 'Etichetta del riepilogo',
+        state: '10 - Validated',
+        phase: 'validated',
+        assignee: 'Luca',
+        severity: null,
+        environment: null,
+        createdAt: '2026-04-01T08:00:00Z',
+        daysInState: 3,
+        stuck: false,
+        lastComment: null,
         note: null,
       },
     ],
@@ -105,9 +135,10 @@ describe('dashboard', () => {
   it('shows figures, trend, flow, open bugs and unclear requirements', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
-    const open = await screen.findByRole('region', { name: text.openTitle })
-    expect(within(open).getByText('Totale sbagliato')).toBeTruthy()
-    expect(within(open).getByText(text.stuckBadge)).toBeTruthy()
+    const open = await screen.findByRole('region', { name: text.qualityTitle })
+    // The bug in view is in the list and, beside it, in its detail.
+    expect(within(open).getAllByText('Totale sbagliato')).toHaveLength(2)
+    expect(within(open).getAllByText(new RegExp(text.stuckBadge)).length).toBeGreaterThan(0)
     expect(within(open).getByText(/In attesa del dato/)).toBeTruthy()
     expect(screen.getByText(text.total(10))).toBeTruthy()
     expect(screen.getByText(text.days(12))).toBeTruthy()
@@ -139,7 +170,7 @@ describe('dashboard', () => {
     fireEvent.click(read)
     expect(await screen.findByText(/Lette 4601 voci, 677 con la cronologia/)).toBeTruthy()
     // The settings now point at the file Octo wrote: the dashboard is computed from it.
-    expect(await screen.findByRole('region', { name: text.openTitle })).toBeTruthy()
+    expect(await screen.findByRole('region', { name: text.qualityTitle })).toBeTruthy()
     expect(api.readTrackerSnapshot).toHaveBeenLastCalledWith('p-1')
   })
 
@@ -168,7 +199,7 @@ describe('dashboard', () => {
   it('keeps the reading beside the age of the data, and the numbers of the trend folded', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
-    await screen.findByRole('region', { name: text.openTitle })
+    await screen.findByRole('region', { name: text.qualityTitle })
     // Newer data are one click away, without opening the settings.
     const read = screen.getByRole('button', { name: text.readTracker })
     expect(read.closest('details')).toBeNull()
@@ -191,7 +222,7 @@ describe('dashboard', () => {
   it('reads a longer period by month, or the one the PM chooses', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
-    await screen.findByRole('region', { name: text.openTitle })
+    await screen.findByRole('region', { name: text.qualityTitle })
     fireEvent.click(screen.getByRole('button', { name: text.presets.y1 }))
     await waitFor(() =>
       expect(api.dashboardView).toHaveBeenLastCalledWith('p-1', {
@@ -215,7 +246,7 @@ describe('dashboard', () => {
   it('keeps what the PM decides as data with its date', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
-    await screen.findByRole('region', { name: text.openTitle })
+    await screen.findByRole('region', { name: text.qualityTitle })
     fireEvent.click(screen.getByRole('button', { name: text.addNote }))
     fireEvent.change(screen.getByLabelText(text.noteLabel('101')), {
       target: { value: 'Sentito il cliente' },
@@ -269,13 +300,13 @@ describe('dashboard', () => {
       exportPath: 'data/latest.json',
       tags: ['Team', 'Altro'],
     })
-    await screen.findByRole('region', { name: text.openTitle })
+    await screen.findByRole('region', { name: text.qualityTitle })
   })
 
   it('lets the PM correct phases, periods and the handover state', async () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
-    await screen.findByRole('region', { name: text.openTitle })
+    await screen.findByRole('region', { name: text.qualityTitle })
     fireEvent.click(screen.getByLabelText('P2'))
     fireEvent.click(screen.getByLabelText('06 - Ready for Test'))
     fireEvent.change(screen.getByLabelText(/04 - In Progress/), { target: { value: 'closed' } })
@@ -325,5 +356,65 @@ describe('dashboard', () => {
     })
     render(<DashboardView api={broken} project={project} now={now} />)
     expect((await screen.findByRole('alert')).textContent).toContain('rovinate')
+  })
+})
+
+describe('the bugs as counts that open their lists', () => {
+  it('lists what each count counts, and shows the bug in view beside the list', async () => {
+    const asked: string[] = []
+    const focus = vi.fn()
+    render(
+      <DashboardView
+        api={fakeApi()}
+        project={project}
+        now={now}
+        onAsk={(question) => asked.push(question)}
+        onFocus={focus}
+      />,
+    )
+    const quality = await screen.findByRole('region', { name: text.qualityTitle })
+    const filters = within(quality).getByRole('group', { name: text.filterLabel })
+    const count = (name: string) =>
+      within(filters).getByRole('button', { name: new RegExp(name) }).textContent
+    // The open ones, the stuck ones among them, and apart the validated ones.
+    expect(count(text.open)).toContain('1')
+    expect(count(text.stuck(configured.stuckDays))).toContain(text.ofWhich)
+    expect(count(text.validated)).toContain('2')
+    expect(within(quality).getByText(text.relation(1, 1, 2, configured.stuckDays))).toBeTruthy()
+
+    fireEvent.click(within(filters).getByRole('button', { name: new RegExp(text.validated) }))
+    const list = within(quality).getByRole('list')
+    expect(within(list).getAllByRole('button')).toHaveLength(2)
+    const detail = within(quality).getByRole('region', { name: text.bugDetail })
+    expect(detail.textContent).toContain('Data nel PDF')
+    expect(detail.textContent).toContain(text.noComment)
+
+    fireEvent.click(within(list).getByText('Etichetta del riepilogo'))
+    expect(focus).toHaveBeenLastCalledWith({ filter: 'validated', bugId: '202' })
+    expect(detail.textContent).toContain('Etichetta del riepilogo')
+    fireEvent.click(within(detail).getByRole('button', { name: text.askAbout }))
+    expect(asked).toEqual([text.askSeed('202', 'Etichetta del riepilogo', '10 - Validated', 3)])
+
+    // The bug in view is not among the stuck ones: the first of them takes its place.
+    fireEvent.click(
+      within(filters).getByRole('button', { name: new RegExp(text.stuck(configured.stuckDays)) }),
+    )
+    expect(detail.textContent).toContain('Totale sbagliato')
+    expect(detail.textContent).toContain('In attesa del dato')
+  })
+
+  it('shows the period asked last, whatever comes back first', async () => {
+    const answers: Array<(result: Result<View>) => void> = []
+    const api = fakeApi({
+      dashboardView: vi.fn(() => new Promise<Result<View>>((resolve) => answers.push(resolve))),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.presets.m3 }))
+    await waitFor(() => expect(answers).toHaveLength(2))
+    const later: View = { ...view, bugs: { ...view.bugs, total: 77 } }
+    await act(async () => answers[1]?.(ok(later)))
+    await act(async () => answers[0]?.(ok(view)))
+    expect(screen.getByText(text.total(77))).toBeTruthy()
+    expect(screen.queryByText(text.total(10))).toBeNull()
   })
 })

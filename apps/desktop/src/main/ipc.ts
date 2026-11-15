@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type {
   AgentRunner,
   Alignments,
+  AppPreferences,
   AskQuestion,
   Backups,
   Dashboard,
@@ -35,12 +36,13 @@ import {
   pathInProject,
   RISK_STATES,
   TEAM_SIDES,
+  THEME_CHOICES,
   type TodayKind,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { z } from 'zod'
-import { CHANNELS, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
+import { CHANNELS, DELIVERABLE_INPUT_LIMIT, type Result, UNEXPECTED_ERROR } from '../shared/api.ts'
 
 export type IpcDeps = {
   window: BrowserWindow
@@ -66,6 +68,7 @@ export type IpcDeps = {
   newProjectDialogTitle: string
   backups: Backups
   models: Models
+  preferences: AppPreferences
   trackerSnapshots: TrackerSnapshots
   backupDialogs: BackupDialogs
   session: Session
@@ -88,6 +91,7 @@ const BACKUP_EXTENSIONS = ['json']
 const MAX_QUESTION_LENGTH = 4000
 const MAX_RULE_LENGTH = 300
 const none = z.undefined()
+const preferencesInput = z.object({ theme: z.enum(THEME_CHOICES) })
 const byProject = z.object({ projectId: z.string().min(1) })
 const askInput = byProject.extend({ question: z.string().max(MAX_QUESTION_LENGTH) })
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
@@ -146,7 +150,7 @@ const feedSaveInput = z.discriminatedUnion('feed', [
 const MAX_LETTERHEAD_BYTES = 20 * 1024 * 1024
 /** A deck carries its pictures and layouts; one larger than this is not a model to write on. */
 const MAX_DECK_MODEL_BYTES = 80 * 1024 * 1024
-const MAX_INPUT_LENGTH = 4000
+const MAX_INPUT_LENGTH = DELIVERABLE_INPUT_LIMIT
 const MAX_INSTRUCTIONS_LENGTH = 20_000
 /** An id Octo made, used in a file name: letters, digits and dashes only. */
 const id = z.string().regex(/^[A-Za-z0-9-]{1,80}$/)
@@ -354,6 +358,9 @@ export function registerIpc(deps: IpcDeps): void {
   const open = handler(() => {})
 
   open(CHANNELS.sessionGet, none, () => deps.session.view())
+  // How the interface looks is asked before anybody signs in.
+  open(CHANNELS.preferencesGet, none, () => deps.preferences.get())
+  open(CHANNELS.preferencesSave, preferencesInput, (input) => deps.preferences.save(input))
   open(CHANNELS.sessionSignIn, none, () => deps.session.signIn())
   open(CHANNELS.sessionCancel, none, async () => {
     deps.session.cancelSignIn()

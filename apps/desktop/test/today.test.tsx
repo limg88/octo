@@ -156,28 +156,36 @@ describe('the page of the day', () => {
     expect(alert.textContent).toContain('Jira: non si legge da 3 giorni')
     expect(screen.getByText(/Posta: .* · Jira: mai letta/)).toBeTruthy()
 
-    const list = screen.getAllByRole('list')[0] as HTMLElement
-    const [first, second] = within(list).getAllByRole('listitem')
+    const list = screen.getByRole('list', { name: text.list })
+    const [first, second] = within(list).getAllByRole('button') as [HTMLElement, HTMLElement]
+    const detail = screen.getByRole('region', { name: text.detailTitle })
+    // The list says what each thing is and where it comes from; the first one is in view.
+    expect(first.textContent).toContain('Ottobre 2026: le ore di 3 persone non tornano')
+    expect(first.textContent).toContain(text.kinds.hours)
+    expect(first.textContent).toContain(text.dueShort.month_end)
+    expect(first.getAttribute('aria-pressed')).toBe('true')
     // The hours: computed, with the people, the reason of the day and why they came back.
-    expect(first?.textContent).toContain('Ottobre 2026: le ore di 3 persone non tornano')
-    expect(first?.textContent).toContain('Bianchi Anna: 160 ore di timesheet, 80 sul tracker')
-    expect(first?.textContent).toContain('Neri Sara: 80 ore di timesheet, nessuna sul tracker')
-    expect(first?.textContent).toContain('Ugo Gialli: 120 ore sul tracker, nessun timesheet')
-    expect(first?.textContent).toContain('1 possibile doppione')
-    expect(first?.textContent).toContain(text.because.month_end)
-    expect(first?.textContent).toContain(text.returned.worse(2, 3))
-    // The mail: that it waits is computed; how much it matters is Claude's, with its source.
-    expect(second?.textContent).toContain('Rispondi a Carla Bianchi · «Aurora: budget»')
-    expect(second?.textContent).toContain('importanza alta')
-    expect(second?.textContent).toContain('«ha approvato un budget aggiuntivo»')
-    expect(second?.textContent).toContain(text.judgement.verified)
+    expect(detail.textContent).toContain('Bianchi Anna: 160 ore di timesheet, 80 sul tracker')
+    expect(detail.textContent).toContain('Neri Sara: 80 ore di timesheet, nessuna sul tracker')
+    expect(detail.textContent).toContain('Ugo Gialli: 120 ore sul tracker, nessun timesheet')
+    expect(detail.textContent).toContain('1 possibile doppione')
+    expect(detail.textContent).toContain(text.because.month_end)
+    expect(detail.textContent).toContain(text.returned.worse(2, 3))
     expect(screen.getByText(/Valutazione di Claude del .* \(claude-fake\)/)).toBeTruthy()
 
     // Each signal leads to where it is put right.
-    fireEvent.click(within(first as HTMLElement).getByRole('button', { name: text.open.hours }))
+    fireEvent.click(within(detail).getByRole('button', { name: text.open.hours }))
     fireEvent.click(within(alert.parentElement as HTMLElement).getByRole('button'))
     expect(opened).toEqual(['hours', 'sources'])
-    fireEvent.click(within(second as HTMLElement).getByRole('button', { name: text.open.mail }))
+    // The mail: that it waits is computed; how much it matters is Claude's, with its source.
+    expect(second.textContent).toContain('Rispondi a Carla Bianchi · «Aurora: budget»')
+    expect(second.textContent).toContain('importanza alta')
+    fireEvent.click(second)
+    expect(second.getAttribute('aria-pressed')).toBe('true')
+    expect(first.getAttribute('aria-pressed')).toBe('false')
+    expect(detail.textContent).toContain('«ha approvato un budget aggiuntivo»')
+    expect(detail.textContent).toContain(text.judgement.verified)
+    fireEvent.click(within(detail).getByRole('button', { name: text.open.mail }))
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'Posta/2026-11/budget.md')
     expect(screen.getByText(text.hidden(1))).toBeTruthy()
     expect(screen.getByText('6 bug fermi da più di 30 giorni')).toBeTruthy()
@@ -186,7 +194,11 @@ describe('the page of the day', () => {
   it('remembers done, later and not interested, each with one gesture', async () => {
     const { api } = todayApi()
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const row = (await screen.findByText(/Rispondi a Carla Bianchi/)).closest('li') as HTMLElement
+    const detailOf = async (title: RegExp) => {
+      fireEvent.click(within(await screen.findByRole('list', { name: text.list })).getByText(title))
+      return screen.getByRole('region', { name: text.detailTitle })
+    }
+    const row = await detailOf(/Rispondi a Carla Bianchi/)
 
     fireEvent.click(within(row).getByRole('button', { name: text.later }))
     fireEvent.click(within(row).getByRole('button', { name: text.laterMonday }))
@@ -199,9 +211,7 @@ describe('the page of the day', () => {
 
     const again = todayApi()
     render(<TodayView api={again.api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const mailRow = (await screen.findByText(/Rispondi a Carla Bianchi/)).closest(
-      'li',
-    ) as HTMLElement
+    const mailRow = await detailOf(/Rispondi a Carla Bianchi/)
     fireEvent.click(within(mailRow).getByRole('button', { name: text.later }))
     fireEvent.click(within(mailRow).getByRole('button', { name: text.laterTomorrow }))
     await waitFor(() =>
@@ -216,16 +226,25 @@ describe('the page of the day', () => {
 
     const third = todayApi()
     render(<TodayView api={third.api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const hoursRow = (await screen.findByText(/le ore di 3 persone/)).closest('li') as HTMLElement
+    const hoursRow = await detailOf(/le ore di 3 persone/)
     fireEvent.click(within(hoursRow).getByRole('button', { name: text.done }))
     await waitFor(() =>
       expect(third.api.decideToday).toHaveBeenCalledWith('p-1', 'hours:2026-10', 'done', null),
+    )
+    // What was put away comes back with one click.
+    const undone = await screen.findByText(/^Segnata come fatta: Ottobre 2026/)
+    fireEvent.click(
+      within(undone.parentElement as HTMLElement).getByRole('button', { name: text.undo }),
+    )
+    await waitFor(() =>
+      expect(third.api.decideToday).toHaveBeenCalledWith('p-1', 'hours:2026-10', 'open', null),
     )
     cleanup()
 
     const fourth = todayApi()
     render(<TodayView api={fourth.api} project={aurora} canJudge onOpenSection={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: text.noAnswerNeeded }))
+    fireEvent.click(await screen.findByText(/Rispondi a Carla Bianchi/))
+    fireEvent.click(screen.getByRole('button', { name: text.noAnswerNeeded }))
     await waitFor(() =>
       expect(fourth.api.decideToday).toHaveBeenCalledWith('p-1', 'mail:budget', 'muted', null),
     )
@@ -244,7 +263,8 @@ describe('the page of the day', () => {
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
     expect(await screen.findByText(text.judgement.running)).toBeTruthy()
     expect(api.evaluateToday).toHaveBeenCalledWith('p-1', false)
-    expect(screen.getByText(`${text.judgement.title}: ${text.judgement.none}`)).toBeTruthy()
+    // While Claude weighs it, the mail says so instead of saying it has no judgement.
+    expect(screen.getAllByText(new RegExp(text.judging)).length).toBeGreaterThan(0)
     act(() => tell({ kind: 'reading', target: 'Posta/2026-11/budget.md' }))
     expect(screen.getByText(/Posta\/2026-11\/budget.md/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.judgement.stop }))
@@ -253,6 +273,7 @@ describe('the page of the day', () => {
     await act(async () => finish({ ok: false, code: 'agent_cancelled' }))
     expect(screen.queryByRole('alert')).toBeNull()
     expect(api.evaluateToday).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(`${text.judgement.title}: ${text.judgement.none}`)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.judgement.update }))
     expect(api.evaluateToday).toHaveBeenCalledTimes(2)
   })
@@ -779,7 +800,7 @@ describe('Octo opened by a person', () => {
     })
     render(<App api={api} />)
     await screen.findByText(/Rispondi a Carla Bianchi/)
-    fireEvent.click(screen.getByRole('button', { name: /Aurora/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aurora' }))
     fireEvent.click(screen.getByRole('menuitem', { name: messages.overview.open }))
     expect(await screen.findByRole('heading', { name: messages.overview.title })).toBeTruthy()
     // The sections are of a project: above the projects there are none.
@@ -793,5 +814,108 @@ describe('Octo opened by a person', () => {
     fireEvent.click(screen.getByRole('button', { name: messages.session.signOut }))
     expect(await screen.findByRole('button', { name: messages.session.signIn })).toBeTruthy()
     expect(signOut).toHaveBeenCalled()
+  })
+})
+
+describe('the day as a list with its detail', () => {
+  const waiting = item(
+    'mail:sal',
+    'waiting',
+    {
+      kind: 'mail_waiting',
+      id: 'sal',
+      path: 'Posta/2026-11/sal.md',
+      to: 'Marco Verdi <marco@cliente.example>',
+      subject: 'SAL di ottobre',
+      days: 5,
+    },
+    { target: 'mail' },
+  )
+  const rows = () => within(screen.getByRole('list', { name: text.list })).getAllByRole('button')
+  const detail = () => screen.getByRole('region', { name: text.detailTitle })
+
+  it('filters by where the signals come from, with counts that are the rows listed', async () => {
+    const { api } = todayApi(view({ items: [hours, mail, waiting] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const filters = await screen.findByRole('group', { name: text.filters })
+    expect(within(filters).getByRole('button', { name: `${text.filterAll} 3` })).toBeTruthy()
+    expect(rows()).toHaveLength(3)
+    expect(detail().textContent).toContain('le ore di 3 persone')
+
+    // The row in view is not of the mail: the first of what is left takes its place.
+    fireEvent.click(within(filters).getByRole('button', { name: `${text.groups.mail} 2` }))
+    expect(rows()).toHaveLength(2)
+    expect(detail().textContent).toContain('Rispondi a Carla Bianchi')
+    expect(rows()[1]?.textContent).toContain('da 5 giorni')
+
+    fireEvent.click(within(filters).getByRole('button', { name: `${text.groups.numbers} 1` }))
+    expect(rows()).toHaveLength(1)
+    expect(detail().textContent).toContain('le ore di 3 persone')
+  })
+
+  it('keeps the filter and the row in view for who shows the page, and leads on with the context', async () => {
+    const { api } = todayApi(view({ items: [hours, mail, bugs] }))
+    const focus = vi.fn()
+    const asked: string[] = []
+    const opened: string[] = []
+    render(
+      <TodayView
+        api={api}
+        project={aurora}
+        canJudge
+        onOpenSection={() => {}}
+        focus={{ group: 'mail', key: 'mail:budget' }}
+        onFocus={focus}
+        onAsk={(question) => asked.push(question)}
+        onOpenBugs={(filter) => opened.push(filter)}
+      />,
+    )
+    await screen.findByRole('group', { name: text.filters })
+    expect(rows()).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: text.askAboutMail }))
+    expect(asked).toEqual([text.mailSeed('Carla Bianchi', 'Aurora: budget')])
+    // The stuck bugs open the dashboard on the stuck ones.
+    fireEvent.click(screen.getByRole('button', { name: text.open.dashboard }))
+    expect(opened).toEqual(['stuck'])
+    fireEvent.click(screen.getByRole('button', { name: `${text.filterAll} 2` }))
+    expect(focus).toHaveBeenCalledWith({ group: 'all', key: 'mail:budget' })
+  })
+
+  it('shows nothing of a project the PM has left, whenever its answer comes back', async () => {
+    let finish: (result: Result<View>) => void = () => {}
+    const { api } = todayApi(view(), {
+      todayView: vi.fn((projectId: string) =>
+        projectId === 'p-1'
+          ? new Promise<Result<View>>((resolve) => (finish = resolve))
+          : Promise.resolve(ok(view({ items: [mail] }))),
+      ),
+    })
+    const boreale: Project = { ...aurora, id: 'p-2', name: 'Boreale' }
+    const page = (project: Project) => (
+      <TodayView api={api} project={project} canJudge onOpenSection={() => {}} />
+    )
+    const { rerender } = render(page(aurora))
+    rerender(page(boreale))
+    expect((await screen.findAllByText(/Rispondi a Carla Bianchi/)).length).toBeGreaterThan(0)
+    await act(async () => finish(ok(view({ items: [hours] }))))
+    expect(screen.queryByText(/le ore di 3 persone/)).toBeNull()
+    expect(rows()).toHaveLength(1)
+  })
+
+  it('says that a file is being opened on the button that opens it, without changing its place', async () => {
+    let finish: (result: Result<null>) => void = () => {}
+    const { api } = todayApi(view({ items: [mail] }), {
+      openEvidence: vi.fn(() => new Promise<Result<null>>((resolve) => (finish = resolve))),
+    })
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const open = await screen.findByRole('button', { name: new RegExp(text.open.mail) })
+    fireEvent.click(open)
+    expect(open.getAttribute('aria-busy')).toBe('true')
+    expect(open.textContent).toContain(messages.wait.opening)
+    // A second press while it works asks nothing more.
+    fireEvent.click(open)
+    expect(api.openEvidence).toHaveBeenCalledTimes(1)
+    await act(async () => finish(ok(null)))
+    expect(open.getAttribute('aria-busy')).toBeNull()
   })
 })

@@ -210,3 +210,26 @@ export function signalText(item: TodayItem): SignalText {
 /** When the data a signal stands on was read, in words; empty when the source does not say. */
 export const asOfText = (item: TodayItem): string =>
   item.asOf === null || item.facts.kind === 'risk' ? '' : `Dati del ${dateTimeText(item.asOf)}`
+
+/** How long a signal has been waiting or how far it is, in a few characters for a row of a list. */
+export function ageText(item: TodayItem): string {
+  const facts = item.facts
+  switch (facts.kind) {
+    case 'mail_reply':
+    case 'mail_waiting':
+    case 'draft':
+      return since(facts.days)
+    case 'tracker_old':
+      return `${count(facts.days, 'giorno', 'giorni')} fa`
+    case 'bugs_stuck':
+      return since(facts.oldestDays)
+    case 'calendar':
+      return within(facts.inDays)
+    case 'meeting':
+      return `alle ${HOUR.format(new Date(facts.start))}`
+    case 'source':
+      return facts.days === null ? '' : since(facts.days)
+    default:
+      return ''
+  }
+}

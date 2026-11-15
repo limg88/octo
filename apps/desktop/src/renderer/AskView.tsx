@@ -3,26 +3,55 @@ import type { Project, QuestionRecord } from '@octo/domain'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
+import type { Handoff } from './context.ts'
 import { dateTimeText, errorText, messages, progressText } from './messages.ts'
+import { BusyButton, Waiting } from './Spinner.tsx'
+
+type AskApi = Pick<OctoApi, 'listQuestions' | 'ask' | 'cancelAsk' | 'openEvidence' | 'onProgress'>
 
 type Props = {
-  api: OctoApi
+  api: AskApi
   project: Project
+  /** A question written elsewhere about something of the project: put in the field, not asked. */
+  seed?: string | null
+  onSeedUsed?: () => void
+  /** Starts a deliverable from an answer, with its question and its sources. */
+  onDraft?: (handoff: Handoff) => void
 }
 
 /** The conversation with one project: past questions, the one in progress, the composer. */
-export function AskView({ api, project }: Props) {
+export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Props) {
   const [records, setRecords] = useState<QuestionRecord[]>([])
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState<string | null>(null)
   const [progress, setProgress] = useState<AgentProgress | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const end = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLTextAreaElement>(null)
+  /** The project on the page now: an answer that comes back for another one is not shown here. */
+  const live = useRef<string | null>(project.id)
+  live.current = project.id
+  useEffect(
+    () => () => {
+      live.current = null
+    },
+    [],
+  )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the question is taken once, when it arrives.
+  useEffect(() => {
+    if (seed === null) return
+    setQuestion(seed)
+    field.current?.focus()
+    onSeedUsed?.()
+  }, [seed])
 
   useEffect(() => {
     let current = true
     setRecords([])
     setError(null)
+    setPending(null)
+    setProgress(null)
     void api.listQuestions(project.id).then((result) => {
       if (!current) return
       if (result.ok) setRecords(result.value)
@@ -37,9 +66,11 @@ export function AskView({ api, project }: Props) {
     }
   }, [api, project.id])
 
+  // The page follows the conversation when it grows, not when a source is looked at.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: what is watched is how much there is to read.
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' })
-  })
+  }, [records.length, pending])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -48,7 +79,9 @@ export function AskView({ api, project }: Props) {
     setPending(asked)
     setQuestion('')
     setError(null)
-    const result = await api.ask(project.id, asked)
+    const projectId = project.id
+    const result = await api.ask(projectId, asked)
+    if (live.current !== projectId) return
     setPending(null)
     setProgress(null)
     if (result.ok) setRecords((previous) => [...previous, result.value])
@@ -69,7 +102,20 @@ export function AskView({ api, project }: Props) {
             {record.answer && (
               <AnswerView
                 answer={record.answer}
-                onOpenSource={(path) => void api.openEvidence(project.id, path)}
+                onOpenSource={(path) => api.openEvidence(project.id, path)}
+                actions={
+                  onDraft && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        record.answer &&
+                        onDraft({ question: record.question, answer: record.answer })
+                      }
+                    >
+                      {messages.askDraft}
+                    </button>
+                  )
+                }
               />
             )}
             {record.error && <p className="warning">{errorText(record.error)}</p>}
@@ -78,9 +124,7 @@ export function AskView({ api, project }: Props) {
         {pending !== null && (
           <article className="exchange">
             <p className="question">{pending}</p>
-            <p className="progress" role="status">
-              {progress ? progressText(progress) : messages.working}
-            </p>
+            <Waiting>{progress ? progressText(progress) : messages.working}</Waiting>
           </article>
         )}
         {error && (
@@ -108,6 +152,7 @@ export function AskView({ api, project }: Props) {
       )}
       <form className="composer" onSubmit={(event) => void submit(event)}>
         <textarea
+          ref={field}
           aria-label={messages.askPlaceholder}
           placeholder={messages.askPlaceholder}
           value={question}
@@ -117,11 +162,15 @@ export function AskView({ api, project }: Props) {
             if (event.key === 'Enter' && !event.shiftKey) void submit(event)
           }}
         />
-        {pending === null ? (
-          <button type="submit" disabled={question.trim().length === 0}>
-            {messages.askSubmit}
-          </button>
-        ) : (
+        <BusyButton
+          type="submit"
+          busy={pending !== null}
+          busyLabel={messages.wait.asking}
+          disabled={question.trim().length === 0}
+        >
+          {messages.askSubmit}
+        </BusyButton>
+        {pending !== null && (
           <button type="button" onClick={() => void api.cancelAsk(project.id)}>
             {messages.askCancel}
           </button>

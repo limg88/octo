@@ -98,13 +98,35 @@ try {
   }
 
   await ask('Quando consegniamo il modulo ordini?')
-  await page.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
-  assert.equal(await page.getByText('Controllata', { exact: true }).count(), 1)
+  await page.getByText('1 citazione riscontrata nel file').waitFor({ timeout: TIMEOUT_MS })
+  // Demo 24: the source of the citation is beside the answer, with what the check found.
+  const source24 = page.getByRole('complementary', { name: 'Fonte citata' })
+  await source24.getByText('Frase riscontrata nel file', { exact: true }).waitFor()
+  await source24.getByText('«', { exact: false }).first().waitFor()
+  assert.equal(
+    await page.getByRole('button', { name: 'Fonte 1', exact: true }).getAttribute('aria-pressed'),
+    'true',
+  )
 
   await ask('E il budget? #inventa')
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('La frase non è nel file').waitFor({ timeout: TIMEOUT_MS })
   await page.screenshot({ path: `${work}/chiedi.png` })
+  // Demo 24: an answer starts a deliverable, and its question and sources go with it.
+  await page
+    .getByRole('button', { name: 'Prepara un deliverable da questa risposta' })
+    .first()
+    .click()
+  const context24 = page.getByRole('region', { name: 'Contesto dalla risposta' })
+  await context24.getByText('Dalla domanda: «Quando consegniamo il modulo ordini?»').waitFor()
+  await page.getByRole('button', { name: /Email al cliente/ }).click()
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.deliverables textarea')].some((field) =>
+      field.value.startsWith('Domanda: Quando consegniamo il modulo ordini?'),
+    ),
+  )
+  await context24.getByRole('button', { name: 'Togli il contesto' }).click()
+  await context24.waitFor({ state: 'detached' })
 
   // Demo 02: the mail of the project enters its folder, once.
   await page.getByRole('tab', { name: 'Impostazioni' }).click()
@@ -233,7 +255,7 @@ try {
   await work06.getByLabel(/^Di che cosa/).fill('Data di consegna')
   await work06.getByLabel(/^Che cosa chiedi/).fill('Conferma della data')
   await work06.getByRole('button', { name: 'Scrivi la bozza' }).click()
-  await work06.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
+  await work06.getByText('1 citazione riscontrata nel file').waitFor({ timeout: TIMEOUT_MS })
   await work06.getByText('Può uscire: nessun punto contestabile trovato.').waitFor()
   await work06.getByLabel('Che cosa vuoi cambiare?').fill('Aggiungi il budget #inventa')
   await work06.getByRole('button', { name: 'Chiedi modifica' }).click()
@@ -296,9 +318,7 @@ try {
   await page.getByText(/Dati aggiornati/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('su 30 bug nel perimetro').waitFor()
   const figure = async (label) =>
-    (await page.locator('.figure', { hasText: label }).first().locator('dd').innerText()).split(
-      '\n',
-    )[0]
+    page.locator('.metric', { hasText: label }).first().locator('.metric-value').innerText()
   assert.equal(await figure('Bug aperti'), '15')
   assert.equal(await figure('In verifica'), '5')
   assert.equal(await figure('Fermi da oltre 30 giorni'), '11')
@@ -307,7 +327,18 @@ try {
   await page.getByRole('button', { name: '12 mesi' }).click()
   await assertEventuallyAsync(async () => (await trendRows.count()) === 12)
   await page.screenshot({ path: `${work}/cruscotto.png` })
-  const open07 = page.getByRole('region', { name: 'Bug aperti' })
+  const open07 = page.getByRole('region', { name: 'Qualità: i bug del perimetro' })
+  // Demo 24: a count opens its list, with as many rows as it counts, and a bug shows its detail.
+  await open07.getByRole('button', { name: /Fermi da oltre 30 giorni/ }).click()
+  assert.equal(await open07.locator('.entry').count(), 11)
+  await open07.getByRole('button', { name: /Validati, in attesa di rilascio/ }).click()
+  assert.equal(await open07.locator('.entry').count(), Number(await figure('Validati')))
+  await open07.getByRole('button', { name: /Bug aperti/ }).click()
+  assert.equal(await open07.locator('.entry').count(), 15)
+  await open07
+    .getByRole('region', { name: 'Dettaglio del bug' })
+    .getByText(/gg nello stato/)
+    .waitFor()
   await open07.getByRole('button', { name: 'Scrivi una nota' }).first().click()
   await open07.getByRole('textbox').fill('Sentito il cliente: dati entro venerdì')
   await open07.getByRole('button', { name: 'Salva la nota' }).click()
@@ -536,7 +567,7 @@ try {
   await work11.getByRole('button', { name: /Stato di avanzamento/ }).click()
   await work11.getByLabel(/^Periodo/).fill('Sprint 28')
   await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
-  await work11.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
+  await work11.getByText('1 citazione riscontrata nel file').waitFor({ timeout: TIMEOUT_MS })
   // The draft is the slides of the model, updated: what the PM reviews is slide by slide.
   await work11
     .getByRole('heading', { name: 'Slide 2 — Aurora - Avanzamento — PI7' })

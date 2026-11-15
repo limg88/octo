@@ -12,6 +12,23 @@ export const messages = {
   openSources: 'Apri «Impostazioni»',
   openSection: (name: string) => `Apri «${name}»`,
   todayTab: 'Oggi',
+  brand: 'octo',
+  theme: { label: 'Tema', light: 'Tema chiaro', dark: 'Tema scuro' },
+  shell: { folder: 'Cartella del progetto', project: (name: string) => `Progetto ${name}` },
+  wait: {
+    opening: 'Apro…',
+    asking: 'Chiedo…',
+    writing: 'Scrivo…',
+    changing: 'Modifico…',
+    approving: 'Approvo…',
+    reading: 'Leggo…',
+    saving: 'Salvo…',
+    retry: 'Riprova',
+  },
+  detail: {
+    none: 'Scegli una voce dell’elenco per vederne il dettaglio.',
+    position: (place: number, all: number) => `${place} / ${all}`,
+  },
   session: {
     title: 'Entra in Octo',
     body: 'Octo si apre con il tuo utente aziendale. L’accesso avviene nel browser: qui non scrivi nessuna password.',
@@ -46,6 +63,36 @@ export const messages = {
   },
   today: {
     loading: 'Preparo la giornata…',
+    filters: 'Filtra le cose da fare',
+    filterAll: 'Tutte',
+    groups: {
+      mail: 'Posta',
+      tracker: 'Tracker',
+      numbers: 'Ore e numeri',
+      work: 'Deliverable',
+      calendar: 'Calendario',
+      risks: 'Rischi',
+      sources: 'Fonti',
+    },
+    list: 'Cose da fare',
+    detailTitle: 'Dettaglio della segnalazione',
+    noneInFilter: 'Nessuna voce con questo filtro.',
+    dueShort: { month_end: 'Fine mese', sprint_end: 'Fine sprint', deadline: 'Scadenza' },
+    computed: 'Calcolato da Octo',
+    evidence: 'Fonte',
+    judging: 'Valutazione in corso…',
+    refreshing: 'Aggiorno le fonti: ciò che vedi è dell’ultima lettura.',
+    decided: {
+      done: (title: string) => `Segnata come fatta: ${title}`,
+      later: (title: string) => `Rimandata: ${title}`,
+      muted: (title: string) => `Messa da parte: ${title}`,
+    },
+    undo: 'Annulla',
+    askAboutMail: 'Chiedi di questa mail',
+    mailSeed: (who: string, subject: string) =>
+      `Che cosa chiede ${who} nella mail «${subject}», entro quando, e che cosa serve per rispondere? Cita le fonti.`,
+    showing: (shown: number, all: number) =>
+      shown === all ? `${all} in elenco` : `${shown} di ${all} in elenco`,
     title: (day: string) => `Oggi · ${day}`,
     freshnessNever: 'mai letta',
     readNow: 'Leggi ora',
@@ -282,7 +329,7 @@ export const messages = {
   openSource: 'Apri il file',
   modified: 'file del',
   allVerified: (count: number) =>
-    count === 1 ? '1 fonte controllata' : `${count} fonti controllate`,
+    count === 1 ? '1 citazione riscontrata nel file' : `${count} citazioni riscontrate nei file`,
   noSources: 'Nessuna fonte citata',
   toCheck: (count: number) =>
     count === 1 ? '1 punto da controllare' : `${count} punti da controllare`,
@@ -862,6 +909,25 @@ export const messages = {
   dashboardTab: 'Cruscotto',
   dashboard: {
     loading: 'Leggo l’esportazione del tracker…',
+    qualityTitle: 'Qualità: i bug del perimetro',
+    filterLabel: 'Scegli quali bug elencare',
+    relation: (open: number, stuck: number, validated: number, days: number) =>
+      `Aperti: ${open}, in lavorazione o in verifica; ${stuck} di questi sono fermi da oltre ${days} giorni. I ${validated} validati non sono più aperti: aspettano il rilascio.`,
+    ofWhich: 'di cui',
+    bugList: 'Bug',
+    bugDetail: 'Dettaglio del bug',
+    noneInFilter: 'Nessun bug con questo filtro.',
+    lastComment: (by: string, when: string) => `Ultimo commento · ${by} · ${when}`,
+    noteOf: (when: string) => `Nota tua · ${when}`,
+    noComment: 'Nessun commento sul tracker e nessuna nota tua.',
+    inState: (days: number | null) =>
+      days === null ? 'tempo nello stato non noto' : `${days} gg nello stato`,
+    severity: 'Gravità',
+    environment: 'Ambiente',
+    created: 'Aperto il',
+    askAbout: 'Chiedi di questo bug',
+    askSeed: (id: string, title: string, state: string, days: number | null) =>
+      `Bug ${id} «${title}», nello stato «${state}»${days === null ? '' : ` da ${days} giorni`}: che cosa lo blocca, chi deve muoversi e qual è il prossimo passo? Cita le fonti.`,
     haveExport: 'Ho già un file di esportazione',
     trendNumbers: 'Mostra i numeri',
     adoUnlinked:
@@ -1094,10 +1160,78 @@ export const messages = {
   agentMissingBody:
     'Octo usa Claude Code con il tuo account. Installalo, accedi una volta dal terminale con «claude» e riapri Octo.',
   agentReady: (version: string) => `Claude ${version}`,
+  citation: {
+    panel: 'Fonte citata',
+    marker: (n: number) => `Fonte ${n}`,
+    markerMissing: (n: number) => `Richiamo ${n} senza fonte`,
+    none: 'Scegli un richiamo nella risposta per vedere qui la fonte, senza perdere il testo.',
+    noSources: 'Questa risposta non cita fonti: prendila come non verificata.',
+    orphan: (n: number) =>
+      `Il richiamo [${n}] non ha una fonte: ciò che gli sta accanto non è appoggiato a nessun file.`,
+    found: 'Frase riscontrata nel file',
+    foundNote:
+      'Il controllo dice che la frase è nel file. Non dice che la conclusione tratta sia giusta: quella resta da leggere.',
+    notFoundNote:
+      'Questa citazione non regge il controllo: verifica sull’originale prima di usarla.',
+    open: 'Apri l’originale',
+    opening: 'Apro la fonte…',
+    openFailed: 'Non sono riuscito ad aprire il file.',
+    path: 'Percorso completo',
+    previous: 'Fonte precedente',
+    next: 'Fonte successiva',
+    close: 'Chiudi la fonte',
+    undated: 'data non nota',
+    sameFile: (markers: string) => `Lo stesso file è citato anche ai richiami ${markers}.`,
+    provenance: {
+      mail: 'Posta',
+      tracker: 'Tracker',
+      feed: (name: string) => name,
+      text: 'Documento',
+      file: 'File del progetto',
+    },
+  },
+  missingTitle: 'Da confermare: non trovato nelle fonti',
+  missingCount: (count: number) =>
+    count === 1 ? '1 informazione mancante' : `${count} informazioni mancanti`,
+  askDraft: 'Prepara un deliverable da questa risposta',
+  handoff: {
+    title: 'Contesto dalla risposta',
+    from: (question: string) => `Dalla domanda: «${question}»`,
+    sources: (count: number) =>
+      count === 0
+        ? 'Nessuna fonte citata.'
+        : count === 1
+          ? '1 fonte citata.'
+          : `${count} fonti citate.`,
+    choose:
+      'Scegli il tipo di deliverable: il contesto entra nel primo campo di testo, e lo puoi correggere.',
+    drop: 'Togli il contesto',
+    filled: 'Compilato dal contesto della risposta: controllalo prima di scrivere.',
+    labels: {
+      question: 'Domanda',
+      answer: 'Risposta di Octo',
+      sources: 'Fonti citate',
+      missing: 'Da confermare',
+    },
+  },
+  review: {
+    panel: 'Rilettura',
+    draft: 'Bozza',
+    seen: 'Segna come rivisto',
+    seenDone: 'Rivisto',
+    left: (count: number) =>
+      count === 0
+        ? 'Tutti i rilievi rivisti'
+        : count === 1
+          ? '1 rilievo da rivedere'
+          : `${count} rilievi da rivedere`,
+    reset: 'La bozza è cambiata: i rilievi sono da rivedere di nuovo.',
+    exported: 'Approvato: i file sono pronti qui sopra.',
+  },
 } as const
 
 const citationStatus: Record<CitationStatus, string> = {
-  verified: 'Controllata',
+  verified: 'Frase riscontrata nel file',
   quote_not_found: 'La frase non è nel file',
   quote_too_short: 'Frase troppo breve per valere come prova',
   file_not_found: 'File non trovato',

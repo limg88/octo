@@ -23,6 +23,7 @@ import {
   type ModelSettings,
   NO_RISKS,
   NO_TEAM,
+  type Preferences,
   type Project,
   type ProjectTeam,
   type QuestionRecord,
@@ -144,6 +145,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     chooseProjectPath: vi.fn(async () => ok<string | null>(null)),
     alignmentChoices: vi.fn(async () => ok({ sprints: [], periods: [], tags: [] })),
     agentStatus: vi.fn(async () => ok(status)),
+    preferences: vi.fn(async () => ok<Preferences>({ theme: 'system' })),
+    savePreferences: vi.fn(async (preferences: Preferences) => ok(preferences)),
     listProjects: vi.fn(async () => ok([aurora])),
     addProject: vi.fn(async () => ok<Project | null>(boreale)),
     removeProject: vi.fn(async () => ok(null)),
@@ -307,14 +310,24 @@ describe('App', () => {
 
     expect(await screen.findByText(messages.toCheck(2))).toBeTruthy()
     expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?')
-    expect(screen.getByText('Controllata')).toBeTruthy()
-    expect(screen.getByText('La frase non è nel file')).toBeTruthy()
-    expect(screen.getByText(messages.markerWithoutSource(3))).toBeTruthy()
+    // The first source is in view beside the answer, with what the check found about it.
+    const panel = screen.getByRole('complementary', { name: messages.citation.panel })
+    expect(within(panel).getByText('Frase riscontrata nel file')).toBeTruthy()
+    expect(within(panel).getByText(messages.citation.foundNote)).toBeTruthy()
+    // A marker shows its source there, and the answer stays where it is.
+    fireEvent.click(screen.getByRole('button', { name: messages.citation.marker(2) }))
+    expect(within(panel).getByText('La frase non è nel file')).toBeTruthy()
+    expect(within(panel).getByText(messages.citation.notFoundNote)).toBeTruthy()
+    expect(screen.getByText(messages.toCheck(2))).toBeTruthy()
+    expect(screen.getByText(messages.citation.orphan(3))).toBeTruthy()
     expect(screen.getByText('data di collaudo')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'sito' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'wiki/stato.md' }))
-    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md')
+    // Every source stays one click away, by a name a person reads; the original opens from there.
+    fireEvent.click(screen.getByRole('button', { name: 'wiki · stato' }))
+    expect(within(panel).getByText('wiki/stato.md')).toBeTruthy()
+    fireEvent.click(within(panel).getByRole('button', { name: messages.citation.open }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md'))
   })
 
   it('tells what the agent is doing and lets the PM stop it', async () => {

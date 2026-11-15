@@ -11,15 +11,26 @@ import {
   type RedTeamReport,
   registerTotals,
 } from '@octo/domain'
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
+import type { OpenSource } from './CitationPanel.tsx'
+import type { Handoff } from './context.ts'
+import { citedPaths, handoffField, handoffText } from './handoff-text.ts'
 import { dateText, errorText, messages, progressText } from './messages.ts'
+import { BusyButton, Waiting } from './Spinner.tsx'
 
 type Props = {
   api: OctoApi
   project: Project
+  /** An answer of «Chiedi» the next deliverable starts from. */
+  handoff?: Handoff | null
+  /** Told when the context was used, or put aside by the PM. */
+  onHandoffDone?: () => void
 }
+
+/** Which step on a deliverable is running: the button that started it says so. */
+type Step = 'start' | 'revise' | 'approve'
 
 /** What the right side shows: the catalog, the form of a kind, or a deliverable. */
 type Shown =
@@ -30,11 +41,21 @@ type Shown =
   | { view: 'one'; id: string }
 
 /** The deliverables of a project: the catalog, the ones in the making, the approved ones. */
-export function DeliverablesView({ api, project }: Props) {
+export function DeliverablesView({ api, project, handoff = null, onHandoffDone }: Props) {
   const [catalog, setCatalog] = useState<DeliverableKind[]>([])
   const [all, setAll] = useState<Deliverable[]>([])
   const [shown, setShown] = useState<Shown>({ view: 'catalog' })
-  const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState<Step | null>(null)
+  const busy = step !== null
+  /** The project on the page now: a draft that comes back for another one is not shown here. */
+  const live = useRef<string | null>(project.id)
+  live.current = project.id
+  useEffect(
+    () => () => {
+      live.current = null
+    },
+    [],
+  )
   const [progress, setProgress] = useState<AgentProgress | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
 
@@ -43,6 +64,8 @@ export function DeliverablesView({ api, project }: Props) {
     setAll([])
     setShown({ view: 'catalog' })
     setError(null)
+    setStep(null)
+    setProgress(null)
     void api.deliverableCatalog(project.id).then((result) => {
       if (current && result.ok) setCatalog(result.value)
     })
@@ -61,17 +84,26 @@ export function DeliverablesView({ api, project }: Props) {
   }, [api, project.id])
 
   /** Runs one step on a deliverable and puts what comes back in the list. */
-  const run = useCallback(async (step: () => Promise<Result<Deliverable>>) => {
-    setBusy(true)
-    setError(null)
-    setProgress(null)
-    const result = await step()
-    setBusy(false)
-    if (!result.ok) return setError(result.code)
-    const made = result.value
-    setAll((previous) => [made, ...previous.filter((other) => other.id !== made.id)])
-    setShown({ view: 'one', id: made.id })
-  }, [])
+  const run = useCallback(
+    async (which: Step, work: () => Promise<Result<Deliverable>>): Promise<boolean> => {
+      const projectId = project.id
+      setStep(which)
+      setError(null)
+      setProgress(null)
+      const result = await work()
+      if (live.current !== projectId) return false
+      setStep(null)
+      if (!result.ok) {
+        setError(result.code)
+        return false
+      }
+      const made = result.value
+      setAll((previous) => [made, ...previous.filter((other) => other.id !== made.id)])
+      setShown({ view: 'one', id: made.id })
+      return true
+    },
+    [project.id],
+  )
 
   /** Changes the kinds of the project, then shows the catalog as it is now. */
   async function changeCatalog(step: () => Promise<Result<unknown>>) {
@@ -121,9 +153,22 @@ export function DeliverablesView({ api, project }: Props) {
           </p>
         )}
         {busy && (
-          <p className="progress" role="status">
-            {progress ? progressText(progress) : messages.deliverableWriting}
-          </p>
+          <Waiting>{progress ? progressText(progress) : messages.deliverableWriting}</Waiting>
+        )}
+        {handoff && (shown.view === 'catalog' || shown.view === 'form') && (
+          <section className="box box-source handoff" aria-label={messages.handoff.title}>
+            <strong>{messages.handoff.title}</strong>
+            <p>{messages.handoff.from(handoff.question)}</p>
+            <p className="hint">
+              {messages.handoff.sources(citedPaths(handoff).length)}{' '}
+              {shown.view === 'catalog' && messages.handoff.choose}
+            </p>
+            <div className="actions">
+              <button type="button" className="quiet" onClick={onHandoffDone}>
+                {messages.handoff.drop}
+              </button>
+            </div>
+          </section>
         )}
         {shown.view === 'catalog' && (
           <>
@@ -167,17 +212,27 @@ export function DeliverablesView({ api, project }: Props) {
             project={project}
             kind={formKind}
             busy={busy}
-            onStart={(inputs) => run(() => api.startDeliverable(project.id, formKind.id, inputs))}
+            writing={step === 'start'}
+            handoff={handoff}
+            onStart={async (inputs) => {
+              const made = await run('start', () =>
+                api.startDeliverable(project.id, formKind.id, inputs),
+              )
+              // The context went into the draft: the next deliverable starts empty.
+              if (made) onHandoffDone?.()
+            }}
           />
         )}
         {one && (
           <Review
             deliverable={one}
             kind={kindOf(one.kindId)}
-            busy={busy}
-            onOpen={(path) => void api.openEvidence(project.id, path)}
-            onRevise={(request) => run(() => api.reviseDeliverable(project.id, one.id, request))}
-            onApprove={() => run(() => api.approveDeliverable(project.id, one.id))}
+            step={step}
+            onOpen={(path) => api.openEvidence(project.id, path)}
+            onRevise={(request) =>
+              void run('revise', () => api.reviseDeliverable(project.id, one.id, request))
+            }
+            onApprove={() => void run('approve', () => api.approveDeliverable(project.id, one.id))}
           />
         )}
       </div>
@@ -240,21 +295,30 @@ function KindForm({
   project,
   kind,
   busy,
+  writing,
+  handoff,
   onStart,
 }: {
   api: OctoApi
   project: Project
   kind: DeliverableKind
   busy: boolean
+  writing: boolean
+  handoff: Handoff | null
   onStart: (inputs: Record<string, string>) => void
 }) {
-  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const filledField = handoff ? handoffField(kind) : null
+  /** What the form starts with: the context of an answer in its field, when there is one. */
+  const initial = (): Record<string, string> =>
+    handoff && filledField ? { [filledField]: handoffText(handoff) } : {}
+  const [inputs, setInputs] = useState<Record<string, string>>(initial)
   const [instructions, setInstructions] = useState('')
   const [saved, setSaved] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the form starts again with another kind or another context, not at every render.
   useEffect(() => {
     let current = true
-    setInputs({})
+    setInputs(initial())
     setSaved(false)
     void api.deliverableInstructions(project.id, kind.id).then((result) => {
       if (current && result.ok) setInstructions(result.value)
@@ -262,7 +326,7 @@ function KindForm({
     return () => {
       current = false
     }
-  }, [api, project.id, kind.id])
+  }, [api, project.id, kind.id, handoff])
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -292,18 +356,24 @@ function KindForm({
             <label key={field.key} htmlFor={id}>
               {field.label}
               {field.kind === 'long' ? (
-                <textarea rows={3} {...control} />
+                <textarea rows={field.key === filledField ? 10 : 3} {...control} />
               ) : (
                 <input type="text" {...control} />
               )}
               {field.hint && <span className="hint">{field.hint}</span>}
+              {field.key === filledField && <span className="hint">{messages.handoff.filled}</span>}
             </label>
           )
         })}
         <div className="actions">
-          <button type="submit" disabled={busy || missing}>
+          <BusyButton
+            type="submit"
+            busy={writing}
+            busyLabel={messages.wait.writing}
+            disabled={busy || missing}
+          >
             {messages.deliverableWrite}
-          </button>
+          </BusyButton>
         </div>
       </form>
       <details className="project-instructions">
@@ -332,22 +402,32 @@ function KindForm({
 function Review({
   deliverable,
   kind,
-  busy,
+  step,
   onOpen,
   onRevise,
   onApprove,
 }: {
   deliverable: Deliverable
   kind: DeliverableKind | undefined
-  busy: boolean
-  onOpen: (path: string) => void
+  step: Step | null
+  onOpen: OpenSource
   onRevise: (request: string) => void
   onApprove: () => void
 }) {
   const [request, setRequest] = useState('')
+  const busy = step !== null
   const cost = costOf(deliverable)
   const lastFailed = deliverable.rounds.at(-1)?.error ?? null
   const inReview = deliverable.status === 'review'
+  // What the PM marked as seen holds for the draft it was marked on: a new draft starts unmarked.
+  const round = `${deliverable.id}:${deliverable.rounds.length}`
+  const [seen, setSeen] = useState<{ round: string; keys: readonly string[] }>({ round, keys: [] })
+  const seenKeys = seen.round === round ? seen.keys : []
+  const toggleSeen = (key: string) =>
+    setSeen({
+      round,
+      keys: seenKeys.includes(key) ? seenKeys.filter((k) => k !== key) : [...seenKeys, key],
+    })
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -355,9 +435,92 @@ function Review({
     setRequest('')
   }
 
+  const side = (
+    <aside className="panel review-panel" aria-label={messages.review.panel}>
+      <div className="panel-head">
+        <h4>{messages.review.panel}</h4>
+        {deliverable.redTeam && inReview && (
+          <span
+            className={
+              deliverable.redTeam.findings.length > seenKeys.length ? 'pill pill-warning' : 'pill'
+            }
+            role="status"
+          >
+            {messages.review.left(deliverable.redTeam.findings.length - seenKeys.length)}
+          </span>
+        )}
+      </div>
+      <div className="panel-body">
+        {deliverable.status === 'approved' && (
+          <p className="badge badge-ok">{messages.review.exported}</p>
+        )}
+        {deliverable.redTeam && (
+          <RedTeam
+            report={deliverable.redTeam}
+            seen={inReview ? seenKeys : null}
+            onSeen={toggleSeen}
+          />
+        )}
+        {kind?.audience === 'client' && deliverable.draft && (
+          <ClientFilter text={deliverable.draft.text} />
+        )}
+        {inReview && kind && (
+          <section aria-label={messages.deliverableChecklist}>
+            <h4>{messages.deliverableChecklist}</h4>
+            <ul className="missing">
+              {kind.checklist.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {inReview && (
+          <form className="source-form" onSubmit={submit}>
+            <label>
+              {messages.deliverableChange}
+              <textarea
+                rows={2}
+                value={request}
+                onChange={(event) => setRequest(event.target.value)}
+              />
+            </label>
+            <div className="actions">
+              <BusyButton
+                type="submit"
+                className="quiet-submit"
+                busy={step === 'revise'}
+                busyLabel={messages.wait.changing}
+                disabled={busy || !request.trim()}
+              >
+                {messages.deliverableChangeSubmit}
+              </BusyButton>
+              <BusyButton
+                className="primary"
+                busy={step === 'approve'}
+                busyLabel={messages.wait.approving}
+                disabled={busy}
+                onClick={onApprove}
+              >
+                {messages.deliverableApprove}
+              </BusyButton>
+            </div>
+          </form>
+        )}
+      </div>
+    </aside>
+  )
+
   return (
     <>
-      <h3>{deliverable.title}</h3>
+      <div className="review-head">
+        <h3>{deliverable.title}</h3>
+        {kind && (
+          <span className={kind.audience === 'client' ? 'pill pill-warning' : 'pill'}>
+            {messages.deliverableFor[kind.audience]}
+          </span>
+        )}
+        <span className="pill">{messages.deliverableStatus[deliverable.status]}</span>
+      </div>
       <p className="hint">
         {kind?.title ?? deliverable.kindId} · {messages.deliverableStatus[deliverable.status]} ·{' '}
         {messages.deliverableCost(cost.draftMinutes, cost.reviewMinutes, cost.rounds)}
@@ -379,52 +542,20 @@ function Review({
           <p>{messages.deliverableFiles}</p>
           <div className="choices">
             {deliverable.files.map((path) => (
-              <button key={path} type="button" onClick={() => onOpen(path)}>
+              <button key={path} type="button" onClick={() => void onOpen(path)}>
                 {path.split('/').at(-1)}
               </button>
             ))}
           </div>
         </div>
       )}
-      {deliverable.draft && (
+      {deliverable.draft ? (
         <div className="draft">
-          <AnswerView answer={deliverable.draft} onOpenSource={onOpen} />
+          <AnswerView answer={deliverable.draft} onOpenSource={onOpen} side={side} />
           {inReview && <p className="hint">{messages.deliverableSourcesNote}</p>}
         </div>
-      )}
-      {kind?.audience === 'client' && deliverable.draft && (
-        <ClientFilter text={deliverable.draft.text} />
-      )}
-      {deliverable.redTeam && <RedTeam report={deliverable.redTeam} />}
-      {inReview && kind && (
-        <section aria-label={messages.deliverableChecklist}>
-          <h4>{messages.deliverableChecklist}</h4>
-          <ul className="missing">
-            {kind.checklist.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {inReview && (
-        <form className="source-form" onSubmit={submit}>
-          <label>
-            {messages.deliverableChange}
-            <textarea
-              rows={2}
-              value={request}
-              onChange={(event) => setRequest(event.target.value)}
-            />
-          </label>
-          <div className="actions">
-            <button type="submit" className="quiet-submit" disabled={busy || !request.trim()}>
-              {messages.deliverableChangeSubmit}
-            </button>
-            <button type="button" className="primary" disabled={busy} onClick={onApprove}>
-              {messages.deliverableApprove}
-            </button>
-          </div>
-        </form>
+      ) : (
+        side
       )}
     </>
   )
@@ -453,7 +584,16 @@ function ClientFilter({ text }: { text: string }) {
   )
 }
 
-function RedTeam({ report }: { report: RedTeamReport }) {
+function RedTeam({
+  report,
+  seen,
+  onSeen,
+}: {
+  report: RedTeamReport
+  /** The findings the PM marked as seen; null when the draft is no longer under review. */
+  seen: readonly string[] | null
+  onSeen: (key: string) => void
+}) {
   const ok = report.verdict === 'deliverable'
   return (
     <section className="red-team" aria-label={messages.deliverableRedTeam}>
@@ -463,16 +603,30 @@ function RedTeam({ report }: { report: RedTeamReport }) {
       </p>
       {report.findings.length > 0 && (
         <ul className="findings">
-          {report.findings.map((finding) => (
-            <li key={`${finding.where}-${finding.finding}`}>
-              <span className="status status-warning">
-                {messages.deliverableSeverity[finding.severity]}
-              </span>
-              <strong>{finding.finding}</strong>
-              <blockquote>{finding.where}</blockquote>
-              <span className="hint">{finding.why}</span>
-            </li>
-          ))}
+          {report.findings.map((finding) => {
+            const key = `${finding.where}-${finding.finding}`
+            const marked = seen?.includes(key) ?? false
+            return (
+              <li key={key} className={marked ? 'finding-seen' : undefined}>
+                <span className="status status-warning">
+                  {messages.deliverableSeverity[finding.severity]}
+                </span>
+                <strong>{finding.finding}</strong>
+                <blockquote>{finding.where}</blockquote>
+                <span className="hint">{finding.why}</span>
+                {seen && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-pressed={marked}
+                    onClick={() => onSeen(key)}
+                  >
+                    {marked ? `${messages.review.seenDone} ✓` : messages.review.seen}
+                  </button>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
       {report.holds && (

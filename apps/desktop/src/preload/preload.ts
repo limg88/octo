@@ -97,6 +97,8 @@ const api: OctoApi = {
   modelSettings: (projectId) => ipcRenderer.invoke(CHANNELS.modelsGet, { projectId }),
   saveModelSettings: (projectId, settings) =>
     ipcRenderer.invoke(CHANNELS.modelsSave, { projectId, settings }),
+  preferences: () => ipcRenderer.invoke(CHANNELS.preferencesGet),
+  savePreferences: (preferences) => ipcRenderer.invoke(CHANNELS.preferencesSave, preferences),
   createProject: (name) => ipcRenderer.invoke(CHANNELS.projectsCreate, { name }),
   readTimesheets: (projectId, period) =>
     ipcRenderer.invoke(CHANNELS.hoursReadTimesheets, { projectId, period }),
