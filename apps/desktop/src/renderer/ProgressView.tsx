@@ -9,7 +9,7 @@ import {
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
-import { dateText, errorText, messages } from './messages.ts'
+import { dateText, messages } from './messages.ts'
 import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
 import { ProgressShares } from './ProgressShares.tsx'

@@ -25,16 +25,18 @@ Durata: 4 minuti. Mostra il previsionale mensile: una riga per codice di progett
    Atteso: manca la tariffa al giorno di Costa Elena (120 ore a costo, senza ricavo); mancano i costi totali previsti di `PRJ000101`; 16 ore non ancora approvate restano fuori; ci sono ore sul codice `PRJ000999`, che il modello non elenca.
    Dimostra: dove manca un dato niente viene stimato, e viene detto.
 
-5. **Aggiungi la tariffa che manca e l'esterno.** Apri «Impostazioni del previsionale». Sotto «Tariffe al giorno» premi «Aggiungi una tariffa» e nella riga nuova scrivi persona `Costa Elena` e tariffa `400` (la commessa resta vuota: vale per tutte). Sotto «Esterni senza timesheet» scrivi nome `Studio Blu`, commessa `PRJ000202`, costo `300`, tariffa `500`. Premi «Salva».
+5. **Aggiungi la tariffa che manca, lì dove manca.** In «Dati che mancano», accanto a «manca la tariffa al giorno di Costa Elena», scrivi `400` e premi «Salva».
    Atteso: su `PRJ000101` costi interni 16.010,00, ricavi 33.200,00, margine del mese 51,78%. La riga di Costa Elena sparisce dai dati mancanti.
+   Dimostra: ciò che manca si corregge dove viene detto, senza cercare la riga giusta nelle impostazioni.
 
-6. **Compila il progetto a corpo.** Apri «Dati del mese per PRJ000202». Sotto «Ore degli esterni nel mese» scrivi nome `Studio Blu` e ore `40`, in «A corpo: costi totali a budget» scrivi `20000`, premi «Salva i dati del mese».
+6. **Dichiara l'esterno e compila il progetto a corpo.** Apri «Impostazioni del previsionale», in cima alla pagina: sotto «Esterni senza timesheet» scrivi nome `Studio Blu`, commessa `PRJ000202`, costo `300`, tariffa `500`, e premi «Salva». Poi, nella riga di `PRJ000202` della tabella, premi «Altri dati»: sotto «Ore degli esterni nel mese» scrivi nome `Studio Blu` e ore `40`, in «A corpo: costi totali a budget» scrivi `20000`. Premi «Salva i dati del mese».
    Atteso: su `PRJ000202` costi esterni 1.500,00, avanzamento 7,5%, ricavi 3.000,00 (il 7,5% dell'ordinato di 40.000).
 
-7. **Aggiungi fatturazione e margine finale.** Apri «Dati del mese per PRJ000101»: in «Importo da fatturare nel mese» scrivi `30000`, in «Costi totali previsti del progetto» scrivi `70000`, premi «Salva i dati del mese».
-   Atteso: da fatturare 30.000,00, margine a fine progetto 41,67%.
+7. **Aggiungi fatturazione e margine finale.** Nella riga di `PRJ000101` scrivi `30000` nella colonna «Da fatturare»; in «Dati che mancano» premi «Scrivi i costi di PRJ000101» e in «Costi totali previsti del progetto» scrivi `70000`. Premi «Salva i dati del mese».
+   Atteso: da fatturare 30.000,00, margine finale 41,67%.
+   Dimostra: i dati del mese di tutti i codici si scrivono nella tabella che li mostra e si salvano insieme.
 
-8. **Compila il modello.** Premi «Compila il modello», poi «Apri il file».
+8. **Compila il modello.** Premi «Compila il modello», accanto al mese, poi «Apri il file».
    Atteso: «Modello compilato in `_octo/previsionale/<mese>/Previsionale avanzamenti.xlsx`. L'originale non è stato toccato.» Si apre Excel: stesse colonne, stessi colori e formati del modello; nelle celle dei ricavi ci sono formule (giorni × tariffa), in quelle dei costi la somma dei costi di ogni persona, il margine è una formula del foglio, le note dicono da dove viene ogni cifra.
    Dimostra: il file è quello dell'amministrazione, non uno ridisegnato; il foglio «Istruzioni» è intatto.
 

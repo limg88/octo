@@ -10,7 +10,7 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
 import { Failure } from './Failure.tsx'
-import { dateText, dateTimeText, errorText, messages } from './messages.ts'
+import { dateText, dateTimeText, messages } from './messages.ts'
 import { TrendChart } from './TrendChart.tsx'
 import { Unlinked } from './Unlinked.tsx'
 

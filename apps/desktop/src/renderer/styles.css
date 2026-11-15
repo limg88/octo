@@ -1650,3 +1650,57 @@ details.advanced[open] > summary {
   background: var(--hover);
   font-weight: 600;
 }
+
+/* The month of the forecast: figures to read and, in the same row, fields to type. */
+.forecast-month {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.forecast-month th,
+.forecast-month td {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.forecast-month td input {
+  display: block;
+  width: 100%;
+  min-width: 90px;
+  margin-top: 4px;
+}
+
+.forecast-month td input.amount {
+  margin-left: auto;
+  width: 100px;
+}
+
+.forecast-month td button {
+  display: block;
+  min-height: 24px;
+  margin: 2px 0 0 -8px;
+  white-space: nowrap;
+}
+
+.row-details > td {
+  padding: 12px 16px 16px;
+  background: var(--panel);
+}
+
+.gaps li {
+  margin-bottom: 6px;
+}
+
+.remedy {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.remedy input.amount {
+  width: 140px;
+}

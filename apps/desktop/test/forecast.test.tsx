@@ -131,7 +131,7 @@ describe('the forecast', () => {
     expect(await screen.findByText('P1')).toBeTruthy()
     expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-06')
     expect(screen.getAllByText('3.200,00')).toHaveLength(2)
-    expect(screen.getByText('18,5')).toBeTruthy()
+    expect(screen.getByText('18,5 gg')).toBeTruthy()
     expect(screen.getByText('12,5%')).toBeTruthy()
     expect(screen.getAllByText('38,28%')).toHaveLength(2)
     expect(screen.getByText('40%')).toBeTruthy()
@@ -199,47 +199,125 @@ describe('the forecast', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/Non trovo il file del modello/)
   })
 
-  it('saves what the PM adds for a code in the month', async () => {
+  it('saves in one go what the PM adds for every code of the month, typed in its row', async () => {
     const api = fakeApi()
     render(<ForecastView api={api} project={project} now={now} />)
-    const form = await screen.findByRole('form', { name: text.inputsTitle('P1') })
-    const field = (label: string) => within(form).getByLabelText(label)
-    const cell = (column: string, row: number) => field(text.cell(column, row))
-    expect((field(text.toInvoice) as HTMLInputElement).value).toBe('12000')
+    const form = await screen.findByRole('form', { name: text.monthData })
+    const cell = (label: string, code: string) =>
+      within(form).getByLabelText<HTMLInputElement>(text.forCode(label, code))
+    await waitFor(() => expect(cell(text.toInvoice, 'P1').value).toBe('12000'))
+    // What is used less often opens under the row of its code.
+    expect(screen.queryByRole('group', { name: text.inputsTitle('P1') })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.moreData, 'P1') }))
+    const more = within(screen.getByRole('group', { name: text.inputsTitle('P1') }))
     // A figure that is not one is told under its field, and the month is not saved.
-    fireEvent.change(cell(text.columns.name, 1), { target: { value: 'Studio Blu' } })
-    fireEvent.change(cell(text.columns.hours, 1), { target: { value: 'tante' } })
-    fireEvent.change(field(text.revenue), { target: { value: 'boh' } })
-    fireEvent.click(within(form).getByRole('button', { name: text.saveInputs }))
-    expect(within(form).getByText(text.wrong.hours(1))).toBeTruthy()
+    fireEvent.change(more.getByLabelText(text.cell(text.columns.name, 1)), {
+      target: { value: 'Studio Blu' },
+    })
+    fireEvent.change(more.getByLabelText(text.cell(text.columns.hours, 1)), {
+      target: { value: 'tante' },
+    })
+    fireEvent.change(cell(text.revenue, 'P2'), { target: { value: 'boh' } })
+    fireEvent.click(screen.getByRole('button', { name: text.saveInputs }))
+    expect(more.getByText(text.wrong.hours(1))).toBeTruthy()
     expect(within(form).getByText(messages.amountWrong)).toBeTruthy()
     expect(within(form).getByRole('status').textContent).toBe(messages.notSaved)
     expect(api.saveForecastSettings).not.toHaveBeenCalled()
-    fireEvent.change(cell(text.columns.hours, 1), { target: { value: '20' } })
-    fireEvent.change(field(text.revenue), { target: { value: '7.000,50' } })
-    fireEvent.change(field(text.budgetCosts), { target: { value: '' } })
-    fireEvent.change(field(text.totalCosts), { target: { value: '60000' } })
-    fireEvent.click(field(text.totalCostsBeforeMonth))
-    fireEvent.change(field(text.note), { target: { value: 'SAL di giugno' } })
-    fireEvent.click(within(form).getByRole('button', { name: text.saveInputs }))
+
+    fireEvent.change(more.getByLabelText(text.cell(text.columns.hours, 1)), {
+      target: { value: '20' },
+    })
+    fireEvent.change(cell(text.revenue, 'P2'), { target: { value: '' } })
+    fireEvent.change(cell(text.revenue, 'P1'), { target: { value: '7.000,50' } })
+    fireEvent.change(more.getByLabelText(text.budgetCosts), { target: { value: '' } })
+    fireEvent.change(more.getByLabelText(text.totalCosts), { target: { value: '60000' } })
+    fireEvent.click(more.getByLabelText(text.totalCostsBeforeMonth))
+    fireEvent.change(cell(text.note, 'P1'), { target: { value: 'SAL di giugno' } })
+    fireEvent.change(cell(text.toInvoice, 'P2'), { target: { value: '500' } })
+    fireEvent.click(screen.getByRole('button', { name: text.saveInputs }))
     await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalled())
-    expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', {
-      ...configured,
-      months: {
-        '2026-06': {
-          P1: {
-            externals: [{ name: 'Studio Blu', hours: 20 }],
-            toInvoice: 12000,
-            revenue: 7000.5,
-            budgetCosts: null,
-            totalCosts: 60000,
-            totalCostsBeforeMonth: true,
-            note: 'SAL di giugno',
-          },
-        },
+    const saved = vi.mocked(api.saveForecastSettings).mock.calls[0]?.[1]
+    expect(saved?.months['2026-06']).toEqual({
+      P1: {
+        externals: [{ name: 'Studio Blu', hours: 20 }],
+        toInvoice: 12000,
+        revenue: 7000.5,
+        budgetCosts: null,
+        totalCosts: 60000,
+        totalCostsBeforeMonth: true,
+        note: 'SAL di giugno',
+      },
+      P2: {
+        externals: [],
+        toInvoice: 500,
+        revenue: null,
+        budgetCosts: null,
+        totalCosts: null,
+        totalCostsBeforeMonth: false,
+        note: '',
       },
     })
     await waitFor(() => expect(api.forecastView).toHaveBeenCalledTimes(2))
+    // The details close with a second click.
+    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.moreData, 'P1') }))
+    expect(screen.queryByRole('group', { name: text.inputsTitle('P1') })).toBeNull()
+  })
+
+  it('puts right what is missing beside where it is said to be missing', async () => {
+    const withExternal: View = {
+      ...view,
+      forecast: {
+        ...view.forecast,
+        gaps: [
+          ...view.forecast.gaps,
+          { kind: 'no_external_rate', code: 'P2', person: 'Studio Blu', hours: 40 },
+        ],
+      },
+    }
+    const api = fakeApi({ forecastView: vi.fn(async () => ok(withExternal)) })
+    const onOpenSection = vi.fn()
+    render(<ForecastView api={api} project={project} now={now} onOpenSection={onOpenSection} />)
+    await screen.findByText(text.gap.no_rate('P1', 'Bianchi Anna', '16,5'))
+    const who = text.remedy.of('Bianchi Anna', 'P1')
+    const rate = screen.getByLabelText(`${text.columns.rate}, ${who}`)
+    const saveRate = screen.getByRole('button', { name: `${text.remedy.save}: ${who}` })
+    // The rate that is missing is typed where it is said to be missing.
+    fireEvent.change(rate, { target: { value: 'tanta' } })
+    fireEvent.click(saveRate)
+    expect(screen.getByText(messages.amountWrong)).toBeTruthy()
+    expect(api.saveForecastSettings).not.toHaveBeenCalled()
+    fireEvent.change(rate, { target: { value: '450' } })
+    fireEvent.click(saveRate)
+    await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.saveForecastSettings).mock.calls[0]?.[1].rates).toEqual([
+      ...configured.rates,
+      { person: 'Bianchi Anna', code: null, ratePerDay: 450 },
+    ])
+
+    // An external needs what a day costs and what it is sold for, on that code.
+    const external = text.remedy.of('Studio Blu', 'P2')
+    fireEvent.change(screen.getByLabelText(`${text.columns.rate}, ${external}`), {
+      target: { value: '500' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: `${text.remedy.save}: ${external}` }))
+    expect(api.saveForecastSettings).toHaveBeenCalledTimes(1)
+    fireEvent.change(screen.getByLabelText(`${text.columns.cost}, ${external}`), {
+      target: { value: '300' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: `${text.remedy.save}: ${external}` }))
+    await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.saveForecastSettings).mock.calls[1]?.[1].externals.at(-1)).toEqual({
+      name: 'Studio Blu',
+      code: 'P2',
+      costPerDay: 300,
+      ratePerDay: 500,
+    })
+
+    // Costs that are missing lead to where they are typed; a cost NetSuite lacks, to the hours.
+    fireEvent.click(screen.getByRole('button', { name: text.remedy.openCode('P1') }))
+    expect(screen.getByRole('group', { name: text.inputsTitle('P1') })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.openSection(messages.hoursTab) }))
+    expect(onOpenSection).toHaveBeenCalledWith('hours')
   })
 
   it('asks for the model first, proposing the only one found, and saves rates', async () => {
