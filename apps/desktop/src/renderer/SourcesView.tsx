@@ -3,11 +3,15 @@ import type { MailPreview, MailSourceConfig, Project, SourceState } from '@octo/
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { dateTimeText, errorText, messages } from './messages.ts'
+import { SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
   project: Project
   now?: () => Date
+  /** False when the mail is one folded row of the list of the sources. */
+  open?: boolean
+  onToggle?: (() => void) | undefined
 }
 
 /** What the PM types: lists are one item per line. */
@@ -53,7 +57,7 @@ const configOf = (form: MailForm): MailSourceConfig => ({
 /** One function for the life of the page: a new one at every render would reload it forever. */
 const systemNow = (): Date => new Date()
 
-export function SourcesView({ api, project, now = systemNow }: Props) {
+export function SourcesView({ api, project, now = systemNow, open = true, onToggle }: Props) {
   const [view, setView] = useState<MailSourceView | null>(null)
   const [form, setForm] = useState<MailForm | null>(null)
   const [busy, setBusy] = useState(false)
@@ -126,11 +130,24 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
 
   return (
     <section className="sources" aria-label={messages.mailTitle}>
-      <h3>{messages.mailTitle}</h3>
-      <p className="hint">{messages.mailIntro}</p>
-      <Freshness state={view.state} configured={view.config !== null} busy={busy} now={now()} />
+      <SourceHeader
+        title={messages.mailTitle}
+        linked={view.config !== null}
+        open={open}
+        onToggle={onToggle}
+        status={
+          <Freshness state={view.state} configured={view.config !== null} busy={busy} now={now()} />
+        }
+      >
+        {view.config !== null && (
+          <button type="button" disabled={busy} onClick={() => void sync()}>
+            {messages.mailSync}
+          </button>
+        )}
+      </SourceHeader>
       {error && <Alert code={error} />}
-      <form className="source-form" onSubmit={(event) => void save(event)}>
+      {open && <p className="hint">{messages.mailIntro}</p>}
+      <form className="source-form" hidden={!open} onSubmit={(event) => void save(event)}>
         <ListField
           label={messages.mailKeywords}
           hint={messages.mailKeywordsHint}
@@ -156,14 +173,17 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
             onChange={(event) => set({ since: event.target.value })}
           />
         </label>
-        <label>
-          {messages.mailTarget}
-          <input
-            type="text"
-            value={form.targetFolder}
-            onChange={(event) => set({ targetFolder: event.target.value })}
-          />
-        </label>
+        <details className="advanced">
+          <summary>{messages.advanced}</summary>
+          <label>
+            {messages.mailTarget}
+            <input
+              type="text"
+              value={form.targetFolder}
+              onChange={(event) => set({ targetFolder: event.target.value })}
+            />
+          </label>
+        </details>
         <label className="check">
           <input
             type="checkbox"
@@ -183,12 +203,12 @@ export function SourcesView({ api, project, now = systemNow }: Props) {
           {saved && <span className="hint">{messages.mailSaved}</span>}
         </div>
       </form>
-      {preview === 'loading' && (
+      {open && preview === 'loading' && (
         <p className="progress" role="status">
           {messages.mailPreviewing}
         </p>
       )}
-      {preview !== null && preview !== 'loading' && (
+      {open && preview !== null && preview !== 'loading' && (
         <div className="preview">
           <p>{messages.mailPreviewCount(preview.count)}</p>
           {preview.subjects.length > 0 && (

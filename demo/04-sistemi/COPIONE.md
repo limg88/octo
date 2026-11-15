@@ -14,8 +14,8 @@ Durata: 4 minuti. Mostra che Octo legge un sistema con la credenziale di sola le
    ```
    Atteso: il terminale stampa l'indirizzo dell'Azure DevOps finto e si apre Octo sul progetto «Aurora».
 
-2. **Apri «Fonti»** e scorri fino ad «Azure DevOps».
-   Atteso: «Non collegato.» «Cartella nel progetto» propone `_octo/fonti/ADO`.
+2. **Apri «Fonti»** e premi «Collega» nella riga «Azure DevOps».
+   Atteso: «Non collegato.» Sotto «Avanzate», «Cartella nel progetto» propone `_octo/fonti/ADO`.
 
 3. **Prova un token sbagliato.** Organizzazione `contoso`, Progetto `Aurora`, Personal Access Token `sbagliato`. Premi «Prova e salva».
    Atteso: «Il sistema ha rifiutato la credenziale…». Resta «Non collegato.»

@@ -361,7 +361,7 @@ describe('App', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: messages.addDialog.existingChoose }))
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
+    expect(await screen.findByRole('region', { name: messages.guideTitle })).toBeTruthy()
   })
 
   it('takes a project off only after a confirmation, and puts it back', async () => {
@@ -457,7 +457,7 @@ describe('App', () => {
     fireEvent.click(create)
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     expect(api.createProject).toHaveBeenLastCalledWith('Boreale')
-    expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
+    expect(await screen.findByRole('region', { name: messages.guideTitle })).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -625,6 +625,36 @@ describe('project tabs', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: messages.ask }))
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
+  })
+
+  it('lists the sources as rows that open one at a time, apart from people and the rest', async () => {
+    const { api } = fakeApi()
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+    await screen.findByText(messages.mailNotConfigured)
+    const formOf = (label: string) => screen.getByLabelText(label).closest('form')
+    const toggle = (action: string, source: string) =>
+      screen.getByRole('button', { name: `${action}: ${source}` })
+    // Every source is one folded row; what is typed once elsewhere is not on this page.
+    expect(formOf(messages.mailExclude)?.hidden).toBe(true)
+    expect(screen.queryByRole('region', { name: messages.team.title })).toBeNull()
+
+    fireEvent.click(toggle(messages.sourceLink, messages.mailTitle))
+    expect(formOf(messages.mailExclude)?.hidden).toBe(false)
+    expect(screen.getByText(messages.mailIntro)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: `${messages.sourceLink}: Jira` }))
+    expect(formOf(messages.mailExclude)?.hidden).toBe(true)
+    expect(formOf(messages.feedFields.site)?.hidden).toBe(false)
+    fireEvent.click(toggle(messages.close, 'Jira'))
+    expect(formOf(messages.feedFields.site)?.hidden).toBe(true)
+
+    fireEvent.click(screen.getByRole('tab', { name: messages.settingsParts.team }))
+    expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
+    expect(screen.queryByText(messages.mailNotConfigured)).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: messages.settingsParts.advanced }))
+    expect(await screen.findByRole('region', { name: messages.models.title })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: messages.settingsParts.links }))
+    expect(await screen.findByText(messages.mailNotConfigured)).toBeTruthy()
   })
 })
 

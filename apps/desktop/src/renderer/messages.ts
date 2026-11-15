@@ -10,6 +10,56 @@ export const messages = {
   addProject: 'Aggiungi un progetto…',
   close: 'Chiudi',
   openSources: 'Apri «Fonti»',
+  sourceLink: 'Collega',
+  sourceEdit: 'Modifica',
+  settingsParts: {
+    title: 'Parti delle impostazioni del progetto',
+    links: 'Collegamenti',
+    team: 'Persone e calendario',
+    advanced: 'Avanzate',
+  },
+  advanced: 'Avanzate',
+  feedSteps: {
+    access: '1 · Accesso',
+    scope: '2 · Che cosa leggere',
+  },
+  feedHelpTitle: {
+    ado: 'Come ottengo il token?',
+    jira: 'Come ottengo il token?',
+    dwsi: 'Dove trovo utente e password?',
+  },
+  feedHelp: {
+    ado: {
+      steps: [
+        'In Azure DevOps apri le impostazioni utente (l’icona in alto a destra) e scegli «Personal access tokens».',
+        'Premi «New Token», dagli un nome e una scadenza.',
+        'In «Scopes» scegli «Custom defined» e spunta solo «Work Items: Read» e «Project and Team: Read».',
+        'Premi «Create» e copia subito il token: si vede una volta sola.',
+      ],
+      note: 'Un token che può anche scrivere viene rifiutato da Octo.',
+    },
+    jira: {
+      steps: [
+        'Apri id.atlassian.com/manage-profile/security/api-tokens con il tuo utente Jira.',
+        'Premi «Crea token API» e dagli un nome, per esempio «Octo».',
+        'Copia subito il token e incollalo qui: si vede una volta sola.',
+      ],
+      note: 'Il token vede ciò che vedi tu; Octo lo usa solo per leggere.',
+    },
+    dwsi: {
+      steps: [
+        'Chiedi a chi amministra il data warehouse aziendale un utente di sola lettura.',
+        'Fatti dare anche il nome del server e del database.',
+      ],
+      note: 'Un utente che può anche scrivere viene rifiutato da Octo.',
+    },
+  },
+  feedOffConfirm: (name: string) =>
+    `Scollegare ${name}? Octo smette di leggerlo e dimentica la credenziale. Ciò che ha già letto resta nella cartella del progetto.`,
+  guideLinked: (linked: number, all: number) =>
+    linked === 0
+      ? 'Niente è ancora collegato: comincia da ciò che usi di più, di solito la posta.'
+      : `${linked} su ${all} collegati. Ciò che non ti serve puoi lasciarlo com’è.`,
   lines: {
     notSaved: 'Non ho salvato: correggi ciò che è segnalato sotto i campi.',
     line: (
@@ -761,16 +811,7 @@ export const messages = {
     'I numeri fra parentesi rimandano alle fonti: spariscono dal file approvato.',
   guideTitle: 'Avvio del progetto',
   guideIntro:
-    'Collega ciò che alimenta la memoria di questo progetto. Ogni passo è facoltativo: puoi tornarci quando vuoi.',
-  guideDone: 'fatto',
-  guideTodo: 'da fare',
-  guideSteps: {
-    mail: 'Posta: quali mail riguardano il progetto',
-    ado: 'Azure DevOps: work item del progetto',
-    jira: 'Jira: issue del progetto',
-    dwsi: 'NetSuite: ore, ordini e fatture delle commesse',
-    documents: 'Documenti della cartella resi leggibili (automatico)',
-  },
+    'Collega ciò che alimenta la memoria di questo progetto, una riga per volta. Ogni collegamento è facoltativo: puoi tornarci quando vuoi.',
   guideFill: 'Riempi la memoria ora',
   guideFilling: 'Sto leggendo tutte le fonti collegate…',
   guideStep: (label: string, written: number, unchanged: number) =>

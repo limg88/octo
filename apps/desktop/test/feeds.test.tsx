@@ -102,8 +102,80 @@ describe('FeedSection', () => {
     act(() => changed('p-1'))
     await waitFor(() => expect(api.feed).toHaveBeenCalledTimes(3))
 
+    // Unlinking forgets the credential: it is asked first, and can be given up.
+    fireEvent.click(screen.getByRole('button', { name: messages.feedOff }))
+    expect(screen.getByRole('alert').textContent).toContain(messages.feedOffConfirm('Azure DevOps'))
+    fireEvent.click(screen.getByRole('button', { name: messages.cancel }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(api.saveFeed).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: messages.feedOff }))
     fireEvent.click(screen.getByRole('button', { name: messages.feedOff }))
     await waitFor(() => expect(api.saveFeed).toHaveBeenCalledWith('p-1', 'ado', null, null))
+  })
+
+  it('explains beside the credential how to get one, on request', async () => {
+    const { api } = fakeApi()
+    render(<FeedSection api={api} project={project} feed="ado" now={now} />)
+    const info = await screen.findByRole('button', { name: messages.feedHelpTitle.ado })
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(info)
+    const guide = screen.getByRole('note')
+    expect(guide.textContent).toContain(messages.feedHelp.ado.steps[0])
+    expect(guide.textContent).toContain(messages.feedHelp.ado.note)
+    expect(guide.querySelectorAll('li')).toHaveLength(messages.feedHelp.ado.steps.length)
+    // It closes with Escape, with a second click, or when the focus goes elsewhere.
+    fireEvent.keyDown(info, { key: 'Escape' })
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(info)
+    fireEvent.click(info)
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(info)
+    fireEvent.blur(info, { relatedTarget: secretInput() })
+    expect(screen.queryByRole('note')).toBeNull()
+    // The credential keeps its own name: the guide is beside the label, not inside it.
+    expect(secretInput().type).toBe('password')
+  })
+
+  it('is one row of a list when folded: its state, a reading, and the way in', async () => {
+    const { api } = fakeApi()
+    const onToggle = vi.fn()
+    const view = render(
+      <FeedSection
+        api={api}
+        project={project}
+        feed="ado"
+        now={now}
+        open={false}
+        onToggle={onToggle}
+      />,
+    )
+    expect(await screen.findByText(/4 aggiornati, 120 invariati/)).toBeTruthy()
+    expect(screen.getByLabelText(fields.organization).closest('form')?.hidden).toBe(true)
+    expect(screen.queryByText(messages.feedIntro.ado)).toBeNull()
+    // Linked: it is read from the row, and changed rather than linked.
+    fireEvent.click(screen.getAllByRole('button', { name: messages.feedSync })[0] as HTMLElement)
+    await waitFor(() => expect(api.syncFeed).toHaveBeenCalledWith('p-1', 'ado'))
+    const edit = screen.getByRole('button', {
+      name: `${messages.sourceEdit}: Azure DevOps`,
+    })
+    expect(edit.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(edit)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    view.unmount()
+
+    const unlinked = fakeApi({ feed: vi.fn(async () => ok(empty)) })
+    render(
+      <FeedSection
+        api={unlinked.api}
+        project={project}
+        feed="ado"
+        now={now}
+        open={false}
+        onToggle={onToggle}
+      />,
+    )
+    const link = await screen.findByRole('button', { name: `${messages.sourceLink}: Azure DevOps` })
+    expect(link.className).toBe('primary')
   })
 
   it('offers the fields of the warehouse, with the port and the security of the connection', async () => {

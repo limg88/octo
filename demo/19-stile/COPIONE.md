@@ -14,8 +14,8 @@ Durata: 3 minuti. Mostra l'aspetto nuovo dell'app, asciutto e denso sul modello 
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Apri «Fonti» e scorri fino in fondo.**
-   Atteso: Posta, Azure DevOps, Jira, NetSuite, «Persone e calendario» e «Modelli» hanno gli stessi campi (bordo sottile, stessa altezza, etichetta sopra); nei menu la freccia è disegnata staccata dal bordo destro e lo stesso margine sinistro. In ogni sezione un solo pulsante blu: quello che salva. «Riempi la memoria ora» è blu; «Scollega», dove c'è, è un pulsante senza cornice, che si evidenzia al passaggio. La scheda in uso è una pastiglia grigia, non una riga sottolineata.
+2. **Apri «Fonti» e apri una riga.** Premi «Collega» su «Posta», poi su «NetSuite»; guarda anche le parti «Persone e calendario» e «Avanzate».
+   Atteso: ovunque gli stessi campi (bordo sottile, stessa altezza, etichetta sopra); nei menu la freccia è disegnata staccata dal bordo destro. In ogni modulo un solo pulsante blu: quello che salva. «Riempi la memoria ora» è blu. La scheda in uso è una pastiglia grigia, non una riga sottolineata.
 
 3. **Apri «Previsionale».**
    Atteso: gli stessi campi di «Fonti». «Salva» è grigio finché non indichi il modello, e si legge. «Ore in una giornata» è un campo corto, non largo quanto la pagina.

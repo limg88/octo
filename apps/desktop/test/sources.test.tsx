@@ -97,6 +97,21 @@ describe('SourcesView', () => {
     expect(screen.queryByText(messages.mailSyncing)).toBeNull()
   })
 
+  it('is one row of the list when folded, read from the row itself', async () => {
+    const { api } = fakeApi()
+    const onToggle = vi.fn()
+    render(<SourcesView api={api} project={project} now={now} open={false} onToggle={onToggle} />)
+    expect(await screen.findByText(/3 nuove, 12 già presenti/)).toBeTruthy()
+    expect(screen.getByLabelText(messages.mailSince).closest('form')?.hidden).toBe(true)
+    expect(screen.queryByText(messages.mailIntro)).toBeNull()
+    fireEvent.click(screen.getAllByRole('button', { name: messages.mailSync })[0] as HTMLElement)
+    await waitFor(() => expect(api.syncMail).toHaveBeenCalledWith('p-1'))
+    fireEvent.click(
+      screen.getByRole('button', { name: `${messages.sourceEdit}: ${messages.mailTitle}` }),
+    )
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
   it('warns when the mail is stale, was never read, or the last reading failed', async () => {
     const old = { ...run, at: '2026-11-12T09:00:00.000Z' }
     const stale = fakeApi({

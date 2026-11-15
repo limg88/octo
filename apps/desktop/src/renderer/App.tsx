@@ -1,23 +1,18 @@
 import type { AgentStatus } from '@octo/application'
-import { FEED_NAMES, type Project, type RestoreOutcome } from '@octo/domain'
+import type { Project, RestoreOutcome } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AlignmentView } from './AlignmentView.tsx'
 import { AskView } from './AskView.tsx'
 import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
-import { DocumentsSection } from './DocumentsSection.tsx'
-import { FeedSection } from './FeedSection.tsx'
 import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
-import { ModelsSection } from './ModelsSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
+import { ProjectSettings } from './ProjectSettings.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
-import { SetupGuide } from './SetupGuide.tsx'
-import { SourcesView } from './SourcesView.tsx'
-import { TeamSection } from './TeamSection.tsx'
 
 type Tab =
   | 'ask'
@@ -261,16 +256,7 @@ export function App({ api }: Props) {
             ) : tab === 'alignment' ? (
               <AlignmentView api={api} project={selected} />
             ) : (
-              <div className="sources-page">
-                <SetupGuide api={api} project={selected} />
-                <SourcesView api={api} project={selected} />
-                {FEED_NAMES.map((feed) => (
-                  <FeedSection key={feed} api={api} project={selected} feed={feed} />
-                ))}
-                <DocumentsSection api={api} project={selected} />
-                <TeamSection api={api} project={selected} />
-                <ModelsSection api={api} project={selected} />
-              </div>
+              <ProjectSettings api={api} project={selected} />
             )}
           </>
         ) : (

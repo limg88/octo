@@ -51,19 +51,18 @@ describe('SetupGuide', () => {
     const { api, changed } = fakeApi()
     render(<SetupGuide api={api} project={project} />)
 
-    await screen.findByText(messages.guideSteps.mail)
-    const states = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
-    expect(states.map((text) => text.startsWith(messages.guideDone))).toEqual([
-      true,
-      true,
-      false,
-      false,
-      true,
-    ])
+    // Posta and one system out of four: the rows below say which.
+    expect(await screen.findByText(messages.guideLinked(2, 4))).toBeTruthy()
 
     act(() => changed('altro'))
     act(() => changed('p-1'))
     await waitFor(() => expect(api.feedingStatus).toHaveBeenCalledTimes(2))
+  })
+
+  it('says where to start when nothing is linked yet', async () => {
+    const { api } = fakeApi({ feedingStatus: async () => ok({ mail: false, feeds: [] }) })
+    render(<SetupGuide api={api} project={project} />)
+    expect(await screen.findByText(messages.guideLinked(0, 4))).toBeTruthy()
   })
 
   it('fills the memory from everything linked and tells each step as it ends', async () => {

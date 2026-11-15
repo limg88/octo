@@ -17,7 +17,7 @@ Durata: 5 minuti. Mostra tre cose piccole che servono ogni giorno: le persone e 
 2. **Guarda le ore senza le persone.** Apri «Ore».
    Atteso: Neri Sara è segnalata «Nessuna ora sul tracker».
 
-3. **Scrivi persone e calendario.** Apri «Fonti», scendi a «Persone e calendario». In «Persone» scrivi:
+3. **Scrivi persone e calendario.** Apri «Fonti» e, in alto, la parte «Persone e calendario». In «Persone» scrivi:
    ```
    Neri Sara; analista; nostra; ; 31/01/2026
    Carla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta e poi il contesto

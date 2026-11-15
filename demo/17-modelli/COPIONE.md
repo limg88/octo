@@ -18,7 +18,7 @@ Durata: 3 minuti. Mostra che il modello di Claude non è più quello che capita 
    Atteso: sotto la domanda, accanto all'ora, «modello claude-fake-default» (con Claude vero: il modello predefinito del tuo Claude Code).
    Dimostra: anche senza scelta si sa chi ha risposto.
 
-3. **Scegli i modelli.** Apri «Fonti», scendi a «Modelli». In «Risposte in «Chiedi»» scegli `Sonnet`, in «Scrittura dei deliverable» `Opus`, in «Rilettura critica dei deliverable» `Haiku`. Premi «Salva i modelli».
+3. **Scegli i modelli.** Apri «Fonti» e, in alto, la parte «Avanzate»: lì c'è «Modelli». In «Risposte in «Chiedi»» scegli `Sonnet`, in «Scrittura dei deliverable» `Opus`, in «Rilettura critica dei deliverable» `Haiku`. Premi «Salva i modelli».
    Atteso: «Modelli salvati: valgono dalla prossima domanda e dal prossimo deliverable.»
 
 4. **Rifai la domanda.** Torna in «Chiedi» e fai la stessa domanda.

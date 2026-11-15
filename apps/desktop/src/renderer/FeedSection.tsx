@@ -7,48 +7,55 @@ import {
   type Project,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { InfoTip } from './InfoTip.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
+import { SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
   project: Project
   feed: FeedName
   now?: () => Date
+  /** False when the system is one folded row of the list of the sources. */
+  open?: boolean
+  onToggle?: (() => void) | undefined
 }
 
 type FieldKey = keyof typeof messages.feedFields
 type FieldKind = 'text' | 'list' | 'number' | 'date' | 'tls'
-type Field = { key: FieldKey; kind: FieldKind; initial?: string; optional?: true }
+/** Where a field is asked: to get in, to say what to read, or out of the way. */
+type Step = 'access' | 'scope' | 'advanced'
+type Field = { key: FieldKey; kind: FieldKind; step: Step; initial?: string; optional?: true }
 /** What the PM types, as text: lists are one item per line. */
 type Form = Partial<Record<FieldKey, string>>
 
 const SHARED: Field[] = [
-  { key: 'since', kind: 'date' },
-  { key: 'targetFolder', kind: 'text' },
+  { key: 'since', kind: 'date', step: 'scope' },
+  { key: 'targetFolder', kind: 'text', step: 'advanced' },
 ]
 const DEFAULT_WAREHOUSE_PORT = '5432'
 
 const FIELDS: Readonly<Record<FeedName, Field[]>> = {
   ado: [
-    { key: 'organization', kind: 'text' },
-    { key: 'project', kind: 'text' },
-    { key: 'areas', kind: 'list', optional: true },
+    { key: 'organization', kind: 'text', step: 'access' },
+    { key: 'project', kind: 'text', step: 'scope' },
+    { key: 'areas', kind: 'list', step: 'scope', optional: true },
   ],
   jira: [
-    { key: 'site', kind: 'text' },
-    { key: 'email', kind: 'text' },
-    { key: 'projects', kind: 'list' },
+    { key: 'site', kind: 'text', step: 'access' },
+    { key: 'email', kind: 'text', step: 'access' },
+    { key: 'projects', kind: 'list', step: 'scope' },
   ],
   dwsi: [
-    { key: 'host', kind: 'text' },
-    { key: 'port', kind: 'number', initial: DEFAULT_WAREHOUSE_PORT },
-    { key: 'database', kind: 'text' },
-    { key: 'user', kind: 'text' },
-    { key: 'ownerEmail', kind: 'text' },
-    { key: 'projectCodes', kind: 'list' },
-    { key: 'tls', kind: 'tls', initial: WAREHOUSE_TLS_MODES[0] },
+    { key: 'host', kind: 'text', step: 'access' },
+    { key: 'port', kind: 'number', step: 'access', initial: DEFAULT_WAREHOUSE_PORT },
+    { key: 'database', kind: 'text', step: 'access' },
+    { key: 'tls', kind: 'tls', step: 'access', initial: WAREHOUSE_TLS_MODES[0] },
+    { key: 'user', kind: 'text', step: 'access' },
+    { key: 'ownerEmail', kind: 'text', step: 'scope' },
+    { key: 'projectCodes', kind: 'list', step: 'scope' },
   ],
 }
 
@@ -89,7 +96,7 @@ function configOf(feed: FeedName, form: Form): FeedConfig {
 }
 
 /** One system of record of a project: its link, its credential, when it was last read. */
-export function FeedSection({ api, project, feed, now = systemNow }: Props) {
+export function FeedSection({ api, project, feed, now = systemNow, open = true, onToggle }: Props) {
   const [view, setView] = useState<FeedView | null>(null)
   const [form, setForm] = useState<Form>({})
   const [secret, setSecret] = useState('')
@@ -99,6 +106,9 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
   const [error, setError] = useState<ErrorCode | null>(null)
   /** What the last attempt to save found empty. */
   const [missing, setMissing] = useState<{ fields: FieldKey[]; secret: boolean }>(NOTHING_MISSING)
+  /** True while the PM is asked whether the system is really to be unlinked. */
+  const [leaving, setLeaving] = useState(false)
+  const secretId = useId()
 
   const show = useCallback(
     (next: FeedView, resetForm: boolean) => {
@@ -124,6 +134,7 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
     setSecret('')
     setChoices(null)
     setMissing(NOTHING_MISSING)
+    setLeaving(false)
     void reload(true)
     return api.onSourcesChanged((projectId) => {
       if (projectId === project.id) void reload(false)
@@ -192,25 +203,51 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
     void save(configOf(feed, form))
   }
 
+  const linked = view.config !== null
+  const inputs = (step: Step) =>
+    fieldsOf(feed)
+      .filter((field) => field.step === step)
+      .map((field) => (
+        <FieldInput
+          key={field.key}
+          field={field}
+          value={form[field.key] ?? ''}
+          missing={missing.fields.includes(field.key)}
+          onChange={(value) => setForm({ ...form, [field.key]: value })}
+        />
+      ))
+
   return (
     <section className="sources" aria-label={label}>
-      <h3>{label}</h3>
-      <p className="hint">{messages.feedIntro[feed]}</p>
-      <Freshness view={view} busy={busy} now={now()} />
+      <SourceHeader
+        title={label}
+        linked={linked}
+        open={open}
+        onToggle={onToggle}
+        status={<Freshness view={view} busy={busy} now={now()} />}
+      >
+        {linked && (
+          <button type="button" disabled={busy} onClick={() => void sync()}>
+            {messages.feedSync}
+          </button>
+        )}
+      </SourceHeader>
       {error && <Alert code={error} />}
-      <form className="source-form" onSubmit={submit}>
-        {fieldsOf(feed).map((field) => (
-          <FieldInput
-            key={field.key}
-            field={field}
-            value={form[field.key] ?? ''}
-            missing={missing.fields.includes(field.key)}
-            onChange={(value) => setForm({ ...form, [field.key]: value })}
-          />
-        ))}
-        <label>
-          {messages.feedSecret[feed]}
+      {open && <p className="hint">{messages.feedIntro[feed]}</p>}
+      <form className="source-form" hidden={!open} onSubmit={submit}>
+        <h4>{messages.feedSteps.access}</h4>
+        {inputs('access')}
+        <div className="field">
+          <span className="field-head">
+            <label htmlFor={secretId}>{messages.feedSecret[feed]}</label>
+            <InfoTip
+              title={messages.feedHelpTitle[feed]}
+              steps={messages.feedHelp[feed].steps}
+              note={messages.feedHelp[feed].note}
+            />
+          </span>
           <input
+            id={secretId}
             type="password"
             autoComplete="off"
             value={secret}
@@ -219,23 +256,51 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
           <span className="hint">
             {view.hasSecret ? messages.feedSecretKept : messages.feedSecretHint}
           </span>
-        </label>
+        </div>
         {missing.secret && <Missing />}
+        <h4>{messages.feedSteps.scope}</h4>
+        {feed !== 'dwsi' && (
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void search()}>
+              {messages.feedChoices}
+            </button>
+          </div>
+        )}
+        {choices && (
+          <div className="preview">
+            {choices.projects.length === 0 && <p>{messages.feedChoicesNone}</p>}
+            <ChoiceList
+              title={messages.feedChoicesProjects}
+              choices={choices.projects}
+              onPick={pickProject}
+            />
+            <ChoiceList
+              title={messages.feedChoicesAreas}
+              choices={choices.areas}
+              onPick={(value) => addLine('areas', value)}
+            />
+          </div>
+        )}
+        {inputs('scope')}
+        <details className="advanced">
+          <summary>{messages.advanced}</summary>
+          {inputs('advanced')}
+        </details>
         <div className="actions">
           <button type="submit" disabled={busy}>
             {messages.feedSave}
           </button>
-          <button type="button" disabled={busy || view.config === null} onClick={() => void sync()}>
+          <button type="button" disabled={busy || !linked} onClick={() => void sync()}>
             {messages.feedSync}
           </button>
-          {view.config !== null && (
-            <button type="button" className="quiet" disabled={busy} onClick={() => void save(null)}>
+          {linked && !leaving && (
+            <button
+              type="button"
+              className="quiet"
+              disabled={busy}
+              onClick={() => setLeaving(true)}
+            >
               {messages.feedOff}
-            </button>
-          )}
-          {feed !== 'dwsi' && (
-            <button type="button" disabled={busy} onClick={() => void search()}>
-              {messages.feedChoices}
             </button>
           )}
           {saved && <span className="hint">{messages.feedSaved}</span>}
@@ -245,22 +310,25 @@ export function FeedSection({ api, project, feed, now = systemNow }: Props) {
             </span>
           )}
         </div>
+        {leaving && (
+          <div className="actions" role="alert">
+            <span>{messages.feedOffConfirm(label)}</span>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                setLeaving(false)
+                void save(null)
+              }}
+            >
+              {messages.feedOff}
+            </button>
+            <button type="button" onClick={() => setLeaving(false)}>
+              {messages.cancel}
+            </button>
+          </div>
+        )}
       </form>
-      {choices && (
-        <div className="preview">
-          {choices.projects.length === 0 && <p>{messages.feedChoicesNone}</p>}
-          <ChoiceList
-            title={messages.feedChoicesProjects}
-            choices={choices.projects}
-            onPick={pickProject}
-          />
-          <ChoiceList
-            title={messages.feedChoicesAreas}
-            choices={choices.areas}
-            onPick={(value) => addLine('areas', value)}
-          />
-        </div>
-      )}
     </section>
   )
 }

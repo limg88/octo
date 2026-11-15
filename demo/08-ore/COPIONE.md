@@ -40,7 +40,7 @@ Durata: 4 minuti. Mostra la riconciliazione delle ore: quelle approvate nei time
 8. **Cambia periodo.** Scegli un altro mese o due date in «Dal» e «Al».
    Atteso: la tabella segue il periodo; un mese senza ore dice «Nessuna ora nel periodo».
 
-9. **Leggi le ore direttamente da Jira.** Apri «Fonti», nella sezione «Jira» scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».
+9. **Leggi le ore direttamente da Jira.** Apri «Fonti», premi «Collega» nella riga «Jira» e scrivi sito `demo`, email `pm@example.test`, API token `demo-token`, progetti `AUR` e premi «Prova e salva». Torna in «Ore», scegli il mese scorso e premi «Leggi le ore da Jira».
    Atteso: «Lette 100 registrazioni di ore (<mese>)…» e la stessa tabella di prima: 664 ore contro 630.
    Nel terminale:
    ```bash

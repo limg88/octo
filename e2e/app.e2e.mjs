@@ -89,10 +89,13 @@ try {
   await page.getByRole('tab', { name: 'Fonti' }).click()
   // Demo 05: the guide shows what is still to link, and the mail starts from the project's name.
   const guide = page.getByRole('region', { name: 'Avvio del progetto' })
-  const guideStep = (text) => guide.getByRole('listitem').filter({ hasText: text })
-  await guideStep('Posta').getByText('da fare').waitFor({ timeout: TIMEOUT_MS })
-  await guideStep('Azure DevOps').getByText('da fare').waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^Niente è ancora collegato/).waitFor({ timeout: TIMEOUT_MS })
+  // Every source is one row with its state: it opens to be linked.
+  const openSource = (action, source) =>
+    page.getByRole('button', { name: `${action}: ${source}`, exact: true }).click()
   const mail = page.getByRole('region', { name: 'Posta' })
+  await mail.getByText('La posta di questo progetto non è ancora configurata.').waitFor()
+  await openSource('Collega', 'Posta')
   assert.equal(await mail.getByLabel('Parole chiave').inputValue(), 'Aurora')
   await mail.getByRole('button', { name: 'Anteprima' }).click()
   await mail.getByText('3 mail entrerebbero con queste regole.').waitFor({ timeout: TIMEOUT_MS })
@@ -102,7 +105,7 @@ try {
   await mail.getByLabel('Mittenti da escludere').fill('avvisi@monitor.example')
   await mail.getByRole('button', { name: 'Salva', exact: true }).click()
   await mail.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
-  await guideStep('Posta').getByText('fatto').waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^1 su 4 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await mail.getByRole('button', { name: 'Leggi ora' }).click()
   // The periodic reading may have run just before the click: either way two mails are there.
   await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
@@ -137,6 +140,7 @@ try {
   const searchAdo = () => adoSection.getByRole('button', { name: 'Cerca progetti e aree' }).click()
   const saveAdo = () => adoSection.getByRole('button', { name: 'Prova e salva' }).click()
   await adoSection.getByText('Non collegato.').waitFor({ timeout: TIMEOUT_MS })
+  await openSource('Collega', 'Azure DevOps')
   await adoSection.getByLabel('Organizzazione').fill(DEMO_ADO.organization)
   await adoProject.fill(DEMO_ADO.project)
   await adoToken.fill('sbagliato')
@@ -152,6 +156,18 @@ try {
   await adoSection
     .getByRole('button', { name: 'Team A', exact: true })
     .waitFor({ timeout: TIMEOUT_MS })
+  await adoSection.getByRole('button', { name: 'Prova e salva' }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: `${work}/fonti-sistema.png` })
+  // The small guide beside the token opens on request.
+  await adoSection.getByRole('button', { name: 'Come ottengo il token?' }).click()
+  await adoSection
+    .getByRole('note')
+    .getByText(/spunta solo «Work Items: Read»/)
+    .waitFor()
+  // The colours of the icon change with a short transition: the picture is taken after it.
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `${work}/fonti-token.png` })
+  await page.keyboard.press('Escape')
   await saveAdo()
   await adoSection.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
   assert.doesNotMatch(
@@ -179,7 +195,7 @@ try {
   await assertEventually(() => workItems().length === 4)
 
   // Demo 05: one button reads everything that is linked.
-  await guideStep('Azure DevOps').getByText('fatto').waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^2 su 4 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await guide.getByRole('button', { name: 'Riempi la memoria ora' }).click()
   await guide.getByText('Fatto. Ora puoi fare domande').waitFor({ timeout: TIMEOUT_MS })
   for (const source of ['Posta', 'Azure DevOps', 'Documenti']) {
@@ -316,6 +332,7 @@ try {
   // The same hours read from Jira itself, with the token of its feed.
   await page.getByRole('tab', { name: 'Fonti' }).click()
   const jiraSection = page.getByRole('region', { name: 'Jira', exact: true })
+  await openSource('Collega', 'Jira')
   await jiraSection.getByLabel(/^Sito/).fill(DEMO_JIRA.site)
   await jiraSection.getByLabel('La tua email su Jira').fill(DEMO_JIRA.email)
   await jiraSection.getByLabel(/^API token/).fill(DEMO_JIRA.token)
@@ -556,6 +573,7 @@ try {
 
   // Demo 14: people and calendar of the project, and their effect on the hours.
   await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team14 = page.getByRole('region', { name: 'Persone e calendario' })
   await team14
     .getByLabel(/^Persone:/)
@@ -593,6 +611,7 @@ try {
   // Demo 17: the model that answers is chosen for the project and written beside the answer.
   await page.getByText('modello claude-fake-default').first().waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('tab', { name: 'Fonti' }).click()
+  await page.getByRole('tab', { name: 'Avanzate' }).click()
   const models17 = page.getByRole('region', { name: 'Modelli' })
   await models17.getByLabel('Risposte in «Chiedi»').selectOption('sonnet')
   await models17.getByRole('button', { name: 'Salva i modelli' }).click()
@@ -737,6 +756,7 @@ try {
   await page.keyboard.press('Escape')
 
   // Demo 20: a line that is not understood is told under its field, and nothing is saved.
+  await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team20 = page.getByRole('region', { name: 'Persone e calendario' })
   const teamFile = () => readFileSync(`${movedFolder}/_octo/.impostazioni/team.json`, 'utf8')
   const teamBefore = teamFile()

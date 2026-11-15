@@ -18,7 +18,7 @@ Durata: 4 minuti. Mostra il selettore dei progetti in cima alla colonna di sinis
    Atteso: la testata dice «Boreale»; l'elenco si chiude. Con ⌘1 (Ctrl+1 su Windows) torni ad Aurora, con ⌘2 a Boreale.
    Dimostra: l'elenco dei progetti è un selettore, e c'è un solo posto dove si cambia progetto.
 
-3. **Fai leggere la posta ad Aurora.** Torna su «Aurora», apri «Fonti», in «Posta» premi «Salva» e poi «Leggi ora».
+3. **Fai leggere la posta ad Aurora.** Torna su «Aurora», apri «Fonti», premi «Collega» nella riga «Posta», poi «Salva» e «Leggi ora».
    Atteso: «Ultima lettura …: 3 nuove, 0 già presenti.»
 
 4. **Prova a togliere Aurora e ripensaci.** Apri l'elenco, premi «Gestisci i progetti…», poi «Togli da Octo» accanto ad Aurora.

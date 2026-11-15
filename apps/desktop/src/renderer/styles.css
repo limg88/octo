@@ -739,10 +739,10 @@ main > .warning {
 .sources-page {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 16px 24px 32px;
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 12px;
 }
 
 .sources {
@@ -758,6 +758,10 @@ main > .warning {
 
 .sources > * {
   max-width: 720px;
+}
+
+.sources > .source-header {
+  max-width: none;
 }
 
 .sources h3 {
@@ -1458,4 +1462,124 @@ input.short {
 
 .request > section {
   padding: 4px 14px 14px;
+}
+
+/* The attribute means what it says, whatever the layout of the element. */
+[hidden] {
+  display: none !important;
+}
+
+/* The parts of the settings of a project: a second, lighter row of tabs. */
+.subtabs {
+  display: flex;
+  gap: 2px;
+}
+
+/* One source of the list: its name and state on the left, what to do on the right. */
+.source-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  max-width: none;
+}
+
+.source-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sources-page > .sources:not(.guide) {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-control);
+}
+
+.source-form h4 {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+details.advanced > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+details.advanced[open] > summary {
+  margin-bottom: 8px;
+}
+
+/* A label with something beside it: the small guide of a field. */
+.field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.source-form .field .hint {
+  font-weight: 400;
+}
+
+.info-tip {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-tip-button {
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: var(--field-line);
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+}
+
+.info-tip-button:hover:not(:disabled),
+.info-tip-button[aria-expanded="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.info-tip-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -8px;
+  z-index: 10;
+  width: 380px;
+  max-width: 70vw;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-raised);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.info-tip-panel ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }

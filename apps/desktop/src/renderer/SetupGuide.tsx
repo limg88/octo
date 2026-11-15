@@ -9,11 +9,9 @@ type Props = {
   project: Project
 }
 
-type StepName = keyof typeof messages.guideSteps
-
 /**
- * The start of a project in one place: what is linked and what is not, and one button that feeds
- * the memory from everything linked.
+ * The start of a project in one place: how much is linked, and one button that feeds the memory
+ * from everything linked.
  */
 export function SetupGuide({ api, project }: Props) {
   const [status, setStatus] = useState<FeedingStatus | null>(null)
@@ -58,27 +56,13 @@ export function SetupGuide({ api, project }: Props) {
     setFinished(true)
   }
 
-  const done = (name: StepName): boolean =>
-    name === 'documents' ||
-    (name === 'mail' ? status?.mail === true : status?.feeds.includes(name) === true)
-  const names: StepName[] = ['mail', ...FEED_NAMES, 'documents']
+  const linked = (status?.mail ? 1 : 0) + (status?.feeds.length ?? 0)
 
   return (
     <section className="sources guide" aria-label={messages.guideTitle}>
       <h3>{messages.guideTitle}</h3>
       <p className="hint">{messages.guideIntro}</p>
-      {status && (
-        <ol className="guide-steps">
-          {names.map((name) => (
-            <li key={name}>
-              <span className={done(name) ? 'status status-ok' : 'status status-warning'}>
-                {done(name) ? messages.guideDone : messages.guideTodo}
-              </span>
-              {messages.guideSteps[name]}
-            </li>
-          ))}
-        </ol>
-      )}
+      {status && <p>{messages.guideLinked(linked, FEED_NAMES.length + 1)}</p>}
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}

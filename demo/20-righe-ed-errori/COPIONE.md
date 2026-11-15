@@ -14,14 +14,14 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Scrivi una persona e un periodo sbagliati.** Apri «Fonti» e scendi a «Persone e calendario». In «Persone» scrivi `Mario Rossi; sviluppatore; boh; 32/13/2026`, in «Calendario» `Sprint 1; ieri; domani`. Premi «Salva persone e calendario».
+2. **Scrivi una persona e un periodo sbagliati.** Apri «Fonti» e, in alto, la parte «Persone e calendario». In «Persone» scrivi `Mario Rossi; sviluppatore; boh; 32/13/2026`, in «Calendario» `Sprint 1; ieri; domani`. Premi «Salva persone e calendario».
    Atteso: sotto il primo campo «Riga 1, «Mario Rossi; sviluppatore; boh; 32/13/2026»: la parte è «nostra» oppure «cliente».»; sotto il secondo «Riga 1, «Sprint 1; ieri; domani»: c'è una data che non esiste o non è scritta come giorno/mese/anno.»; accanto al pulsante «Non ho salvato: correggi ciò che è segnalato sotto i campi.»
    Dimostra: prima «boh» diventava «nostra», il periodo spariva e la risposta era «Salvate 1 persone e 0 periodi».
 
 3. **Correggi.** Scrivi `Mario Rossi; sviluppatore; nostra; 01/03/2026` e `Sprint 1; 02/11/2026; 13/11/2026`, poi salva.
    Atteso: «Salvate 1 persone e 1 periodi.» e nessun avviso.
 
-4. **Collega Jira a metà.** In «Jira» premi «Prova e salva» senza scrivere nulla.
+4. **Collega Jira a metà.** Torna alla parte «Collegamenti», premi «Collega» nella riga «Jira» e poi «Prova e salva» senza scrivere nulla.
    Atteso: sotto «Sito», «La tua email su Jira», «Progetti» e «API token» compare «Manca: va compilato per collegare il sistema.»; accanto ai pulsanti «Non ho provato il collegamento: compila i campi segnalati.»
    Dimostra: prima la risposta era «Controlla il giorno di inizio e la cartella», i due soli campi già compilati.
 

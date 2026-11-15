@@ -14,7 +14,7 @@ Durata: 3 minuti. Mostra che Octo rende leggibili a Claude i file Word, Excel, P
    ```
    Atteso: si apre Octo sul progetto «Aurora», che in `Documenti/` ha un'offerta in Word e un foglio Excel.
 
-2. **Apri «Fonti».** In fondo alla pagina c'è la sezione «Documenti».
+2. **Apri «Fonti».** L'ultima riga dell'elenco è «Documenti».
    Atteso: «Mai convertiti.» oppure, se sono passati dieci secondi dall'avvio, già l'esito della prima conversione automatica.
 
 3. **Converti.** Premi «Converti ora».

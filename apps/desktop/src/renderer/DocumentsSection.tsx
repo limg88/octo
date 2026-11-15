@@ -2,6 +2,7 @@ import type { Project, SourceState } from '@octo/domain'
 import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { dateTimeText, errorText, messages } from './messages.ts'
+import { SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
@@ -41,31 +42,36 @@ export function DocumentsSection({ api, project }: Props) {
   const run = state?.lastRun ?? null
   return (
     <section className="sources" aria-label={messages.documentsTitle}>
-      <h3>{messages.documentsTitle}</h3>
+      <SourceHeader
+        title={messages.documentsTitle}
+        linked
+        open={false}
+        status={
+          busy ? (
+            <p className="progress" role="status">
+              {messages.documentsConverting}
+            </p>
+          ) : run ? (
+            <p className={run.error ? 'warning' : 'badge badge-ok'}>
+              {run.error
+                ? errorText(run.error)
+                : messages.documentsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
+            </p>
+          ) : (
+            state && <p className="badge badge-warning">{messages.documentsNever}</p>
+          )
+        }
+      >
+        <button type="button" disabled={busy} onClick={() => void convert()}>
+          {messages.documentsConvert}
+        </button>
+      </SourceHeader>
       <p className="hint">{messages.documentsIntro}</p>
-      {busy ? (
-        <p className="progress" role="status">
-          {messages.documentsConverting}
-        </p>
-      ) : run ? (
-        <p className={run.error ? 'warning' : 'badge badge-ok'}>
-          {run.error
-            ? errorText(run.error)
-            : messages.documentsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
-        </p>
-      ) : (
-        state && <p className="badge badge-warning">{messages.documentsNever}</p>
-      )}
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}
         </p>
       )}
-      <div className="actions">
-        <button type="button" disabled={busy} onClick={() => void convert()}>
-          {messages.documentsConvert}
-        </button>
-      </div>
     </section>
   )
 }
