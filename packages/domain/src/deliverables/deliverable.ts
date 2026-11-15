@@ -95,6 +95,11 @@ export type Deliverable = {
   approvedAt: string | null
   /** Files written at approval, as paths inside the project folder. */
   files: string[]
+  /**
+   * The models that wrote the draft now shown and read it again, as Claude Code named them;
+   * absent in what was written before.
+   */
+  models?: { write: string | null; review: string | null }
 }
 
 /** Where Octo keeps the deliverables of a project. */

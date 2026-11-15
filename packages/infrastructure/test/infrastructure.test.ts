@@ -80,6 +80,16 @@ describe('claude cli runner', () => {
     ])
   })
 
+  it('uses the model it is asked for, or the default of the seat, and says which', async () => {
+    const used: string[] = []
+    const onModel = (model: string) => used.push(model)
+    const request = { projectFolder: project, question: 'Quando consegniamo?', onModel }
+    await runner().ask(request)
+    await runner().ask({ ...request, model: null })
+    await runner().ask({ ...request, model: 'sonnet' })
+    expect(used).toEqual(['claude-fake-default', 'claude-fake-default', 'claude-sonnet-fake'])
+  })
+
   it('runs on the seat of the PM, confined to the project and without connectors', async () => {
     const draft = await runner({
       env: { ANTHROPIC_API_KEY: 'k', CLAUDE_CODE_OAUTH_TOKEN: 't', CLAUDECODE: '1' },

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createDeliverables } from '@octo/application'
-import { deliverableKind, type Project } from '@octo/domain'
+import { deliverableKind, type ModelSettings, type Project } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { extract } from '../src/extract/extract.ts'
@@ -42,9 +42,10 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-function deliverables() {
+function deliverables(models?: ModelSettings) {
   let tick = 0
   return createDeliverables({
+    ...(models ? { models: async () => models } : {}),
     writer: createClaudeDeliverableWriter({
       command: process.execPath,
       prefixArgs: [FAKE_CLAUDE],
@@ -102,6 +103,15 @@ describe('a deliverable from the request to the approved file', () => {
       'La consegna è il 12 dicembre.',
     )
     expect(await readFile(join(project.folder, '_octo', '.gitignore'), 'utf8')).toBe('*\n')
+  })
+
+  it('writes and reads again with the models chosen for the project, and records them', async () => {
+    const chosen = deliverables({ ask: null, write: 'opus', review: 'haiku' })
+    const made = await chosen.start(project, { kindId: 'email-cliente', inputs })
+    expect(made.models).toEqual({ write: 'claude-opus-fake', review: 'claude-haiku-fake' })
+    // Without a choice it is the default of the seat, and that is what is recorded.
+    const plain = await deliverables().start(project, { kindId: 'email-cliente', inputs })
+    expect(plain.models).toEqual({ write: 'claude-fake-default', review: 'claude-fake-default' })
   })
 
   it('puts in an estimate the totals the code computes, and keeps the register', async () => {

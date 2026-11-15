@@ -10,6 +10,7 @@ import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
 import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
+import { ModelsSection } from './ModelsSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { SetupGuide } from './SetupGuide.tsx'
@@ -265,6 +266,7 @@ export function App({ api }: Props) {
                 ))}
                 <DocumentsSection api={api} project={selected} />
                 <TeamSection api={api} project={selected} />
+                <ModelsSection api={api} project={selected} />
               </div>
             )}
           </>

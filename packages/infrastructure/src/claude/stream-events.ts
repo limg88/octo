@@ -20,10 +20,18 @@ const resultEventSchema = z.object({
   structured_output: z.unknown().optional(),
 })
 
+const initEventSchema = z.object({
+  type: z.literal('system'),
+  subtype: z.literal('init'),
+  model: z.string().min(1),
+})
+
 export type ResultEvent = z.infer<typeof resultEventSchema>
 
 export type StreamEvent =
   | { kind: 'progress'; steps: AgentProgress[] }
+  /** The first line of a run: which model it uses. */
+  | { kind: 'model'; model: string }
   | { kind: 'result'; result: ResultEvent }
   | { kind: 'other' }
 
@@ -34,6 +42,8 @@ export function parseStreamLine(line: string, projectFolder: string): StreamEven
   const event = parseJson(line)
   const result = resultEventSchema.safeParse(event)
   if (result.success) return { kind: 'result', result: result.data }
+  const started = initEventSchema.safeParse(event)
+  if (started.success) return { kind: 'model', model: started.data.model }
   const assistant = assistantEventSchema.safeParse(event)
   if (!assistant.success) return { kind: 'other' }
   const steps = assistant.data.message.content.flatMap((block) => {

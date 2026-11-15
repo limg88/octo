@@ -20,6 +20,7 @@ import type {
   HoursSettings,
   JiraFeedConfig,
   MailMessage,
+  ModelSettings,
   ProgressSettings,
   Project,
   ProjectTeam,
@@ -47,6 +48,10 @@ export type AgentStatus =
 export type AskRequest = {
   projectFolder: string
   question: string
+  /** The model to use; absent or null: the default of Claude Code on this seat. */
+  model?: string | null
+  /** Told which model answers, as soon as the run says it. */
+  onModel?: (model: string) => void
   onProgress?: (progress: AgentProgress) => void
   signal?: AbortSignal
 }
@@ -212,6 +217,8 @@ export type DraftRequest = {
   inputs: Readonly<Record<string, string>>
   /** A change asked in words on the draft shown; null for the first draft. */
   revision: { draft: DeliverableDraft; request: string } | null
+  model?: string | null
+  onModel?: (model: string) => void
   onProgress?: (progress: AgentProgress) => void
   signal?: AbortSignal
 }
@@ -221,6 +228,8 @@ export type RedTeamRequest = {
   kind: DeliverableKind
   /** The text as the reader would get it. The red team never sees how it was written. */
   text: string
+  model?: string | null
+  onModel?: (model: string) => void
   signal?: AbortSignal
 }
 
@@ -304,6 +313,12 @@ export interface TimesheetReader {
     period: HoursPeriod,
     signal: AbortSignal,
   ): Promise<Array<Record<string, unknown>>>
+}
+
+/** The model chosen for each task in a project, kept with Octo's settings of the project. */
+export interface ModelSettingsStore {
+  load(projectFolder: string): Promise<ModelSettings>
+  save(projectFolder: string, settings: ModelSettings): Promise<void>
 }
 
 /** The tracker as it is now, in the shape of the export the dashboard reads. */

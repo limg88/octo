@@ -6,6 +6,7 @@ import type {
   ExportCandidates,
   ForecastSettingsStore,
   HoursSettingsStore,
+  ModelSettingsStore,
   ProgressSettingsStore,
   TeamStore,
   TrackerExports,
@@ -15,6 +16,7 @@ import {
   cleanDashboardSettings,
   cleanForecastSettings,
   cleanHoursSettings,
+  cleanModelSettings,
   cleanProgressSettings,
   cleanTeam,
   DEFAULT_ALIGNMENT_SETTINGS,
@@ -311,6 +313,22 @@ export function createFsTeamStore(): TeamStore {
       return cleanTeam(parsed.data)
     },
     save: (projectFolder, team) => writeJson(fileOf(projectFolder), team),
+  }
+}
+
+const MODELS_FILE = 'models.json'
+
+/** The model of each task, kept with Octo's settings of the project. */
+export function createFsModelSettings(): ModelSettingsStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, MODELS_FILE)
+  return {
+    async load(projectFolder) {
+      const kept = await readJsonOr(fileOf(projectFolder), {})
+      // A file that names a model Octo does not offer falls back on the default, task by task.
+      return cleanModelSettings(typeof kept === 'object' && kept !== null ? kept : {})
+    },
+    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }
 }
 

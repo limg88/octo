@@ -23,6 +23,10 @@ export type StructuredRun<Output> = {
   input: string
   systemPrompt: string
   schema: z.ZodType<Output>
+  /** The model asked of the CLI; absent or null: its own default on this seat. */
+  model?: string | null | undefined
+  /** Told the model the run says it uses. */
+  onModel?: ((model: string) => void) | undefined
   onProgress?: ((progress: AgentProgress) => void) | undefined
   signal?: AbortSignal | undefined
 }
@@ -66,9 +70,10 @@ function jsonSchemaOf(schema: z.ZodType): string {
   return JSON.stringify(body)
 }
 
-function runArguments(systemPrompt: string, jsonSchema: string): string[] {
+function runArguments(systemPrompt: string, jsonSchema: string, model: string | null): string[] {
   return [
     '-p',
+    ...(model === null ? [] : ['--model', model]),
     '--output-format',
     'stream-json',
     '--verbose',
@@ -107,7 +112,7 @@ export async function runStructured<Output>(
 ): Promise<Output> {
   const args = [
     ...(config.prefixArgs ?? []),
-    ...runArguments(run.systemPrompt, jsonSchemaOf(run.schema)),
+    ...runArguments(run.systemPrompt, jsonSchemaOf(run.schema), run.model ?? null),
   ]
   const timeout = AbortSignal.timeout(config.askTimeoutMs ?? DEFAULT_TIMEOUT_MS)
   const signal = run.signal ? AbortSignal.any([run.signal, timeout]) : timeout
@@ -124,6 +129,7 @@ export async function runStructured<Output>(
     createInterface({ input: child.stdout }).on('line', (line) => {
       const event = parseStreamLine(line, run.projectFolder)
       if (event.kind === 'result') result = event.result
+      if (event.kind === 'model') run.onModel?.(event.model)
       if (event.kind !== 'progress') return
       for (const step of event.steps) run.onProgress?.(step)
     })

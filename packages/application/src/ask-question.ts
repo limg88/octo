@@ -6,6 +6,7 @@ import {
   type DraftAnswer,
   type Evidence,
   isDomainError,
+  type ModelSettings,
   type Project,
   type QuestionRecord,
 } from '@octo/domain'
@@ -24,6 +25,8 @@ export type AskQuestionDeps = {
   questions: QuestionLog
   clock: Clock
   ids: IdGenerator
+  /** The models the PM chose for the project; without, the default of Claude Code. */
+  models?: (project: Project) => Promise<ModelSettings>
 }
 
 export type AskQuestionInput = {
@@ -56,18 +59,24 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
   async function outcome(
     input: AskQuestionInput,
     question: string,
-  ): Promise<Pick<QuestionRecord, 'answer' | 'error'>> {
+  ): Promise<Pick<QuestionRecord, 'answer' | 'error' | 'model'>> {
+    let model: string | null = null
     try {
+      const chosen = (await deps.models?.(input.project))?.ask ?? null
       const draft = await deps.agent.ask({
         projectFolder: input.project.folder,
         question,
+        model: chosen,
+        onModel: (used) => {
+          model = used
+        },
         ...(input.onProgress ? { onProgress: input.onProgress } : {}),
         ...(input.signal ? { signal: input.signal } : {}),
       })
-      return { answer: await check(input.project, draft), error: null }
+      return { answer: await check(input.project, draft), error: null, model }
     } catch (error) {
       if (!isDomainError(error)) throw error
-      return { answer: null, error: error.code satisfies DomainErrorCode }
+      return { answer: null, error: error.code satisfies DomainErrorCode, model }
     }
   }
 

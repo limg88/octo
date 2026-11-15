@@ -549,6 +549,21 @@ try {
   page = await app.firstWindow()
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
 
+  // Demo 17: the model that answers is chosen for the project and written beside the answer.
+  await page.getByText('modello claude-fake-default').first().waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('tab', { name: 'Fonti' }).click()
+  const models17 = page.getByRole('region', { name: 'Modelli' })
+  await models17.getByLabel('Risposte in «Chiedi»').selectOption('sonnet')
+  await models17.getByRole('button', { name: 'Salva i modelli' }).click()
+  await models17.getByText(/^Modelli salvati/).waitFor({ timeout: TIMEOUT_MS })
+  assert.deepEqual(
+    JSON.parse(readFileSync(`${work}/Aurora/_octo/.impostazioni/models.json`, 'utf8')),
+    { ask: 'sonnet', write: null, review: null },
+  )
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
+  await ask('Quando consegniamo il modulo ordini?')
+  await page.getByText('modello claude-sonnet-fake').waitFor({ timeout: TIMEOUT_MS })
+
   // Demo 16: the dashboard from Azure DevOps as it is now, read with the token of the source.
   await page.getByRole('tab', { name: 'Cruscotto' }).click()
   await page.locator('.dashboard-settings summary').click()

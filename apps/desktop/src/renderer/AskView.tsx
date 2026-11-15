@@ -62,7 +62,10 @@ export function AskView({ api, project }: Props) {
         {records.map((record) => (
           <article key={record.id} className="exchange">
             <p className="question">{record.question}</p>
-            <p className="asked-at">{dateTimeText(record.askedAt)}</p>
+            <p className="asked-at">
+              {dateTimeText(record.askedAt)}
+              {record.model && ` · ${messages.models.used(record.model)}`}
+            </p>
             {record.answer && (
               <AnswerView
                 answer={record.answer}

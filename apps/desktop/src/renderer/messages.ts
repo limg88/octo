@@ -117,6 +117,25 @@ export const messages = {
     nothing: 'La copia non contiene progetti.',
     credentials: 'Rimetti le credenziali di Jira e Azure DevOps in «Fonti»: non sono nella copia.',
   },
+  models: {
+    title: 'Modelli',
+    intro:
+      'Quale modello di Claude risponde alle domande, scrive i deliverable e li rilegge in questo progetto. «Predefinito» è quello che Claude Code usa su questo computer: su un altro può essere diverso. Accanto a ogni risposta e a ogni deliverable resta scritto il modello che ha lavorato davvero.',
+    task: {
+      ask: 'Risposte in «Chiedi»',
+      write: 'Scrittura dei deliverable',
+      review: 'Rilettura critica dei deliverable',
+    },
+    byDefault: 'Predefinito di Claude Code',
+    choice: { fable: 'Fable', opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' },
+    save: 'Salva i modelli',
+    saved: 'Modelli salvati: valgono dalla prossima domanda e dal prossimo deliverable.',
+    used: (model: string) => `modello ${model}`,
+    wroteAndReviewed: (write: string, review: string | null) =>
+      review === null || review === write
+        ? `modello ${write}`
+        : `scritto da ${write}, riletto da ${review}`,
+  },
   newProject: 'Nuovo progetto',
   newProjectName: 'Nome del nuovo progetto',
   newProjectCreate: 'Scegli dove crearlo',

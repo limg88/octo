@@ -16,6 +16,7 @@ import {
   JOBS_FOLDER,
   jobPath,
   LETTERHEAD_PATH,
+  type ModelSettings,
   OWN_KINDS_FOLDER,
   type OwnKindInput,
   ownKind,
@@ -47,6 +48,8 @@ export type DeliverablesDeps = {
   memory: MemoryWriter
   clock: Clock
   ids: IdGenerator
+  /** The models the PM chose for the project; without, the default of Claude Code. */
+  models?: (project: Project) => Promise<ModelSettings>
 }
 
 export type StartInput = {
@@ -169,9 +172,15 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     const startedAt = deps.clock.now()
     const previous = deliverable.written
     try {
+      const chosen = await deps.models?.(project)
+      const models: NonNullable<Deliverable['models']> = { write: null, review: null }
       const written = await deps.writer.draft({
         projectFolder: project.folder,
         kind,
+        model: chosen?.write ?? null,
+        onModel: (used) => {
+          models.write = used
+        },
         projectInstructions: (await instructions(project, kind.id)) || null,
         inputs: deliverable.inputs,
         revision: previous && request ? { draft: previous, request } : null,
@@ -184,6 +193,10 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         projectFolder: project.folder,
         kind,
         text: withoutMarkers(checked.text),
+        model: chosen?.review ?? null,
+        onModel: (used) => {
+          models.review = used
+        },
       })
       const readyAt = deps.clock.now()
       return {
@@ -192,6 +205,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         draft: checked,
         written,
         redTeam,
+        models,
         readyAt: readyAt.toISOString(),
         rounds: [...deliverable.rounds, roundOf(startedAt, readyAt, request, null)],
       }

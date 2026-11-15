@@ -8,8 +8,16 @@ import { OCTO_FOLDER, PRIVATE_FOLDER, SETTINGS_FOLDER } from './extracted-docume
  */
 export const HISTORY_FOLDER = `${OCTO_FOLDER}/.cronologia`
 
-/** The folders of a project that are never a source: not searched, not read, not cited. */
-export const UNCITABLE_FOLDERS = [HISTORY_FOLDER, SETTINGS_FOLDER, PRIVATE_FOLDER] as const
+/**
+ * The folders of a project that are never a source: not searched, not read, not cited. The last
+ * holds the deliverables in the making.
+ */
+export const UNCITABLE_FOLDERS = [
+  HISTORY_FOLDER,
+  SETTINGS_FOLDER,
+  PRIVATE_FOLDER,
+  `${OCTO_FOLDER}/.lavori`,
+] as const
 
 /** One question of the PM with its outcome: a checked answer or the reason it failed. */
 export type QuestionRecord = {
@@ -20,6 +28,8 @@ export type QuestionRecord = {
   durationMs: number
   answer: CheckedAnswer | null
   error: DomainErrorCode | null
+  /** The model that answered, as Claude Code named it; absent in what was asked before. */
+  model?: string | null | undefined
 }
 
 export function cleanQuestion(question: string): string {

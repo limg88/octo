@@ -15,6 +15,7 @@ import {
   createFeeds,
   createForecasts,
   createHours,
+  createModels,
   createProgress,
   createProjects,
   createSources,
@@ -24,7 +25,7 @@ import {
   type MailArchive,
   type Projects,
 } from '@octo/application'
-import { backupFileName, DomainError } from '@octo/domain'
+import { backupFileName, DomainError, type Project } from '@octo/domain'
 import {
   createAdoTrackerReader,
   createAppleMailArchive,
@@ -40,6 +41,7 @@ import {
   createFsForecastSettings,
   createFsHoursSettings,
   createFsMemoryWriter,
+  createFsModelSettings,
   createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
@@ -211,6 +213,8 @@ function start(): void {
     clock,
   })
   const team = createTeam({ store: createFsTeamStore(), writer })
+  const models = createModels({ store: createFsModelSettings() })
+  const chosenModels = (project: Project) => models.get(project)
   const hours = createHours({
     settings: createFsHoursSettings(),
     files,
@@ -244,6 +248,7 @@ function start(): void {
       memory: writer,
       clock,
       ids,
+      models: chosenModels,
     }),
     dashboard: createDashboard({ settings: dashboardSettings, exports: trackerExports, clock }),
     alignments: createAlignments({
@@ -267,7 +272,15 @@ function start(): void {
     projects,
     questions,
     evidence,
-    askQuestion: createAskQuestion({ agent, evidence, questions, clock, ids }),
+    askQuestion: createAskQuestion({
+      agent,
+      evidence,
+      questions,
+      clock,
+      ids,
+      models: chosenModels,
+    }),
+    models,
     folderDialogTitle: FOLDER_DIALOG_TITLE,
     letterheadDialogTitle: LETTERHEAD_DIALOG_TITLE,
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,

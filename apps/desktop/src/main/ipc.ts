@@ -13,6 +13,7 @@ import type {
   Feeds,
   Forecasts,
   Hours,
+  Models,
   Progress,
   Projects,
   QuestionLog,
@@ -24,6 +25,7 @@ import {
   DomainError,
   FEED_NAMES,
   isDomainError,
+  MODEL_CHOICES,
   PHASES,
   TEAM_SIDES,
   WAREHOUSE_TLS_MODES,
@@ -55,6 +57,7 @@ export type IpcDeps = {
   deckModelDialogTitle: string
   newProjectDialogTitle: string
   backups: Backups
+  models: Models
   trackerSnapshots: TrackerSnapshots
   backupDialogs: BackupDialogs
 }
@@ -287,6 +290,10 @@ const teamInput = byProject.extend({
     periods: z.array(z.object({ name: rule, from: rule, to: rule })).max(MAX_RULES),
   }),
 })
+const modelChoice = z.enum(MODEL_CHOICES).nullable()
+const modelsInput = byProject.extend({
+  settings: z.object({ ask: modelChoice, write: modelChoice, review: modelChoice }),
+})
 const newProjectInput = z.object({ name: rule })
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
@@ -349,6 +356,14 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.teamGet, byProject, async ({ projectId }) =>
     deps.team.get(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.modelsGet, byProject, async ({ projectId }) =>
+    deps.models.get(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.modelsSave, modelsInput, async (input) =>
+    deps.models.save(await deps.projects.get(input.projectId), input.settings),
   )
 
   handle(CHANNELS.teamSave, teamInput, async (input) =>

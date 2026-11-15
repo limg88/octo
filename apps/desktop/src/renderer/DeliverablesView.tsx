@@ -361,6 +361,8 @@ function Review({
       <p className="hint">
         {kind?.title ?? deliverable.kindId} · {messages.deliverableStatus[deliverable.status]} ·{' '}
         {messages.deliverableCost(cost.draftMinutes, cost.reviewMinutes, cost.rounds)}
+        {deliverable.models?.write &&
+          ` · ${messages.models.wroteAndReviewed(deliverable.models.write, deliverable.models.review)}`}
       </p>
       {deliverable.status === 'failed' && (
         <p className="warning" role="alert">

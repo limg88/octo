@@ -33,6 +33,7 @@ import type {
   HoursSettings,
   MailPreview,
   MailSourceConfig,
+  ModelSettings,
   OwnKindInput,
   ProgressSettings,
   Project,
@@ -114,6 +115,8 @@ export const CHANNELS = {
   alignmentExport: 'alignment:export',
   teamGet: 'team:get',
   teamSave: 'team:save',
+  modelsGet: 'models:get',
+  modelsSave: 'models:save',
   projectsCreate: 'projects:create',
   dashboardReadTracker: 'dashboard:tracker:read',
   backupSave: 'backup:save',
@@ -263,6 +266,9 @@ export type OctoApi = {
   /** The people and the calendar of the project. */
   team(projectId: string): Promise<Result<ProjectTeam>>
   saveTeam(projectId: string, team: ProjectTeam): Promise<Result<ProjectTeam>>
+  /** Which model answers, writes and reads again in the project. */
+  modelSettings(projectId: string): Promise<Result<ModelSettings>>
+  saveModelSettings(projectId: string, settings: ModelSettings): Promise<Result<ModelSettings>>
   /**
    * Makes the folder of a new project where the PM chooses and adds it; null when the PM closes
    * the dialog.

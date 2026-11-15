@@ -22,6 +22,14 @@ const answer = {
   missing: [],
 }
 
+// As the real one: the model asked with --model, or the default of the seat.
+const asked = args.indexOf('--model')
+emit({
+  type: 'system',
+  subtype: 'init',
+  model: asked < 0 ? 'claude-fake-default' : `claude-${args[asked + 1]}-fake`,
+})
+
 // A run of the red team: it is told so in its system prompt, and reads the text on standard input.
 if (args.join(' ').includes('You attack the content of a deliverable')) {
   const invented = question.includes('99.000')
@@ -142,7 +150,6 @@ if (args.join(' ').includes('Write an estimate of effort in days')) {
   process.exit(0)
 }
 
-emit({ type: 'system', subtype: 'init' })
 console.log('not json at all')
 
 if (question.includes('#lento')) {

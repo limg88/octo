@@ -36,6 +36,8 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
         schema: draftAnswerSchema,
         onProgress: request.onProgress,
         signal: request.signal,
+        model: request.model,
+        onModel: request.onModel,
       }),
   }
 }

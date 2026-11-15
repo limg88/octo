@@ -174,6 +174,8 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
         schema: draftSchemaOf(request.kind),
         onProgress: request.onProgress,
         signal: request.signal,
+        model: request.model,
+        onModel: request.onModel,
       }),
     redTeam: async (request) =>
       runStructured(config, {
@@ -182,6 +184,8 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
         systemPrompt: redTeamSystemPrompt(request.kind, await projectRules(request.projectFolder)),
         schema: redTeamSchema,
         signal: request.signal,
+        model: request.model,
+        onModel: request.onModel,
       }),
   }
 }
