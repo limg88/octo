@@ -116,6 +116,10 @@ describe('bug dashboard', () => {
     expect(dashboard.total).toBe(5)
     expect(dashboard.open.map((row) => row.id)).toEqual(['1', '2', '7'])
     expect(dashboard.byPhase).toEqual({ work: 2, verify: 1, validated: 1, closed: 1 })
+    // The validated ones are listed apart: they are no longer open, and not yet gone.
+    expect(dashboard.validated).toHaveLength(1)
+    expect(dashboard.validated.every((row) => row.phase === 'validated')).toBe(true)
+    expect(dashboard.open.some((row) => row.phase === 'validated')).toBe(false)
     expect(dashboard.open[0]).toMatchObject({
       daysInState: 60,
       stuck: true,

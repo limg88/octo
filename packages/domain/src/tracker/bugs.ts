@@ -46,6 +46,8 @@ export type FlowStep = { median: number | null; sample: number }
 
 export type BugDashboard = {
   open: BugRow[]
+  /** Validated and not yet released: no longer open, still to follow until they leave. */
+  validated: BugRow[]
   byPhase: Record<Phase, number>
   stuck: number
   /** Bugs in scope, whatever their state. */
@@ -262,9 +264,9 @@ export function bugDashboard(
   const bugs = data.items.filter((item) => isOfType(item, settings.bugTypes))
   const scoped = bugs.filter((item) => inScope(item.tags, settings))
   const rows = scoped.map((item) => rowOf(item, settings, now.getTime()))
-  const open = rows
-    .filter((row) => isOpenPhase(row.phase))
-    .sort((a, b) => (b.daysInState ?? -1) - (a.daysInState ?? -1))
+  const longestFirst = (a: BugRow, b: BugRow) => (b.daysInState ?? -1) - (a.daysInState ?? -1)
+  const open = rows.filter((row) => isOpenPhase(row.phase)).sort(longestFirst)
+  const validated = rows.filter((row) => row.phase === 'validated').sort(longestFirst)
   const byPhase: Record<Phase, number> = { work: 0, verify: 0, validated: 0, closed: 0 }
   for (const row of rows) byPhase[row.phase] += 1
 
@@ -285,6 +287,7 @@ export function bugDashboard(
 
   return {
     open,
+    validated,
     byPhase,
     stuck: open.filter((row) => row.stuck).length,
     total: scoped.length,
