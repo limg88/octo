@@ -887,7 +887,7 @@ describe('a DWSI sync', () => {
     expect(String(error)).toContain('stopped')
   })
 
-  it('reads the hours of a period for the bound projects: who, when, how long, never the cost', async () => {
+  it('reads the hours of a period for the bound projects, with the cost of each row', async () => {
     const rows = await dwsiConnector.timesheets(ctx([APOLLO, BOREA]), {
       from: '2026-10-06',
       to: '2026-10-31',
@@ -901,6 +901,7 @@ describe('a DWSI sync', () => {
         timesheetdate: '2026-10-06',
         duration: '8.0000',
         approvalstatus: 'Pending Approval',
+        laborcost_new: '304.0000',
       },
       {
         internalid: '9003',
@@ -909,6 +910,7 @@ describe('a DWSI sync', () => {
         timesheetdate: '2026-10-06',
         duration: '4.0000',
         approvalstatus: 'Approved',
+        laborcost_new: '160.0000',
       },
       {
         internalid: '9004',
@@ -917,9 +919,11 @@ describe('a DWSI sync', () => {
         timesheetdate: '2026-10-07',
         duration: '1.0000',
         approvalstatus: 'Approved',
+        laborcost_new: '45.0000',
       },
     ])
-    expect(JSON.stringify(rows)).not.toMatch(/laborcost|memo|nota privata/)
+    // The cost of the row, never the hourly cost, the notes or the rest of what is personal.
+    expect(JSON.stringify(rows)).not.toMatch(/laborcosthh|memo|nota privata|smartworking/)
 
     // A PM bound to one project only reads that one; bound to none, nothing.
     const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })

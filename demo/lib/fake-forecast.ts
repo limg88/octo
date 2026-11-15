@@ -1,5 +1,5 @@
 // Writes into a project folder what the monthly forecast needs: the spreadsheet the administration
-// sends (three project codes, one line each) and the daily costs and rates of the people, all but
+// sends (three project codes, one line each) and the daily rates of the people, all but
 // one. Usage: node demo/lib/fake-forecast.ts <project folder> [hours]
 // `hours` also says where the timesheets are, for a demo that starts from this screen.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -42,7 +42,7 @@ writeFileSync(
 
 const settings = join(project, '_octo', '.impostazioni')
 mkdirSync(settings, { recursive: true })
-// Costa Elena is left out: the demo shows what a missing cost does.
+// Costa Elena is left out: the demo shows what a missing rate does.
 writeFileSync(
   join(settings, 'forecast.json'),
   JSON.stringify(
@@ -50,11 +50,12 @@ writeFileSync(
       modelPath: '',
       hoursPerDay: 8,
       rates: [
-        { person: 'Rossi Mario', costPerDay: 220, ratePerDay: 450 },
-        { person: 'Bianchi Anna', costPerDay: 200, ratePerDay: 400 },
-        { person: 'Verdi Luca', costPerDay: 180, ratePerDay: 380 },
-        { person: 'Neri Sara', costPerDay: 160, ratePerDay: 350 },
+        { person: 'Rossi Mario', code: null, ratePerDay: 450 },
+        { person: 'Bianchi Anna', code: null, ratePerDay: 400 },
+        { person: 'Verdi Luca', code: null, ratePerDay: 380 },
+        { person: 'Neri Sara', code: null, ratePerDay: 350 },
       ],
+      externals: [],
       months: {},
     },
     null,

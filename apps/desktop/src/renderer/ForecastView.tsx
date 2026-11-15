@@ -13,6 +13,8 @@ import {
   amountOf,
   amountText,
   externalLines,
+  externalRateLines,
+  externalRatesOf,
   externalsOf,
   rateLines,
   ratesOf,
@@ -238,6 +240,8 @@ function gapText(gap: ForecastGap): string {
       return text.gap.no_cost(gap.code, gap.person, text.hours(gap.hours))
     case 'no_rate':
       return text.gap.no_rate(gap.code, gap.person, text.hours(gap.hours))
+    case 'no_external_rate':
+      return text.gap.no_external_rate(gap.code, gap.person, text.hours(gap.hours))
     case 'no_total_costs':
       return text.gap.no_total_costs(gap.code)
     case 'no_ordered':
@@ -380,12 +384,13 @@ function InputsForm({
   )
 }
 
-type SettingsDraft = { modelPath: string; hoursPerDay: string; rates: string }
+type SettingsDraft = { modelPath: string; hoursPerDay: string; rates: string; externals: string }
 
 const settingsDraft = (settings: ForecastSettings): SettingsDraft => ({
   modelPath: settings.modelPath,
   hoursPerDay: String(settings.hoursPerDay),
   rates: rateLines(settings.rates),
+  externals: externalRateLines(settings.externals),
 })
 
 function SettingsForm({
@@ -417,6 +422,7 @@ function SettingsForm({
           modelPath: draft.modelPath,
           hoursPerDay: Number(draft.hoursPerDay),
           rates: ratesOf(draft.rates),
+          externals: externalRatesOf(draft.externals),
         })
       }}
     >
@@ -461,6 +467,17 @@ function SettingsForm({
         />
       </label>
       <p className="hint">{text.ratesHint}</p>
+      <label>
+        {text.externalRates}
+        <textarea
+          value={draft.externals}
+          onChange={(event) => {
+            const { value } = event.target
+            setDraft((current) => ({ ...current, externals: value }))
+          }}
+        />
+      </label>
+      <p className="hint">{text.externalRatesHint}</p>
       <div className="actions">
         <button type="submit" disabled={draft.modelPath.trim() === ''}>
           {text.save}

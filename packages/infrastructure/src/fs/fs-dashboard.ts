@@ -23,6 +23,9 @@ import {
   DEFAULT_HOURS_SETTINGS,
   DEFAULT_PROGRESS_SETTINGS,
   DomainError,
+  type ForecastExternal,
+  type ForecastExternalRate,
+  type ForecastSettings,
   isDomainError,
   NO_DECISIONS,
   PHASES,
@@ -111,9 +114,11 @@ const forecastRowSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        days: z.number(),
-        costPerDay: z.number(),
-        ratePerDay: z.number(),
+        hours: z.number().optional(),
+        // As kept before externals had their cost and rate written once: days, with both.
+        days: z.number().optional(),
+        costPerDay: z.number().optional(),
+        ratePerDay: z.number().optional(),
       }),
     )
     .default([]),
@@ -129,15 +134,64 @@ const forecastSchema = z.object({
   hoursPerDay: z.number().default(DEFAULT_FORECAST_SETTINGS.hoursPerDay),
   rates: z
     .array(
-      z.object({ person: z.string(), costPerDay: z.number(), ratePerDay: z.number().nullable() }),
+      z.object({
+        person: z.string(),
+        code: z.string().nullable().default(null),
+        ratePerDay: z.number().nullable(),
+      }),
+    )
+    .default([]),
+  externals: z
+    .array(
+      z.object({
+        name: z.string(),
+        code: z.string(),
+        costPerDay: z.number(),
+        ratePerDay: z.number(),
+      }),
     )
     .default([]),
   months: z.record(z.string(), z.record(z.string(), forecastRowSchema)).default({}),
 })
 
 /**
- * Daily costs and rates are kept here, in Octo's hidden settings of the project: the agent's
- * search does not look inside hidden folders, so they do not end in an answer or a deliverable.
+ * The settings as the domain has them, from the file as it is or as it was kept before: a rate
+ * without an amount was a cost only and is dropped (costs come from the timesheets now); an
+ * external written by days with its cost and rate becomes hours, and its cost and rate are kept
+ * once for the project code.
+ */
+function forecastSettingsOf(kept: z.infer<typeof forecastSchema>): ForecastSettings {
+  const externals: ForecastExternalRate[] = [...kept.externals]
+  const months: ForecastSettings['months'] = {}
+  for (const [month, rows] of Object.entries(kept.months)) {
+    months[month] = {}
+    for (const [code, row] of Object.entries(rows)) {
+      const hours: ForecastExternal[] = []
+      for (const external of row.externals) {
+        const { name, costPerDay, ratePerDay } = external
+        hours.push({ name, hours: external.hours ?? (external.days ?? 0) * kept.hoursPerDay })
+        const known = externals.some((rate) => rate.name === name && rate.code === code)
+        if (costPerDay !== undefined && ratePerDay !== undefined && !known) {
+          externals.push({ name, code, costPerDay, ratePerDay })
+        }
+      }
+      months[month][code] = { ...row, externals: hours }
+    }
+  }
+  return {
+    modelPath: kept.modelPath,
+    hoursPerDay: kept.hoursPerDay,
+    rates: kept.rates.flatMap((rate) =>
+      rate.ratePerDay === null ? [] : [{ ...rate, ratePerDay: rate.ratePerDay }],
+    ),
+    externals,
+    months,
+  }
+}
+
+/**
+ * Rates, and the costs and rates of externals, are kept here, in Octo's settings of the project:
+ * a folder that is neither searched nor cited, so they do not end in an answer or a deliverable.
  */
 export function createFsForecastSettings(): ForecastSettingsStore {
   const fileOf = (projectFolder: string) =>
@@ -146,7 +200,7 @@ export function createFsForecastSettings(): ForecastSettingsStore {
     async load(projectFolder) {
       const parsed = forecastSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       if (!parsed.success) throw new DomainError('forecast_settings_invalid', FORECAST_FILE)
-      return cleanForecastSettings(parsed.data)
+      return cleanForecastSettings(forecastSettingsOf(parsed.data))
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }

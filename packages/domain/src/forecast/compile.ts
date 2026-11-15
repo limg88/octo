@@ -36,6 +36,7 @@ export type ForecastValues = {
 export type ForecastGap =
   | { kind: 'no_cost'; code: string; person: string; hours: number }
   | { kind: 'no_rate'; code: string; person: string; hours: number }
+  | { kind: 'no_external_rate'; code: string; person: string; hours: number }
   | { kind: 'no_total_costs'; code: string }
   | { kind: 'no_ordered'; code: string }
 
@@ -68,6 +69,7 @@ export type ForecastTexts = {
   progress: (share: number, budgetCosts: number) => string
   revenueDecided: string
   left: (people: string[]) => string
+  externalLeft: (people: string[]) => string
 }
 
 const italian = (value: number, decimals: number): string =>
@@ -79,13 +81,16 @@ export const FORECAST_TEXTS: ForecastTexts = {
   timesheet: (hours, days) =>
     `timesheet approvati: ${italian(hours, 1)} h = ${italian(days, 3)} gg`,
   external: (name, days) => `${name}: ${italian(days, 3)} gg dichiarati`,
+  externalLeft: (people) =>
+    `esterni senza costo e tariffa, fuori dal calcolo: ${people.join(', ')}`,
   progress: (share, budgetCosts) =>
     `avanzamento ${italian(share * 100, 2)}% = costi del mese / costi a budget ${italian(budgetCosts, 2)}`,
   revenueDecided: 'ricavi indicati dal PM',
-  left: (people) => `senza costo al giorno, fuori dal calcolo: ${people.join(', ')}`,
+  left: (people) => `ore senza costo nei timesheet, fuori dai costi: ${people.join(', ')}`,
 }
 
 const DAYS_DECIMALS = 3
+const MONEY_DECIMALS = 2
 const round = (value: number, decimals: number): number => Number(value.toFixed(decimals))
 
 /** A number as a formula writes it: a point for the decimals, no needless zeros. */
@@ -94,30 +99,62 @@ const literal = (value: number): string => String(round(value, 6))
 const sum = (terms: readonly string[]): string => terms.join('+')
 
 /**
- * The rate of a person whatever the order of the name; a rate written with fewer names (no middle
- * name) is theirs when it is the only one that fits.
+ * The one among `named` that is this person, whatever the order of the name; a name written with
+ * fewer words (no middle name) is theirs when it is the only one that fits.
  */
-function rateOf(rates: readonly ForecastRate[], person: string): ForecastRate | null {
+function ofPerson<T>(named: readonly T[], nameOf: (entry: T) => string, person: string): T | null {
   const key = personKey(person)
-  const exact = rates.find((rate) => personKey(rate.person) === key)
+  const exact = named.find((entry) => personKey(nameOf(entry)) === key)
   if (exact) return exact
   const words = new Set(key.split(' '))
-  const fitting = rates.filter((rate) =>
-    personKey(rate.person)
+  const fitting = named.filter((entry) =>
+    personKey(nameOf(entry))
       .split(' ')
       .every((word) => words.has(word)),
   )
   return fitting.length === 1 ? (fitting[0] ?? null) : null
 }
 
-/** The hours each person has on a code, under the name the timesheet writes first. */
-function hoursByPerson(entries: readonly HoursEntry[]): Array<{ person: string; hours: number }> {
-  const people = new Map<string, { person: string; hours: number }>()
+/** The rate of a person on a code: the one written for that code, else the person's own. */
+function rateOf(rates: readonly ForecastRate[], person: string, code: string): ForecastRate | null {
+  const named = (rate: ForecastRate) => rate.person
+  return (
+    ofPerson(
+      rates.filter((rate) => rate.code === code),
+      named,
+      person,
+    ) ??
+    ofPerson(
+      rates.filter((rate) => rate.code === null),
+      named,
+      person,
+    )
+  )
+}
+
+type PersonHours = {
+  person: string
+  hours: number
+  /** The cost of the rows that carry one, and the hours of those that do not. */
+  cost: number
+  hoursWithoutCost: number
+}
+
+/** The hours and the cost each person has on a code, under the name the timesheet writes first. */
+function hoursByPerson(entries: readonly HoursEntry[]): PersonHours[] {
+  const people = new Map<string, PersonHours>()
   for (const entry of entries) {
     const key = personKey(entry.person)
-    const known = people.get(key)
-    if (known) known.hours += entry.hours
-    else people.set(key, { person: entry.person, hours: entry.hours })
+    const known = people.get(key) ?? {
+      person: entry.person,
+      hours: 0,
+      cost: 0,
+      hoursWithoutCost: 0,
+    }
+    known.hours += entry.hours
+    if (entry.cost === null || entry.cost === undefined) known.hoursWithoutCost += entry.hours
+    else known.cost += entry.cost
+    people.set(key, known)
   }
   return [...people.values()].sort((a, b) => a.person.localeCompare(b.person))
 }
@@ -155,20 +192,21 @@ export function compileForecast(
     let days = 0
     let hours = 0
 
-    for (const { person, hours: personHours } of people) {
+    for (const { person, hours: personHours, cost, hoursWithoutCost } of people) {
       const personDays = personHours / settings.hoursPerDay
       hours += personHours
       days += personDays
-      const rate = rateOf(settings.rates, person)
-      if (rate === null) {
-        gaps.push({ kind: 'no_cost', code: line.code, person, hours: personHours })
+      if (hoursWithoutCost > 0) {
+        gaps.push({ kind: 'no_cost', code: line.code, person, hours: hoursWithoutCost })
         left.push(person)
-        continue
       }
-      costTerms.push(`${literal(personDays)}*${literal(rate.costPerDay)}`)
-      internalCosts += personDays * rate.costPerDay
+      if (hoursWithoutCost < personHours) {
+        costTerms.push(literal(round(cost, MONEY_DECIMALS)))
+        internalCosts += cost
+      }
       if (!sold) continue
-      if (rate.ratePerDay === null) {
+      const rate = rateOf(settings.rates, person, line.code)
+      if (rate === null) {
         gaps.push({ kind: 'no_rate', code: line.code, person, hours: personHours })
         continue
       }
@@ -179,17 +217,35 @@ export function compileForecast(
     if (left.length > 0) notes.push(texts.left(left))
 
     const externalTerms: string[] = []
+    const externalLeft: string[] = []
     let externalCosts = 0
     for (const external of input.externals) {
-      externalTerms.push(`${literal(external.days)}*${literal(external.costPerDay)}`)
-      externalCosts += external.days * external.costPerDay
-      days += external.days
-      if (sold) {
-        revenueTerms.push(`${literal(external.days)}*${literal(external.ratePerDay)}`)
-        revenue += external.days * external.ratePerDay
+      const rate = ofPerson(
+        settings.externals.filter((candidate) => candidate.code === line.code),
+        (candidate) => candidate.name,
+        external.name,
+      )
+      if (rate === null) {
+        gaps.push({
+          kind: 'no_external_rate',
+          code: line.code,
+          person: external.name,
+          hours: external.hours,
+        })
+        externalLeft.push(external.name)
+        continue
       }
-      notes.push(texts.external(external.name, external.days))
+      const externalDays = external.hours / settings.hoursPerDay
+      externalTerms.push(`${literal(externalDays)}*${literal(rate.costPerDay)}`)
+      externalCosts += externalDays * rate.costPerDay
+      days += externalDays
+      if (sold) {
+        revenueTerms.push(`${literal(externalDays)}*${literal(rate.ratePerDay)}`)
+        revenue += externalDays * rate.ratePerDay
+      }
+      notes.push(texts.external(external.name, round(externalDays, DAYS_DECIMALS)))
     }
+    if (externalLeft.length > 0) notes.push(texts.externalLeft(externalLeft))
 
     const amountCell = (terms: readonly string[], value: number): ForecastCell =>
       terms.length > 0

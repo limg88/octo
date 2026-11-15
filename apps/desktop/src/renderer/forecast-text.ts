@@ -1,4 +1,4 @@
-import type { ForecastExternal, ForecastRate } from '@octo/domain'
+import type { ForecastExternal, ForecastExternalRate, ForecastRate } from '@octo/domain'
 
 const FIELD_SEPARATOR = ';'
 
@@ -27,41 +27,64 @@ const fieldsOf = (text: string): string[][] =>
     .map((line) => line.split(FIELD_SEPARATOR).map((field) => field.trim()))
     .filter((fields) => (fields[0] ?? '') !== '')
 
-/** `name; cost; rate` per line; a line without a cost is not a rate. */
+const line = (...fields: string[]): string => fields.join(`${FIELD_SEPARATOR} `)
+
+/**
+ * `name; rate` for the rate of a person wherever they work, `name; project code; rate` for one
+ * code only. A line as it was written when the cost was typed too (`name; cost; rate`) is read
+ * for its rate; a line without a rate is not one.
+ */
 export function ratesOf(text: string): ForecastRate[] {
-  return fieldsOf(text).flatMap(([person = '', cost = '', rate = '']) => {
-    const costPerDay = amountOf(cost)
-    return costPerDay === null ? [] : [{ person, costPerDay, ratePerDay: amountOf(rate) }]
+  return fieldsOf(text).flatMap(([person = '', second = '', third]): ForecastRate[] => {
+    if (third === undefined) {
+      const ratePerDay = amountOf(second)
+      return ratePerDay === null ? [] : [{ person, code: null, ratePerDay }]
+    }
+    const ratePerDay = amountOf(third)
+    if (ratePerDay === null) return []
+    const writtenWithCost = second === '' || amountOf(second) !== null
+    return [{ person, code: writtenWithCost ? null : second.toUpperCase(), ratePerDay }]
   })
 }
 
 export const rateLines = (rates: readonly ForecastRate[]): string =>
   rates
     .map((rate) =>
-      [rate.person, amountText(rate.costPerDay), amountText(rate.ratePerDay)]
-        .join(`${FIELD_SEPARATOR} `)
-        .replace(/; $/, ''),
+      rate.code === null
+        ? line(rate.person, amountText(rate.ratePerDay))
+        : line(rate.person, rate.code, amountText(rate.ratePerDay)),
     )
     .join('\n')
 
-/** `name; days; cost; rate` per line; a line that lacks a number is left out. */
+/** `name; project code; cost; rate` per line; a line that lacks one of them is left out. */
+export function externalRatesOf(text: string): ForecastExternalRate[] {
+  return fieldsOf(text).flatMap(([name = '', code = '', cost = '', rate = '']) => {
+    const costPerDay = amountOf(cost)
+    const ratePerDay = amountOf(rate)
+    if (code === '' || costPerDay === null || ratePerDay === null) return []
+    return [{ name, code: code.toUpperCase(), costPerDay, ratePerDay }]
+  })
+}
+
+export const externalRateLines = (externals: readonly ForecastExternalRate[]): string =>
+  externals
+    .map((external) =>
+      line(
+        external.name,
+        external.code,
+        amountText(external.costPerDay),
+        amountText(external.ratePerDay),
+      ),
+    )
+    .join('\n')
+
+/** `name; hours` per line: what an external worked in the month. */
 export function externalsOf(text: string): ForecastExternal[] {
-  return fieldsOf(text).flatMap(([name = '', days = '', cost = '', rate = '']) => {
-    const numbers = [amountOf(days), amountOf(cost), amountOf(rate)]
-    const [daysValue, costPerDay, ratePerDay] = numbers
-    if (daysValue == null || costPerDay == null || ratePerDay == null) return []
-    return [{ name, days: daysValue, costPerDay, ratePerDay }]
+  return fieldsOf(text).flatMap(([name = '', worked = '']) => {
+    const hours = amountOf(worked)
+    return hours === null ? [] : [{ name, hours }]
   })
 }
 
 export const externalLines = (externals: readonly ForecastExternal[]): string =>
-  externals
-    .map((external) =>
-      [
-        external.name,
-        amountText(external.days),
-        amountText(external.costPerDay),
-        amountText(external.ratePerDay),
-      ].join(`${FIELD_SEPARATOR} `),
-    )
-    .join('\n')
+  externals.map((external) => line(external.name, amountText(external.hours))).join('\n')

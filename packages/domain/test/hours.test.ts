@@ -9,6 +9,7 @@ import {
   type HoursSettings,
   monthsOf,
   parseSeparated,
+  parseTimesheetCosts,
   parseTimesheetExport,
   parseWorklogExport,
   personKey,
@@ -191,6 +192,7 @@ describe('sources of hours', () => {
         duration: 8,
         approvalstatus: 'Approved',
         internalid: 7,
+        laborcost_new: '309.5000',
       },
       {
         employee: 'Rossi Mario',
@@ -211,6 +213,7 @@ describe('sources of hours', () => {
         project: 'P1',
         approved: true,
         id: '7',
+        cost: 309.5,
       },
       {
         person: 'Rossi Mario',
@@ -219,6 +222,7 @@ describe('sources of hours', () => {
         project: null,
         approved: false,
         id: null,
+        cost: null,
       },
       {
         person: 'Rossi Mario',
@@ -227,11 +231,30 @@ describe('sources of hours', () => {
         project: null,
         approved: true,
         id: null,
+        cost: null,
       },
     ])
     expect(parseTimesheetExport(rows)).toHaveLength(3)
     expect(parseTimesheetExport({ items: [] })).toBeNull()
     expect(parseTimesheetExport('text')).toBeNull()
+  })
+
+  it('reads the costs kept apart from the hours, by the id of the row', () => {
+    const kept = JSON.stringify({
+      rows: [
+        { internalid: 7, laborcost_new: '309.5000' },
+        { internalid: '8', laborcost_new: 40 },
+        { internalid: 9, laborcost_new: null },
+        { laborcost_new: 10 },
+        'noise',
+      ],
+    })
+    expect(parseTimesheetCosts(kept)).toEqual([
+      { id: '7', cost: 309.5 },
+      { id: '8', cost: 40 },
+    ])
+    expect(parseTimesheetCosts('{')).toBeNull()
+    expect(parseTimesheetCosts('[]')).toBeNull()
   })
 
   it('splits a text with separators, quotes included', () => {

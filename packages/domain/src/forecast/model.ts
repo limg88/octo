@@ -1,19 +1,27 @@
 import { personKey } from '../hours/model.ts'
 
-/** What a day of a person costs the company and what it is sold for. */
+/**
+ * What a day of a person is sold for. With a project code it holds on that code only; without,
+ * wherever the person has no rate of their own for the code.
+ */
 export type ForecastRate = {
   person: string
-  costPerDay: number
-  /** Null: the days of this person are a cost only. */
-  ratePerDay: number | null
+  code: string | null
+  ratePerDay: number
 }
 
-/** Days of someone who has no timesheet here, as the supplier declared them for the month. */
-export type ForecastExternal = {
+/** Someone with no timesheet here: what a day costs and is sold for on a project code. */
+export type ForecastExternalRate = {
   name: string
-  days: number
+  code: string
   costPerDay: number
   ratePerDay: number
+}
+
+/** The hours an external worked on a project code in a month, as they declared them. */
+export type ForecastExternal = {
+  name: string
+  hours: number
 }
 
 /** What the PM adds for a project code in a month: what no timesheet can tell. */
@@ -38,6 +46,7 @@ export type ForecastSettings = {
   modelPath: string
   hoursPerDay: number
   rates: ForecastRate[]
+  externals: ForecastExternalRate[]
   /** Month (`YYYY-MM`), then project code. */
   months: Record<string, Record<string, ForecastRowInputs>>
 }
@@ -48,6 +57,7 @@ export const DEFAULT_FORECAST_SETTINGS: ForecastSettings = {
   modelPath: '',
   hoursPerDay: DEFAULT_HOURS_PER_DAY,
   rates: [],
+  externals: [],
   months: {},
 }
 
@@ -74,13 +84,7 @@ function cleanRow(row: ForecastRowInputs): ForecastRowInputs {
   return {
     externals: row.externals
       .map((external) => ({ ...external, name: external.name.trim() }))
-      .filter(
-        (external) =>
-          external.name !== '' &&
-          positive(external.days) &&
-          amount(external.costPerDay) !== null &&
-          amount(external.ratePerDay) !== null,
-      ),
+      .filter((external) => external.name !== '' && positive(external.hours)),
     toInvoice: amount(row.toInvoice),
     revenue: amount(row.revenue),
     budgetCosts: budgetCosts === 0 ? null : budgetCosts,
@@ -98,17 +102,26 @@ const isEmptyRow = (row: ForecastRowInputs): boolean =>
   row.totalCosts === null &&
   row.note === ''
 
-/** Settings as the PM typed them, made tidy: one rate per person, no empty month or row. */
+/** Settings as the PM typed them, made tidy: one rate per person and code, no empty month or row. */
 export function cleanForecastSettings(settings: ForecastSettings): ForecastSettings {
   const rates = new Map<string, ForecastRate>()
   for (const rate of settings.rates) {
-    const key = personKey(rate.person)
-    if (key === '' || amount(rate.costPerDay) === null) continue
-    rates.set(key, {
+    const person = personKey(rate.person)
+    const code = rate.code?.trim().toUpperCase() || null
+    if (person === '' || amount(rate.ratePerDay) === null) continue
+    rates.set(`${person}|${code ?? ''}`, {
       person: rate.person.trim(),
-      costPerDay: rate.costPerDay,
-      ratePerDay: amount(rate.ratePerDay),
+      code,
+      ratePerDay: rate.ratePerDay,
     })
+  }
+  const externals = new Map<string, ForecastExternalRate>()
+  for (const external of settings.externals) {
+    const name = personKey(external.name)
+    const code = external.code.trim().toUpperCase()
+    const valid = amount(external.costPerDay) !== null && amount(external.ratePerDay) !== null
+    if (name === '' || code === '' || !valid) continue
+    externals.set(`${name}|${code}`, { ...external, name: external.name.trim(), code })
   }
   const months: ForecastSettings['months'] = {}
   for (const [month, rows] of Object.entries(settings.months)) {
@@ -123,6 +136,7 @@ export function cleanForecastSettings(settings: ForecastSettings): ForecastSetti
     modelPath: settings.modelPath.trim(),
     hoursPerDay: positive(hours) && hours <= MAX_HOURS_PER_DAY ? hours : DEFAULT_HOURS_PER_DAY,
     rates: [...rates.values()],
+    externals: [...externals.values()],
     months,
   }
 }

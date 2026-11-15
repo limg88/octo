@@ -7,13 +7,16 @@ import {
   monthsOf,
   NO_TEAM,
   OCTO_FOLDER,
+  PRIVATE_FOLDER,
   type Project,
   type ProjectTeam,
+  parseTimesheetCosts,
   parseTimesheetExport,
   parseWorklogExport,
   peopleAway,
   type Reconciliation,
   reconcileHours,
+  TIMESHEET_COST_FIELD,
   worklogCsv,
 } from '@octo/domain'
 import { secretKey } from './feeds.ts'
@@ -51,6 +54,12 @@ export const TRACKER_HOURS_FOLDER = `${OCTO_FOLDER}/ore/jira`
 export const NETSUITE_TIMESHEET_FOLDER = `${OCTO_FOLDER}/ore/netsuite`
 const timesheetFile = (month: string): string =>
   `${NETSUITE_TIMESHEET_FOLDER}/timesheet_${month}.json`
+/**
+ * Where the cost of each row read from the company's system is kept, by the id of the row: apart
+ * from the hours, in the folder nothing is searched or cited from.
+ */
+export const TIMESHEET_COSTS_FOLDER = `${PRIVATE_FOLDER}/costi`
+const costsFile = (month: string): string => `${TIMESHEET_COSTS_FOLDER}/timesheet_${month}.json`
 /** Months read in one go at most: a longer period is asked in pieces. */
 export const MAX_MONTHS_READ = 12
 const TIMESHEET_SOURCE = 'NetSuite'
@@ -187,6 +196,17 @@ export function createHours(deps: HoursDeps): Hours {
     })
   }
 
+  /** The cost of the rows Octo read from the company's system, by the id of the row. */
+  async function keptCosts(project: Project): Promise<Map<string, number>> {
+    const costs = new Map<string, number>()
+    for (const path of await deps.files.under(project.folder, TIMESHEET_COSTS_FOLDER)) {
+      const content = await deps.files.readText(project.folder, path)
+      const rows = content === null ? [] : (parseTimesheetCosts(content) ?? [])
+      for (const row of rows) costs.set(row.id, row.cost)
+    }
+    return costs
+  }
+
   return {
     settings: (project) => deps.settings.load(project.folder),
 
@@ -194,7 +214,14 @@ export function createHours(deps: HoursDeps): Hours {
       const settings = await deps.settings.load(project.folder)
       if (settings.timesheetPath === '') return null
       const files = await filesAt(project, settings.timesheetPath, TIMESHEET_EXTENSION)
-      return timesheetRows(project, files, [])
+      const rows = await timesheetRows(project, files, [])
+      const costs = await keptCosts(project)
+      // A cost the export itself carries stays; the others come from what was kept apart.
+      return rows.map((row) =>
+        (row.cost ?? null) === null && row.id !== null && costs.has(row.id)
+          ? { ...row, cost: costs.get(row.id) ?? null }
+          : row,
+      )
     },
 
     async saveSettings(project, settings) {
@@ -321,11 +348,22 @@ export function createHours(deps: HoursDeps): Hours {
         await deps.writer.claim(project.folder)
         for (const { month } of months) {
           const ofMonth = rows.filter((row) => String(row.timesheetdate ?? '').startsWith(month))
-          const content = { exported_at: at, source: TIMESHEET_SOURCE, rows: ofMonth }
+          // The hours are a file answers may read; what each row cost is kept apart from it.
+          const hours = ofMonth.map(({ [TIMESHEET_COST_FIELD]: _cost, ...row }) => row)
+          const costs = ofMonth.map((row) => ({
+            internalid: row.internalid,
+            [TIMESHEET_COST_FIELD]: row[TIMESHEET_COST_FIELD] ?? null,
+          }))
+          const header = { exported_at: at, source: TIMESHEET_SOURCE }
           await deps.writer.write(
             project.folder,
             timesheetFile(month),
-            `${JSON.stringify(content, null, 1)}\n`,
+            `${JSON.stringify({ ...header, rows: hours }, null, 1)}\n`,
+          )
+          await deps.writer.write(
+            project.folder,
+            costsFile(month),
+            `${JSON.stringify({ ...header, rows: costs })}\n`,
           )
         }
         const settings = await deps.settings.load(project.folder)

@@ -145,8 +145,13 @@ describe('the settings of the forecast on disk', () => {
     const settings = {
       ...DEFAULT_FORECAST_SETTINGS,
       modelPath: 'modello.xlsx',
-      rates: [{ person: 'Rossi Mario', costPerDay: 200, ratePerDay: null }],
-      months: { '2026-06': { P1: { ...NO_ROW_INPUTS, toInvoice: 100 } } },
+      rates: [{ person: 'Rossi Mario', code: 'P1', ratePerDay: 400 }],
+      externals: [{ name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 }],
+      months: {
+        '2026-06': {
+          P1: { ...NO_ROW_INPUTS, toInvoice: 100, externals: [{ name: 'Studio Blu', hours: 20 }] },
+        },
+      },
     }
     await store.save(folder, settings)
     expect(await store.load(folder)).toEqual(settings)
@@ -155,6 +160,44 @@ describe('the settings of the forecast on disk', () => {
     const { writeFile } = await import('node:fs/promises')
     await writeFile(file, JSON.stringify({ rates: 'none' }))
     await expect(store.load(folder)).rejects.toThrow('forecast_settings_invalid')
+  })
+
+  it('read what was kept before costs came from the timesheets', async () => {
+    const store = createFsForecastSettings()
+    const file = join(folder, '_octo', '.impostazioni', 'forecast.json')
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(
+      file,
+      JSON.stringify({
+        modelPath: 'modello.xlsx',
+        hoursPerDay: 8,
+        rates: [
+          { person: 'Rossi Mario', costPerDay: 200, ratePerDay: 400 },
+          { person: 'Bianchi Anna', costPerDay: 250, ratePerDay: null },
+        ],
+        months: {
+          '2026-06': {
+            P1: {
+              externals: [{ name: 'Studio Blu', days: 2.5, costPerDay: 300, ratePerDay: 500 }],
+            },
+          },
+          '2026-07': {
+            P1: {
+              externals: [{ name: 'Studio Blu', days: 1, costPerDay: 999, ratePerDay: 999 }],
+            },
+          },
+        },
+      }),
+    )
+    const loaded = await store.load(folder)
+    // The cost per day is gone; a person with a cost only has no rate to keep.
+    expect(loaded.rates).toEqual([{ person: 'Rossi Mario', code: null, ratePerDay: 400 }])
+    // Days become hours; cost and rate are kept once for the code, as first written.
+    expect(loaded.externals).toEqual([
+      { name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 },
+    ])
+    expect(loaded.months['2026-06']?.P1?.externals).toEqual([{ name: 'Studio Blu', hours: 20 }])
+    expect(loaded.months['2026-07']?.P1?.externals).toEqual([{ name: 'Studio Blu', hours: 8 }])
   })
 
   it('keep the order, the requests and the map of the form', async () => {

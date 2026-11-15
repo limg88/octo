@@ -44,7 +44,15 @@ const grid: SheetGrid = {
 const MODEL = new Uint8Array([1, 2, 3])
 const FILLED = new Uint8Array([9])
 const hours: HoursEntry[] = [
-  { person: 'Rossi Mario', day: '2026-06-03', hours: 8, project: 'P1', approved: true, id: '1' },
+  {
+    person: 'Rossi Mario',
+    day: '2026-06-03',
+    hours: 8,
+    project: 'P1',
+    approved: true,
+    id: '1',
+    cost: 200,
+  },
 ]
 
 function setup(
@@ -101,7 +109,7 @@ function setup(
 
 const configured = {
   modelPath: 'amministrazione/Previsionale giugno.xlsx',
-  rates: [{ person: 'Rossi Mario', costPerDay: 200, ratePerDay: 400 }],
+  rates: [{ person: 'Rossi Mario', code: null, ratePerDay: 400 }],
 }
 
 describe('the monthly forecast', () => {
@@ -156,7 +164,7 @@ describe('the monthly forecast', () => {
     ])
     expect(filled[0]?.find((write) => write.ref === 'C2')?.cell).toEqual({
       kind: 'formula',
-      formula: '1*200',
+      formula: '200',
       value: 200,
     })
   })

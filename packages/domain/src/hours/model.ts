@@ -10,6 +10,11 @@ export type HoursEntry = {
   approved: boolean
   /** The id the source gives the row, when it has one: the same row in two files counts once. */
   id: string | null
+  /**
+   * What the row cost the company, as the timesheet system wrote it; absent or null where the
+   * source does not say.
+   */
+  cost?: number | null
 }
 
 /** How a project compares the hours of its timesheets with those logged on its tracker. */

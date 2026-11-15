@@ -1,8 +1,8 @@
 import {
   EXTRACTED_TEXT_FOLDER,
   FEED_NOTE_FILE,
-  HISTORY_FOLDER,
   MIN_QUOTE_LENGTH,
+  UNCITABLE_FOLDERS,
 } from '@octo/domain'
 import { z } from 'zod'
 
@@ -31,7 +31,8 @@ How to look:
 - Do not stop at the files the index points to. Search the whole folder for the key terms of the
   question (names, codes, order and project numbers), including generated outputs and drafts: a
   fact that contradicts the main sources often sits in a file nobody indexed.
-- \`${HISTORY_FOLDER}/\` holds earlier questions and answers: it is not a source. Never read or cite it.
+- ${UNCITABLE_FOLDERS.map((folder) => `\`${folder}/\``).join(', ')} hold earlier answers, settings and
+  internal costs: they are not sources. Never read, search or cite them.
 - For every topic the question touches, read what the memory records as open: open points, pending
   decisions, risks, things awaited from someone. Report those that concern the question.
 

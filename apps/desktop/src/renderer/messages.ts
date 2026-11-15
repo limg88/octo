@@ -278,13 +278,17 @@ export const messages = {
     loading: 'Preparo il previsionale…',
     setupTitle: 'Il modello dell’amministrazione',
     setupIntro:
-      'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. Costi interni e ricavi vengono dalle ore approvate dei timesheet e dai costi e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
+      'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. I costi interni vengono dal costo che NetSuite scrive su ogni riga di timesheet approvata; i ricavi dalle stesse ore e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
     modelPath: 'Modello: file Excel nella cartella del progetto',
     hoursPerDay: 'Ore in una giornata',
     rates:
-      'Costo e tariffa al giorno: una riga per persona, «nome; costo; tariffa» (senza tariffa: solo costo)',
+      'Tariffe al giorno: una riga per persona, «nome; tariffa», oppure «nome; commessa; tariffa» se vale solo su una commessa',
     ratesHint:
-      'Restano nelle impostazioni di Octo del progetto, in una cartella nascosta: non entrano nelle risposte né nei deliverable.',
+      'Le persone e il costo delle loro ore arrivano dai timesheet di NetSuite: qui scrivi solo a quanto vendi una giornata. La tariffa scritta per una commessa vince su quella generale della persona. Chi ha ore e nessuna tariffa compare fra i dati che mancano.',
+    externalRates:
+      'Esterni senza timesheet: una riga per persona e commessa, «nome; commessa; costo al giorno; tariffa al giorno»',
+    externalRatesHint:
+      'Le ore le scrivi ogni mese, nei dati del mese della commessa. Tariffe e costi restano in una cartella di Octo che non entra nelle risposte né nei deliverable.',
     save: 'Salva',
     settings: 'Impostazioni del previsionale',
     month: 'Mese',
@@ -315,9 +319,11 @@ export const messages = {
     noGaps: 'Nessun dato mancante.',
     gap: {
       no_cost: (code: string, person: string, hours: string) =>
-        `${code}: manca il costo al giorno di ${person} (${hours} ore fuori dal calcolo)`,
+        `${code}: i timesheet non hanno il costo di ${hours} ore di ${person} (fuori dai costi). Rileggi i timesheet da NetSuite.`,
       no_rate: (code: string, person: string, hours: string) =>
         `${code}: manca la tariffa al giorno di ${person} (${hours} ore a costo, senza ricavo)`,
+      no_external_rate: (code: string, person: string, hours: string) =>
+        `${code}: mancano costo e tariffa dell’esterno ${person} su questa commessa (${hours} ore fuori dal calcolo)`,
       no_total_costs: (code: string) =>
         `${code}: mancano i costi totali previsti, il margine a fine progetto resta vuoto`,
       no_ordered: (code: string) =>
@@ -328,8 +334,7 @@ export const messages = {
     otherCodes: (codes: string) =>
       `Nei timesheet del mese ci sono ore su codici che il modello non elenca: ${codes}`,
     inputsTitle: (code: string) => `Dati del mese per ${code}`,
-    externals:
-      'Esterni senza timesheet: una riga per persona, «nome; giorni; costo al giorno; tariffa al giorno»',
+    externals: 'Ore degli esterni nel mese: una riga per persona, «nome; ore»',
     toInvoice: 'Importo da fatturare nel mese',
     revenue: 'Ricavi decisi da te (sostituiscono quelli calcolati)',
     budgetCosts: 'A corpo: costi totali a budget (l’avanzamento è costi del mese su questi)',
@@ -405,7 +410,7 @@ export const messages = {
     codesFound: 'Codici trovati nel periodo',
     timesheetsTitle: 'Timesheet da NetSuite',
     timesheetsIntro:
-      'Leggo le ore dei timesheet delle commesse indicate in «Fonti», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Di ogni riga tengo solo persona, giorno, ore, commessa e stato di approvazione: mai il costo.',
+      'Leggo le ore dei timesheet delle commesse indicate in «Fonti», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Il costo di ogni riga serve al previsionale: lo tengo a parte, in una cartella che non entra nelle risposte né nei deliverable.',
     readTimesheets: 'Leggi i timesheet da NetSuite',
     readingTimesheets: 'Leggo i timesheet da NetSuite…',
     timesheetsRead: (entries: number, months: string, when: string) =>

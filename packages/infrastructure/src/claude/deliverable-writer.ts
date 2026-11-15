@@ -5,6 +5,7 @@ import {
   MIN_QUOTE_LENGTH,
   RED_TEAM_SEVERITIES,
   RED_TEAM_VERDICTS,
+  UNCITABLE_FOLDERS,
   WBS_STATES,
 } from '@octo/domain'
 import { z } from 'zod'
@@ -67,6 +68,8 @@ Its reader is ${AUDIENCE[kind.audience]}.
 The project is the current folder: read as many files as you need. If it has an index or a manifest
 (for example wiki/indice.md, raw/_MANIFEST.md), read it first. Word, Excel, PowerPoint and PDF files
 have their text in \`_octo/testo/<path of the file>.md\`.
+${UNCITABLE_FOLDERS.map((folder) => `\`${folder}/\``).join(', ')} hold earlier answers, settings and
+internal costs: they are not sources. Never read, search or cite them.
 
 What you give back:
 - "text": the deliverable in Markdown, ready for its reader, in the language of the PM's request.

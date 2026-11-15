@@ -194,7 +194,10 @@ const forecastSettingsInput = byProject.extend({
     modelPath: rule,
     hoursPerDay: z.number(),
     rates: z
-      .array(z.object({ person: rule, costPerDay: z.number(), ratePerDay: money }))
+      .array(z.object({ person: rule, code: rule.nullable(), ratePerDay: z.number() }))
+      .max(MAX_RULES),
+    externals: z
+      .array(z.object({ name: rule, code: rule, costPerDay: z.number(), ratePerDay: z.number() }))
       .max(MAX_RULES),
     months: z
       .record(
@@ -202,16 +205,7 @@ const forecastSettingsInput = byProject.extend({
         z.record(
           rule,
           z.object({
-            externals: z
-              .array(
-                z.object({
-                  name: rule,
-                  days: z.number(),
-                  costPerDay: z.number(),
-                  ratePerDay: z.number(),
-                }),
-              )
-              .max(MAX_RULES),
+            externals: z.array(z.object({ name: rule, hours: z.number() })).max(MAX_RULES),
             toInvoice: money,
             revenue: money,
             budgetCosts: money,

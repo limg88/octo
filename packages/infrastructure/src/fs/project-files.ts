@@ -10,8 +10,10 @@ import {
   NEVER_READ,
   NO_SOURCES,
   OCTO_FOLDER,
+  SETTINGS_FOLDER,
   type SourceState,
   type SourcesConfig,
+  UNCITABLE_FOLDERS,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { z } from 'zod'
@@ -78,7 +80,7 @@ const stateSchema = z.object({
 const statesSchema = z.record(z.string(), stateSchema)
 
 /** Octo's settings of a project: with the rest of what Octo writes, under its own folder. */
-export const PROJECT_SETTINGS_FOLDER = `${OCTO_FOLDER}/.impostazioni`
+export const PROJECT_SETTINGS_FOLDER = SETTINGS_FOLDER
 const SOURCES_FILE = 'sources.json'
 const STATES_FOLDER = 'sources'
 const MAIL_FOLDER = `${OCTO_FOLDER}/posta`
@@ -96,6 +98,8 @@ const GIT_IGNORE = { name: '.gitignore', content: '*\n' }
  * agent would not find the mail and the texts Octo writes.
  */
 const SEARCH_ALLOW = { name: '.ignore', content: '!*\n' }
+/** Tells the search tools to leave a folder out: settings, costs and earlier answers. */
+const SEARCH_DENY = { name: '.ignore', content: '*\n' }
 const PRIVATE_FILE_MODE = 0o600
 
 /**
@@ -132,10 +136,15 @@ export function createFsMemoryWriter(): MemoryWriter {
     async claim(projectFolder) {
       const folder = join(await realpath(projectFolder), OCTO_FOLDER)
       await mkdir(folder, { recursive: true })
-      for (const marker of [GIT_IGNORE, SEARCH_ALLOW]) {
-        const file = join(folder, marker.name)
+      const mark = async (inFolder: string, marker: { name: string; content: string }) => {
+        const file = join(inFolder, marker.name)
         const current = await readFile(file, 'utf8').catch(() => null)
         if (current !== marker.content) await writeAtomic(file, marker.content)
+      }
+      for (const marker of [GIT_IGNORE, SEARCH_ALLOW]) await mark(folder, marker)
+      // What is not a source is left out of the search again, folder by folder.
+      for (const kept of UNCITABLE_FOLDERS) {
+        await mark(join(folder, ...kept.split('/').slice(1)), SEARCH_DENY)
       }
     },
   }

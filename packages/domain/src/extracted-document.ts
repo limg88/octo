@@ -6,6 +6,13 @@ import type { Extraction, Locator, TextChunk } from './extraction.ts'
  * PM's is ever touched and a versioned project can leave the whole folder out.
  */
 export const OCTO_FOLDER = '_octo'
+/**
+ * What Octo keeps for its own computations and must never reach an answer or a deliverable:
+ * costs of people, above all. Nothing in here is searched or may be cited.
+ */
+export const PRIVATE_FOLDER = `${OCTO_FOLDER}/.riservato`
+/** Octo's settings of a project: not a source either. */
+export const SETTINGS_FOLDER = `${OCTO_FOLDER}/.impostazioni`
 export const EXTRACTED_TEXT_FOLDER = `${OCTO_FOLDER}/testo`
 const TEXT_SUFFIX = '.md'
 

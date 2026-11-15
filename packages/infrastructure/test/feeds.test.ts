@@ -353,6 +353,7 @@ describe.runIf(HAS_TEST_DATABASE)('the NetSuite warehouse as files of the projec
         project: 'PRJ000101',
         approved: true,
         id: '9001',
+        cost: 309,
       },
       {
         person: 'Bruno Sala',
@@ -361,9 +362,10 @@ describe.runIf(HAS_TEST_DATABASE)('the NetSuite warehouse as files of the projec
         project: 'PRJ000101',
         approved: false,
         id: '9002',
+        cost: 304,
       },
     ])
-    expect(JSON.stringify(rows)).not.toMatch(/laborcost/)
+    expect(JSON.stringify(rows)).not.toMatch(/laborcosthh|memo/)
     await expect(reader.read(clean, 'sbagliata', october, signal)).rejects.toMatchObject({
       code: 'feed_credential_refused',
     })

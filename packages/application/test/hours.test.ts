@@ -5,6 +5,7 @@ import {
   type HoursSettings,
   type JiraFeedConfig,
   NO_SOURCES,
+  PRIVATE_FOLDER,
   type Project,
   type ProjectTeam,
   parseTimesheetExport,
@@ -17,6 +18,7 @@ import {
   type HoursSettingsStore,
   NETSUITE_TIMESHEET_FOLDER,
   type ProjectFiles,
+  TIMESHEET_COSTS_FOLDER,
   TRACKER_HOURS_FOLDER,
   type TrackerHoursReader,
 } from '../src/index.ts'
@@ -93,9 +95,12 @@ function setup(initial: Partial<HoursSettings> = {}, tracker: TrackerSetup = {})
         .filter((path) => extensions.includes(path.split('.').pop() ?? ''))
         .map((path) => ({ path, size: 1, modifiedAt: '' })),
     read: unused,
-    readText: async (_folder, path) => FILES[path] ?? null,
+    // What Octo wrote in this run is in the project as well.
+    readText: async (_folder, path) => FILES[path] ?? writer.files.get(path) ?? null,
     under: async (_folder, folder) =>
-      Object.keys(FILES).filter((path) => path.startsWith(`${folder}/`)),
+      [...Object.keys(FILES), ...writer.files.keys()].filter((path) =>
+        path.startsWith(`${folder}/`),
+      ),
     remove: unused,
   }
   const writer = memoryWriter()
@@ -333,9 +338,9 @@ describe('hours', () => {
       { worklogPath: 'ore/jira', timesheetPath: 'raw/vecchi' },
       {
         timesheets: [
-          row(11, 'Mario Rossi', '2026-05-29', 8),
-          row(12, 'Mario Rossi', '2026-06-03', 6),
-          row(13, 'Anna Bianchi', '2026-06-04', 4),
+          { ...row(11, 'Mario Rossi', '2026-05-29', 8), laborcost_new: '200.0000' },
+          { ...row(12, 'Mario Rossi', '2026-06-03', 6), laborcost_new: '150.0000' },
+          { ...row(13, 'Anna Bianchi', '2026-06-04', 4), laborcost_new: null },
         ],
       },
     )
@@ -358,6 +363,23 @@ describe('hours', () => {
     expect(hours.saved().timesheetPath).toBe(NETSUITE_TIMESHEET_FOLDER)
     // What is written is an export the comparison reads.
     expect(parseTimesheetExport(june)?.map((entry) => entry.hours)).toEqual([6, 4])
+    // The cost of a row never sits beside its hours: it is kept in the private folder.
+    expect(JSON.stringify(june)).not.toContain('laborcost')
+    const costs = JSON.parse(
+      hours.written.get(`${TIMESHEET_COSTS_FOLDER}/timesheet_2026-06.json`) ?? '',
+    )
+    expect(costs.rows).toEqual([
+      { internalid: 12, laborcost_new: '150.0000' },
+      { internalid: 13, laborcost_new: null },
+    ])
+    expect(TIMESHEET_COSTS_FOLDER.startsWith(PRIVATE_FOLDER)).toBe(true)
+    // What is computed from the timesheets gets each row with its cost again.
+    const rows = await hours.timesheet(project)
+    expect(rows?.map((entry) => [entry.id, entry.cost ?? null])).toEqual([
+      ['11', 200],
+      ['12', 150],
+      ['13', null],
+    ])
   })
 
   it('needs the NetSuite source and its credential, a valid period, and keeps the failure code', async () => {

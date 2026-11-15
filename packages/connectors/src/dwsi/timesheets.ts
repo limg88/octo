@@ -7,8 +7,9 @@ export interface TimesheetPeriod {
 }
 
 /**
- * One row of hours as the reconciliation needs it: who, which day, how long, on which project
- * and whether it is approved. Never the cost of the hour, the notes or anything else personal.
+ * One row of hours as the reconciliation and the forecast need it: who, which day, how long, on
+ * which project, whether it is approved and what the row cost. Never the notes or anything else
+ * personal. The cost is for the forecast only: who receives it keeps it apart from what is read.
  */
 export interface DwsiTimesheetRow {
   /** As the warehouse writes it: the id is too wide for a number. */
@@ -19,6 +20,8 @@ export interface DwsiTimesheetRow {
   /** Hours, as the warehouse writes a decimal: a text such as `7.5000`. */
   duration: string | number | null
   approvalstatus: string | null
+  /** What the row cost, as the warehouse writes a decimal. */
+  laborcost_new: string | number | null
 }
 
 const WANTED = [
@@ -28,6 +31,7 @@ const WANTED = [
   'timesheetdate',
   'duration',
   'approvalstatus',
+  'laborcost_new',
 ]
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 

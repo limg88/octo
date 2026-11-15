@@ -31,6 +31,9 @@ export function amountOf(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/** The cost of a row of timesheet, as the company's system names it. */
+export const TIMESHEET_COST_FIELD = 'laborcost_new'
+
 const APPROVED = /^(approved|approvat[oa])$/i
 
 /**
@@ -57,8 +60,29 @@ export function parseTimesheetExport(value: unknown): HoursEntry[] | null {
         // An export that does not say counts as approved: it has no other hours to tell apart.
         approved: status === '' || APPROVED.test(status),
         id: text(row.internalid) || null,
+        cost: amountOf(row[TIMESHEET_COST_FIELD]),
       },
     ]
+  })
+}
+
+/**
+ * The costs of timesheet rows kept apart from their hours: `{ rows: [{ internalid,
+ * laborcost_new }] }`. A row without an id or a cost is left out; null when the text is not one.
+ */
+export function parseTimesheetCosts(content: string): Array<{ id: string; cost: number }> | null {
+  let value: unknown
+  try {
+    value = JSON.parse(content)
+  } catch {
+    return null
+  }
+  if (!isObject(value) || !Array.isArray(value.rows)) return null
+  return value.rows.flatMap((row) => {
+    if (!isObject(row)) return []
+    const id = text(row.internalid)
+    const cost = amountOf(row[TIMESHEET_COST_FIELD])
+    return id === '' || cost === null ? [] : [{ id, cost }]
   })
 }
 

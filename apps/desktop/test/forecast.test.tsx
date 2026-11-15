@@ -13,6 +13,8 @@ import {
   amountOf,
   amountText,
   externalLines,
+  externalRateLines,
+  externalRatesOf,
   externalsOf,
   rateLines,
   ratesOf,
@@ -28,7 +30,7 @@ const text = messages.forecast
 const configured: ForecastSettings = {
   ...DEFAULT_FORECAST_SETTINGS,
   modelPath: 'amministrazione/Previsionale.xlsx',
-  rates: [{ person: 'Rossi Mario', costPerDay: 200, ratePerDay: 400 }],
+  rates: [{ person: 'Rossi Mario', code: null, ratePerDay: 400 }],
   months: { '2026-06': { P1: { ...NO_ROW_INPUTS, toInvoice: 12000 } } },
 }
 
@@ -119,15 +121,32 @@ describe('what the PM types', () => {
   })
 
   it('reads rates and externals one per line and writes them back', () => {
-    const rates = ratesOf('Rossi Mario; 200; 400\nBianchi Anna; 250\n\nSenza costo;;300\n')
+    const rates = ratesOf(
+      'Rossi Mario; 400\nRossi Mario; prj000101; 630\n\nSenza tariffa\nAltro; x\n',
+    )
     expect(rates).toEqual([
-      { person: 'Rossi Mario', costPerDay: 200, ratePerDay: 400 },
-      { person: 'Bianchi Anna', costPerDay: 250, ratePerDay: null },
+      { person: 'Rossi Mario', code: null, ratePerDay: 400 },
+      { person: 'Rossi Mario', code: 'PRJ000101', ratePerDay: 630 },
     ])
-    expect(rateLines(rates)).toBe('Rossi Mario; 200; 400\nBianchi Anna; 250')
-    const externals = externalsOf('Studio Blu; 2,5; 300; 500\nIncompleto; 2; 300\n')
-    expect(externals).toEqual([{ name: 'Studio Blu', days: 2.5, costPerDay: 300, ratePerDay: 500 }])
-    expect(externalLines(externals)).toBe('Studio Blu; 2,5; 300; 500')
+    expect(rateLines(rates)).toBe('Rossi Mario; 400\nRossi Mario; PRJ000101; 630')
+    // A line as it was typed when the cost was written too: the rate is read, the cost is not.
+    expect(
+      ratesOf('Rossi Mario; 346,16; 480\nSolo Costo; 151,44\nVuoto; ; 300\nNiente; 200;'),
+    ).toEqual([
+      { person: 'Rossi Mario', code: null, ratePerDay: 480 },
+      { person: 'Solo Costo', code: null, ratePerDay: 151.44 },
+      { person: 'Vuoto', code: null, ratePerDay: 300 },
+    ])
+    const externalRates = externalRatesOf(
+      'Studio Blu; p1; 300; 500\nIncompleto; P1; 300\nSenza; ; 1; 2\n',
+    )
+    expect(externalRates).toEqual([
+      { name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 },
+    ])
+    expect(externalRateLines(externalRates)).toBe('Studio Blu; P1; 300; 500')
+    const externals = externalsOf('Studio Blu; 20,5\nSenza ore\n')
+    expect(externals).toEqual([{ name: 'Studio Blu', hours: 20.5 }])
+    expect(externalLines(externals)).toBe('Studio Blu; 20,5')
   })
 
   it('knows the month before', () => {
@@ -210,7 +229,7 @@ describe('the forecast', () => {
     const form = await screen.findByRole('form', { name: text.inputsTitle('P1') })
     const field = (label: string) => within(form).getByLabelText(label)
     expect((field(text.toInvoice) as HTMLInputElement).value).toBe('12000')
-    fireEvent.change(field(text.externals), { target: { value: 'Studio Blu; 2,5; 300; 500' } })
+    fireEvent.change(field(text.externals), { target: { value: 'Studio Blu; 20' } })
     fireEvent.change(field(text.revenue), { target: { value: '7.000,50' } })
     fireEvent.change(field(text.budgetCosts), { target: { value: '' } })
     fireEvent.change(field(text.totalCosts), { target: { value: '60000' } })
@@ -223,7 +242,7 @@ describe('the forecast', () => {
       months: {
         '2026-06': {
           P1: {
-            externals: [{ name: 'Studio Blu', days: 2.5, costPerDay: 300, ratePerDay: 500 }],
+            externals: [{ name: 'Studio Blu', hours: 20 }],
             toInvoice: 12000,
             revenue: 7000.5,
             budgetCosts: null,
@@ -245,7 +264,10 @@ describe('the forecast', () => {
     await waitFor(() => expect(model.value).toBe('amministrazione/Previsionale.xlsx'))
     fireEvent.change(screen.getByLabelText(text.hoursPerDay), { target: { value: '7.5' } })
     fireEvent.change(screen.getByLabelText(text.rates), {
-      target: { value: 'Rossi Mario; 200; 400' },
+      target: { value: 'Rossi Mario; 400\nRossi Mario; P2; 630' },
+    })
+    fireEvent.change(screen.getByLabelText(text.externalRates), {
+      target: { value: 'Studio Blu; P1; 300; 500' },
     })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
@@ -253,7 +275,11 @@ describe('the forecast', () => {
         ...DEFAULT_FORECAST_SETTINGS,
         modelPath: 'amministrazione/Previsionale.xlsx',
         hoursPerDay: 7.5,
-        rates: [{ person: 'Rossi Mario', costPerDay: 200, ratePerDay: 400 }],
+        rates: [
+          { person: 'Rossi Mario', code: null, ratePerDay: 400 },
+          { person: 'Rossi Mario', code: 'P2', ratePerDay: 630 },
+        ],
+        externals: [{ name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 }],
       }),
     )
     expect(await screen.findByText('P1')).toBeTruthy()

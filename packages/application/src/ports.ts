@@ -293,7 +293,8 @@ export interface TrackerHoursReader {
 /**
  * Reads the hours of the timesheets from the company's system with the PM's own read-only
  * credential, only when the PM asks. Each row has the names of a timesheet export (`employee`,
- * `timesheetdate`, `projectid`, `duration`, `approvalstatus`, `internalid`) and nothing else.
+ * `timesheetdate`, `projectid`, `duration`, `approvalstatus`, `internalid`) and the cost of the
+ * row (`laborcost_new`), which the use case keeps apart from what answers may read.
  * Failures are DomainErrors with a `feed_*` code.
  */
 export interface TimesheetReader {

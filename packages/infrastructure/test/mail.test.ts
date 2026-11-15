@@ -1,11 +1,12 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type MailSourceConfig, NO_SOURCES } from '@octo/domain'
+import { type MailSourceConfig, NO_SOURCES, UNCITABLE_FOLDERS } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   createAppleMailArchive,
   createFileVault,
+  createFsEvidenceReader,
   createFsMemoryWriter,
   createFsSourceSettings,
   createJsonSourceStates,
@@ -216,6 +217,14 @@ describe('files of a project', () => {
 
     expect(await readFile(join(project, '_octo', '.gitignore'), 'utf8')).toBe('*\n')
     expect(await readFile(join(project, '_octo', '.ignore'), 'utf8')).toBe('!*\n')
+    // Settings, costs and earlier answers are left out of the search again, and are never proof.
+    for (const folder of UNCITABLE_FOLDERS) {
+      expect(await readFile(join(project, folder, '.ignore'), 'utf8')).toBe('*\n')
+      await writeFile(join(project, folder, 'dato.json'), '{"costo": 300}')
+      expect(await createFsEvidenceReader().read(project, `${folder}/dato.json`)).toEqual({
+        kind: 'missing',
+      })
+    }
   })
 
   it('keeps what each source did on this computer', async () => {

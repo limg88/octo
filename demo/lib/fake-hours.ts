@@ -12,6 +12,7 @@ import { days, month, PEOPLE, today, WORKING_DAYS } from './hours-data.ts'
 
 const PROJECT_CODE = 'PRJ000101'
 const OTHER_CODE = 'PRJ000999'
+const HOURS_PER_DAY = 8
 
 let id = 5000
 const rows: object[] = []
@@ -26,6 +27,7 @@ for (const [index, day] of days.entries()) {
         timesheetdate: day,
         projectid: PROJECT_CODE,
         duration: person.timesheet,
+        laborcost_new: (person.timesheet * person.costPerDay) / HOURS_PER_DAY,
         // The last two days of the month are still to be approved.
         approvalstatus:
           index >= WORKING_DAYS - 2 && person.name === 'Rossi Mario' ? 'Open' : 'Approved',
