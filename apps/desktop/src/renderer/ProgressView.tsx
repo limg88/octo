@@ -14,6 +14,7 @@ import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
 import { ProgressShares } from './ProgressShares.tsx'
 import { problemText, warningRequest, warningText } from './progress-words.ts'
+import { useSavedNote } from './SavedNote.tsx'
 
 type ProgressApi = Pick<
   OctoApi,
@@ -46,6 +47,7 @@ export function ProgressView({ api, project }: Props) {
   const [candidates, setCandidates] = useState<string[]>([])
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
+  const savedNote = useSavedNote()
   const [file, setFile] = useState<ProgressFile | null>(null)
   const [panel, setPanel] = useState<Panel>(CLOSED)
 
@@ -75,12 +77,14 @@ export function ProgressView({ api, project }: Props) {
   /** True when the settings were saved: what follows a save happens only then. */
   async function save(next: ProgressSettings): Promise<boolean> {
     setError(null)
+    savedNote.clear()
     const result = await api.saveProgressSettings(project.id, next)
     if (!result.ok) {
       setError(result.code)
       return false
     }
     setSettings(result.value)
+    savedNote.saved()
     setPanel(CLOSED)
     await loadView()
     return true
@@ -129,6 +133,7 @@ export function ProgressView({ api, project }: Props) {
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
+      {savedNote.note}
       <Overview settings={settings} onSetup={() => setPanel({ kind: 'setup' })} />
       {warnings
         .filter((warning) => warningRequest(warning) === null)

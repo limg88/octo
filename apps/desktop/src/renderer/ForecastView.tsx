@@ -10,6 +10,7 @@ import { MonthField } from './MonthField.tsx'
 import { messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import { useSavedNote } from './SavedNote.tsx'
 import type { Section } from './sections.ts'
 
 type ForecastApi = Pick<
@@ -47,6 +48,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   const [view, setView] = useState<View | null>(null)
   const [month, setMonth] = useState(() => previousMonthOf(now()))
   const [error, setError] = useState<ErrorCode | null>(null)
+  const savedNote = useSavedNote()
   const [compiling, setCompiling] = useState(false)
   const [file, setFile] = useState<ForecastFile | null>(null)
 
@@ -78,9 +80,11 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
 
   async function save(next: ForecastSettings) {
     setError(null)
+    savedNote.clear()
     const result = await api.saveForecastSettings(project.id, next)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    savedNote.saved()
     if (result.value.modelPath !== '') await loadView(month)
   }
 
@@ -133,6 +137,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   return (
     <div className="dashboard">
       {error && <Failure code={error} onOpen={onOpenSection} />}
+      {savedNote.note}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
         <SettingsForm

@@ -11,6 +11,7 @@ import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
 import { Failure } from './Failure.tsx'
 import { dateText, dateTimeText, messages } from './messages.ts'
+import { useSavedNote } from './SavedNote.tsx'
 import { TrendChart } from './TrendChart.tsx'
 import { Unlinked } from './Unlinked.tsx'
 
@@ -45,6 +46,7 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
   const [preset, setPreset] = useState<RangePreset>(DEFAULT_PRESET)
   const [range, setRange] = useState<DashboardRange>(() => presetRange('w8', now()))
   const [error, setError] = useState<ErrorCode | null>(null)
+  const savedNote = useSavedNote()
   const [loading, setLoading] = useState(false)
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerSnapshotRun | null>(null)
@@ -77,9 +79,11 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
 
   async function save(next: DashboardSettings) {
     setError(null)
+    savedNote.clear()
     const result = await api.saveDashboardSettings(project.id, next)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    savedNote.saved()
     if (result.value.exportPath !== '') await loadView(range)
   }
 
@@ -194,6 +198,7 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
+      {savedNote.note}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
         <DashboardSettingsForm

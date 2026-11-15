@@ -9,6 +9,7 @@ import { MonthField } from './MonthField.tsx'
 import { dateText, dateTimeText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import { useSavedNote } from './SavedNote.tsx'
 import { Unlinked } from './Unlinked.tsx'
 
 type HoursApi = Pick<
@@ -60,6 +61,7 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
   const [view, setView] = useState<View | null>(null)
   const [period, setPeriod] = useState<HoursPeriod>(() => previousMonth(now()))
   const [error, setError] = useState<ErrorCode | null>(null)
+  const savedNote = useSavedNote()
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerHoursRun | null>(null)
   const [readingTimesheets, setReadingTimesheets] = useState(false)
@@ -96,9 +98,11 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
 
   async function save(next: HoursSettings) {
     setError(null)
+    savedNote.clear()
     const result = await api.saveHoursSettings(project.id, next)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    savedNote.saved()
     if (ready(result.value)) await loadView(period)
   }
 
@@ -272,6 +276,7 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
+      {savedNote.note}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
         <SettingsForm

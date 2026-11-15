@@ -9,6 +9,7 @@ import { dateText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { listOf, listText } from './progress-text.ts'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import { useSavedNote } from './SavedNote.tsx'
 import type { Section } from './sections.ts'
 
 type AlignmentApi = Pick<
@@ -43,6 +44,7 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
   const [settings, setSettings] = useState<AlignmentSettings | null>(null)
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
+  const savedNote = useSavedNote()
   const [file, setFile] = useState<AlignmentFile | null>(null)
   const [choices, setChoices] = useState<AlignmentChoices>(NO_CHOICES)
 
@@ -78,9 +80,11 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
 
   async function save(next: AlignmentSettings) {
     setError(null)
+    savedNote.clear()
     const result = await api.saveAlignmentSettings(project.id, next)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    savedNote.saved()
     void loadChoices()
     if (result.value.sprint !== '') await loadView()
   }
@@ -114,6 +118,7 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
   return (
     <div className="dashboard">
       {error && <Failure code={error} onOpen={onOpenSection} />}
+      {savedNote.note}
       {view ? (
         <details className="dashboard-settings">
           <summary>{text.settings}</summary>

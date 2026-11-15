@@ -571,6 +571,32 @@ main {
   white-space: nowrap;
 }
 
+/* Something is being done: a small turning ring before the words that say what. */
+.progress::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid var(--field-line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: turning 0.8s linear infinite;
+}
+
+@keyframes turning {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress::before {
+    animation: none;
+  }
+}
+
 .answer {
   display: flex;
   flex-direction: column;

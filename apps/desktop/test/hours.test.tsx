@@ -186,6 +186,8 @@ describe('hours', () => {
     fireEvent.click(known(text.noTimesheetExpected).getByLabelText('Gialli Ugo'))
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalledTimes(1))
+    // Every save says so, the same way in every section.
+    expect(await screen.findByText(messages.saved)).toBeTruthy()
     const saved = vi.mocked(api.saveHoursSettings).mock.calls[0]?.[1]
     expect(saved?.projects).toEqual([...configured.projects, 'P9'])
     expect(saved?.noTimesheetExpected).toEqual([...configured.noTimesheetExpected, 'Gialli Ugo'])

@@ -313,5 +313,7 @@ describe('the alignment', () => {
     expect(onOpenSection).toHaveBeenCalledWith('dashboard')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/non sono valide/))
+    // A save that failed is never said to be saved.
+    expect(screen.queryByText(messages.saved)).toBeNull()
   })
 })

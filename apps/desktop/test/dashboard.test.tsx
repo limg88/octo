@@ -264,6 +264,7 @@ describe('dashboard', () => {
     fireEvent.change(screen.getByLabelText(text.tags), { target: { value: 'Team, Altro' } })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalled())
+    expect(await screen.findByText(messages.saved)).toBeTruthy()
     expect(vi.mocked(api.saveDashboardSettings).mock.calls[0]?.[1]).toMatchObject({
       exportPath: 'data/latest.json',
       tags: ['Team', 'Altro'],

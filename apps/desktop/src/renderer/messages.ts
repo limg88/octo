@@ -72,6 +72,7 @@ export const messages = {
     linked === 0
       ? 'Niente è ancora collegato: comincia da ciò che usi di più, di solito la posta.'
       : `${linked} su ${all} collegati. Ciò che non ti serve puoi lasciarlo com’è.`,
+  saved: 'Salvato.',
   notSaved: 'Non ho salvato: correggi ciò che è segnalato sotto i campi.',
   amountWrong: 'Non è un numero che capisco: scrivi solo cifre, per esempio 12.500,50.',
   cancel: 'Annulla',
