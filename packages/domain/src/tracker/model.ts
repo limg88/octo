@@ -1,3 +1,9 @@
+import { OCTO_FOLDER } from '../extracted-document.ts'
+
+/** Where Octo keeps the tracker it read by itself, and the history of its bugs. */
+export const TRACKER_SNAPSHOT_PATH = `${OCTO_FOLDER}/cruscotto/azure-devops.json`
+export const TRACKER_HISTORY_PATH = `${OCTO_FOLDER}/cruscotto/azure-devops-cronologia.json`
+
 /** One comment of a work item, as the tracker keeps it. */
 export type TrackerComment = { by: string; at: string; text: string }
 

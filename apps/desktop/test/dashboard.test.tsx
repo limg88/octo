@@ -75,7 +75,11 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
-  'dashboardSettings' | 'saveDashboardSettings' | 'dashboardCandidates' | 'dashboardView'
+  | 'dashboardSettings'
+  | 'saveDashboardSettings'
+  | 'dashboardCandidates'
+  | 'dashboardView'
+  | 'readTrackerSnapshot'
 >
 
 function fakeApi(overrides: Partial<Api> = {}) {
@@ -84,6 +88,9 @@ function fakeApi(overrides: Partial<Api> = {}) {
     saveDashboardSettings: vi.fn(async (_id: string, settings: DashboardSettings) => ok(settings)),
     dashboardCandidates: vi.fn(async () => ok({ exports: ['data/latest.json'], histories: [] })),
     dashboardView: vi.fn(async () => ok(view)),
+    readTrackerSnapshot: vi.fn(async () =>
+      ok({ at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 }),
+    ),
     ...overrides,
   }
   return api
@@ -106,6 +113,31 @@ describe('dashboard', () => {
     expect(screen.getByText(/il formato è TBD/)).toBeTruthy()
     expect(screen.getByText(new RegExp(text.age.fresh))).toBeTruthy()
     expect(api.dashboardView).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)))
+  })
+
+  it('reads Azure DevOps on request, from the first setup, and shows the dashboard from it', async () => {
+    const empty = { ...configured, exportPath: '' }
+    const api = fakeApi({
+      dashboardSettings: vi
+        .fn<Api['dashboardSettings']>()
+        .mockResolvedValueOnce(ok(empty))
+        .mockResolvedValue(ok(configured)),
+      readTrackerSnapshot: vi
+        .fn<Api['readTrackerSnapshot']>()
+        .mockResolvedValueOnce({ ok: false, code: 'secret_missing' })
+        .mockResolvedValue(ok({ at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 })),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    const read = await screen.findByRole('button', { name: text.readTracker })
+    fireEvent.click(read)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Serve la credenziale/)
+    expect(api.dashboardView).not.toHaveBeenCalled()
+
+    fireEvent.click(read)
+    expect(await screen.findByText(/Letti 4601 work item, 677 con la cronologia/)).toBeTruthy()
+    // The settings now point at the file Octo wrote: the dashboard is computed from it.
+    expect(await screen.findByRole('region', { name: text.openTitle })).toBeTruthy()
+    expect(api.readTrackerSnapshot).toHaveBeenLastCalledWith('p-1')
   })
 
   it('reads a longer period by month, or the one the PM chooses', async () => {

@@ -1,4 +1,9 @@
-import type { DashboardRange, ExportCandidates, DashboardView as View } from '@octo/application'
+import type {
+  DashboardRange,
+  ExportCandidates,
+  TrackerSnapshotRun,
+  DashboardView as View,
+} from '@octo/application'
 import type { BugRow, DashboardSettings, Project, RequirementRow } from '@octo/domain'
 import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
@@ -9,7 +14,11 @@ import { TrendChart } from './TrendChart.tsx'
 
 type DashboardApi = Pick<
   OctoApi,
-  'dashboardSettings' | 'saveDashboardSettings' | 'dashboardCandidates' | 'dashboardView'
+  | 'dashboardSettings'
+  | 'saveDashboardSettings'
+  | 'dashboardCandidates'
+  | 'dashboardView'
+  | 'readTrackerSnapshot'
 >
 
 type Props = {
@@ -32,6 +41,8 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
   const [range, setRange] = useState<DashboardRange>(() => presetRange('w8', now()))
   const [error, setError] = useState<ErrorCode | null>(null)
   const [loading, setLoading] = useState(false)
+  const [reading, setReading] = useState(false)
+  const [run, setRun] = useState<TrackerSnapshotRun | null>(null)
 
   const loadView = useCallback(
     async (wanted: DashboardRange) => {
@@ -67,6 +78,43 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
     if (result.value.exportPath !== '') await loadView(range)
   }
 
+  async function readTracker() {
+    setReading(true)
+    setError(null)
+    setRun(null)
+    const result = await api.readTrackerSnapshot(project.id)
+    setReading(false)
+    if (!result.ok) return setError(result.code)
+    setRun(result.value)
+    // The reading points the dashboard at the file it wrote: the settings are read again.
+    const saved = await api.dashboardSettings(project.id)
+    if (!saved.ok) return setError(saved.code)
+    setSettings(saved.value)
+    await loadView(range)
+  }
+
+  const tracker = (
+    <section aria-label={text.trackerTitle}>
+      <h3>{text.trackerTitle}</h3>
+      <p className="hint">{text.trackerIntro}</p>
+      {reading && (
+        <p className="progress" role="status">
+          {text.readingTracker}
+        </p>
+      )}
+      {run && (
+        <p className="badge badge-ok">
+          {text.trackerRead(run.items, run.withHistory, dateTimeText(run.at))}
+        </p>
+      )}
+      <div className="actions">
+        <button type="button" disabled={reading} onClick={() => void readTracker()}>
+          {text.readTracker}
+        </button>
+      </div>
+    </section>
+  )
+
   function choosePreset(next: RangePreset) {
     setPreset(next)
     if (next === 'custom') return
@@ -93,6 +141,7 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
     return (
       <div className="dashboard">
         {error && <Failure code={error} />}
+        {tracker}
         <section aria-label={text.setupTitle}>
           <h3>{text.setupTitle}</h3>
           <p className="hint">{text.setupIntro}</p>
@@ -241,6 +290,7 @@ export function DashboardView({ api, project, now = () => new Date() }: Props) {
       )}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
+        {tracker}
         <DashboardSettingsForm
           settings={settings}
           candidates={candidates}

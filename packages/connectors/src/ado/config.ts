@@ -80,7 +80,8 @@ const lit = (...names: readonly string[]): PathPart[] => names.map((literal) => 
 
 /**
  * The calls of the connector: the list of projects and one project (GET), the classification
- * nodes (GET), the WIQL query and the batch read of work items (POST, both read). Nothing else,
+ * nodes (GET), the WIQL query and the batch read of work items (POST, both read), the updates and
+ * the comments of one work item (GET, its id in the path). Nothing else,
  * and never a path with a name in it: area and iteration paths travel in the query body.
  */
 export function adoRules(endpoint: AdoEndpoint, cfg: AdoConfig): HttpRule[] {
@@ -89,15 +90,21 @@ export function adoRules(endpoint: AdoEndpoint, cfg: AdoConfig): HttpRule[] {
   const rules: HttpRule[] = [{ method: 'GET', host, path: at('_apis', 'projects') }]
   const projectId = projectIdOf(cfg.projectId)
   if (projectId !== null) {
+    const workItem: PathPart[] = [...at(projectId, '_apis', 'wit', 'workItems'), 'segment']
     rules.push(
       { method: 'GET', host, path: at('_apis', 'projects', projectId) },
       { method: 'GET', host, path: at(projectId, '_apis', 'wit', 'classificationnodes') },
       { method: 'POST', host, path: at(projectId, '_apis', 'wit', 'wiql') },
       { method: 'POST', host, path: at(projectId, '_apis', 'wit', 'workitemsbatch') },
+      // Read only when the PM asks for a snapshot of the tracker: what one work item went through.
+      { method: 'GET', host, path: [...workItem, { literal: 'updates' }] },
+      { method: 'GET', host, path: [...workItem, { literal: 'comments' }] },
     )
   }
   return rules
 }
+
+const API_VERSION = '7.1'
 
 /** A URL of the API: the endpoint, its prefix, the given segments and the query. */
 export function apiUrl(
@@ -106,6 +113,6 @@ export function apiUrl(
   query: Record<string, string> = {},
 ): string {
   const path = [...endpoint.prefix, ...segments].map(encodeURIComponent).join('/')
-  const search = new URLSearchParams({ ...query, 'api-version': '7.1' })
+  const search = new URLSearchParams({ 'api-version': API_VERSION, ...query })
   return `${endpoint.origin}/${path}?${search.toString()}`
 }

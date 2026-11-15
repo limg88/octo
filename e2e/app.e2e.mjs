@@ -544,6 +544,33 @@ try {
   page = await app.firstWindow()
   await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
 
+  // Demo 16: the dashboard from Azure DevOps as it is now, read with the token of the source.
+  await page.getByRole('tab', { name: 'Cruscotto' }).click()
+  await page.locator('.dashboard-settings summary').click()
+  await page.getByRole('button', { name: 'Leggi da Azure DevOps' }).click()
+  await page.getByText(/Letti \d work item, 1 con la cronologia/).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('su 1 bug nel perimetro').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText(/Dati aggiornati/).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText('in attesa del test del cliente').waitFor({ timeout: TIMEOUT_MS })
+  const snapshot16 = JSON.parse(
+    readFileSync(`${work}/Aurora/_octo/cruscotto/azure-devops.json`, 'utf8'),
+  )
+  assert.equal(snapshot16.items.find((entry) => entry.id === 103).state, 'Ready for Test')
+  const history16 = JSON.parse(
+    readFileSync(`${work}/Aurora/_octo/cruscotto/azure-devops-cronologia.json`, 'utf8'),
+  )
+  assert.deepEqual(
+    history16.bugs['103'].states.map(([, state]) => state),
+    ['New', 'Active', 'Ready for Test'],
+  )
+  assert.equal(
+    JSON.parse(readFileSync(`${work}/Aurora/_octo/.impostazioni/dashboard.json`, 'utf8'))
+      .exportPath,
+    '_octo/cruscotto/azure-devops.json',
+  )
+  await page.screenshot({ path: `${work}/cruscotto-da-ado.png` })
+  await page.getByRole('tab', { name: 'Chiedi' }).click()
+
   // Demo 15: a backup on this computer, restored on a new one where the folder is elsewhere.
   // The dialogs are the system's: here they answer by themselves.
   const backupFile = `${work}/chiavetta/octo-copia.json`

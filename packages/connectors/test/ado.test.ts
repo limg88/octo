@@ -177,7 +177,7 @@ describe('the Azure DevOps configuration', () => {
     )
   })
 
-  it('reads only: GET on projects and nodes, POST only on the WIQL query and the batch read', () => {
+  it('reads only: GET on projects, nodes and one work item, POST only on the query and the batch read', () => {
     const rules = connector.rules(connector.parseConfig(valid))
     const shown = rules.map(
       (r) => `${r.method} ${r.path.map((p) => (p === 'segment' ? '*' : p.literal)).join('/')}`,
@@ -187,6 +187,8 @@ describe('the Azure DevOps configuration', () => {
         'GET contoso/_apis/projects',
         `GET contoso/_apis/projects/${PROJECT_ID}`,
         `GET contoso/${PROJECT_ID}/_apis/wit/classificationnodes`,
+        `GET contoso/${PROJECT_ID}/_apis/wit/workItems/*/comments`,
+        `GET contoso/${PROJECT_ID}/_apis/wit/workItems/*/updates`,
         `POST contoso/${PROJECT_ID}/_apis/wit/wiql`,
         `POST contoso/${PROJECT_ID}/_apis/wit/workitemsbatch`,
       ].sort(),

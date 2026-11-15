@@ -1,5 +1,6 @@
 import { MAX_ITEMS_PER_DELIVERY, type PullSourceKind } from '@octo/domain'
-import { createAdoConnector } from './ado/connector.ts'
+import { type AdoConnector, type AdoTrackerOptions, createAdoConnector } from './ado/connector.ts'
+import type { AdoTrackerSnapshot } from './ado/tracker.ts'
 import { type ConnectorDelivery, toDelivery } from './delivery.ts'
 import { ConnectorError } from './errors.ts'
 import { createJiraConnector, type JiraConnector } from './jira/connector.ts'
@@ -57,6 +58,12 @@ export interface ConnectorReader {
     period: WorklogPeriod,
     signal: AbortSignal,
   ): Promise<JiraWorklog[]>
+  /** Every work item of an Azure DevOps source as it is now: read only when the PM asks. */
+  tracker(
+    source: Omit<ReadableSource, 'kind'>,
+    options: AdoTrackerOptions,
+    signal: AbortSignal,
+  ): Promise<AdoTrackerSnapshot>
 }
 
 function connectorsOf(options: ConnectorReaderOptions): Record<PullSourceKind, AnyConnector> {
@@ -201,6 +208,13 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
       const config = connectors.jira.parseConfig(source.config)
       return withContext('jira', { ...source, config }, signal, (connector, ctx) =>
         (connector as unknown as JiraConnector).worklogs(ctx as never, period),
+      )
+    },
+
+    async tracker(source, options, signal) {
+      const config = connectors.ado.parseConfig(source.config)
+      return withContext('ado', { ...source, config }, signal, (connector, ctx) =>
+        (connector as unknown as AdoConnector).tracker(ctx as never, options),
       )
     },
 

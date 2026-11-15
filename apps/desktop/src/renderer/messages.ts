@@ -416,7 +416,14 @@ export const messages = {
     loading: 'Leggo l’esportazione del tracker…',
     setupTitle: 'Da dove leggo bug e requisiti',
     setupIntro:
-      'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto. Octo la legge soltanto: non la modifica e non scrive nel tracker.',
+      'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da Azure DevOps qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.',
+    trackerTitle: 'Leggi da Azure DevOps',
+    trackerIntro:
+      'Leggo adesso i work item del progetto e delle aree indicati in «Fonti», con il tuo Personal Access Token di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
+    readTracker: 'Leggi da Azure DevOps',
+    readingTracker: 'Sto leggendo Azure DevOps…',
+    trackerRead: (items: number, withHistory: number, when: string) =>
+      `Letti ${items} work item, ${withHistory} con la cronologia, alle ${when}`,
     exportPath: 'File dell’esportazione',
     historyPath: 'File della cronologia (facoltativo)',
     historyHint: 'Con la cronologia l’andamento segue i cambi di stato veri; senza, è una stima.',

@@ -1,4 +1,5 @@
 import type {
+  AdoFeedConfig,
   AlignmentSettings,
   ArchivedMail,
   Backup,
@@ -286,6 +287,28 @@ export interface TrackerHoursReader {
     period: HoursPeriod,
     signal: AbortSignal,
   ): Promise<TrackerHours[]>
+}
+
+/** The tracker as it is now, in the shape of the export the dashboard reads. */
+export type TrackerSnapshot = {
+  exportedAt: string
+  items: readonly object[]
+  /** By item id: what each item of the detailed types went through. */
+  history: Readonly<Record<string, object>>
+}
+
+/**
+ * Reads every work item of an Azure DevOps source with the PM's own read-only credential, only
+ * when the PM asks. Never writes to the tracker. Failures are DomainErrors with a `feed_*` code.
+ */
+export interface TrackerSnapshotReader {
+  read(
+    config: AdoFeedConfig,
+    secret: string,
+    /** The types whose history of states and comments are read too. */
+    detailTypes: readonly string[],
+    signal: AbortSignal,
+  ): Promise<TrackerSnapshot>
 }
 
 /** How a project fills the monthly forecast, kept with Octo's settings of the project. */

@@ -2,11 +2,19 @@
 // it, reaches the network only through `createSafeHttp`, and fails with codes only.
 export { type AdoConfig, type AdoEndpoint, type AdoHost, adoRules } from './ado/config.ts'
 export {
+  type AdoConnector,
   type AdoConnectorOptions,
   type AdoCursor,
+  type AdoTrackerOptions,
   adoConnector,
   createAdoConnector,
 } from './ado/connector.ts'
+export type {
+  AdoTrackerComment,
+  AdoTrackerHistory,
+  AdoTrackerItem,
+  AdoTrackerSnapshot,
+} from './ado/tracker.ts'
 export { type ConnectorDelivery, toDelivery } from './delivery.ts'
 export { type DwsiConfig, parseDwsiConfig, prjOption } from './dwsi/config.ts'
 export {

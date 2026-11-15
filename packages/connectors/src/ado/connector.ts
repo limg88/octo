@@ -29,6 +29,18 @@ import {
   type WorkItem,
   workItemOf,
 } from './items.ts'
+import {
+  type AdoTrackerHistory,
+  type AdoTrackerSnapshot,
+  addUpdates,
+  commentsOf,
+  inPool,
+  MAX_UPDATE_PAGES,
+  type ReadTrackerItem,
+  TRACKER_FIELDS,
+  TRACKER_PAGE_SIZE,
+  trackerItemOf,
+} from './tracker.ts'
 import { listQuery, syncQuery } from './wiql.ts'
 
 /** Where a sync is in the order of the query: the change date and id of the last item read. */
@@ -42,6 +54,25 @@ export const WIQL_TOP = 5_000
 const MAX_PROJECT_PAGES = 50
 /** Depth of the area and iteration trees read (Azure DevOps allows 14 levels). */
 const NODE_DEPTH = 14
+
+/** Work items whose updates or comments are read at the same time. */
+const TRACKER_POOL = 4
+/** The comments API of Azure DevOps is still a preview: it answers only when asked by this name. */
+const COMMENTS_API_VERSION = '7.1-preview.4'
+
+/** What a snapshot of the tracker reads beyond the work items themselves. */
+export interface AdoTrackerOptions {
+  /** The work item types whose history and comments are read too (case does not count). */
+  detailTypes: readonly string[]
+}
+
+export type AdoConnector = Connector<AdoConfig, AdoCursor> & {
+  /**
+   * Every work item of the perimeter as it is now, with the changes of state and of tags and the
+   * comments of the types asked. Read only when the PM asks for it.
+   */
+  tracker(ctx: ConnectorContext<AdoConfig>, options: AdoTrackerOptions): Promise<AdoTrackerSnapshot>
+}
 
 export interface AdoConnectorOptions {
   /** Where the API of a configuration is; the public Azure DevOps hosts by default. */
@@ -142,9 +173,7 @@ function parseCursor(raw: unknown): AdoCursor {
  * work item plus, when it read any, an «Export ADO del gg/mm hh:mm» of them (a backlog export,
  * system data). What the system returns outside the perimeter is read past and dropped.
  */
-export function createAdoConnector(
-  options: AdoConnectorOptions = {},
-): Connector<AdoConfig, AdoCursor> {
+export function createAdoConnector(options: AdoConnectorOptions = {}): AdoConnector {
   const endpointOf = options.endpoint ?? publicEndpoint
 
   const projectIdOf = (cfg: AdoConfig): string => {
@@ -271,9 +300,105 @@ export function createAdoConnector(
     return found
   }
 
+  async function readTrackerItems(
+    ctx: ConnectorContext<AdoConfig>,
+    ids: readonly number[],
+    asOf: Date,
+  ): Promise<ReadTrackerItem[]> {
+    const url = apiUrl(endpointOf(ctx.config), [
+      projectIdOf(ctx.config),
+      '_apis',
+      'wit',
+      'workitemsbatch',
+    ])
+    const read: ReadTrackerItem[] = []
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const body = {
+        ids: ids.slice(i, i + BATCH_SIZE),
+        fields: TRACKER_FIELDS,
+        asOf: asOf.toISOString(),
+        errorPolicy: 'omit',
+      }
+      const { json } = await call(ctx, 'POST', url, body)
+      if (!isRecord(json) || !Array.isArray(json.value)) return bad()
+      for (const raw of json.value) if (raw !== null) read.push(trackerItemOf(raw))
+    }
+    return read
+  }
+
+  const workItemUrl = (
+    ctx: ConnectorContext<AdoConfig>,
+    id: number,
+    what: 'updates' | 'comments',
+    query: Record<string, string>,
+  ): string =>
+    apiUrl(
+      endpointOf(ctx.config),
+      [projectIdOf(ctx.config), '_apis', 'wit', 'workItems', String(id), what],
+      query,
+    )
+
+  async function historyOf(ctx: ConnectorContext<AdoConfig>, id: number) {
+    const history: AdoTrackerHistory = { created: null, states: [], tags: [] }
+    for (let page = 0; page < MAX_UPDATE_PAGES; page += 1) {
+      const { json } = await call(
+        ctx,
+        'GET',
+        workItemUrl(ctx, id, 'updates', {
+          $top: String(TRACKER_PAGE_SIZE),
+          $skip: String(page * TRACKER_PAGE_SIZE),
+        }),
+      )
+      if (addUpdates(history, json) < TRACKER_PAGE_SIZE) return history
+    }
+    // More updates than a reading takes: never a history cut short in silence.
+    throw new ConnectorError('response_too_large')
+  }
+
+  /** The newest comments of a work item, oldest first. */
+  async function discussionOf(ctx: ConnectorContext<AdoConfig>, id: number) {
+    const { json } = await call(
+      ctx,
+      'GET',
+      workItemUrl(ctx, id, 'comments', {
+        $top: String(TRACKER_PAGE_SIZE),
+        order: 'desc',
+        'api-version': COMMENTS_API_VERSION,
+      }),
+    )
+    return commentsOf(json).reverse()
+  }
+
   return {
     kind: 'ado',
     parseConfig: parseAdoConfig,
+
+    async tracker(ctx, { detailTypes }) {
+      const { areas, iterations } = await chosenNodes(ctx)
+      const { ids, asOf } = await runWiql(
+        ctx,
+        listQuery({ areas: areas.map((n) => n.path), iterations: iterations.map((n) => n.path) }),
+        MAX_LISTED_IDS,
+      )
+      if (ids.length >= MAX_LISTED_IDS) throw new ConnectorError('response_too_large')
+      // What the system returns outside the perimeter is dropped, as in a sync.
+      const read = (await readTrackerItems(ctx, [...new Set(ids)], asOf)).filter(
+        (entry) =>
+          (areas.length === 0 || coverOf(entry.areaPath, areas) !== null) &&
+          (iterations.length === 0 || coverOf(entry.iterationPath, iterations) !== null),
+      )
+      // By id whatever the system's order: the same tracker gives the same file.
+      read.sort((a, b) => a.item.id - b.item.id)
+      const wanted = new Set(detailTypes.map((type) => type.toLowerCase()))
+      const detailed = read.filter((entry) => wanted.has(entry.item.type.toLowerCase()))
+      const history: Record<string, AdoTrackerHistory> = {}
+      await inPool(detailed, TRACKER_POOL, async ({ item, commentCount }) => {
+        history[String(item.id)] = await historyOf(ctx, item.id)
+        if (commentCount > 0) item.discussion = await discussionOf(ctx, item.id)
+      })
+      return { exportedAt: asOf.toISOString(), items: read.map((entry) => entry.item), history }
+    },
+
     parseCursor,
     rules: (config) => adoRules(endpointOf(config), config),
 

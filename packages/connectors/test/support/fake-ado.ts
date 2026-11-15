@@ -30,6 +30,10 @@ export interface FakeWorkItem {
   id: number
   rev: number
   fields: Record<string, unknown>
+  /** What the updates of the item answer, oldest first. */
+  updates?: unknown[]
+  /** The comments of the item, oldest first. */
+  comments?: unknown[]
 }
 
 export interface FakeAdoOptions {
@@ -177,7 +181,8 @@ export async function startFakeAdo(options: FakeAdoOptions): Promise<FakeAdo> {
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://fake')
     const path = decodeURIComponent(url.pathname)
-    if (url.searchParams.get('api-version') !== '7.1') {
+    const wanted = path.endsWith('/comments') ? '7.1-preview.4' : '7.1'
+    if (url.searchParams.get('api-version') !== wanted) {
       json(res, 400, { message: 'api-version missing' })
       return
     }
@@ -316,6 +321,28 @@ export async function startFakeAdo(options: FakeAdoOptions): Promise<FakeAdo> {
         return { id: item.id, rev: item.rev, fields, url: `${base}/_apis/wit/workItems/${id}` }
       })
       json(res, 200, { count: value.length, value })
+      return
+    }
+    const oneItem = /^\/([^/]+)\/([^/]+)\/_apis\/wit\/workItems\/(\d+)\/(updates|comments)$/.exec(
+      path,
+    )
+    if (req.method === 'GET' && oneItem && oneItem[1] === org && oneItem[2] === project) {
+      const item = options.items.find((i) => i.id === Number(oneItem[3]))
+      if (!item) {
+        json(res, 404, { message: 'TF401232: work item does not exist' })
+        return
+      }
+      const top = Number(url.searchParams.get('$top') ?? '200')
+      if (oneItem[4] === 'updates') {
+        const skip = Number(url.searchParams.get('$skip') ?? '0')
+        const value = (item.updates ?? []).slice(skip, skip + top)
+        json(res, 200, { count: value.length, value })
+        return
+      }
+      const all = [...(item.comments ?? [])]
+      if (url.searchParams.get('order') === 'desc') all.reverse()
+      const comments = all.slice(0, top)
+      json(res, 200, { totalCount: all.length, count: comments.length, comments })
       return
     }
     json(res, 404, { message: 'not found' })

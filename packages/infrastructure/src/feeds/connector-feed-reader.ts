@@ -1,4 +1,4 @@
-import type { FeedReader, TrackerHoursReader } from '@octo/application'
+import type { FeedReader, TrackerHoursReader, TrackerSnapshotReader } from '@octo/application'
 import {
   ConnectorError,
   type ConnectorReader,
@@ -361,6 +361,28 @@ export function createJiraHoursReader(options: ConnectorFeedOptions = {}): Track
           hours: worklog.seconds / SECONDS_PER_HOUR,
           issue: worklog.issueKey,
         }))
+      } catch (error) {
+        throw failure(error)
+      }
+    },
+  }
+}
+
+/**
+ * Azure DevOps as it is now, through the same read-only connector the feed uses and with the same
+ * credential: every work item of the project and areas of the source, with the history and the
+ * comments of the types asked.
+ */
+export function createAdoTrackerReader(options: ConnectorFeedOptions = {}): TrackerSnapshotReader {
+  const trackers = createConnectorReader(
+    options.devEndpoints ? { devEndpoints: options.devEndpoints } : {},
+  )
+  return {
+    async read(config, secret, detailTypes, signal) {
+      try {
+        const { config: raw, scope } = trackerOf.ado(config)
+        const source = await trackers.connect('ado', raw, secret, scope)
+        return await trackers.tracker({ ...source, secret }, { detailTypes }, signal)
       } catch (error) {
         throw failure(error)
       }

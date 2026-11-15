@@ -18,6 +18,7 @@ import type {
   QuestionLog,
   Sources,
   Team,
+  TrackerSnapshots,
 } from '@octo/application'
 import {
   DomainError,
@@ -54,6 +55,7 @@ export type IpcDeps = {
   deckModelDialogTitle: string
   newProjectDialogTitle: string
   backups: Backups
+  trackerSnapshots: TrackerSnapshots
   backupDialogs: BackupDialogs
 }
 
@@ -584,6 +586,10 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.hoursView, hoursViewInput, async (input) =>
     deps.hours.view(await deps.projects.get(input.projectId), input.period),
+  )
+
+  handle(CHANNELS.dashboardReadTracker, byProject, async ({ projectId }) =>
+    deps.trackerSnapshots.read(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.hoursReadTracker, hoursViewInput, async (input) =>

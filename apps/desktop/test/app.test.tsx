@@ -203,6 +203,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     dashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     saveDashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),
+    readTrackerSnapshot: vi.fn(async () => ok({ at: '', items: 0, withHistory: 0 })),
     dashboardView: vi.fn(async () => ({
       ok: false as const,
       code: 'tracker_export_not_set' as const,

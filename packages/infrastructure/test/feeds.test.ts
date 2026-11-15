@@ -4,13 +4,21 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFeeds, type SecretVault } from '@octo/application'
-import type { AdoFeedConfig, JiraFeedConfig, Project, WarehouseFeedConfig } from '@octo/domain'
+import {
+  type AdoFeedConfig,
+  type JiraFeedConfig,
+  type Project,
+  parseTrackerExport,
+  parseTrackerHistory,
+  type WarehouseFeedConfig,
+} from '@octo/domain'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { type FakeAdo, startFakeAdo, workItem } from '../../connectors/test/support/fake-ado.ts'
 import { type FakeDwsi, startFakeDwsi } from '../../connectors/test/support/fake-dwsi.ts'
 import { type FakeJira, jiraIssue, startFakeJira } from '../../connectors/test/support/fake-jira.ts'
 import {
   type ConnectorFeedOptions,
+  createAdoTrackerReader,
   createConnectorFeedReader,
   createFsMemoryWriter,
   createFsProjectFiles,
@@ -100,6 +108,53 @@ describe('Azure DevOps as files of the project', () => {
     })
     return setup({ devEndpoints: { ado: fake.server.origin } })
   }
+
+  it('reads the tracker as it is now, in the shape the dashboard reads', async () => {
+    const bug = workItem(7, {
+      area: PROJECT,
+      iteration: `${PROJECT}\\Sprint 1`,
+      changedAt: '2026-11-05T10:00:00Z',
+      createdAt: '2026-10-01T08:00:00Z',
+      type: 'Bug',
+      title: 'Errore IVA',
+      state: 'Ready for Test',
+      tags: 'Squadra',
+    })
+    bug.updates = [
+      {
+        fields: {
+          'System.ChangedDate': { newValue: '2026-10-01T08:00:00Z' },
+          'System.CreatedDate': { newValue: '2026-10-01T08:00:00Z' },
+          'System.State': { newValue: 'New' },
+        },
+      },
+    ]
+    const old = workItem(8, {
+      area: PROJECT,
+      iteration: PROJECT,
+      changedAt: '2026-10-01T10:00:00Z',
+      createdAt: '2026-09-01T08:00:00Z',
+    })
+    await start([bug, old])
+    const reader = createAdoTrackerReader({ devEndpoints: { ado: fake.server.origin } })
+    const signal = new AbortController().signal
+
+    const snapshot = await reader.read(config, PAT, ['Bug'], signal)
+
+    // Whatever its change date: a snapshot is the whole tracker, not what changed since a day.
+    const parsed = parseTrackerExport({ exported_at: snapshot.exportedAt, items: snapshot.items })
+    expect(parsed?.items.map((entry) => [entry.id, entry.type, entry.period])).toEqual([
+      ['7', 'Bug', 'Sprint 1'],
+      ['8', 'User Story', null],
+    ])
+    expect(parsed?.items[0]).toMatchObject({ tags: ['Squadra'], createdAt: '2026-10-01T08:00:00Z' })
+    const history = parseTrackerHistory({ bugs: snapshot.history })
+    expect(history?.get('7')?.states).toEqual([{ at: '2026-10-01T08:00:00Z', state: 'New' }])
+    expect(history?.has('8')).toBe(false)
+    await expect(reader.read(config, 'wrong', ['Bug'], signal)).rejects.toMatchObject({
+      code: 'feed_credential_refused',
+    })
+  })
 
   it('writes one file per work item changed since the first day, then only what changes', async () => {
     const { feeds, project, names, text } = await start([

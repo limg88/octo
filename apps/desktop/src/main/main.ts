@@ -19,12 +19,14 @@ import {
   createProjects,
   createSources,
   createTeam,
+  createTrackerSnapshots,
   type Feeding,
   type MailArchive,
   type Projects,
 } from '@octo/application'
 import { backupFileName, DomainError } from '@octo/domain'
 import {
+  createAdoTrackerReader,
   createAppleMailArchive,
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
@@ -269,6 +271,13 @@ function start(): void {
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
     newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
     team,
+    trackerSnapshots: createTrackerSnapshots({
+      settings: dashboardSettings,
+      sources: settings,
+      secrets,
+      tracker: createAdoTrackerReader({ devEndpoints }),
+      writer,
+    }),
     backups: createBackups({
       registry,
       sourceStates,

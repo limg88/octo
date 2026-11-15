@@ -17,6 +17,7 @@ import type {
   ProgressFile,
   ProgressView,
   TrackerHoursRun,
+  TrackerSnapshotRun,
 } from '@octo/application'
 import type {
   AlignmentSettings,
@@ -113,6 +114,7 @@ export const CHANNELS = {
   teamGet: 'team:get',
   teamSave: 'team:save',
   projectsCreate: 'projects:create',
+  dashboardReadTracker: 'dashboard:tracker:read',
   backupSave: 'backup:save',
   backupRestore: 'backup:restore',
   sourcesChanged: 'sources:changed',
@@ -222,6 +224,8 @@ export type OctoApi = {
   hoursView(projectId: string, period: HoursPeriod): Promise<Result<HoursView>>
   /** Reads the hours of the period from the tracker, with the credential of its feed. */
   readTrackerHours(projectId: string, period: HoursPeriod): Promise<Result<TrackerHoursRun>>
+  /** Reads Azure DevOps as it is now, with the credential of its source, for the dashboard. */
+  readTrackerSnapshot(projectId: string): Promise<Result<TrackerSnapshotRun>>
   forecastSettings(projectId: string): Promise<Result<ForecastSettings>>
   saveForecastSettings(
     projectId: string,
