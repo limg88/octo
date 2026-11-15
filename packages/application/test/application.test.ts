@@ -8,7 +8,6 @@ import {
   folderProbe,
   memoryQuestionLog,
   memoryRegistry,
-  memorySourceStates,
   STEP_MS,
   steppingClock,
 } from './fakes.ts'
@@ -22,11 +21,11 @@ const project: Project = {
 }
 
 function projectsWith(initial: Project[] = []) {
-  const sourceStates = memorySourceStates()
+  const setAside = memoryRegistry()
   const created: Array<{ parent: string; name: string; paths: string[] }> = []
   const projects = createProjects({
     registry: memoryRegistry(initial),
-    sourceStates,
+    setAside,
     folders: folderProbe([FOLDER, `${FOLDER}/`, '/progetti/Boreale 2']),
     scaffold: {
       create: async (parent, name, files) => {
@@ -37,7 +36,7 @@ function projectsWith(initial: Project[] = []) {
     clock: steppingClock(),
     ids: countingIds('p'),
   })
-  return { projects, sourceStates, created }
+  return { projects, setAside, created }
 }
 
 describe('projects', () => {
@@ -84,18 +83,47 @@ describe('projects', () => {
     })
   })
 
-  it('forgets a project with its readings', async () => {
-    const { projects, sourceStates } = projectsWith([project])
-    await sourceStates.set(project.id, 'mail', {
-      cursor: '2026-11-10T00:00:00.000Z',
-      lastRun: null,
-    })
+  it('takes a project off the list and puts it back as it was', async () => {
+    const { projects, setAside } = projectsWith([project])
 
     await projects.remove(project.id)
 
     expect(await projects.list()).toEqual([])
-    expect(sourceStates.all().size).toBe(0)
+    expect(await setAside.list()).toEqual([project])
     await expect(projects.get(project.id)).rejects.toMatchObject({ code: 'project_not_found' })
+
+    expect(await projects.restore(project.id)).toEqual(project)
+    expect(await projects.list()).toEqual([project])
+    expect(await setAside.list()).toEqual([])
+    await expect(projects.restore(project.id)).rejects.toMatchObject({
+      code: 'project_not_found',
+    })
+  })
+
+  it('gives back the same project when its folder is added again', async () => {
+    const { projects, setAside } = projectsWith([project])
+    await projects.remove(project.id)
+
+    // The same folder, written another way, is the same project: same id, same readings.
+    expect(await projects.add(`${FOLDER}/`)).toEqual(project)
+    expect(await setAside.list()).toEqual([])
+
+    // Taken off twice, it is kept once.
+    await projects.remove(project.id)
+    await projects.restore(project.id)
+    await projects.remove(project.id)
+    expect(await setAside.list()).toEqual([project])
+  })
+
+  it('does not reuse an id that is already in the list', async () => {
+    const kept: Project = { ...project, id: 'p-9' }
+    const { projects, setAside } = projectsWith([{ ...kept, folder: '/progetti/Boreale 2' }])
+    await setAside.save([kept])
+
+    const added = await projects.add(FOLDER)
+
+    expect(added.id).toBe('p-1')
+    expect(await setAside.list()).toEqual([kept])
   })
 })
 

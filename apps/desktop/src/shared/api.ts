@@ -55,6 +55,7 @@ export const CHANNELS = {
   projectsList: 'projects:list',
   projectsAdd: 'projects:add',
   projectsRemove: 'projects:remove',
+  projectsRestore: 'projects:restore',
   questionsList: 'questions:list',
   questionsAsk: 'questions:ask',
   questionsCancel: 'questions:cancel',
@@ -132,7 +133,10 @@ export type OctoApi = {
   listProjects(): Promise<Result<Project[]>>
   /** Lets the PM choose a folder; null when the PM closes the dialog. */
   addProject(): Promise<Result<Project | null>>
+  /** Takes the project off the list; nothing of it is deleted. */
   removeProject(projectId: string): Promise<Result<null>>
+  /** Puts back, as it was, a project taken off the list. */
+  restoreProject(projectId: string): Promise<Result<Project>>
   listQuestions(projectId: string): Promise<Result<QuestionRecord[]>>
   ask(projectId: string, question: string): Promise<Result<QuestionRecord>>
   cancelAsk(projectId: string): Promise<Result<null>>

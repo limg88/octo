@@ -7,6 +7,7 @@ const api: OctoApi = {
   listProjects: () => ipcRenderer.invoke(CHANNELS.projectsList),
   addProject: () => ipcRenderer.invoke(CHANNELS.projectsAdd),
   removeProject: (projectId) => ipcRenderer.invoke(CHANNELS.projectsRemove, { projectId }),
+  restoreProject: (projectId) => ipcRenderer.invoke(CHANNELS.projectsRestore, { projectId }),
   listQuestions: (projectId) => ipcRenderer.invoke(CHANNELS.questionsList, { projectId }),
   ask: (projectId, question) => ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),

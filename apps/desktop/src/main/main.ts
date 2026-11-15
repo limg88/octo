@@ -54,6 +54,7 @@ import {
   createJsonBackupFiles,
   createJsonFeedIndexes,
   createJsonProjectRegistry,
+  createJsonSetAsideProjects,
   createJsonSourceStates,
   createWarehouseTimesheetReader,
   createWordRenderer,
@@ -177,7 +178,7 @@ function start(): void {
   const folders = createFsFolderProbe()
   const projects = createProjects({
     registry,
-    sourceStates,
+    setAside: createJsonSetAsideProjects(dataFolder),
     folders,
     scaffold: createFsProjectScaffold(),
     clock,

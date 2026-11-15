@@ -376,6 +376,8 @@ export function registerIpc(deps: IpcDeps): void {
     return null
   })
 
+  handle(CHANNELS.projectsRestore, byProject, ({ projectId }) => deps.projects.restore(projectId))
+
   handle(CHANNELS.questionsList, byProject, async ({ projectId }) => {
     const project = await deps.projects.get(projectId)
     return deps.questions.list(project.folder)

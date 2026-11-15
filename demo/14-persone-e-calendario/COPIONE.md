@@ -37,10 +37,10 @@ Durata: 5 minuti. Mostra tre cose piccole che servono ogni giorno: le persone e 
 5. **Usa una domanda pronta.** Apri «Chiedi» e premi «Blocchi e rischi».
    Atteso: la domanda compare nel riquadro, completa, e non parte da sola: la puoi correggere prima di inviarla.
 
-6. **Crea un progetto nuovo.** Nella colonna di sinistra premi «Nuovo progetto», scrivi `Boreale`, premi «Scegli dove crearlo» e scegli la cartella `Nuovi progetti` stampata nel terminale.
+6. **Crea un progetto nuovo.** Nella colonna di sinistra premi il nome del progetto, poi «Aggiungi un progetto…»; sotto «Parto da zero» scrivi `Boreale`, premi «Scegli dove crearla…» e scegli la cartella `Nuovi progetti` stampata nel terminale.
    Atteso: «Boreale» compare fra i progetti e si apre su «Fonti». Nella cartella scelta c'è `Boreale/` con `LEGGIMI.md` e le cartelle `Contratti`, `Documenti`, `Riunioni`, `Tracker`.
 
-7. **Riprova con lo stesso nome.** Di nuovo «Nuovo progetto», `Boreale`, stessa cartella.
+7. **Riprova con lo stesso nome.** Di nuovo «Aggiungi un progetto…», `Boreale`, stessa cartella.
    Atteso: «Lì c'è già una cartella con questo nome»: Octo non scrive sopra una cartella che esiste.
 
 ## Che cosa dimostra

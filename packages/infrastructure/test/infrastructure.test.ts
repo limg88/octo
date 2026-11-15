@@ -13,6 +13,7 @@ import {
   createFsQuestionLog,
   createJsonBackupFiles,
   createJsonProjectRegistry,
+  createJsonSetAsideProjects,
   locateClaude,
 } from '../src/index.ts'
 
@@ -199,6 +200,15 @@ describe('json stores', () => {
 
     await createJsonProjectRegistry(data).save([sample])
     expect(await createJsonProjectRegistry(data).list()).toEqual([sample])
+  })
+
+  it('keeps the projects taken off the list apart from the list', async () => {
+    const data = join(root, 'dati-tolti')
+    expect(await createJsonSetAsideProjects(data).list()).toEqual([])
+
+    await createJsonSetAsideProjects(data).save([sample])
+    expect(await createJsonSetAsideProjects(data).list()).toEqual([sample])
+    expect(await createJsonProjectRegistry(data).list()).toEqual([])
   })
 
   it('keeps the questions in the project folder, out of the sources', async () => {

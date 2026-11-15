@@ -6,12 +6,35 @@ import type { ErrorCode } from '../shared/api.ts'
 export const messages = {
   appName: 'Octo',
   projects: 'Progetti',
-  addProject: 'Aggiungi progetto',
-  removeProject: 'Togli dall’elenco',
-  removeProjectHint: 'La cartella resta dov’è: Octo smette solo di mostrarla.',
+  project: 'Progetto',
+  addProject: 'Aggiungi un progetto…',
+  close: 'Chiudi',
+  cancel: 'Annulla',
+  addDialog: {
+    title: 'Aggiungi un progetto',
+    existingTitle: 'Ho già una cartella',
+    existingHint:
+      'Scegli la cartella del progetto su questo computer. Octo la legge così com’è: non sposta e non cancella nulla.',
+    existingChoose: 'Scegli la cartella…',
+    newTitle: 'Parto da zero',
+  },
+  manage: {
+    open: 'Gestisci i progetti…',
+    title: 'I tuoi progetti',
+    none: 'Nessun progetto in elenco.',
+    remove: 'Togli da Octo',
+    removeOf: (name: string) => `Togli ${name} da Octo`,
+    confirmTitle: (name: string) => `Togliere «${name}» da Octo?`,
+    confirmBody:
+      'La cartella e tutto ciò che contiene restano dove sono. Anche le credenziali e il punto a cui sono arrivate le letture restano su questo computer: se aggiungi di nuovo la stessa cartella, il progetto torna com’era.',
+    confirm: 'Togli',
+    removed: (name: string) => `«${name}» non è più in elenco. La cartella è rimasta dov’è.`,
+    undo: 'Rimettilo in elenco',
+  },
   noProjectTitle: 'Nessun progetto',
   noProjectBody:
     'Un progetto è una cartella del tuo computer. Aggiungine una per fare domande su ciò che contiene.',
+  projectShortcut: 'Con ⌘ o Ctrl e un numero passi al progetto in quella posizione.',
   ask: 'Chiedi',
   askPlaceholder: 'Chiedi qualcosa su questo progetto…',
   askSubmit: 'Chiedi',
@@ -136,9 +159,8 @@ export const messages = {
         ? `modello ${write}`
         : `scritto da ${write}, riletto da ${review}`,
   },
-  newProject: 'Nuovo progetto',
   newProjectName: 'Nome del nuovo progetto',
-  newProjectCreate: 'Scegli dove crearlo',
+  newProjectCreate: 'Scegli dove crearla…',
   newProjectHint:
     'Creo una cartella con questo nome, con un posto per contratti, documenti, riunioni e tracker.',
   askReady: [

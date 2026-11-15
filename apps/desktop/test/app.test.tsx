@@ -117,6 +117,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     listProjects: vi.fn(async () => ok([aurora])),
     addProject: vi.fn(async () => ok<Project | null>(boreale)),
     removeProject: vi.fn(async () => ok(null)),
+    restoreProject: vi.fn(async () => ok(boreale)),
     listQuestions: vi.fn(async () => ok<QuestionRecord[]>([])),
     ask: vi.fn(async () => ok(answered)),
     cancelAsk: vi.fn(async () => ok(null)),
@@ -313,18 +314,121 @@ describe('App', () => {
     expect(screen.getByText(/Claude non ha un accesso attivo/)).toBeTruthy()
   })
 
-  it('adds a project from a folder and forgets it on request', async () => {
+  const openMenu = async () =>
+    fireEvent.click(await screen.findByRole('button', { name: /Aurora|Boreale|Nessun progetto/ }))
+  const openAdd = async () => {
+    await openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: messages.addProject }))
+    return screen.getByRole('dialog', { name: messages.addDialog.title })
+  }
+  const openManage = async () => {
+    await openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: messages.manage.open }))
+    return screen.getByRole('dialog', { name: messages.manage.title })
+  }
+
+  it('switches project from the list in the sidebar, by click or by number', async () => {
+    const { api } = fakeApi({ listProjects: async () => ok([aurora, boreale]) })
+    render(<App api={api} />)
+    await openMenu()
+    const menu = screen.getByRole('menu', { name: messages.projects })
+    expect(
+      within(menu).getByRole('menuitemradio', { name: 'Aurora' }).getAttribute('aria-checked'),
+    ).toBe('true')
+
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Boreale' }))
+    expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    expect(await screen.findByRole('heading', { name: 'Aurora' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: '2', ctrlKey: true })
+    expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    // A number with no project, or without the modifier, changes nothing.
+    fireEvent.keyDown(window, { key: '7', metaKey: true })
+    fireEvent.keyDown(window, { key: '1' })
+    expect(screen.getByRole('heading', { name: 'Boreale' })).toBeTruthy()
+
+    await openMenu()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('adds a project from a folder and opens its sources', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)
-    await screen.findByRole('button', { name: 'Aurora' })
-
-    fireEvent.click(screen.getByRole('button', { name: messages.addProject }))
+    const dialog = await openAdd()
+    fireEvent.click(within(dialog).getByRole('button', { name: messages.addDialog.existingChoose }))
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: messages.removeProject }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Boreale' })).toBeNull())
-    expect(api.removeProject).toHaveBeenCalledWith('p-2')
+  it('takes a project off only after a confirmation, and puts it back', async () => {
+    const { api } = fakeApi({
+      listProjects: async () => ok([aurora, boreale]),
+      removeProject: vi
+        .fn<OctoApi['removeProject']>()
+        .mockResolvedValueOnce({ ok: false, code: 'project_not_found' })
+        .mockResolvedValue(ok(null)),
+    })
+    render(<App api={api} />)
+    const dialog = await openManage()
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: messages.manage.removeOf('Boreale') }),
+    )
+    const confirm = screen.getByRole('dialog', { name: messages.manage.confirmTitle('Boreale') })
+    expect(confirm.textContent).toContain(messages.manage.confirmBody)
+    expect(api.removeProject).not.toHaveBeenCalled()
+
+    // Changing one's mind goes back to the list, with the project still there.
+    fireEvent.click(within(confirm).getByRole('button', { name: messages.cancel }))
+    expect(api.removeProject).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.removeOf('Boreale') }))
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.confirm }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/non è più in elenco/)
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.confirm }))
+
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toBe(messages.manage.removed('Boreale'))
+    expect(api.removeProject).toHaveBeenLastCalledWith('p-2')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // The project that was open stays open.
     expect(screen.getByRole('heading', { name: 'Aurora' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.undo }))
+    expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    expect(api.restoreProject).toHaveBeenCalledWith('p-2')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('opens another project when the open one is taken off, and says when undo fails', async () => {
+    const { api } = fakeApi({
+      restoreProject: async () => ({ ok: false, code: 'project_not_found' }),
+    })
+    render(<App api={api} />)
+    const dialog = await openManage()
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: messages.manage.removeOf('Aurora') }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.confirm }))
+    expect(await screen.findByText(messages.noProjectTitle, { selector: 'h2' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: messages.manage.undo }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/non è più in elenco/)
+    // Every notice closes.
+    for (const close of screen.getAllByRole('button', { name: messages.close })) {
+      fireEvent.click(close)
+    }
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
+
+    const empty = await openManage()
+    expect(empty.textContent).toContain(messages.manage.none)
+    fireEvent.click(
+      within(empty).getAllByRole('button', { name: messages.close })[0] as HTMLElement,
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('makes a new project from its name and opens its sources', async () => {
@@ -336,17 +440,17 @@ describe('App', () => {
         .mockResolvedValue(ok(boreale)),
     })
     render(<App api={api} />)
-    fireEvent.click(await screen.findByRole('button', { name: messages.newProject }))
-    const create = screen.getByRole<HTMLButtonElement>('button', {
+    const dialog = await openAdd()
+    const create = within(dialog).getByRole<HTMLButtonElement>('button', {
       name: messages.newProjectCreate,
     })
     expect(create.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText(messages.newProjectName), {
+    fireEvent.change(within(dialog).getByLabelText(messages.newProjectName), {
       target: { value: 'Boreale' },
     })
     fireEvent.click(create)
-    expect((await screen.findByRole('alert')).textContent).toMatch(/c’è già una cartella/)
-    // The PM closes the dialog: the name stays, to try again.
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/c’è già una cartella/)
+    // The PM closes the system dialog: the name stays, to try again.
     fireEvent.click(create)
     await waitFor(() => expect(api.createProject).toHaveBeenCalledTimes(2))
     expect(screen.getByLabelText<HTMLInputElement>(messages.newProjectName).value).toBe('Boreale')
@@ -354,7 +458,32 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     expect(api.createProject).toHaveBeenLastCalledWith('Boreale')
     expect(await screen.findByRole('region', { name: messages.team.title })).toBeTruthy()
-    expect(screen.queryByLabelText(messages.newProjectName)).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('closes a dialog with Cancel, with Escape or outside it, and forgets its error', async () => {
+    const { api } = fakeApi({
+      addProject: async () => ({ ok: false, code: 'project_already_added' }),
+    })
+    render(<App api={api} />)
+    let dialog = await openAdd()
+    fireEvent.click(within(dialog).getByRole('button', { name: messages.addDialog.existingChoose }))
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/già fra i tuoi/)
+    fireEvent.click(within(dialog).getByRole('button', { name: messages.cancel }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    dialog = await openAdd()
+    fireEvent.keyDown(dialog, { key: 'Enter' })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    dialog = await openAdd()
+    fireEvent.mouseDown(dialog)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.mouseDown(dialog.parentElement as HTMLElement)
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('writes a backup and says the credentials are not in it', async () => {
@@ -366,7 +495,8 @@ describe('App', () => {
         .mockResolvedValue(ok({ file: '/chiavetta/c.json', projects: 2 })),
     })
     render(<App api={api} />)
-    const save = await screen.findByRole('button', { name: messages.backup.save })
+    const dialog = await openManage()
+    const save = within(dialog).getByRole('button', { name: messages.backup.save })
     fireEvent.click(save)
     expect((await screen.findByRole('alert')).textContent).toMatch(/Non riesco a scrivere/)
     fireEvent.click(save)
@@ -376,6 +506,9 @@ describe('App', () => {
     const note = await screen.findByRole('status')
     expect(note.textContent).toContain('/chiavetta/c.json: 2 progetti')
     expect(note.textContent).toMatch(/credenziali non ci sono/)
+    // The note goes away when the PM has read it.
+    fireEvent.click(screen.getByRole('button', { name: messages.close }))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('restores a backup, lists the projects again and tells what was left out', async () => {
@@ -384,13 +517,15 @@ describe('App', () => {
       .mockResolvedValueOnce(ok([aurora]))
       .mockResolvedValue(ok([aurora, boreale]))
     render(<App api={api} />)
-    fireEvent.click(await screen.findByRole('button', { name: messages.backup.restore }))
+    const dialog = await openManage()
+    fireEvent.click(within(dialog).getByRole('button', { name: messages.backup.restore }))
     const note = await screen.findByRole('status')
     expect(note.textContent).toContain('Ripristinati: Boreale.')
     expect(note.textContent).toContain('Già in elenco, lasciati come sono: Aurora.')
     expect(note.textContent).toMatch(/cartella non è su questo computer: Cometa/)
     expect(note.textContent).toContain(messages.backup.credentials)
-    expect(await screen.findByRole('button', { name: 'Boreale' })).toBeTruthy()
+    await openMenu()
+    expect(screen.getByRole('menuitemradio', { name: 'Boreale' })).toBeTruthy()
     // The project that was open stays open.
     expect(screen.getByRole('heading', { name: 'Aurora' })).toBeTruthy()
   })
@@ -404,7 +539,8 @@ describe('App', () => {
         .mockResolvedValue(ok({ restored: [], alreadyHere: [], skipped: [] })),
     })
     render(<App api={api} />)
-    const restore = await screen.findByRole('button', { name: messages.backup.restore })
+    const dialog = await openManage()
+    const restore = within(dialog).getByRole('button', { name: messages.backup.restore })
     fireEvent.click(restore)
     expect((await screen.findByRole('alert')).textContent).toMatch(/non è una copia di sicurezza/)
     fireEvent.click(restore)
@@ -434,11 +570,16 @@ describe('App', () => {
     })
     render(<App api={api} />)
 
-    expect(await screen.findByText(messages.noProjectTitle)).toBeTruthy()
+    expect(await screen.findByText(messages.noProjectTitle, { selector: 'h2' })).toBeTruthy()
     expect(await screen.findByText(messages.agentMissingTitle)).toBeTruthy()
 
+    // With no project the page itself offers the way in.
     fireEvent.click(screen.getByRole('button', { name: messages.addProject }))
-    fireEvent.click(screen.getByRole('button', { name: messages.addProject }))
+    const choose = screen.getByRole('button', { name: messages.addDialog.existingChoose })
+    fireEvent.click(choose)
+    await waitFor(() => expect(api.addProject).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.click(choose)
     expect(await screen.findByText('Questa cartella è già fra i tuoi progetti.')).toBeTruthy()
   })
 
@@ -450,12 +591,9 @@ describe('App', () => {
 
     const second = fakeApi({
       listQuestions: async () => ({ ok: false, code: 'project_not_found' }),
-      removeProject: async () => ({ ok: false, code: 'project_not_found' }),
     })
     render(<App api={second.api} />)
     expect(await screen.findByText('Questo progetto non è più in elenco.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.removeProject }))
-    await waitFor(() => expect(screen.getAllByRole('alert').length).toBeGreaterThan(1))
   })
 })
 

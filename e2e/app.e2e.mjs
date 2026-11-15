@@ -69,6 +69,12 @@ try {
 
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('Claude 9.9.9 (Fake Claude)').waitFor({ timeout: TIMEOUT_MS })
+  // The list of the projects opens from the name of the one in use.
+  const openProjects = () => page.locator('.switcher-button').click()
+  const manageProjects = async () => {
+    await openProjects()
+    await page.getByRole('menuitem', { name: 'Gestisci i progetti…' }).click()
+  }
 
   await ask('Quando consegniamo il modulo ordini?')
   await page.getByText('1 fonte controllata').waitFor({ timeout: TIMEOUT_MS })
@@ -625,6 +631,7 @@ try {
   await app.evaluate(({ dialog }, filePath) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath })
   }, backupFile)
+  await manageProjects()
   await page.getByRole('button', { name: 'Copia di sicurezza' }).click()
   await page.getByText(/1 progetto\. Le credenziali non ci sono/).waitFor({ timeout: TIMEOUT_MS })
   const backupText = readFileSync(backupFile, 'utf8')
@@ -647,6 +654,7 @@ try {
     },
     { file: backupFile, folder: movedFolder },
   )
+  await manageProjects()
   await page.getByRole('button', { name: 'Ripristina' }).click()
   await page.getByText('Ripristinati: Aurora.').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText(/Rimetti le credenziali/).waitFor({ timeout: TIMEOUT_MS })
@@ -661,6 +669,60 @@ try {
     movedFolder,
   )
   await page.screenshot({ path: `${work}/ripristino.png` })
+
+  // Demo 18: a project leaves the list only after a confirmation and comes back as it was.
+  await page.getByRole('button', { name: 'Chiudi' }).click()
+  await page.getByText('Ripristinati: Aurora.').waitFor({ state: 'detached' })
+  const listed = (file) => JSON.parse(readFileSync(`${work}/dati-nuovo/${file}`, 'utf8'))
+  const mailState = () => readFileSync(`${work}/dati-nuovo/sources/demo-aurora.json`, 'utf8')
+  const readingsBefore = mailState()
+  const takeOff = async () => {
+    await manageProjects()
+    await page.getByRole('button', { name: 'Togli Aurora da Octo' }).click()
+    const confirm = page.getByRole('dialog', { name: 'Togliere «Aurora» da Octo?' })
+    await confirm
+      .getByText(/credenziali e il punto a cui sono arrivate le letture restano/)
+      .waitFor()
+    return confirm
+  }
+  let confirm18 = await takeOff()
+  await confirm18.getByRole('button', { name: 'Annulla' }).click()
+  assert.equal(listed('projects.json').length, 1)
+  await page
+    .getByRole('dialog', { name: 'I tuoi progetti' })
+    .getByRole('button', { name: 'Chiudi' })
+    .first()
+    .click()
+  confirm18 = await takeOff()
+  await page.screenshot({ path: `${work}/progetti-conferma.png` })
+  await confirm18.getByRole('button', { name: 'Togli', exact: true }).click()
+  await page.getByText('«Aurora» non è più in elenco.').waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Nessun progetto' }).waitFor({ timeout: TIMEOUT_MS })
+  assert.deepEqual(listed('projects.json'), [])
+  assert.equal(listed('projects-set-aside.json')[0].id, 'demo-aurora')
+  await page.getByRole('button', { name: 'Rimettilo in elenco' }).click()
+  await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(mailState(), readingsBefore)
+  assert.deepEqual(listed('projects-set-aside.json'), [])
+
+  // Taken off again, it comes back from its folder as the same project.
+  confirm18 = await takeOff()
+  await confirm18.getByRole('button', { name: 'Togli', exact: true }).click()
+  await page.getByText('«Aurora» non è più in elenco.').waitFor({ timeout: TIMEOUT_MS })
+  await openProjects()
+  await page.screenshot({ path: `${work}/progetti-elenco.png` })
+  await page.getByRole('menuitem', { name: 'Aggiungi un progetto…' }).click()
+  await page.screenshot({ path: `${work}/progetti-aggiungi.png` })
+  await page.getByRole('button', { name: 'Scegli la cartella…' }).click()
+  await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(listed('projects.json')[0].id, 'demo-aurora')
+  assert.equal(mailState(), readingsBefore)
+  await page
+    .getByRole('region', { name: 'Posta' })
+    .getByText(/^Ultima lettura/)
+    .waitFor()
+  await openProjects()
+  await page.screenshot({ path: `${work}/progetti.png` })
   console.log('e2e: ok')
 } finally {
   await app.close()

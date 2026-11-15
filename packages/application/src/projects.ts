@@ -6,18 +6,12 @@ import {
   sameFolder,
   starterFiles,
 } from '@octo/domain'
-import type {
-  Clock,
-  FolderProbe,
-  IdGenerator,
-  ProjectRegistry,
-  ProjectScaffold,
-  SourceStates,
-} from './ports.ts'
+import type { Clock, FolderProbe, IdGenerator, ProjectRegistry, ProjectScaffold } from './ports.ts'
 
 export type ProjectsDeps = {
   registry: ProjectRegistry
-  sourceStates: SourceStates
+  /** The projects taken off the list, kept so that the same folder comes back as it was. */
+  setAside: ProjectRegistry
   folders: FolderProbe
   scaffold: ProjectScaffold
   clock: Clock
@@ -30,7 +24,10 @@ export type Projects = {
   add(folder: string): Promise<Project>
   /** Makes a new folder with the starter files inside `parent`, and adds it as a project. */
   create(parent: string, name: string): Promise<Project>
+  /** Takes the project off the list. Nothing of it is deleted: it can be put back. */
   remove(id: string): Promise<void>
+  /** Puts back a project taken off the list, as it was. */
+  restore(id: string): Promise<Project>
 }
 
 export function createProjects(deps: ProjectsDeps): Projects {
@@ -48,25 +45,42 @@ export function createProjects(deps: ProjectsDeps): Projects {
     if (projects.some((project) => sameFolder(project.folder, folder))) {
       throw new DomainError('project_already_added', folder)
     }
-    const project: Project = {
+    const setAside = await deps.setAside.list()
+    // The same folder is the same project: its readings and credentials are found again.
+    const known = setAside.find(
+      (candidate) =>
+        sameFolder(candidate.folder, folder) && !projects.some(({ id }) => id === candidate.id),
+    )
+    const project: Project = known ?? {
       id: deps.ids.next(),
       name: projectNameFromFolder(folder),
       folder,
       addedAt: deps.clock.now().toISOString(),
     }
     await deps.registry.save([...projects, project])
+    if (known) await deps.setAside.save(setAside.filter(({ id }) => id !== known.id))
     return project
   }
 
   /**
-   * Forgets the project and its readings. The folder is never touched: its questions stay in it
-   * and come back when the folder is added again.
+   * Takes the project off the list and sets it aside. Its folder, its readings and its
+   * credentials are not touched: they are there when the project is put back.
    */
   async function remove(id: string): Promise<void> {
     const project = await get(id)
     const projects = await deps.registry.list()
+    const setAside = await deps.setAside.list()
+    await deps.setAside.save([
+      ...setAside.filter((candidate) => !sameFolder(candidate.folder, project.folder)),
+      project,
+    ])
     await deps.registry.save(projects.filter((candidate) => candidate.id !== project.id))
-    await deps.sourceStates.removeProject(project.id)
+  }
+
+  async function restore(id: string): Promise<Project> {
+    const project = (await deps.setAside.list()).find((candidate) => candidate.id === id)
+    if (!project) throw new DomainError('project_not_found', id)
+    return add(project.folder)
   }
 
   async function create(parent: string, name: string): Promise<Project> {
@@ -75,5 +89,5 @@ export function createProjects(deps: ProjectsDeps): Projects {
     return add(await deps.scaffold.create(parent, folderName, starterFiles(folderName)))
   }
 
-  return { list: () => deps.registry.list(), get, add, create, remove }
+  return { list: () => deps.registry.list(), get, add, create, remove, restore }
 }

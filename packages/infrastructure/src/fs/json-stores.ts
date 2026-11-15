@@ -56,12 +56,21 @@ const questionSchema = z.object({
 })
 
 const PROJECTS_FILE = 'projects.json'
+const SET_ASIDE_FILE = 'projects-set-aside.json'
 const QUESTIONS_FILE = 'domande.json'
 const PRIVATE_FILE_MODE = 0o600
 
 /** The app's own state lives in its data folder, never in the project folder. */
 export function createJsonProjectRegistry(dataFolder: string): ProjectRegistry {
-  const file = join(dataFolder, PROJECTS_FILE)
+  return projectListIn(join(dataFolder, PROJECTS_FILE))
+}
+
+/** The projects taken off the list, beside the list itself. */
+export function createJsonSetAsideProjects(dataFolder: string): ProjectRegistry {
+  return projectListIn(join(dataFolder, SET_ASIDE_FILE))
+}
+
+function projectListIn(file: string): ProjectRegistry {
   return {
     list: async (): Promise<Project[]> => z.array(projectSchema).parse(await readJsonOr(file, [])),
     save: (projects) => writeJson(file, projects, PRIVATE_FILE_MODE),

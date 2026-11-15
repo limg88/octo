@@ -13,6 +13,8 @@ import { HoursView } from './HoursView.tsx'
 import { ModelsSection } from './ModelsSection.tsx'
 import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
+import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
+import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SetupGuide } from './SetupGuide.tsx'
 import { SourcesView } from './SourcesView.tsx'
 import { TeamSection } from './TeamSection.tsx'
@@ -31,14 +33,19 @@ type Props = {
   api: OctoApi
 }
 
+/** How many projects the number keys reach. */
+const SHORTCUT_PROJECTS = 9
+
 export function App({ api }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [tab, setTab] = useState<Tab>('ask')
-  const [newName, setNewName] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<'add' | 'manage' | null>(null)
   const [backupNotes, setBackupNotes] = useState<string[]>([])
+  /** The project just taken off the list, while it can still be put back with one click. */
+  const [removed, setRemoved] = useState<Project | null>(null)
 
   useEffect(() => {
     void api.agentStatus().then((result) => {
@@ -51,28 +58,52 @@ export function App({ api }: Props) {
     })
   }, [api])
 
+  // Command or Control with a number goes to the project in that place of the list.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+      const place = Number(event.key)
+      if (!Number.isInteger(place) || place < 1 || place > SHORTCUT_PROJECTS) return
+      const project = projects[place - 1]
+      if (!project) return
+      event.preventDefault()
+      setSelectedId(project.id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [projects])
+
+  function openDialog(next: 'add' | 'manage') {
+    setError(null)
+    setDialog(next)
+  }
+
+  function closeDialog() {
+    setError(null)
+    setDialog(null)
+  }
+
+  /** A project that enters the list is opened on what feeds it. */
+  function enter(project: Project) {
+    setDialog(null)
+    setRemoved(null)
+    setProjects((previous) => [...previous, project])
+    setSelectedId(project.id)
+    setTab('sources')
+  }
+
   async function addProject() {
     setError(null)
     const result = await api.addProject()
     if (!result.ok) return setError(result.code)
-    const added = result.value
-    if (added === null) return
-    setProjects((previous) => [...previous, added])
-    setSelectedId(added.id)
-    // A new project starts from what feeds it.
-    setTab('sources')
+    if (result.value !== null) enter(result.value)
   }
 
   async function createProject(name: string) {
     setError(null)
     const result = await api.createProject(name)
     if (!result.ok) return setError(result.code)
-    const created = result.value
-    if (created === null) return
-    setNewName(null)
-    setProjects((previous) => [...previous, created])
-    setSelectedId(created.id)
-    setTab('sources')
+    if (result.value !== null) enter(result.value)
   }
 
   async function saveBackup() {
@@ -81,6 +112,7 @@ export function App({ api }: Props) {
     const result = await api.saveBackup()
     if (!result.ok) return setError(result.code)
     if (result.value === null) return
+    setDialog(null)
     setBackupNotes([messages.backup.saved(result.value.file, result.value.projects)])
   }
 
@@ -90,6 +122,7 @@ export function App({ api }: Props) {
     const result = await api.restoreBackup()
     if (!result.ok) return setError(result.code)
     if (result.value === null) return
+    setDialog(null)
     setBackupNotes(restoreNotes(result.value))
     const listed = await api.listProjects()
     if (!listed.ok) return setError(listed.code)
@@ -98,11 +131,23 @@ export function App({ api }: Props) {
   }
 
   async function removeProject(project: Project) {
+    setError(null)
     const result = await api.removeProject(project.id)
     if (!result.ok) return setError(result.code)
     const remaining = projects.filter((candidate) => candidate.id !== project.id)
     setProjects(remaining)
-    setSelectedId(remaining[0]?.id ?? null)
+    if (project.id === selectedId) setSelectedId(remaining[0]?.id ?? null)
+    setDialog(null)
+    setRemoved(project)
+  }
+
+  async function putBack(project: Project) {
+    setError(null)
+    const result = await api.restoreProject(project.id)
+    if (!result.ok) return setError(result.code)
+    setRemoved(null)
+    setProjects((previous) => [...previous, result.value])
+    setSelectedId(result.value.id)
   }
 
   const selected = projects.find((project) => project.id === selectedId) ?? null
@@ -111,74 +156,40 @@ export function App({ api }: Props) {
     <div className="shell">
       <nav className="sidebar" aria-label={messages.projects}>
         <h1>{messages.appName}</h1>
-        <h2>{messages.projects}</h2>
-        <ul>
-          {projects.map((project) => (
-            <li key={project.id}>
-              <button
-                type="button"
-                className={project.id === selectedId ? 'project project-selected' : 'project'}
-                aria-current={project.id === selectedId}
-                title={project.folder}
-                onClick={() => setSelectedId(project.id)}
-              >
-                {project.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button type="button" className="add-project" onClick={() => void addProject()}>
-          {messages.addProject}
-        </button>
-        {newName === null ? (
-          <button type="button" className="add-project" onClick={() => setNewName('')}>
-            {messages.newProject}
-          </button>
-        ) : (
-          <form
-            className="new-project"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void createProject(newName)
-            }}
-          >
-            <label>
-              {messages.newProjectName}
-              <input
-                type="text"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-              />
-            </label>
-            <p className="hint">{messages.newProjectHint}</p>
-            <button type="submit" disabled={newName.trim() === ''}>
-              {messages.newProjectCreate}
-            </button>
-          </form>
-        )}
-        <section className="backup" aria-label={messages.backup.title}>
-          <h2>{messages.backup.title}</h2>
-          <button type="button" className="quiet" onClick={() => void saveBackup()}>
-            {messages.backup.save}
-          </button>
-          <button type="button" className="quiet" onClick={() => void restoreBackup()}>
-            {messages.backup.restore}
-          </button>
-          <p className="hint">{messages.backup.hint}</p>
-        </section>
+        <h2>{messages.project}</h2>
+        <ProjectSwitcher
+          projects={projects}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onAdd={() => openDialog('add')}
+          onManage={() => openDialog('manage')}
+        />
         {agent?.available && <p className="agent">{messages.agentReady(agent.version)}</p>}
       </nav>
       <main>
-        {error && (
-          <p className="warning" role="alert">
-            {errorText(error)}
-          </p>
+        {error && dialog === null && (
+          <div className="notice-bar notice-bar-warning">
+            <p role="alert">{errorText(error)}</p>
+            <CloseButton onClose={() => setError(null)} />
+          </div>
         )}
         {backupNotes.length > 0 && (
-          <div className="notice" role="status">
-            {backupNotes.map((note) => (
-              <p key={note}>{note}</p>
-            ))}
+          <div className="notice-bar">
+            <div role="status">
+              {backupNotes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+            <CloseButton onClose={() => setBackupNotes([])} />
+          </div>
+        )}
+        {removed && (
+          <div className="notice-bar">
+            <p role="status">{messages.manage.removed(removed.name)}</p>
+            <button type="button" onClick={() => void putBack(removed)}>
+              {messages.manage.undo}
+            </button>
+            <CloseButton onClose={() => setRemoved(null)} />
           </div>
         )}
         {agent?.available === false && (
@@ -194,14 +205,6 @@ export function App({ api }: Props) {
                 <h2>{selected.name}</h2>
                 <p className="folder">{selected.folder}</p>
               </div>
-              <button
-                type="button"
-                className="quiet"
-                title={messages.removeProjectHint}
-                onClick={() => void removeProject(selected)}
-              >
-                {messages.removeProject}
-              </button>
             </header>
             <div className="tabs" role="tablist">
               <TabButton current={tab} tab="ask" label={messages.ask} onSelect={setTab} />
@@ -274,10 +277,41 @@ export function App({ api }: Props) {
           <div className="notice">
             <h2>{messages.noProjectTitle}</h2>
             <p>{messages.noProjectBody}</p>
+            <div className="actions">
+              <button type="button" className="primary" onClick={() => openDialog('add')}>
+                {messages.addProject}
+              </button>
+            </div>
           </div>
         )}
       </main>
+      {dialog === 'add' && (
+        <AddProjectDialog
+          error={error}
+          onClose={closeDialog}
+          onAddFolder={() => void addProject()}
+          onCreate={(name) => void createProject(name)}
+        />
+      )}
+      {dialog === 'manage' && (
+        <ManageProjectsDialog
+          projects={projects}
+          error={error}
+          onClose={closeDialog}
+          onRemove={(project) => void removeProject(project)}
+          onSaveBackup={() => void saveBackup()}
+          onRestoreBackup={() => void restoreBackup()}
+        />
+      )}
     </div>
+  )
+}
+
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button type="button" className="quiet" aria-label={messages.close} onClick={onClose}>
+      ×
+    </button>
   )
 }
 
