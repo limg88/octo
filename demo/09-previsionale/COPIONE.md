@@ -25,10 +25,10 @@ Durata: 4 minuti. Mostra il previsionale mensile: una riga per codice di progett
    Atteso: manca la tariffa al giorno di Costa Elena (120 ore a costo, senza ricavo); mancano i costi totali previsti di `PRJ000101`; 16 ore non ancora approvate restano fuori; ci sono ore sul codice `PRJ000999`, che il modello non elenca.
    Dimostra: dove manca un dato niente viene stimato, e viene detto.
 
-5. **Aggiungi la tariffa che manca e l'esterno.** Apri «Impostazioni del previsionale». In fondo a «Tariffe al giorno» aggiungi la riga `Costa Elena; 400`. In «Esterni senza timesheet» scrivi `Studio Blu; PRJ000202; 300; 500`. Premi «Salva».
+5. **Aggiungi la tariffa che manca e l'esterno.** Apri «Impostazioni del previsionale». Sotto «Tariffe al giorno» premi «Aggiungi una tariffa» e nella riga nuova scrivi persona `Costa Elena` e tariffa `400` (la commessa resta vuota: vale per tutte). Sotto «Esterni senza timesheet» scrivi nome `Studio Blu`, commessa `PRJ000202`, costo `300`, tariffa `500`. Premi «Salva».
    Atteso: su `PRJ000101` costi interni 16.010,00, ricavi 33.200,00, margine del mese 51,78%. La riga di Costa Elena sparisce dai dati mancanti.
 
-6. **Compila il progetto a corpo.** Apri «Dati del mese per PRJ000202». In «Ore degli esterni nel mese» scrivi `Studio Blu; 40`, in «A corpo: costi totali a budget» scrivi `20000`, premi «Salva i dati del mese».
+6. **Compila il progetto a corpo.** Apri «Dati del mese per PRJ000202». Sotto «Ore degli esterni nel mese» scrivi nome `Studio Blu` e ore `40`, in «A corpo: costi totali a budget» scrivi `20000`, premi «Salva i dati del mese».
    Atteso: su `PRJ000202` costi esterni 1.500,00, avanzamento 7,5%, ricavi 3.000,00 (il 7,5% dell'ordinato di 40.000).
 
 7. **Aggiungi fatturazione e margine finale.** Apri «Dati del mese per PRJ000101»: in «Importo da fatturare nel mese» scrivi `30000`, in «Costi totali previsti del progetto» scrivi `70000`, premi «Salva i dati del mese».

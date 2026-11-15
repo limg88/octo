@@ -281,6 +281,7 @@ describe('the settings of the forecast on disk', () => {
           side: 'client' as const,
           from: '',
           to: '',
+          allocation: 40,
           note: '',
         },
       ],
@@ -289,6 +290,12 @@ describe('the settings of the forecast on disk', () => {
     await store.save(folder, team)
     expect(await store.load(folder)).toEqual(team)
     const { writeFile } = await import('node:fs/promises')
+    // A team saved before people had an allocation is read as it was: none is said.
+    await writeFile(
+      join(folder, '_octo', '.impostazioni', 'team.json'),
+      '{"people":[{"name":"Carla Bianchi","side":"client"}]}',
+    )
+    expect((await store.load(folder)).people[0]?.allocation).toBeNull()
     await writeFile(join(folder, '_octo', '.impostazioni', 'team.json'), '{"people":1}')
     await expect(store.load(folder)).rejects.toThrow('team_invalid')
   })

@@ -9,19 +9,11 @@ import {
 } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import {
-  amountField,
-  amountText,
-  externalLines,
-  externalRateLines,
-  externalRatesOf,
-  externalsOf,
-  rateLines,
-  ratesOf,
-} from './forecast-text.ts'
-import { LineProblems } from './LineProblems.tsx'
-import { type Lines, noProblems } from './lines.ts'
+import { FieldProblems, NotSaved } from './FieldProblems.tsx'
+import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { errorText, messages } from './messages.ts'
+import { PathField } from './PathField.tsx'
+import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 
 type ForecastApi = Pick<
   OctoApi,
@@ -31,6 +23,7 @@ type ForecastApi = Pick<
   | 'forecastView'
   | 'compileForecast'
   | 'openEvidence'
+  | 'chooseProjectPath'
 >
 
 type Props = {
@@ -102,6 +95,15 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
     else setError(result.code)
   }
 
+  /** The model is a spreadsheet of the project: chosen from the dialog of the system. */
+  async function chooseModel(): Promise<string | null> {
+    setError(null)
+    const result = await api.chooseProjectPath(project.id, 'file', ['xlsx'])
+    if (result.ok) return result.value
+    setError(result.code)
+    return null
+  }
+
   if (settings === null) {
     return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
   }
@@ -113,7 +115,13 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
         <section aria-label={text.setupTitle}>
           <h3>{text.setupTitle}</h3>
           <p className="hint">{text.setupIntro}</p>
-          <SettingsForm settings={settings} candidates={candidates} onSave={save} />
+          <SettingsForm
+            settings={settings}
+            candidates={candidates}
+            codes={[]}
+            onSave={save}
+            onChooseModel={chooseModel}
+          />
         </section>
       </div>
     )
@@ -181,6 +189,9 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
               <InputsForm
                 code={row.code}
                 inputs={settings.months[month]?.[row.code] ?? NO_ROW_INPUTS}
+                externalNames={settings.externals
+                  .filter((external) => external.code === row.code)
+                  .map((external) => external.name)}
                 onSave={(inputs) => saveInputs(row.code, inputs)}
               />
             </details>
@@ -189,7 +200,13 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
       )}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
-        <SettingsForm settings={settings} candidates={candidates} onSave={save} />
+        <SettingsForm
+          settings={settings}
+          candidates={candidates}
+          codes={view?.forecast.rows.map((row) => row.code) ?? []}
+          onSave={save}
+          onChooseModel={chooseModel}
+        />
       </details>
     </div>
   )
@@ -282,8 +299,14 @@ function Gaps({ view }: { view: View }) {
   )
 }
 
+type ExternalKey = 'name' | 'hours'
+const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
+  { key: 'name', label: text.columns.name },
+  { key: 'hours', label: text.columns.hours, kind: 'amount', width: '140px' },
+]
+
 type InputsDraft = {
-  externals: string
+  externals: Row<ExternalKey>[]
   toInvoice: string
   revenue: string
   budgetCosts: string
@@ -293,7 +316,10 @@ type InputsDraft = {
 }
 
 const inputsDraft = (inputs: ForecastRowInputs): InputsDraft => ({
-  externals: externalLines(inputs.externals),
+  externals: orOneRow(
+    inputs.externals.map(({ name, hours }) => ({ name, hours: amountText(hours) })),
+    EXTERNAL_COLUMNS,
+  ),
   toInvoice: amountText(inputs.toInvoice),
   revenue: amountText(inputs.revenue),
   budgetCosts: amountText(inputs.budgetCosts),
@@ -302,21 +328,37 @@ const inputsDraft = (inputs: ForecastRowInputs): InputsDraft => ({
   note: inputs.note,
 })
 
-type AmountField = 'toInvoice' | 'revenue' | 'budgetCosts' | 'totalCosts'
+const AMOUNT_FIELDS = ['toInvoice', 'revenue', 'budgetCosts', 'totalCosts'] as const
+type AmountField = (typeof AMOUNT_FIELDS)[number]
+
+/** The rows that hold something, each checked: what is wrong, by its place in the list. */
+function wrongRows<Key extends string>(
+  rows: ReadonlyArray<Row<Key>>,
+  right: (row: Row<Key>) => boolean,
+  message: (n: number) => string,
+): string[] {
+  return rows.flatMap((row, index) => (blankRow(row) || right(row) ? [] : [message(index + 1)]))
+}
+
+const filled = (...values: string[]): boolean => values.every((value) => value.trim() !== '')
+const isAmount = (typed: string): boolean => amountOf(typed) !== null
 
 function InputsForm({
   code,
   inputs,
+  externalNames,
   onSave,
 }: {
   code: string
   inputs: ForecastRowInputs
+  /** The externals declared for this code: proposed while typing. */
+  externalNames: string[]
   onSave: (inputs: ForecastRowInputs) => Promise<void>
 }) {
   const [draft, setDraft] = useState<InputsDraft>(() => inputsDraft(inputs))
-  const [unread, setUnread] = useState<Partial<
-    Record<AmountField | 'externals', Lines<unknown>>
-  > | null>(null)
+  const [problems, setProblems] = useState<{ externals: string[]; amounts: AmountField[] } | null>(
+    null,
+  )
   useEffect(() => setDraft(inputsDraft(inputs)), [inputs])
 
   const amount = (name: AmountField, label: string) => (
@@ -326,6 +368,7 @@ function InputsForm({
         <input
           type="text"
           inputMode="decimal"
+          className="amount"
           value={draft[name]}
           onChange={(event) => {
             const { value } = event.target
@@ -333,9 +376,34 @@ function InputsForm({
           }}
         />
       </label>
-      <LineProblems problems={unread?.[name]?.problems ?? []} shape="" single />
+      <FieldProblems lines={problems?.amounts.includes(name) ? [messages.amountWrong] : []} />
     </>
   )
+
+  function submit() {
+    const found = {
+      externals: wrongRows(
+        draft.externals,
+        (row) => filled(row.name) && isAmount(row.hours),
+        text.wrong.hours,
+      ),
+      amounts: AMOUNT_FIELDS.filter((name) => amountField(draft[name]).wrong),
+    }
+    // A figure that is not understood is told: saved as empty, it would change the forecast.
+    if (found.externals.length + found.amounts.length > 0) return setProblems(found)
+    setProblems(null)
+    void onSave({
+      externals: draft.externals
+        .filter((row) => !blankRow(row))
+        .map((row) => ({ name: row.name.trim(), hours: amountOf(row.hours) ?? 0 })),
+      toInvoice: amountOf(draft.toInvoice),
+      revenue: amountOf(draft.revenue),
+      budgetCosts: amountOf(draft.budgetCosts),
+      totalCosts: amountOf(draft.totalCosts),
+      totalCostsBeforeMonth: draft.totalCostsBeforeMonth,
+      note: draft.note,
+    })
+  }
 
   return (
     <form
@@ -343,38 +411,22 @@ function InputsForm({
       aria-label={text.inputsTitle(code)}
       onSubmit={(event) => {
         event.preventDefault()
-        const read = {
-          externals: externalsOf(draft.externals),
-          toInvoice: amountField(draft.toInvoice),
-          revenue: amountField(draft.revenue),
-          budgetCosts: amountField(draft.budgetCosts),
-          totalCosts: amountField(draft.totalCosts),
-        }
-        // A figure that is not understood is told: saved as empty, it would change the forecast.
-        if (!noProblems(...Object.values(read))) return setUnread(read)
-        setUnread(null)
-        void onSave({
-          externals: read.externals.values,
-          toInvoice: read.toInvoice.values[0] ?? null,
-          revenue: read.revenue.values[0] ?? null,
-          budgetCosts: read.budgetCosts.values[0] ?? null,
-          totalCosts: read.totalCosts.values[0] ?? null,
-          totalCostsBeforeMonth: draft.totalCostsBeforeMonth,
-          note: draft.note,
-        })
+        submit()
       }}
     >
-      <label>
-        {text.externals}
-        <textarea
-          value={draft.externals}
-          onChange={(event) => {
-            const { value } = event.target
-            setDraft((current) => ({ ...current, externals: value }))
-          }}
-        />
-      </label>
-      <LineProblems problems={unread?.externals?.problems ?? []} shape={text.shapes.externals} />
+      <h4>{text.externals}</h4>
+      <RowsField
+        label={text.externals}
+        columns={EXTERNAL_COLUMNS.map((column) =>
+          column.key === 'name' ? { ...column, suggestions: externalNames } : column,
+        )}
+        rows={draft.externals}
+        onChange={(externals) => setDraft((current) => ({ ...current, externals }))}
+        addLabel={text.add.external}
+        cellLabel={(column, row) => text.cell(text.columns[column], row)}
+        removeLabel={text.removeRow}
+      />
+      <FieldProblems lines={problems?.externals ?? []} />
       {amount('toInvoice', text.toInvoice)}
       {amount('revenue', text.revenue)}
       {amount('budgetCosts', text.budgetCosts)}
@@ -403,39 +455,71 @@ function InputsForm({
       </label>
       <div className="actions">
         <button type="submit">{text.saveInputs}</button>
-        {unread && (
-          <span className="field-problems" role="status">
-            {messages.lines.notSaved}
-          </span>
-        )}
+        {problems && <NotSaved text={messages.notSaved} />}
       </div>
     </form>
   )
 }
 
-type SettingsDraft = { modelPath: string; hoursPerDay: string; rates: string; externals: string }
+type RateKey = 'person' | 'code' | 'rate'
+type ExternalRateKey = 'name' | 'code' | 'cost' | 'rate'
+const RATE_COLUMNS: RowsColumn<RateKey>[] = [
+  { key: 'person', label: text.columns.person },
+  { key: 'code', label: text.columns.codeOrAll, width: '200px' },
+  { key: 'rate', label: text.columns.rate, kind: 'amount', width: '150px' },
+]
+const EXTERNAL_RATE_COLUMNS: RowsColumn<ExternalRateKey>[] = [
+  { key: 'name', label: text.columns.name },
+  { key: 'code', label: text.columns.code, width: '160px' },
+  { key: 'cost', label: text.columns.cost, kind: 'amount', width: '140px' },
+  { key: 'rate', label: text.columns.rate, kind: 'amount', width: '140px' },
+]
+
+type SettingsDraft = {
+  modelPath: string
+  hoursPerDay: string
+  rates: Row<RateKey>[]
+  externals: Row<ExternalRateKey>[]
+}
 
 const settingsDraft = (settings: ForecastSettings): SettingsDraft => ({
   modelPath: settings.modelPath,
   hoursPerDay: String(settings.hoursPerDay),
-  rates: rateLines(settings.rates),
-  externals: externalRateLines(settings.externals),
+  rates: orOneRow(
+    settings.rates.map((rate) => ({
+      person: rate.person,
+      code: rate.code ?? '',
+      rate: amountText(rate.ratePerDay),
+    })),
+    RATE_COLUMNS,
+  ),
+  externals: orOneRow(
+    settings.externals.map((external) => ({
+      name: external.name,
+      code: external.code,
+      cost: amountText(external.costPerDay),
+      rate: amountText(external.ratePerDay),
+    })),
+    EXTERNAL_RATE_COLUMNS,
+  ),
 })
 
 function SettingsForm({
   settings,
   candidates,
+  codes,
   onSave,
+  onChooseModel,
 }: {
   settings: ForecastSettings
   candidates: string[]
+  /** The project codes the model lists: proposed where a code is typed. */
+  codes: string[]
   onSave: (settings: ForecastSettings) => Promise<void>
+  onChooseModel: () => Promise<string | null>
 }) {
   const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraft(settings))
-  const [unread, setUnread] = useState<{
-    rates: Lines<unknown>
-    externals: Lines<unknown>
-  } | null>(null)
+  const [problems, setProblems] = useState<{ rates: string[]; externals: string[] } | null>(null)
   useEffect(() => setDraft(settingsDraft(settings)), [settings])
   // The only model found is proposed without asking.
   useEffect(() => {
@@ -444,43 +528,61 @@ function SettingsForm({
       modelPath: current.modelPath || (candidates.length === 1 ? (candidates[0] ?? '') : ''),
     }))
   }, [candidates])
+  const withCodes = <Key extends string>(columns: RowsColumn<Key>[]): RowsColumn<Key>[] =>
+    columns.map((column) => (column.key === 'code' ? { ...column, suggestions: codes } : column))
+
+  function submit() {
+    const found = {
+      rates: wrongRows(
+        draft.rates,
+        (row) => filled(row.person) && isAmount(row.rate),
+        text.wrong.rate,
+      ),
+      externals: wrongRows(
+        draft.externals,
+        (row) => filled(row.name, row.code) && isAmount(row.cost) && isAmount(row.rate),
+        text.wrong.external,
+      ),
+    }
+    if (found.rates.length + found.externals.length > 0) return setProblems(found)
+    setProblems(null)
+    void onSave({
+      ...settings,
+      modelPath: draft.modelPath,
+      hoursPerDay: Number(draft.hoursPerDay),
+      rates: draft.rates
+        .filter((row) => !blankRow(row))
+        .map((row) => ({
+          person: row.person.trim(),
+          code: row.code.trim() === '' ? null : row.code.trim().toUpperCase(),
+          ratePerDay: amountOf(row.rate) ?? 0,
+        })),
+      externals: draft.externals
+        .filter((row) => !blankRow(row))
+        .map((row) => ({
+          name: row.name.trim(),
+          code: row.code.trim().toUpperCase(),
+          costPerDay: amountOf(row.cost) ?? 0,
+          ratePerDay: amountOf(row.rate) ?? 0,
+        })),
+    })
+  }
 
   return (
     <form
-      className="settings-form"
+      className="settings-form wide-form"
       onSubmit={(event) => {
         event.preventDefault()
-        const read = { rates: ratesOf(draft.rates), externals: externalRatesOf(draft.externals) }
-        if (!noProblems(read.rates, read.externals)) return setUnread(read)
-        setUnread(null)
-        void onSave({
-          ...settings,
-          modelPath: draft.modelPath,
-          hoursPerDay: Number(draft.hoursPerDay),
-          rates: read.rates.values,
-          externals: read.externals.values,
-        })
+        submit()
       }}
     >
-      <label>
-        {text.modelPath}
-        <input
-          type="text"
-          list={candidates.length > 0 ? 'forecast-models' : undefined}
-          value={draft.modelPath}
-          onChange={(event) => {
-            const { value } = event.target
-            setDraft((current) => ({ ...current, modelPath: value }))
-          }}
-        />
-        {candidates.length > 0 && (
-          <datalist id="forecast-models">
-            {candidates.map((candidate) => (
-              <option key={candidate} value={candidate} />
-            ))}
-          </datalist>
-        )}
-      </label>
+      <PathField
+        label={text.modelPath}
+        value={draft.modelPath}
+        candidates={candidates}
+        onChange={(modelPath) => setDraft((current) => ({ ...current, modelPath }))}
+        onChoose={onChooseModel}
+      />
       <label>
         {text.hoursPerDay}
         <input
@@ -492,41 +594,43 @@ function SettingsForm({
           }}
         />
       </label>
-      <label>
-        {text.rates}
-        <textarea
-          value={draft.rates}
-          onChange={(event) => {
-            const { value } = event.target
-            setDraft((current) => ({ ...current, rates: value }))
-          }}
-        />
-      </label>
-      <LineProblems problems={unread?.rates.problems ?? []} shape={text.shapes.rates} />
+      <h4>{text.rates}</h4>
       <p className="hint">{text.ratesHint}</p>
-      <label>
-        {text.externalRates}
-        <textarea
-          value={draft.externals}
-          onChange={(event) => {
-            const { value } = event.target
-            setDraft((current) => ({ ...current, externals: value }))
-          }}
-        />
-      </label>
-      <LineProblems problems={unread?.externals.problems ?? []} shape={text.shapes.externalRates} />
+      <RowsField
+        label={text.rates}
+        columns={withCodes(RATE_COLUMNS)}
+        rows={draft.rates}
+        onChange={(rates) => setDraft((current) => ({ ...current, rates }))}
+        addLabel={text.add.rate}
+        cellLabel={(column, row) => text.cell(RATE_LABELS[column], row)}
+        removeLabel={text.removeRow}
+      />
+      <FieldProblems lines={problems?.rates ?? []} />
+      <h4>{text.externalRates}</h4>
       <p className="hint">{text.externalRatesHint}</p>
+      <RowsField
+        label={text.externalRates}
+        columns={withCodes(EXTERNAL_RATE_COLUMNS)}
+        rows={draft.externals}
+        onChange={(externals) => setDraft((current) => ({ ...current, externals }))}
+        addLabel={text.add.external}
+        cellLabel={(column, row) => text.cell(text.columns[column], row)}
+        removeLabel={text.removeRow}
+      />
+      <FieldProblems lines={problems?.externals ?? []} />
       <div className="actions">
         <button type="submit" disabled={draft.modelPath.trim() === ''}>
           {text.save}
         </button>
         {draft.modelPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
-        {unread && (
-          <span className="field-problems" role="status">
-            {messages.lines.notSaved}
-          </span>
-        )}
+        {problems && <NotSaved text={messages.notSaved} />}
       </div>
     </form>
   )
+}
+
+const RATE_LABELS: Record<RateKey, string> = {
+  person: text.columns.person,
+  code: text.columns.code,
+  rate: text.columns.rate,
 }

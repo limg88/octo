@@ -20,6 +20,7 @@ type DashboardApi = Pick<
   | 'dashboardCandidates'
   | 'dashboardView'
   | 'readTrackerSnapshot'
+  | 'chooseProjectPath'
 >
 
 type Props = {
@@ -79,6 +80,15 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
     if (result.value.exportPath !== '') await loadView(range)
+  }
+
+  /** The export and its history are JSON files of the project. */
+  async function chooseFile(): Promise<string | null> {
+    setError(null)
+    const result = await api.chooseProjectPath(project.id, 'file', ['json'])
+    if (result.ok) return result.value
+    setError(result.code)
+    return null
   }
 
   /** The reading was asked while Azure DevOps is not linked. */
@@ -159,6 +169,7 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
             candidates={candidates}
             view={null}
             onSave={save}
+            onChooseFile={chooseFile}
           />
         </section>
       </div>
@@ -305,6 +316,7 @@ export function DashboardView({ api, project, now = () => new Date(), onOpenSour
           candidates={candidates}
           view={view}
           onSave={save}
+          onChooseFile={chooseFile}
         />
       </details>
     </div>

@@ -76,6 +76,7 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
+  | 'chooseProjectPath'
   | 'hoursSettings'
   | 'saveHoursSettings'
   | 'hoursCandidates'
@@ -86,6 +87,7 @@ type Api = Pick<
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
+    chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
     hoursSettings: vi.fn(async () => ok(configured)),
     saveHoursSettings: vi.fn(async (_id: string, settings: HoursSettings) => ok(settings)),
     hoursCandidates: vi.fn(async () =>
@@ -186,19 +188,29 @@ describe('hours', () => {
     await waitFor(() => expect(path.value).toBe('ore/Timesheets'))
     fireEvent.change(screen.getByLabelText(text.projects), { target: { value: 'P1, P2' } })
     fireEvent.change(screen.getByLabelText(text.threshold), { target: { value: '30' } })
-    fireEvent.change(screen.getByLabelText(text.aliases), {
-      target: { value: 'anna.b = Bianchi Anna\nriga senza segno' },
-    })
+    const alias = (column: string, row: number) =>
+      screen.getByLabelText(text.aliasCell(column, row))
+    fireEvent.change(alias(text.aliasColumns.worklog, 1), { target: { value: 'anna.b' } })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
-    // The line that is not a pair of names is told, and nothing is saved until it is right.
-    expect(
-      await screen.findByText(
-        messages.lines.line(2, 'riga senza segno', 'shape', text.shapes.aliases),
-      ),
-    ).toBeTruthy()
+    // A pair with one name only is told, and nothing is saved until it is right.
+    expect(await screen.findByText(text.aliasWrong(1))).toBeTruthy()
     expect(api.saveHoursSettings).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText(text.aliases), {
-      target: { value: 'anna.b = Bianchi Anna' },
+    fireEvent.change(alias(text.aliasColumns.timesheet, 1), {
+      target: { value: 'Bianchi Anna' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: text.addAlias }))
+    // The folder of the exports can be chosen from the dialog of the system.
+    fireEvent.click(
+      screen.getByRole('button', { name: `${messages.choosePath}: ${text.worklogPath}` }),
+    )
+    await waitFor(() =>
+      expect((screen.getByLabelText(text.worklogPath) as HTMLInputElement).value).toBe(
+        'scelto/qui',
+      ),
+    )
+    expect(api.chooseProjectPath).toHaveBeenCalledWith('p-1', 'folder', [])
+    fireEvent.change(screen.getByLabelText(text.worklogPath), {
+      target: { value: 'ore/jira/w.csv' },
     })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveHoursSettings).toHaveBeenCalled())

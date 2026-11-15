@@ -29,13 +29,15 @@ Durata: 4 minuti. Mostra il confronto fra le voci del tracker del cliente in uno
    - «Ticket che nominano una voce che non c'è»: `AUR-8`, che nomina la 999.
    - «Forse sono la stessa cosa»: la voce 106 e il ticket `AUR-6`, titoli quasi uguali ma nessun riferimento. Octo li propone, non li collega.
 
-5. **Di' quali stati vogliono dire la stessa cosa.** Apri «Che cosa confronto», in «Stati che vogliono dire la stessa cosa» scrivi:
-   ```
-   da fare: New = Da completare
-   in corso: In Progress = In corso
-   chiuso: Closed = Completata
-   ```
-   e premi «Salva».
+5. **Di' quali stati vogliono dire la stessa cosa.** Apri «Che cosa confronto». Sotto «Stati che vogliono dire la stessa cosa» scrivi tre righe, con «Aggiungi un gruppo» per le due in più:
+
+   | Che cosa vogliono dire | Stati del cliente | Stati dei ticket |
+   |---|---|---|
+   | `da fare` | `New` | `Da completare` |
+   | `in corso` | `In Progress` | `In corso` |
+   | `chiuso` | `Closed` | `Completata` |
+
+   Premi «Salva».
    Atteso: fra le collegate, la 101 ha stati «Coerenti»; la 102 «Diversi»: per il cliente è in corso, il ticket è già completato.
 
 6. **Scrivi il file di import.** In «Senza ticket» premi «Scrivi il file di import dei ticket mancanti», poi «Apri il file».

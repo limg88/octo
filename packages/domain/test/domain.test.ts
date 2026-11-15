@@ -9,6 +9,7 @@ import {
   isDomainError,
   markersIn,
   normalizeForMatch,
+  pathInProject,
   projectNameFromFolder,
   sameFolder,
   unverifiedCount,
@@ -105,6 +106,16 @@ describe('project', () => {
   it('compares folders ignoring a trailing separator', () => {
     expect(sameFolder('/a/b/', '/a/b')).toBe(true)
     expect(sameFolder('/a/b', '/a/c')).toBe(false)
+  })
+
+  it('gives a chosen path as a path from the project folder, or refuses it', () => {
+    expect(pathInProject('/p/Aurora', '/p/Aurora/dati/ore.csv')).toBe('dati/ore.csv')
+    expect(pathInProject('/p/Aurora/', '/p/Aurora/dati/')).toBe('dati')
+    expect(pathInProject('C:\\p\\Aurora', 'C:\\p\\Aurora\\dati\\ore.csv')).toBe('dati/ore.csv')
+    // The folder itself, a sibling whose name starts the same way, and anything elsewhere.
+    expect(pathInProject('/p/Aurora', '/p/Aurora')).toBeNull()
+    expect(pathInProject('/p/Aurora', '/p/Aurora 2/ore.csv')).toBeNull()
+    expect(pathInProject('/p/Aurora', '/altrove/ore.csv')).toBeNull()
   })
 })
 

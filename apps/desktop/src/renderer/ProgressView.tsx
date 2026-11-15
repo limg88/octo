@@ -22,6 +22,7 @@ type ProgressApi = Pick<
   | 'progressView'
   | 'compileProgress'
   | 'openEvidence'
+  | 'chooseProjectPath'
 >
 
 type Props = { api: ProgressApi; project: Project }
@@ -106,6 +107,13 @@ export function ProgressView({ api, project }: Props) {
           candidates={candidates}
           onSave={async (next) => {
             await save(next)
+          }}
+          onChooseModel={async () => {
+            setError(null)
+            const result = await api.chooseProjectPath(project.id, 'file', ['xlsx'])
+            if (result.ok) return result.value
+            setError(result.code)
+            return null
           }}
           onClose={ready(settings) ? () => setPanel(CLOSED) : undefined}
         />

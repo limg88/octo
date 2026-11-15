@@ -324,7 +324,10 @@ try {
   await page.getByRole('button', { name: 'È atteso: Neri Sara' }).click()
   await hoursRow('Neri Sara').getByText('Atteso').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('Impostazioni delle ore').click()
-  await page.getByLabel(/^Stessa persona, nomi diversi/).fill('E. Costa = Costa Elena')
+  // Rows with a field for each value: no separators to remember.
+  const cell = (scope, label) => scope.getByLabel(label, { exact: true })
+  await cell(page, 'Nome sul tracker, riga 1').fill('E. Costa')
+  await cell(page, 'Nome nel timesheet, riga 1').fill('Costa Elena')
   await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
   await hoursRow('Costa Elena').getByText('Torna').waitFor({ timeout: TIMEOUT_MS })
   assert.equal(await hoursRow('E. Costa').count(), 0)
@@ -379,15 +382,23 @@ try {
   await page.getByText(/^16 ore del mese non ancora approvate/).waitFor()
   await page.getByText(/codici che il modello non elenca: PRJ000999/).waitFor()
   await page.getByText('Impostazioni del previsionale').click()
-  const rates = page.getByLabel(/^Tariffe al giorno/)
-  await rates.fill(`${await rates.inputValue()}\nCosta Elena; 400`)
-  await page.getByLabel(/^Esterni senza timesheet/).fill('Studio Blu; PRJ000202; 300; 500')
+  const rates = page.getByRole('group', { name: 'Tariffe al giorno' })
+  await rates.getByRole('button', { name: 'Aggiungi una tariffa' }).click()
+  const newRate = await rates.getByLabel(/^Persona, riga/).count()
+  await cell(rates, `Persona, riga ${newRate}`).fill('Costa Elena')
+  await cell(rates, `Tariffa al giorno, riga ${newRate}`).fill('400')
+  const externals = page.getByRole('group', { name: 'Esterni senza timesheet' })
+  await cell(externals, 'Nome, riga 1').fill('Studio Blu')
+  await cell(externals, 'Commessa, riga 1').fill('PRJ000202')
+  await cell(externals, 'Costo al giorno, riga 1').fill('300')
+  await cell(externals, 'Tariffa al giorno, riga 1').fill('500')
   await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
   await forecastRow('PRJ000101').getByText('33.200,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('51,78%').waitFor()
   await page.getByText('Dati del mese per PRJ000202').click()
   const inputs202 = page.getByRole('form', { name: 'Dati del mese per PRJ000202' })
-  await inputs202.getByLabel(/^Ore degli esterni nel mese/).fill('Studio Blu; 40')
+  await cell(inputs202, 'Nome, riga 1').fill('Studio Blu')
+  await cell(inputs202, 'Ore, riga 1').fill('40')
   await inputs202.getByLabel(/^A corpo/).fill('20000')
   await inputs202.getByRole('button', { name: 'Salva i dati del mese' }).click()
   await forecastRow('PRJ000202').getByText('7,5%', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
@@ -550,11 +561,18 @@ try {
     .getByText(/^AUR-6 · /)
     .waitFor()
   await page.getByText('Che cosa confronto').click()
-  await page
-    .getByLabel(/^Stati che vogliono dire/)
-    .fill(
-      'da fare: New = Da completare\nin corso: In Progress = In corso\nchiuso: Closed = Completata',
-    )
+  const groups13 = page.getByRole('group', { name: 'Stati che vogliono dire la stessa cosa' })
+  const stateGroups = [
+    ['da fare', 'New', 'Da completare'],
+    ['in corso', 'In Progress', 'In corso'],
+    ['chiuso', 'Closed', 'Completata'],
+  ]
+  for (const [index, [name, item, ticket]] of stateGroups.entries()) {
+    if (index > 0) await groups13.getByRole('button', { name: 'Aggiungi un gruppo' }).click()
+    await cell(groups13, `Che cosa vogliono dire, riga ${index + 1}`).fill(name)
+    await cell(groups13, `Stati del cliente (separati da virgola), riga ${index + 1}`).fill(item)
+    await cell(groups13, `Stati dei ticket (separati da virgola), riga ${index + 1}`).fill(ticket)
+  }
   await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
   await list13('Collegate').getByText('Diversi', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('button', { name: 'Scrivi il file di import dei ticket mancanti' }).click()
@@ -575,16 +593,23 @@ try {
   await page.getByRole('tab', { name: 'Fonti' }).click()
   await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team14 = page.getByRole('region', { name: 'Persone e calendario' })
-  await team14
-    .getByLabel(/^Persone:/)
-    .fill(
-      'Neri Sara; analista; nostra; ; 31/01/2026\nCarla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta',
-    )
-  await team14.getByLabel(/^Calendario:/).fill('Sprint 28; 26/10/2026; 13/11/2026')
+  await cell(team14, 'Nome, persona 1').fill('Neri Sara')
+  await cell(team14, 'Ruolo, persona 1').fill('analista')
+  await cell(team14, 'Al, persona 1').fill('2026-01-31')
+  await cell(team14, 'Allocazione %, persona 1').fill('50')
+  await team14.getByRole('button', { name: 'Aggiungi una persona' }).click()
+  await cell(team14, 'Nome, persona 2').fill('Carla Bianchi')
+  await cell(team14, 'Ruolo, persona 2').fill('referente')
+  await cell(team14, 'Parte, persona 2').selectOption('client')
+  await cell(team14, 'Come scrivergli, persona 2').fill('dare del lei, prima la richiesta')
+  await cell(team14, 'Periodo, periodo 1').fill('Sprint 28')
+  await cell(team14, 'Dal, periodo 1').fill('2026-10-26')
+  await cell(team14, 'Al, periodo 1').fill('2026-11-13')
   await team14.getByRole('button', { name: 'Salva persone e calendario' }).click()
   await team14.getByText('Salvate 2 persone e 1 periodi.').waitFor({ timeout: TIMEOUT_MS })
   const teamText = readFileSync(`${work}/Aurora/_octo/progetto/persone-e-calendario.md`, 'utf8')
   assert.match(teamText, /\*\*Carla Bianchi\*\*, referente/)
+  assert.match(teamText, /\*\*Neri Sara\*\*, analista, al 50% del suo tempo/)
   assert.match(teamText, /\| Sprint 28 \| 26\/10\/2026 \| 13\/11\/2026 \|/)
   assert.equal(
     JSON.parse(readFileSync(`${work}/Aurora/_octo/.impostazioni/team.json`, 'utf8')).people[0].to,
@@ -755,18 +780,16 @@ try {
   await page.screenshot({ path: `${work}/progetti.png` })
   await page.keyboard.press('Escape')
 
-  // Demo 20: a line that is not understood is told under its field, and nothing is saved.
+  // Demo 20: a row that lacks something is told under its table, and nothing is saved.
   await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team20 = page.getByRole('region', { name: 'Persone e calendario' })
   const teamFile = () => readFileSync(`${movedFolder}/_octo/.impostazioni/team.json`, 'utf8')
   const teamBefore = teamFile()
-  await team20.getByLabel(/^Persone:/).fill('Mario Rossi; sviluppatore; boh')
-  await team20.getByLabel(/^Calendario:/).fill('Sprint 1; ieri; domani')
+  await cell(team20, 'Nome, persona 1').fill('')
+  await cell(team20, 'Al, periodo 1').fill('')
   await team20.getByRole('button', { name: 'Salva persone e calendario' }).click()
-  await team20
-    .getByText('Riga 1, «Mario Rossi; sviluppatore; boh»: la parte è «nostra» oppure «cliente».')
-    .waitFor({ timeout: TIMEOUT_MS })
-  await team20.getByText(/Riga 1, «Sprint 1; ieri; domani»: c’è una data che non esiste/).waitFor()
+  await team20.getByText('Persona 1: manca il nome.').waitFor({ timeout: TIMEOUT_MS })
+  await team20.getByText('Periodo 1: servono il nome e le due date.').waitFor()
   await team20.getByText(/^Non ho salvato/).waitFor()
   assert.equal(teamFile(), teamBefore)
   await team20.getByRole('button', { name: 'Salva persone e calendario' }).scrollIntoViewIfNeeded()

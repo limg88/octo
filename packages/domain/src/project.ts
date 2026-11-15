@@ -15,6 +15,22 @@ export function projectNameFromFolder(folder: string): string {
   return segments.at(-1) ?? FALLBACK_PROJECT_NAME
 }
 
+/**
+ * A path chosen on this computer as a path from the project folder, with `/` between its parts;
+ * null when it is not inside the folder. Octo reads and writes only there.
+ */
+export function pathInProject(projectFolder: string, path: string): string | null {
+  const parts = (value: string): string[] =>
+    value
+      .normalize('NFC')
+      .split(PATH_SEPARATORS)
+      .filter((segment) => segment.length > 0)
+  const root = parts(projectFolder)
+  const target = parts(path)
+  const inside = target.length > root.length && root.every((segment, at) => segment === target[at])
+  return inside ? target.slice(root.length).join('/') : null
+}
+
 export function sameFolder(a: string, b: string): boolean {
   return normalizeFolder(a) === normalizeFolder(b)
 }

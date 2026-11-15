@@ -314,6 +314,7 @@ describe('hours', () => {
       side: 'supplier' as const,
       from,
       to,
+      allocation: null,
       note: '',
     })
     const paths = { timesheetPath: 'ore/Timesheets', worklogPath: 'ore/jira/' }

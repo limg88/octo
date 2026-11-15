@@ -9,7 +9,7 @@ import {
 } from '@octo/domain'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AlignmentView, stateGroupLines, stateGroupsOf } from '../src/renderer/AlignmentView.tsx'
+import { AlignmentView } from '../src/renderer/AlignmentView.tsx'
 import { messages } from '../src/renderer/messages.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
@@ -85,6 +85,7 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
+  | 'chooseProjectPath'
   | 'alignmentSettings'
   | 'saveAlignmentSettings'
   | 'alignmentView'
@@ -94,6 +95,7 @@ type Api = Pick<
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
+    chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
     alignmentSettings: vi.fn(async () => ok(configured)),
     saveAlignmentSettings: vi.fn(async (_id: string, settings: AlignmentSettings) => ok(settings)),
     alignmentView: vi.fn(async () => ok(view)),
@@ -107,25 +109,6 @@ function fakeApi(overrides: Partial<Api> = {}) {
 }
 
 afterEach(cleanup)
-
-describe('groups of states as typed', () => {
-  it('are read one per line and written back', () => {
-    const groups = stateGroupsOf(
-      'in corso: In Progress, Active = In corso\nsenza uguale: x\nsenza nome\nchiuso: Closed = Completata, Chiusa',
-    )
-    expect(groups.values).toEqual([
-      { name: 'in corso', item: ['In Progress', 'Active'], ticket: ['In corso'] },
-      { name: 'chiuso', item: ['Closed'], ticket: ['Completata', 'Chiusa'] },
-    ])
-    expect(groups.problems).toEqual([
-      { line: 2, text: 'senza uguale: x', reason: 'shape' },
-      { line: 3, text: 'senza nome', reason: 'shape' },
-    ])
-    expect(stateGroupLines(groups.values)).toBe(
-      'in corso: In Progress, Active = In corso\nchiuso: Closed = Completata, Chiusa',
-    )
-  })
-})
 
 describe('the alignment', () => {
   it('shows every list with its count and whether the numbers add up', async () => {
@@ -202,15 +185,25 @@ describe('the alignment', () => {
     type(text.period, 'PI7')
     type(text.tags, 'Squadra, Altri')
     type(text.referencePrefixes, 'AZDO')
-    type(text.stateGroups, 'in corso: In Progress')
+    const group = (column: string, row: number) =>
+      screen.getByLabelText(text.groupCell(column, row))
+    fireEvent.change(group(text.groupColumns.name, 1), { target: { value: 'in corso' } })
+    fireEvent.change(group(text.groupColumns.item, 1), { target: { value: 'In Progress' } })
     fireEvent.click(save)
-    expect(
-      screen.getByText(
-        messages.lines.line(1, 'in corso: In Progress', 'shape', text.shapes.stateGroups),
-      ),
-    ).toBeTruthy()
+    // A group that names the states of one tracker only is told, and nothing is saved.
+    expect(screen.getByText(text.groupWrong(1))).toBeTruthy()
     expect(api.saveAlignmentSettings).not.toHaveBeenCalled()
-    type(text.stateGroups, 'in corso: In Progress = In corso')
+    fireEvent.change(group(text.groupColumns.ticket, 1), { target: { value: 'In corso' } })
+    fireEvent.click(screen.getByRole('button', { name: text.addGroup }))
+    // The export and the folder of the tickets can be chosen from the dialog of the system.
+    fireEvent.click(
+      screen.getByRole('button', { name: `${messages.choosePath}: ${text.exportPath}` }),
+    )
+    await waitFor(() => expect(api.chooseProjectPath).toHaveBeenCalledWith('p-1', 'file', ['json']))
+    fireEvent.click(
+      screen.getByRole('button', { name: `${messages.choosePath}: ${text.ticketFolder}` }),
+    )
+    await waitFor(() => expect(api.chooseProjectPath).toHaveBeenCalledWith('p-1', 'folder', []))
     type(text.ticketFolder, 'ticket')
     type(text.exportPath, 'dati/sprint.json')
     fireEvent.click(save)

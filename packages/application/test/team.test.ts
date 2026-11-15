@@ -27,15 +27,18 @@ describe('the people and the calendar of a project', () => {
           side: 'client',
           from: '',
           to: '',
+          allocation: 50,
           note: 'lei',
         },
-        { name: '', role: '', side: 'supplier', from: '', to: '', note: '' },
+        { name: '', role: '', side: 'supplier', from: '', to: '', allocation: null, note: '' },
       ],
       periods: [{ name: 'Sprint 28', from: '2026-10-26', to: '2026-11-13' }],
     })
     expect(clean.people.map((person) => person.name)).toEqual(['Carla Bianchi'])
     expect(await team.get(project)).toEqual(clean)
-    expect(writer.files.get(TEAM_FILE)).toContain('- **Carla Bianchi**, referente')
+    expect(writer.files.get(TEAM_FILE)).toContain(
+      '- **Carla Bianchi**, referente, al 50% del suo tempo',
+    )
     expect(writer.files.get(TEAM_FILE)).toContain('| Sprint 28 | 26/10/2026 | 13/11/2026 |')
   })
 })

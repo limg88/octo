@@ -1376,14 +1376,6 @@ fieldset > button {
   align-items: center;
 }
 
-.rows-cells {
-  grid-template-columns: 90px 1fr 30px;
-}
-
-.rows-positions {
-  grid-template-columns: 1fr 180px 30px;
-}
-
 .rows-row {
   display: contents;
 }
@@ -1582,4 +1574,37 @@ details.advanced[open] > summary {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.rows-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Inside a row the column decides the width, not the kind of field. */
+.rows input,
+.rows select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* A path with the button that opens the dialog of the system beside it. */
+.path-field {
+  display: flex;
+  gap: 8px;
+}
+
+.path-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A form whose rows have many columns takes the room there is. */
+.wide-form {
+  max-width: 1000px;
+}
+
+.settings-form .field label {
+  font-weight: 500;
 }

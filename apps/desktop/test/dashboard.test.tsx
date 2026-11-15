@@ -75,6 +75,7 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
+  | 'chooseProjectPath'
   | 'dashboardSettings'
   | 'saveDashboardSettings'
   | 'dashboardCandidates'
@@ -84,6 +85,7 @@ type Api = Pick<
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
+    chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
     dashboardSettings: vi.fn(async () => ok(configured)),
     saveDashboardSettings: vi.fn(async (_id: string, settings: DashboardSettings) => ok(settings)),
     dashboardCandidates: vi.fn(async () => ok({ exports: ['data/latest.json'], histories: [] })),
@@ -218,6 +220,23 @@ describe('dashboard', () => {
     await screen.findByRole('region', { name: text.setupTitle })
     const path = screen.getByLabelText(text.exportPath) as HTMLInputElement
     await waitFor(() => expect(path.value).toBe('data/latest.json'))
+    // The history is chosen from the dialog of the system; a file elsewhere is refused.
+    const choose = screen.getByRole('button', {
+      name: `${messages.choosePath}: ${text.historyPath}`,
+    })
+    vi.mocked(api.chooseProjectPath).mockResolvedValueOnce({
+      ok: false,
+      code: 'path_outside_project',
+    })
+    fireEvent.click(choose)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/fuori dalla cartella/)
+    fireEvent.click(choose)
+    await waitFor(() =>
+      expect((screen.getByLabelText(text.historyPath) as HTMLInputElement).value).toBe(
+        'scelto/qui',
+      ),
+    )
+    expect(api.chooseProjectPath).toHaveBeenLastCalledWith('p-1', 'file', ['json'])
     fireEvent.change(screen.getByLabelText(text.tags), { target: { value: 'Team, Altro' } })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalled())

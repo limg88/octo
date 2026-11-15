@@ -24,9 +24,11 @@ import type {
 import {
   DomainError,
   FEED_NAMES,
+  FULL_ALLOCATION,
   isDomainError,
   MODEL_CHOICES,
   PHASES,
+  pathInProject,
   TEAM_SIDES,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
@@ -283,6 +285,7 @@ const teamInput = byProject.extend({
           side: z.enum(TEAM_SIDES),
           from: rule,
           to: rule,
+          allocation: z.number().positive().max(FULL_ALLOCATION).nullable(),
           note: z.string().max(MAX_INPUT_LENGTH),
         }),
       )
@@ -295,6 +298,11 @@ const modelsInput = byProject.extend({
   settings: z.object({ ask: modelChoice, write: modelChoice, review: modelChoice }),
 })
 const newProjectInput = z.object({ name: rule })
+const MAX_EXTENSIONS = 8
+const choosePathInput = byProject.extend({
+  what: z.enum(['file', 'folder']),
+  extensions: z.array(z.string().regex(/^[a-z0-9]{1,8}$/)).max(MAX_EXTENSIONS),
+})
 
 /** Every request from the interface is validated here, and every failure leaves as a code. */
 export function registerIpc(deps: IpcDeps): void {
@@ -377,6 +385,23 @@ export function registerIpc(deps: IpcDeps): void {
   })
 
   handle(CHANNELS.projectsRestore, byProject, ({ projectId }) => deps.projects.restore(projectId))
+
+  handle(CHANNELS.projectsChoosePath, choosePathInput, async ({ projectId, what, extensions }) => {
+    const project = await deps.projects.get(projectId)
+    const choice = await dialog.showOpenDialog(deps.window, {
+      defaultPath: project.folder,
+      properties: [what === 'folder' ? 'openDirectory' : 'openFile'],
+      ...(what === 'file' && extensions.length > 0
+        ? { filters: [{ name: extensions.join(', ').toUpperCase(), extensions }] }
+        : {}),
+    })
+    const chosen = choice.filePaths[0]
+    if (choice.canceled || !chosen) return null
+    const inside = pathInProject(project.folder, chosen)
+    // Octo reads only inside the project: a file elsewhere is refused, not copied in silence.
+    if (inside === null) throw new DomainError('path_outside_project', chosen)
+    return inside
+  })
 
   handle(CHANNELS.questionsList, byProject, async ({ projectId }) => {
     const project = await deps.projects.get(projectId)

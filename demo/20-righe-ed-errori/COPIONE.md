@@ -14,11 +14,11 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Scrivi una persona e un periodo sbagliati.** Apri «Fonti» e, in alto, la parte «Persone e calendario». In «Persone» scrivi `Mario Rossi; sviluppatore; boh; 32/13/2026`, in «Calendario» `Sprint 1; ieri; domani`. Premi «Salva persone e calendario».
-   Atteso: sotto il primo campo «Riga 1, «Mario Rossi; sviluppatore; boh; 32/13/2026»: la parte è «nostra» oppure «cliente».»; sotto il secondo «Riga 1, «Sprint 1; ieri; domani»: c'è una data che non esiste o non è scritta come giorno/mese/anno.»; accanto al pulsante «Non ho salvato: correggi ciò che è segnalato sotto i campi.»
-   Dimostra: prima «boh» diventava «nostra», il periodo spariva e la risposta era «Salvate 1 persone e 0 periodi».
+2. **Scrivi una persona e un periodo a metà.** Apri «Fonti» e, in alto, la parte «Persone e calendario». Nella prima riga delle persone scrivi solo il ruolo `sviluppatore`; nel calendario il nome `Sprint 1` e solo la data «Dal». Premi «Salva persone e calendario».
+   Atteso: sotto le persone «Persona 1: manca il nome.»; sotto il calendario «Periodo 1: servono il nome e le due date.»; accanto al pulsante «Non ho salvato: correggi ciò che è segnalato sotto i campi.»
+   Dimostra: prima una riga incompleta spariva al salvataggio e la risposta era una conferma verde. Una parte che non è «nostra» o «cliente» e una data che non esiste non si possono più nemmeno scrivere: sono un menu e un campo data.
 
-3. **Correggi.** Scrivi `Mario Rossi; sviluppatore; nostra; 01/03/2026` e `Sprint 1; 02/11/2026; 13/11/2026`, poi salva.
+3. **Correggi.** Nome `Mario Rossi`, «Al» del periodo il 13 novembre 2026, poi salva.
    Atteso: «Salvate 1 persone e 1 periodi.» e nessun avviso.
 
 4. **Collega Jira a metà.** Torna alla parte «Collegamenti», premi «Collega» nella riga «Jira» e poi «Prova e salva» senza scrivere nulla.
@@ -44,6 +44,6 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
 - Gli errori stanno sotto il campo o accanto al pulsante che li ha provocati, e dicono che cosa manca e dove andare.
 
 ## Limiti
-- Fuori da «Avanzamento» i campi restano righe con i separatori: diventano tabelle nell'incremento 6.
+- I campi a righe con i separatori non ci sono più (incremento 6): restano liste separate da virgola per tag, persone attese e codici, che diventeranno selezioni.
 - Un «Salva» riuscito non dà ancora una conferma uguale in tutte le schede.
 - Gli errori che arrivano dai sistemi (credenziale rifiutata, sistema che non risponde) sono quelli di prima.

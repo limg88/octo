@@ -1,6 +1,7 @@
 export const DOMAIN_ERROR_CODES = [
   'empty_question',
   'project_not_found',
+  'path_outside_project',
   'project_already_added',
   'folder_not_readable',
   'agent_not_installed',

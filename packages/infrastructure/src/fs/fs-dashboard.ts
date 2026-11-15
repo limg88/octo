@@ -296,6 +296,7 @@ const teamSchema = z.object({
         side: z.enum(TEAM_SIDES).default('supplier'),
         from: z.string().default(''),
         to: z.string().default(''),
+        allocation: z.number().nullable().default(null),
         note: z.string().default(''),
       }),
     )

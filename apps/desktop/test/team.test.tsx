@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { messages } from '../src/renderer/messages.ts'
 import { TeamSection } from '../src/renderer/TeamSection.tsx'
-import { dayOf, peopleLines, peopleOf, periodLines, periodsOf } from '../src/renderer/team-text.ts'
 import type { Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -19,6 +18,7 @@ const team: ProjectTeam = {
       side: 'supplier',
       from: '2026-03-01',
       to: '',
+      allocation: 80,
       note: '',
     },
     {
@@ -27,6 +27,7 @@ const team: ProjectTeam = {
       side: 'client',
       from: '',
       to: '',
+      allocation: null,
       note: 'dare del lei; prima la richiesta',
     },
   ],
@@ -35,100 +36,98 @@ const team: ProjectTeam = {
 
 afterEach(cleanup)
 
-describe('people and calendar as typed', () => {
-  it('reads days written the Italian way', () => {
-    expect(dayOf('1/3/2026')).toBe('2026-03-01')
-    expect(dayOf('31-12-26')).toBe('2026-12-31')
-    expect(dayOf(' 2026-03-01 ')).toBe('2026-03-01')
-    expect(dayOf('marzo')).toBe('')
-    // A day that the calendar does not have is not a day.
-    expect(dayOf('32/13/2026')).toBe('')
-    expect(dayOf('31/02/2026')).toBe('')
-    expect(dayOf('2026-02-30')).toBe('')
-    expect(dayOf('')).toBe('')
-  })
-
-  it('reads people and periods one per line and writes them back', () => {
-    const people = peopleOf(
-      'Rossi Mario; sviluppatore; nostra; 01/03/2026\n\nCarla Bianchi; referente; Cliente; ; ; dare del lei; prima la richiesta\nSolo Nome',
-    )
-    expect(people.problems).toEqual([])
-    expect(people.values.slice(0, 2)).toEqual(team.people)
-    expect(people.values[2]).toEqual({
-      name: 'Solo Nome',
-      role: '',
-      side: 'supplier',
-      from: '',
-      to: '',
-      note: '',
-    })
-    expect(peopleLines(team.people)).toBe(
-      'Rossi Mario; sviluppatore; nostra; 01/03/2026; ; \nCarla Bianchi; referente; cliente; ; ; dare del lei; prima la richiesta',
-    )
-    expect(
-      periodsOf('Sprint 28; 26/10/2026; 13/11/2026\nSenza date\nSprint 1; ieri; domani'),
-    ).toEqual({
-      values: team.periods,
-      problems: [
-        { line: 2, text: 'Senza date', reason: 'shape' },
-        { line: 3, text: 'Sprint 1; ieri; domani', reason: 'date' },
-      ],
-    })
-    // A side that is neither ours nor the client's, and a day that does not exist, are told.
-    expect(
-      peopleOf('Mario; dev; boh\nAnna; pm; fornitore; 32/13/2026\n; ruolo').problems.map(
-        ({ line, reason }) => [line, reason],
-      ),
-    ).toEqual([
-      [1, 'side'],
-      [2, 'date'],
-      [3, 'shape'],
-    ])
-    expect(periodLines(team.periods)).toBe('Sprint 28; 26/10/2026; 13/11/2026')
-  })
-})
-
 describe('the section of people and calendar', () => {
-  it('shows what is kept and saves what is typed', async () => {
+  const cell = (row: string, column: string) =>
+    screen.getByLabelText(text.cell(row, column)) as HTMLInputElement
+  const set = (row: string, column: string, value: string) =>
+    fireEvent.change(cell(row, column), { target: { value } })
+  const columns = text.columns
+
+  it('shows what is kept, one field for each value, and saves what is typed', async () => {
     const api = {
       team: vi.fn(async () => ok(team)),
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    const people = (await screen.findByLabelText(text.people)) as HTMLTextAreaElement
-    expect(people.value).toContain('Carla Bianchi; referente; cliente')
-    // A line that is not understood is told under its field, and nothing is saved.
-    fireEvent.change(people, { target: { value: 'Mario Rossi; sviluppatore; boh' } })
-    fireEvent.change(screen.getByLabelText(text.periods), {
-      target: { value: 'Sprint 1; ieri; domani' },
-    })
+    await screen.findByRole('group', { name: text.people })
+    expect(cell(text.personN(2), columns.name).value).toBe('Carla Bianchi')
+    expect(cell(text.personN(2), columns.side).value).toBe('client')
+    expect(cell(text.personN(1), columns.from).value).toBe('2026-03-01')
+    expect(cell(text.periodN(1), columns.period).value).toBe('Sprint 28')
+
+    // A row that lacks what makes it a person or a period is told, and nothing is saved.
+    fireEvent.click(screen.getByRole('button', { name: text.addPerson }))
+    set(text.personN(3), columns.role, 'analista')
+    set(text.periodN(1), columns.to, '')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
-    expect(
-      await screen.findByText(
-        messages.lines.line(1, 'Mario Rossi; sviluppatore; boh', 'side', text.shapes.people),
-      ),
-    ).toBeTruthy()
-    expect(
-      screen.getByText(
-        messages.lines.line(1, 'Sprint 1; ieri; domani', 'date', text.shapes.periods),
-      ),
-    ).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
+    expect(screen.getByText(text.personWrong(3))).toBeTruthy()
+    expect(screen.getByText(text.periodWrong(1))).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(messages.notSaved)
     expect(api.saveTeam).not.toHaveBeenCalled()
-    fireEvent.change(people, { target: { value: 'Verdi Luca; ; ; ; 31/05/2026' } })
-    fireEvent.change(screen.getByLabelText(text.periods), {
-      target: { value: 'Sprint 29; 16/11/2026; 04/12/2026' },
-    })
+
+    // An allocation is a share of time: 150% and words are told, and nothing is saved.
+    expect(cell(text.personN(1), columns.allocation).value).toBe('80')
+    set(text.personN(3), columns.name, ' Verdi Luca ')
+    set(text.personN(3), columns.allocation, '150')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(screen.getByText(text.allocationWrong(3))).toBeTruthy()
+    set(text.personN(3), columns.allocation, 'metà')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(screen.getByText(text.allocationWrong(3))).toBeTruthy()
+    expect(api.saveTeam).not.toHaveBeenCalled()
+    set(text.personN(3), columns.allocation, '37,5')
+    set(text.personN(3), columns.to, '2026-05-31')
+    fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
+    fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
+    set(text.periodN(1), columns.to, '2026-12-04')
+    // A row added and left empty is not a period, and not a mistake either.
+    fireEvent.click(screen.getByRole('button', { name: text.addPeriod }))
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveTeam).toHaveBeenCalledWith('p-1', {
         people: [
-          { name: 'Verdi Luca', role: '', side: 'supplier', from: '', to: '2026-05-31', note: '' },
+          {
+            name: 'Verdi Luca',
+            role: 'analista',
+            side: 'supplier',
+            from: '',
+            to: '2026-05-31',
+            allocation: 37.5,
+            note: '',
+          },
         ],
-        periods: [{ name: 'Sprint 29', from: '2026-11-16', to: '2026-12-04' }],
+        periods: [{ name: 'Sprint 28', from: '2026-10-26', to: '2026-12-04' }],
       }),
     )
     expect(await screen.findByText(text.saved(1, 1))).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('starts with one empty row to type in, and keeps the side chosen', async () => {
+    const api = {
+      team: vi.fn(async () => ok(NO_TEAM)),
+      saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
+    }
+    render(<TeamSection api={api} project={project} />)
+    await screen.findByRole('group', { name: text.people })
+    set(text.personN(1), columns.name, 'Carla Bianchi')
+    set(text.personN(1), columns.side, 'client')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() => expect(api.saveTeam).toHaveBeenCalled())
+    expect(api.saveTeam.mock.calls[0]?.[1]).toEqual({
+      people: [
+        {
+          name: 'Carla Bianchi',
+          role: '',
+          side: 'client',
+          from: '',
+          to: '',
+          allocation: null,
+          note: '',
+        },
+      ],
+      periods: [],
+    })
   })
 
   it('says why it cannot read or save', async () => {
@@ -140,7 +139,7 @@ describe('the section of people and calendar', () => {
       />,
     )
     expect((await screen.findByRole('alert')).textContent).toMatch(/non sono leggibili/)
-    expect(screen.queryByLabelText(text.people)).toBeNull()
+    expect(screen.queryByRole('group', { name: text.people })).toBeNull()
     unmount()
     const api = { team: vi.fn(async () => ok(NO_TEAM)), saveTeam: vi.fn(async () => failing) }
     render(<TeamSection api={api} project={project} />)

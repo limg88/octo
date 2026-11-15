@@ -1,13 +1,18 @@
 import { orderTotal, type ProgressSettings } from '@octo/domain'
 import { useEffect, useRef, useState } from 'react'
+import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountOf, amountText } from './forecast-text.ts'
 import { messages } from './messages.ts'
+import { PathField } from './PathField.tsx'
+import { orOneRow, type RowsColumn, RowsField } from './RowsField.tsx'
 
 type Props = {
   settings: ProgressSettings
   /** Spreadsheets of the project that look like the form of the client. */
   candidates: string[]
   onSave: (settings: ProgressSettings) => Promise<void>
+  /** Opens the dialog of the system on the spreadsheets of the project. */
+  onChooseModel: () => Promise<string | null>
   /** Absent the first time: there is nothing to go back to yet. */
   onClose?: (() => void) | undefined
 }
@@ -34,8 +39,14 @@ type Draft = {
   positions: PositionDraft[]
 }
 
-const EMPTY_CELL: CellDraft = { ref: '', text: '' }
-const EMPTY_POSITION: PositionDraft = { code: '', amount: '' }
+const CELL_COLUMNS: RowsColumn<keyof CellDraft>[] = [
+  { key: 'ref', label: text.cell, width: '90px' },
+  { key: 'text', label: text.cellText },
+]
+const POSITION_COLUMNS: RowsColumn<keyof PositionDraft>[] = [
+  { key: 'code', label: text.code },
+  { key: 'amount', label: text.amount, kind: 'amount', width: '180px' },
+]
 const EMPTY_TABLE: TableDraft = {
   firstRow: '',
   rows: '',
@@ -45,23 +56,20 @@ const EMPTY_TABLE: TableDraft = {
   period: '',
 }
 
-/** An empty row waits at the end of a list that has none, so there is always where to type. */
-const orOne = <T,>(rows: T[], empty: T): T[] => (rows.length === 0 ? [empty] : rows)
-
 const draftOf = (settings: ProgressSettings): Draft => {
   const { table } = settings.form
   return {
     modelPath: settings.modelPath,
-    cells: orOne([...settings.form.fields], EMPTY_CELL),
+    cells: orOneRow([...settings.form.fields], CELL_COLUMNS),
     table:
       table === null
         ? EMPTY_TABLE
         : { ...table, firstRow: String(table.firstRow), rows: String(table.rows) },
     order: settings.order,
     total: amountText(settings.total),
-    positions: orOne(
+    positions: orOneRow(
       settings.positions.map(({ code, amount }) => ({ code, amount: amountText(amount) })),
-      EMPTY_POSITION,
+      POSITION_COLUMNS,
     ),
   }
 }
@@ -133,19 +141,8 @@ function Status({ done }: { done: boolean }) {
   )
 }
 
-function Problem({ lines }: { lines: string[] }) {
-  if (lines.length === 0) return null
-  return (
-    <ul className="field-problems" role="alert">
-      {lines.map((line) => (
-        <li key={line}>{line}</li>
-      ))}
-    </ul>
-  )
-}
-
 /** What is typed once: the form of the client, where each datum goes, and the order. */
-export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) {
+export function ProgressSetup({ settings, candidates, onSave, onChooseModel, onClose }: Props) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
   const [problems, setProblems] = useState<Problems | null>(null)
   /** The row of the map a datum is inserted into: the last one the PM typed in. */
@@ -169,17 +166,7 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
   const change = (part: Partial<Draft>) => setDraft((current) => ({ ...current, ...part }))
   const setCell = (index: number, part: Partial<CellDraft>) =>
     change({ cells: draft.cells.map((cell, at) => (at === index ? { ...cell, ...part } : cell)) })
-  const setPosition = (index: number, part: Partial<PositionDraft>) =>
-    change({
-      positions: draft.positions.map((position, at) =>
-        at === index ? { ...position, ...part } : position,
-      ),
-    })
-  const without = <T,>(rows: T[], index: number): T[] => rows.filter((_row, at) => at !== index)
 
-  const options = candidates.includes(draft.modelPath)
-    ? candidates
-    : [...(draft.modelPath === '' ? [] : [draft.modelPath]), ...candidates]
   const sum = orderTotal(
     draft.positions.flatMap((position) => {
       const amount = amountOf(position.amount)
@@ -211,31 +198,13 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
           {text.moduleTitle} <Status done={settings.modelPath !== ''} />
         </legend>
         <p className="hint">{text.moduleHint}</p>
-        {candidates.length > 0 ? (
-          <label>
-            {text.modelPath}
-            <select
-              value={draft.modelPath}
-              onChange={(event) => change({ modelPath: event.target.value })}
-            >
-              <option value="">{text.modelChoose}</option>
-              {options.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <label>
-            {text.modelPath}
-            <input
-              type="text"
-              value={draft.modelPath}
-              onChange={(event) => change({ modelPath: event.target.value })}
-            />
-          </label>
-        )}
+        <PathField
+          label={text.modelPath}
+          value={draft.modelPath}
+          candidates={candidates}
+          onChange={(modelPath) => change({ modelPath })}
+          onChoose={onChooseModel}
+        />
         {candidates.length === 0 && <p className="hint">{text.modelNone}</p>}
       </fieldset>
 
@@ -244,44 +213,17 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
           {text.cellsTitle} <Status done={settings.form.table !== null} />
         </legend>
         <p className="hint">{text.cellsHint}</p>
-        <div className="rows rows-cells">
-          <span className="rows-head">{text.cell}</span>
-          <span className="rows-head">{text.cellText}</span>
-          <span />
-          {draft.cells.map((cell, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a row is its place in the list.
-            <div key={index} className="rows-row">
-              <input
-                type="text"
-                aria-label={text.cellN(index + 1)}
-                value={cell.ref}
-                onFocus={() => setActiveCell(index)}
-                onChange={(event) => setCell(index, { ref: event.target.value })}
-              />
-              <input
-                type="text"
-                aria-label={text.cellTextN(index + 1)}
-                value={cell.text}
-                onFocus={() => setActiveCell(index)}
-                onChange={(event) => setCell(index, { text: event.target.value })}
-              />
-              <button
-                type="button"
-                className="quiet"
-                aria-label={text.removeCell(index + 1)}
-                onClick={() => change({ cells: orOne(without(draft.cells, index), EMPTY_CELL) })}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <Problem lines={problems?.cells ?? []} />
-        <div className="actions">
-          <button type="button" onClick={() => change({ cells: [...draft.cells, EMPTY_CELL] })}>
-            {text.addCell}
-          </button>
-        </div>
+        <RowsField
+          label={text.cellsTitle}
+          columns={CELL_COLUMNS}
+          rows={draft.cells}
+          onChange={(cells) => change({ cells })}
+          addLabel={text.addCell}
+          cellLabel={(column, row) => (column === 'ref' ? text.cellN(row) : text.cellTextN(row))}
+          removeLabel={text.removeCell}
+          onFocusRow={setActiveCell}
+        />
+        <FieldProblems lines={problems?.cells ?? []} />
         <div className="choices">
           <span className="hint">{text.insert}</span>
           {text.placeholders.map((placeholder) => (
@@ -315,7 +257,7 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
             </label>
           ))}
         </div>
-        <Problem lines={problems?.table ? [problems.table] : []} />
+        <FieldProblems lines={problems?.table ? [problems.table] : []} />
       </fieldset>
 
       <fieldset>
@@ -340,51 +282,18 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
             onChange={(event) => change({ total: event.target.value })}
           />
         </label>
-        <Problem lines={problems?.total ? [messages.lines.single.amount()] : []} />
+        <FieldProblems lines={problems?.total ? [messages.amountWrong] : []} />
         <h4>{text.positionsTitle}</h4>
-        <div className="rows rows-positions">
-          <span className="rows-head">{text.code}</span>
-          <span className="rows-head">{text.amount}</span>
-          <span />
-          {draft.positions.map((position, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a row is its place in the list.
-            <div key={index} className="rows-row">
-              <input
-                type="text"
-                aria-label={text.codeN(index + 1)}
-                value={position.code}
-                onChange={(event) => setPosition(index, { code: event.target.value })}
-              />
-              <input
-                type="text"
-                inputMode="decimal"
-                className="amount"
-                aria-label={text.amountN(index + 1)}
-                value={position.amount}
-                onChange={(event) => setPosition(index, { amount: event.target.value })}
-              />
-              <button
-                type="button"
-                className="quiet"
-                aria-label={text.removePosition(index + 1)}
-                onClick={() =>
-                  change({ positions: orOne(without(draft.positions, index), EMPTY_POSITION) })
-                }
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <Problem lines={problems?.positions ?? []} />
-        <div className="actions">
-          <button
-            type="button"
-            onClick={() => change({ positions: [...draft.positions, EMPTY_POSITION] })}
-          >
-            {text.addPosition}
-          </button>
-        </div>
+        <RowsField
+          label={text.positionsTitle}
+          columns={POSITION_COLUMNS}
+          rows={draft.positions}
+          onChange={(positions) => change({ positions })}
+          addLabel={text.addPosition}
+          cellLabel={(column, row) => (column === 'code' ? text.codeN(row) : text.amountN(row))}
+          removeLabel={text.removePosition}
+        />
+        <FieldProblems lines={problems?.positions ?? []} />
         {declared !== null && Math.abs(declared - sum) >= CENT ? (
           <p className="badge badge-warning">{text.sumDiffers(money(sum), money(declared))}</p>
         ) : (
@@ -399,11 +308,7 @@ export function ProgressSetup({ settings, candidates, onSave, onClose }: Props) 
             {text.close}
           </button>
         )}
-        {problems && (
-          <span className="field-problems" role="status">
-            {messages.lines.notSaved}
-          </span>
-        )}
+        {problems && <NotSaved text={messages.notSaved} />}
       </div>
     </form>
   )

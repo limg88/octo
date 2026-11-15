@@ -69,6 +69,7 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
+  | 'chooseProjectPath'
   | 'progressSettings'
   | 'saveProgressSettings'
   | 'progressCandidates'
@@ -79,6 +80,7 @@ type Api = Pick<
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
+    chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
     progressSettings: vi.fn(async () => ok(configured)),
     saveProgressSettings: vi.fn(async (_id: string, settings: ProgressSettings) => ok(settings)),
     progressCandidates: vi.fn(async () => ok(['Moduli/Richiesta SAL.xlsx'])),
@@ -199,9 +201,9 @@ describe('the requests of an order', () => {
 
     // Nothing typed, or something that is not an amount, is refused under the field.
     press(text.request.saveOnly)
-    expect(within(form).getByRole('alert').textContent).toBe(messages.lines.single.amount())
+    expect(within(form).getByRole('alert').textContent).toBe(messages.amountWrong)
     type(text.request.amount, 'tanto')
-    expect(within(form).getByRole('alert').textContent).toBe(messages.lines.single.amount())
+    expect(within(form).getByRole('alert').textContent).toBe(messages.amountWrong)
     // More than what is left is said while typing, and not saved.
     type(text.request.amount, '5.000')
     expect(within(form).getByRole('alert').textContent).toBe(text.problem.over_total(2, '4.700,00'))
@@ -302,7 +304,7 @@ describe('the settings of the order and of the form', () => {
     const api = fakeApi({ progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)) })
     render(<ProgressView api={api} project={project} />)
     expect(await screen.findByText(text.setup.firstTime)).toBeTruthy()
-    const model = screen.getByLabelText(text.setup.modelPath) as HTMLSelectElement
+    const model = screen.getByLabelText(text.setup.modelPath) as HTMLInputElement
     await waitFor(() => expect(model.value).toBe('Moduli/Richiesta SAL.xlsx'))
     expect(screen.getAllByText(text.setup.todo)).toHaveLength(3)
     expect(screen.queryByRole('button', { name: text.setup.close })).toBeNull()
@@ -318,8 +320,8 @@ describe('the settings of the order and of the form', () => {
     expect(screen.getByText(setup.cellWrong(1))).toBeTruthy()
     expect(screen.getByText(setup.tableWrong)).toBeTruthy()
     expect(screen.getByText(setup.positionWrong(1))).toBeTruthy()
-    expect(screen.getByText(messages.lines.single.amount())).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe(messages.lines.notSaved)
+    expect(screen.getByText(messages.amountWrong)).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(messages.notSaved)
     expect(api.saveProgressSettings).not.toHaveBeenCalled()
 
     // A datum of the request is inserted with a button into the row last typed in.
@@ -393,10 +395,16 @@ describe('the settings of the order and of the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: text.setup.open }))
     const form = screen.getByRole('form', { name: text.setup.title })
     expect(within(form).getAllByText(text.setup.done)).toHaveLength(3)
-    // The form in use stays among the choices even when it is not one of those found.
-    const model = within(form).getByLabelText(text.setup.modelPath) as HTMLSelectElement
-    await waitFor(() => expect(model.value).toBe('Altro/Modulo.xlsx'))
-    expect(within(model).getAllByRole('option')).toHaveLength(4)
+    // The form in use is kept as it is; another can be chosen from the dialog of the system.
+    const model = within(form).getByLabelText(text.setup.modelPath) as HTMLInputElement
+    expect(model.value).toBe('Altro/Modulo.xlsx')
+    fireEvent.click(
+      within(form).getByRole('button', {
+        name: `${messages.choosePath}: ${text.setup.modelPath}`,
+      }),
+    )
+    await waitFor(() => expect(model.value).toBe('scelto/qui'))
+    expect(api.chooseProjectPath).toHaveBeenCalledWith('p-1', 'file', ['xlsx'])
     expect((screen.getByLabelText(text.setup.cellN(1)) as HTMLInputElement).value).toBe('D2')
     expect((screen.getByLabelText(text.setup.firstRow) as HTMLInputElement).value).toBe('14')
     expect((screen.getByLabelText(text.setup.amountN(2)) as HTMLInputElement).value).toBe('400')

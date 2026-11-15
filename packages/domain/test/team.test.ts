@@ -18,6 +18,7 @@ const person = (name: string, over: Partial<TeamPerson> = {}): TeamPerson => ({
   side: 'supplier',
   from: '',
   to: '',
+  allocation: null,
   note: '',
   ...over,
 })
@@ -25,7 +26,7 @@ const person = (name: string, over: Partial<TeamPerson> = {}): TeamPerson => ({
 const team: ProjectTeam = {
   people: [
     person('Rossi Mario', { role: 'sviluppatore', from: '2026-03-01' }),
-    person('Verdi Luca', { to: '2026-05-31' }),
+    person('Verdi Luca', { to: '2026-05-31', allocation: 50 }),
     person('Neri Sara', { from: '2026-07-01', to: '2026-12-31' }),
     person('Carla Bianchi', {
       role: 'referente',
@@ -66,6 +67,27 @@ describe('the people and the calendar of a project', () => {
     expect(clean.periods.map((period) => period.name)).toEqual(['PI7', 'sprint 28', 'Sprint 29'])
   })
 
+  it('keep the share of time a person gives to the project only when it is one', () => {
+    const allocations = [50, 100, 12.5, 0, -10, 150, Number.NaN, null]
+    const clean = cleanTeam({
+      people: allocations.map((allocation, index) =>
+        person(`Persona ${'abcdefgh'[index]}`, { allocation }),
+      ),
+      periods: [],
+    })
+    expect(clean.people.map(({ allocation }) => allocation)).toEqual([
+      50,
+      100,
+      12.5,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ])
+    expect(teamMarkdown(clean)).toContain('- **Persona c**, al 12,5% del suo tempo\n')
+  })
+
   it('know who was not on the project in a stretch of time, and which periods hold a day', () => {
     expect(peopleAway(team, '2026-06-01', '2026-06-30')).toEqual(['Verdi Luca', 'Neri Sara'])
     expect(peopleAway(team, '2026-05-15', '2026-07-15')).toEqual([])
@@ -82,7 +104,9 @@ describe('the people and the calendar of a project', () => {
     expect(text).toContain(
       '## Dalla nostra parte\n\n- **Rossi Mario**, sviluppatore — sul progetto dal 01/03/2026\n',
     )
-    expect(text).toContain('- **Verdi Luca** — sul progetto fino al 31/05/2026\n')
+    expect(text).toContain(
+      '- **Verdi Luca**, al 50% del suo tempo — sul progetto fino al 31/05/2026\n',
+    )
     expect(text).toContain('- **Neri Sara** — sul progetto dal 01/07/2026 fino al 31/12/2026\n')
     expect(text).toContain(
       '## Dal cliente\n\n- **Carla Bianchi**, referente\n  - Come scrivergli o scriverle: dare del lei, prima la richiesta\n',

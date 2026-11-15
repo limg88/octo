@@ -1,11 +1,12 @@
 import type { AlignmentFile, AlignmentView as View } from '@octo/application'
 import type { AlignedPair, AlignmentSettings, Project, StateGroup } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
-import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { LineProblems } from './LineProblems.tsx'
-import { type LineProblem, type Lines, readLines } from './lines.ts'
+import type { ErrorCode, OctoApi, PathKind } from '../shared/api.ts'
+import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { dateText, errorText, messages } from './messages.ts'
+import { PathField } from './PathField.tsx'
 import { listOf, listText } from './progress-text.ts'
+import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 
 type AlignmentApi = Pick<
   OctoApi,
@@ -14,32 +15,18 @@ type AlignmentApi = Pick<
   | 'alignmentView'
   | 'exportMissingTickets'
   | 'openEvidence'
+  | 'chooseProjectPath'
 >
 
 type Props = { api: AlignmentApi; project: Project }
 
 const text = messages.alignment
-const GROUP_NAME_SEPARATOR = ':'
-const GROUP_SIDES_SEPARATOR = '='
-
-/** `name: client states = ticket states`, one group per line. */
-export function stateGroupsOf(typed: string): Lines<StateGroup> {
-  return readLines(typed, (line) => {
-    const at = line.indexOf(GROUP_NAME_SEPARATOR)
-    const [item = '', ticket = '', ...rest] = line.slice(at + 1).split(GROUP_SIDES_SEPARATOR)
-    const group = { name: line.slice(0, at).trim(), item: listOf(item), ticket: listOf(ticket) }
-    const whole = at > 0 && rest.length === 0 && group.item.length > 0 && group.ticket.length > 0
-    return whole ? { value: group } : { reason: 'shape' }
-  })
-}
-
-export const stateGroupLines = (groups: readonly StateGroup[]): string =>
-  groups
-    .map(
-      (group) =>
-        `${group.name}${GROUP_NAME_SEPARATOR} ${listText(group.item)} ${GROUP_SIDES_SEPARATOR} ${listText(group.ticket)}`,
-    )
-    .join('\n')
+type GroupKey = 'name' | 'item' | 'ticket'
+const GROUP_COLUMNS: RowsColumn<GroupKey>[] = [
+  { key: 'name', label: text.groupColumns.name, width: '200px' },
+  { key: 'item', label: text.groupColumns.item },
+  { key: 'ticket', label: text.groupColumns.ticket },
+]
 
 /** The client's tracker and the supplier's own, compared sprint by sprint. */
 export function AlignmentView({ api, project }: Props) {
@@ -89,7 +76,22 @@ export function AlignmentView({ api, project }: Props) {
   if (settings === null) {
     return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
   }
-  const form = <SettingsForm settings={settings} sprints={view?.sprints ?? []} onSave={save} />
+  /** The export is a JSON file of the project, the tickets a folder of it. */
+  async function choose(what: PathKind): Promise<string | null> {
+    setError(null)
+    const result = await api.chooseProjectPath(project.id, what, what === 'file' ? ['json'] : [])
+    if (result.ok) return result.value
+    setError(result.code)
+    return null
+  }
+  const form = (
+    <SettingsForm
+      settings={settings}
+      sprints={view?.sprints ?? []}
+      onSave={save}
+      onChoose={choose}
+    />
+  )
 
   return (
     <div className="dashboard">
@@ -319,6 +321,9 @@ function Result({
   )
 }
 
+/** The fields of the form that hold one typed value. */
+type TextField = Exclude<keyof Draft, 'stateGroups'>
+
 type Draft = {
   sprint: string
   period: string
@@ -326,7 +331,7 @@ type Draft = {
   exportPath: string
   ticketFolder: string
   referencePrefixes: string
-  stateGroups: string
+  stateGroups: Row<GroupKey>[]
 }
 
 const draftOf = (settings: AlignmentSettings): Draft => ({
@@ -336,24 +341,33 @@ const draftOf = (settings: AlignmentSettings): Draft => ({
   exportPath: settings.exportPath,
   ticketFolder: settings.ticketFolder,
   referencePrefixes: listText(settings.referencePrefixes),
-  stateGroups: stateGroupLines(settings.stateGroups),
+  stateGroups: orOneRow(
+    settings.stateGroups.map((group) => ({
+      name: group.name,
+      item: listText(group.item),
+      ticket: listText(group.ticket),
+    })),
+    GROUP_COLUMNS,
+  ),
 })
 
 function SettingsForm({
   settings,
   sprints,
   onSave,
+  onChoose,
 }: {
   settings: AlignmentSettings
   sprints: string[]
   onSave: (settings: AlignmentSettings) => Promise<void>
+  onChoose: (what: PathKind) => Promise<string | null>
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
-  const [unread, setUnread] = useState<LineProblem[]>([])
+  const [unread, setUnread] = useState<string[]>([])
   useEffect(() => setDraft(draftOf(settings)), [settings])
-  const set = (name: keyof Draft, value: string) =>
+  const set = (name: TextField, value: string) =>
     setDraft((current) => ({ ...current, [name]: value }))
-  const input = (name: keyof Draft, label: string, options: string[] = []) => (
+  const input = (name: TextField, label: string, options: string[] = []) => (
     <label>
       {label}
       <input
@@ -376,9 +390,21 @@ function SettingsForm({
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
-        const stateGroups = stateGroupsOf(draft.stateGroups)
-        setUnread(stateGroups.problems)
-        if (stateGroups.problems.length > 0) return
+        const groups = draft.stateGroups
+          .filter((row) => !blankRow(row))
+          .map((row) => ({
+            name: row.name.trim(),
+            item: listOf(row.item),
+            ticket: listOf(row.ticket),
+          }))
+        const wrong = draft.stateGroups.flatMap((row, index) =>
+          blankRow(row) ||
+          (row.name.trim() !== '' && listOf(row.item).length > 0 && listOf(row.ticket).length > 0)
+            ? []
+            : [text.groupWrong(index + 1)],
+        )
+        setUnread(wrong)
+        if (wrong.length > 0) return
         void onSave({
           ...settings,
           sprint: draft.sprint,
@@ -387,7 +413,7 @@ function SettingsForm({
           exportPath: draft.exportPath,
           ticketFolder: draft.ticketFolder,
           referencePrefixes: listOf(draft.referencePrefixes),
-          stateGroups: stateGroups.values,
+          stateGroups: groups,
         })
       }}
     >
@@ -395,27 +421,36 @@ function SettingsForm({
       {input('period', text.period)}
       {input('tags', text.tags)}
       {input('referencePrefixes', text.referencePrefixes)}
-      <label>
-        {text.stateGroups}
-        <textarea
-          value={draft.stateGroups}
-          onChange={(event) => set('stateGroups', event.target.value)}
-        />
-      </label>
-      <LineProblems problems={unread} shape={text.shapes.stateGroups} />
+      <h4>{text.stateGroups}</h4>
       <p className="hint">{text.stateGroupsHint}</p>
-      {input('exportPath', text.exportPath)}
-      {input('ticketFolder', text.ticketFolder)}
+      <RowsField
+        label={text.stateGroups}
+        columns={GROUP_COLUMNS}
+        rows={draft.stateGroups}
+        onChange={(stateGroups) => setDraft((current) => ({ ...current, stateGroups }))}
+        addLabel={text.addGroup}
+        cellLabel={(column, row) => text.groupCell(text.groupColumns[column], row)}
+        removeLabel={text.removeGroup}
+      />
+      <FieldProblems lines={unread} />
+      <PathField
+        label={text.exportPath}
+        value={draft.exportPath}
+        onChange={(exportPath) => setDraft((current) => ({ ...current, exportPath }))}
+        onChoose={() => onChoose('file')}
+      />
+      <PathField
+        label={text.ticketFolder}
+        value={draft.ticketFolder}
+        onChange={(ticketFolder) => setDraft((current) => ({ ...current, ticketFolder }))}
+        onChoose={() => onChoose('folder')}
+      />
       <div className="actions">
         <button type="submit" disabled={draft.sprint.trim() === ''}>
           {text.save}
         </button>
         {draft.sprint.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
-        {unread.length > 0 && (
-          <span className="field-problems" role="status">
-            {messages.lines.notSaved}
-          </span>
-        )}
+        {unread.length > 0 && <NotSaved text={messages.notSaved} />}
       </div>
     </form>
   )

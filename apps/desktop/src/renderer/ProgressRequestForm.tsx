@@ -55,7 +55,7 @@ export function ProgressRequestForm({ settings, n, onSave, onCancel }: Props) {
   const before = settings.requests.slice(0, n - 1)
   const after = settings.requests.slice(n)
   const typed = amountField(draft.amount)
-  const amount = typed.values[0]
+  const amount = typed.value ?? undefined
 
   // What the order looks like before this request: what is left, in all and on each position.
   const until = computeProgress(settings.positions, before)
@@ -126,9 +126,9 @@ export function ProgressRequestForm({ settings, n, onSave, onCancel }: Props) {
           </button>
         )}
       </div>
-      {(typed.problems.length > 0 || (refused && amount === undefined)) && (
+      {(typed.wrong || (refused && amount === undefined)) && (
         <p className="field-problems" role="alert">
-          {messages.lines.single.amount()}
+          {messages.amountWrong}
         </p>
       )}
       {computation && !computation.ok && (

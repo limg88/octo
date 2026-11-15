@@ -10,6 +10,7 @@ export const messages = {
   addProject: 'Aggiungi un progetto…',
   close: 'Chiudi',
   openSources: 'Apri «Fonti»',
+  choosePath: 'Scegli…',
   sourceLink: 'Collega',
   sourceEdit: 'Modifica',
   settingsParts: {
@@ -60,22 +61,8 @@ export const messages = {
     linked === 0
       ? 'Niente è ancora collegato: comincia da ciò che usi di più, di solito la posta.'
       : `${linked} su ${all} collegati. Ciò che non ti serve puoi lasciarlo com’è.`,
-  lines: {
-    notSaved: 'Non ho salvato: correggi ciò che è segnalato sotto i campi.',
-    line: (
-      line: number,
-      text: string,
-      reason: 'shape' | 'amount' | 'date' | 'side' | 'cell',
-      shape: string,
-    ) => `Riga ${line}, «${text}»: ${lineReasons[reason](shape)}`,
-    single: {
-      shape: (shape: string) => `Scrivilo nella forma «${shape}».`,
-      amount: () => 'Non è un numero che capisco: scrivi solo cifre, per esempio 12.500,50.',
-      date: () => 'La data non esiste o non è scritta come giorno/mese/anno.',
-      side: () => 'Scrivi «nostra» oppure «cliente».',
-      cell: () => 'Una cella si scrive con lettere e numero, per esempio D2.',
-    },
-  },
+  notSaved: 'Non ho salvato: correggi ciò che è segnalato sotto i campi.',
+  amountWrong: 'Non è un numero che capisco: scrivi solo cifre, per esempio 12.500,50.',
   cancel: 'Annulla',
   addDialog: {
     title: 'Aggiungi un progetto',
@@ -187,14 +174,30 @@ export const messages = {
     title: 'Persone e calendario',
     intro:
       'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Octo li scrive anche come testo del progetto: risposte e deliverable li leggono e li citano. Chi non era sul progetto in un periodo non viene segnalato per le ore che mancano.',
-    shapes: {
-      people: 'nome; ruolo; nostra o cliente; dal; al; come scrivergli',
-      periods: 'nome; dal; al',
-    },
-    people: 'Persone: una riga ciascuna, «nome; ruolo; nostra o cliente; dal; al; come scrivergli»',
+    people: 'Persone',
     peopleHint:
-      'Solo il nome è obbligatorio. Le date sono giorno/mese/anno; vuote se la persona c’è dall’inizio o c’è ancora. Esempio: «Carla Bianchi; referente; cliente; ; ; dare del lei, prima la richiesta».',
-    periods: 'Calendario: una riga per periodo o sprint, «nome; dal; al»',
+      'Solo il nome è obbligatorio. L’allocazione è la parte del suo tempo che la persona dà al progetto, in percentuale: vuota se non la sai. Le date si lasciano vuote se la persona c’è dall’inizio o c’è ancora. In «Come scrivergli» va ciò che un’email deve rispettare, per esempio «dare del lei, prima la richiesta».',
+    periods: 'Calendario: periodi e sprint',
+    columns: {
+      name: 'Nome',
+      role: 'Ruolo',
+      side: 'Parte',
+      allocation: 'Allocazione %',
+      from: 'Dal',
+      to: 'Al',
+      note: 'Come scrivergli',
+      period: 'Periodo',
+    },
+    personN: (n: number) => `persona ${n}`,
+    periodN: (n: number) => `periodo ${n}`,
+    cell: (row: string, column: string) => `${column}, ${row}`,
+    remove: (row: string) => `Togli ${row}`,
+    addPerson: 'Aggiungi una persona',
+    addPeriod: 'Aggiungi un periodo',
+    personWrong: (n: number) => `Persona ${n}: manca il nome.`,
+    allocationWrong: (n: number) =>
+      `Persona ${n}: l’allocazione è una percentuale, più di 0 e al massimo 100.`,
+    periodWrong: (n: number) => `Periodo ${n}: servono il nome e le due date.`,
     save: 'Salva persone e calendario',
     saved: (people: number, periods: number) => `Salvate ${people} persone e ${periods} periodi.`,
     sides: { supplier: 'nostra', client: 'cliente' },
@@ -262,7 +265,16 @@ export const messages = {
   alignmentTab: 'Allineamento',
   alignment: {
     loading: 'Confronto i due tracker…',
-    shapes: { stateGroups: 'nome: stati del cliente = stati dei ticket' },
+    groupColumns: {
+      name: 'Che cosa vogliono dire',
+      item: 'Stati del cliente (separati da virgola)',
+      ticket: 'Stati dei ticket (separati da virgola)',
+    },
+    groupCell: (column: string, row: number) => `${column}, riga ${row}`,
+    addGroup: 'Aggiungi un gruppo',
+    removeGroup: (row: number) => `Togli la riga ${row}`,
+    groupWrong: (n: number) =>
+      `Gruppo ${n}: servono un nome e almeno uno stato per ciascuno dei due tracker.`,
     saveNeeds: 'Per salvare indica lo sprint.',
     intro:
       'Confronto le voci del tracker del cliente in uno sprint con i ticket del tuo tracker. Una voce e un ticket sono collegati quando la voce porta fra i tag la chiave del ticket, oppure il titolo del ticket nomina l’id della voce, per esempio «[AZDO 123]». Leggo l’esportazione usata dal cruscotto e i ticket che Octo ha già letto: non scrivo in nessuno dei due tracker.',
@@ -275,10 +287,9 @@ export const messages = {
     ticketFolder: 'Cartella dei ticket nel progetto (vuoto: quella della fonte Jira)',
     referencePrefixes:
       'Che cosa precede l’id della voce nel titolo del ticket (separati da virgola), per esempio AZDO',
-    stateGroups:
-      'Stati che vogliono dire la stessa cosa: una riga per gruppo, «nome: stati del cliente = stati dei ticket»',
+    stateGroups: 'Stati che vogliono dire la stessa cosa',
     stateGroupsHint:
-      'Per esempio «in corso: In Progress, Active = In corso». Senza gruppi collego le voci ma non giudico gli stati.',
+      'Per esempio «in corso»: dal cliente «In Progress, Active», nei ticket «In corso». Senza gruppi collego le voci ma non giudico gli stati.',
     save: 'Salva',
     summary: (total: number, linked: number, needsUpdate: number, missing: number) =>
       `${total} voci del cliente nello sprint: ${linked} con il ticket nello sprint, ${needsUpdate} con il ticket altrove, ${missing} senza ticket.`,
@@ -336,7 +347,6 @@ export const messages = {
       moduleHint:
         'Il file Excel vuoto che il cliente chiede di compilare. Deve stare nella cartella del progetto.',
       modelPath: 'Modulo vuoto',
-      modelChoose: 'Scegli…',
       modelNone:
         'Non trovo file Excel che sembrino il modulo: scrivi dove sta, a partire dalla cartella del progetto.',
       cellsTitle: '2 · Che cosa va in ogni cella',
@@ -464,25 +474,36 @@ export const messages = {
   forecastTab: 'Previsionale',
   forecast: {
     loading: 'Preparo il previsionale…',
-    shapes: {
-      rates: 'nome; tariffa',
-      externalRates: 'nome; commessa; costo al giorno; tariffa al giorno',
-      externals: 'nome; ore',
+    columns: {
+      person: 'Persona',
+      name: 'Nome',
+      code: 'Commessa',
+      codeOrAll: 'Commessa (vuota: tutte)',
+      rate: 'Tariffa al giorno',
+      cost: 'Costo al giorno',
+      hours: 'Ore',
+    },
+    cell: (column: string, row: number) => `${column}, riga ${row}`,
+    removeRow: (row: number) => `Togli la riga ${row}`,
+    add: { rate: 'Aggiungi una tariffa', external: 'Aggiungi un esterno' },
+    wrong: {
+      rate: (n: number) => `Tariffa ${n}: servono la persona e una tariffa scritta in cifre.`,
+      external: (n: number) =>
+        `Esterno ${n}: servono nome, commessa, costo e tariffa scritti in cifre.`,
+      hours: (n: number) => `Riga ${n}: servono il nome e le ore scritte in cifre.`,
     },
     saveNeeds: 'Per salvare indica il file del modello.',
     setupTitle: 'Il modello dell’amministrazione',
     setupIntro:
       'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. I costi interni vengono dal costo che NetSuite scrive su ogni riga di timesheet approvata; i ricavi dalle stesse ore e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
-    modelPath: 'Modello: file Excel nella cartella del progetto',
+    modelPath: 'Modello: file Excel dell’amministrazione',
     hoursPerDay: 'Ore in una giornata',
-    rates:
-      'Tariffe al giorno: una riga per persona, «nome; tariffa», oppure «nome; commessa; tariffa» se vale solo su una commessa',
+    rates: 'Tariffe al giorno',
     ratesHint:
-      'Le persone e il costo delle loro ore arrivano dai timesheet di NetSuite: qui scrivi solo a quanto vendi una giornata. La tariffa scritta per una commessa vince su quella generale della persona. Chi ha ore e nessuna tariffa compare fra i dati che mancano.',
-    externalRates:
-      'Esterni senza timesheet: una riga per persona e commessa, «nome; commessa; costo al giorno; tariffa al giorno»',
+      'Le persone e il costo delle loro ore arrivano dai timesheet di NetSuite: qui scrivi solo a quanto vendi una giornata. Senza commessa la tariffa vale ovunque; quella scritta per una commessa vince. Chi ha ore e nessuna tariffa compare fra i dati che mancano.',
+    externalRates: 'Esterni senza timesheet',
     externalRatesHint:
-      'Le ore le scrivi ogni mese, nei dati del mese della commessa. Tariffe e costi restano in una cartella di Octo che non entra nelle risposte né nei deliverable.',
+      'Una riga per persona e commessa. Le ore le scrivi ogni mese, nei dati del mese della commessa. Tariffe e costi restano in una cartella di Octo che non entra nelle risposte né nei deliverable.',
     save: 'Salva',
     settings: 'Impostazioni del previsionale',
     month: 'Mese',
@@ -528,7 +549,7 @@ export const messages = {
     otherCodes: (codes: string) =>
       `Nei timesheet del mese ci sono ore su codici che il modello non elenca: ${codes}`,
     inputsTitle: (code: string) => `Dati del mese per ${code}`,
-    externals: 'Ore degli esterni nel mese: una riga per persona, «nome; ore»',
+    externals: 'Ore degli esterni nel mese',
     toInvoice: 'Importo da fatturare nel mese',
     revenue: 'Ricavi decisi da te (sostituiscono quelli calcolati)',
     budgetCosts: 'A corpo: costi totali a budget (l’avanzamento è costi del mese su questi)',
@@ -546,7 +567,11 @@ export const messages = {
   hoursTab: 'Ore',
   hours: {
     loading: 'Leggo le ore…',
-    shapes: { aliases: 'nome sul tracker = nome nel timesheet' },
+    aliasColumns: { worklog: 'Nome sul tracker', timesheet: 'Nome nel timesheet' },
+    aliasCell: (column: string, row: number) => `${column}, riga ${row}`,
+    addAlias: 'Aggiungi una persona',
+    removeAlias: (row: number) => `Togli la riga ${row}`,
+    aliasWrong: (n: number) => `Riga ${n}: servono tutti e due i nomi.`,
     saveNeeds: 'Per salvare indica dove sono i timesheet e le ore del tracker.',
     netsuiteUnlinked:
       'NetSuite non è collegato a questo progetto: collegalo in «Fonti», poi torna qui a leggere i timesheet.',
@@ -555,8 +580,8 @@ export const messages = {
     setupTitle: 'Da dove leggo le ore',
     setupIntro:
       'Confronto le ore approvate dei timesheet con le ore segnate sul tracker, persona per persona. Le leggo io da NetSuite e da Jira con i pulsanti qui sotto, oppure indichi due esportazioni che hai già nella cartella del progetto. Non scrivo in nessun sistema.',
-    timesheetPath: 'Timesheet: file o cartella delle esportazioni (JSON)',
-    worklogPath: 'Ore del tracker: file o cartella delle esportazioni (CSV)',
+    timesheetPath: 'Timesheet: cartella o file delle esportazioni',
+    worklogPath: 'Ore del tracker: cartella o file delle esportazioni',
     worklogHint:
       'Va bene l’esportazione dello strumento con cui si segnano le ore sul tracker: servono le colonne persona, data e ore.',
     projects: 'Codici di progetto dei timesheet che sono di questo progetto (nessuno: tutti)',
@@ -564,8 +589,7 @@ export const messages = {
     cutoff: 'Ultimo giorno completo (i giorni dopo restano fuori dal confronto; vuoto: nessuno)',
     noWorklogExpected: 'Persone che non segnano ore sul tracker (separate da virgola)',
     noTimesheetExpected: 'Persone senza timesheet qui, per esempio esterni (separate da virgola)',
-    aliases:
-      'Stessa persona, nomi diversi: una riga per persona, «nome sul tracker = nome nel timesheet»',
+    aliases: 'Stessa persona, nomi diversi',
     save: 'Salva',
     settings: 'Impostazioni delle ore',
     month: 'Mese',
@@ -850,14 +874,6 @@ export const messages = {
   agentReady: (version: string) => `Claude ${version}`,
 } as const
 
-const lineReasons = {
-  shape: (shape: string) => `scrivila nella forma «${shape}».`,
-  amount: () => 'c’è un numero che non capisco. Scrivi solo cifre, per esempio 12.500,50.',
-  date: () => 'c’è una data che non esiste o non è scritta come giorno/mese/anno.',
-  side: () => 'la parte è «nostra» oppure «cliente».',
-  cell: () => 'una cella si scrive con lettere e numero, per esempio D2.',
-}
-
 const citationStatus: Record<CitationStatus, string> = {
   verified: 'Controllata',
   quote_not_found: 'La frase non è nel file',
@@ -870,6 +886,8 @@ const citationStatus: Record<CitationStatus, string> = {
 const errors: Record<ErrorCode, string> = {
   empty_question: 'Scrivi una domanda.',
   project_not_found: 'Questo progetto non è più in elenco.',
+  path_outside_project:
+    'Quello che hai scelto è fuori dalla cartella del progetto. Octo legge solo lì dentro: copia il file nella cartella e scegli la copia.',
   project_already_added: 'Questa cartella è già fra i tuoi progetti.',
   folder_not_readable: 'Non riesco a leggere questa cartella.',
   agent_not_installed: 'Claude non è installato su questo computer.',

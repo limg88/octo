@@ -56,6 +56,7 @@ export const CHANNELS = {
   projectsAdd: 'projects:add',
   projectsRemove: 'projects:remove',
   projectsRestore: 'projects:restore',
+  projectsChoosePath: 'projects:choose-path',
   questionsList: 'questions:list',
   questionsAsk: 'questions:ask',
   questionsCancel: 'questions:cancel',
@@ -125,6 +126,9 @@ export const CHANNELS = {
   sourcesChanged: 'sources:changed',
 } as const
 
+/** What the PM is asked to choose inside a project. */
+export type PathKind = 'file' | 'folder'
+
 export type SavedBackup = { file: string; projects: number }
 
 /** What the interface can ask the app. It is the only door between the two. */
@@ -135,6 +139,15 @@ export type OctoApi = {
   addProject(): Promise<Result<Project | null>>
   /** Takes the project off the list; nothing of it is deleted. */
   removeProject(projectId: string): Promise<Result<null>>
+  /**
+   * Lets the PM choose a file (with one of the extensions) or a folder inside the project, and
+   * gives it as a path from the project folder; null when the PM closes the dialog.
+   */
+  chooseProjectPath(
+    projectId: string,
+    what: PathKind,
+    extensions: string[],
+  ): Promise<Result<string | null>>
   /** Puts back, as it was, a project taken off the list. */
   restoreProject(projectId: string): Promise<Result<Project>>
   listQuestions(projectId: string): Promise<Result<QuestionRecord[]>>

@@ -2,6 +2,7 @@ import type { DashboardView, ExportCandidates } from '@octo/application'
 import { type DashboardSettings, PHASES, type Phase } from '@octo/domain'
 import { useEffect, useRef, useState } from 'react'
 import { messages } from './messages.ts'
+import { PathField } from './PathField.tsx'
 
 type Props = {
   settings: DashboardSettings
@@ -9,6 +10,8 @@ type Props = {
   /** What the tracker holds, once read: the states and periods to choose among. */
   view: DashboardView | null
   onSave: (settings: DashboardSettings) => Promise<void>
+  /** Opens the dialog of the system on the JSON files of the project. */
+  onChooseFile: () => Promise<string | null>
 }
 
 const text = messages.dashboard
@@ -18,7 +21,7 @@ const toggled = (values: string[], value: string): string[] =>
   values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value]
 
 /** Where the tracker export is and how to read it. Nothing here leaves the project folder. */
-export function DashboardSettingsForm({ settings, candidates, view, onSave }: Props) {
+export function DashboardSettingsForm({ settings, candidates, view, onSave, onChooseFile }: Props) {
   const [draft, setDraft] = useState(settings)
   const [tags, setTags] = useState(settings.tags.join(`${LIST_SEPARATOR} `))
   const [saving, setSaving] = useState(false)
@@ -68,8 +71,9 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
       <PathField
         label={text.exportPath}
         value={draft.exportPath}
-        options={candidates.exports}
+        candidates={candidates.exports}
         onChange={(exportPath) => change({ exportPath })}
+        onChoose={onChooseFile}
       />
       {candidates.exports.length === 0 && draft.exportPath === '' && (
         <p className="hint">{text.noCandidates}</p>
@@ -77,8 +81,9 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
       <PathField
         label={text.historyPath}
         value={draft.historyPath}
-        options={candidates.histories}
+        candidates={candidates.histories}
         onChange={(historyPath) => change({ historyPath })}
+        onChoose={onChooseFile}
       />
       <p className="hint">{text.historyHint}</p>
       <label>
@@ -150,31 +155,6 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave }: Pr
         {draft.exportPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
       </div>
     </form>
-  )
-}
-
-function PathField({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string
-  options: string[]
-  onChange: (value: string) => void
-}) {
-  const listId = `paths-${label}`
-  return (
-    <label>
-      {label}
-      <input list={listId} value={value} onChange={(event) => onChange(event.target.value)} />
-      <datalist id={listId}>
-        {options.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-    </label>
   )
 }
 

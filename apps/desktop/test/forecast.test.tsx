@@ -9,17 +9,7 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForecastView, previousMonthOf } from '../src/renderer/ForecastView.tsx'
-import {
-  amountField,
-  amountOf,
-  amountText,
-  externalLines,
-  externalRateLines,
-  externalRatesOf,
-  externalsOf,
-  rateLines,
-  ratesOf,
-} from '../src/renderer/forecast-text.ts'
+import { amountField, amountOf, amountText } from '../src/renderer/forecast-text.ts'
 import { messages } from '../src/renderer/messages.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
@@ -84,6 +74,7 @@ const view: View = {
 
 type Api = Pick<
   OctoApi,
+  | 'chooseProjectPath'
   | 'forecastSettings'
   | 'saveForecastSettings'
   | 'forecastCandidates'
@@ -94,6 +85,7 @@ type Api = Pick<
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
+    chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
     forecastSettings: vi.fn(async () => ok(configured)),
     saveForecastSettings: vi.fn(async (_id: string, settings: ForecastSettings) => ok(settings)),
     forecastCandidates: vi.fn(async () => ok(['amministrazione/Previsionale.xlsx'])),
@@ -121,58 +113,10 @@ describe('what the PM types', () => {
     expect(amountText(null)).toBe('')
   })
 
-  it('reads rates and externals one per line and writes them back', () => {
-    const rates = ratesOf(
-      'Rossi Mario; 400\nRossi Mario; prj000101; 630\n\nSenza tariffa\nAltro; x\n',
-    )
-    expect(rates.values).toEqual([
-      { person: 'Rossi Mario', code: null, ratePerDay: 400 },
-      { person: 'Rossi Mario', code: 'PRJ000101', ratePerDay: 630 },
-    ])
-    expect(rates.problems).toEqual([
-      { line: 4, text: 'Senza tariffa', reason: 'shape' },
-      { line: 5, text: 'Altro; x', reason: 'amount' },
-    ])
-    expect(rateLines(rates.values)).toBe('Rossi Mario; 400\nRossi Mario; PRJ000101; 630')
-    // A line as it was typed when the cost was written too: the rate is read, the cost is not.
-    expect(
-      ratesOf(
-        'Rossi Mario; 346,16; 480\nSolo Costo; 151,44\nVuoto; ; 300\nNiente; 200;\nP; C; x\nA; B; 1; 2',
-      ),
-    ).toEqual({
-      values: [
-        { person: 'Rossi Mario', code: null, ratePerDay: 480 },
-        { person: 'Solo Costo', code: null, ratePerDay: 151.44 },
-        { person: 'Vuoto', code: null, ratePerDay: 300 },
-      ],
-      problems: [
-        { line: 4, text: 'Niente; 200;', reason: 'shape' },
-        { line: 5, text: 'P; C; x', reason: 'amount' },
-        { line: 6, text: 'A; B; 1; 2', reason: 'shape' },
-      ],
-    })
-    const externalRates = externalRatesOf(
-      'Studio Blu; p1; 300; 500\nIncompleto; P1; 300\nSenza; ; 1; 2\nCaro; P1; tanto; 2\n',
-    )
-    expect(externalRates.values).toEqual([
-      { name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 },
-    ])
-    expect(externalRates.problems.map(({ line, reason }) => [line, reason])).toEqual([
-      [2, 'shape'],
-      [3, 'shape'],
-      [4, 'amount'],
-    ])
-    expect(externalRateLines(externalRates.values)).toBe('Studio Blu; P1; 300; 500')
-    const externals = externalsOf('Studio Blu; 20,5\nSenza ore\nStudio Blu; tante\n')
-    expect(externals.values).toEqual([{ name: 'Studio Blu', hours: 20.5 }])
-    expect(externals.problems.map(({ line, reason }) => [line, reason])).toEqual([
-      [2, 'shape'],
-      [3, 'amount'],
-    ])
-    expect(externalLines(externals.values)).toBe('Studio Blu; 20,5')
-    expect(amountField('').values).toEqual([])
-    expect(amountField(' 1.200,5 ').values).toEqual([1200.5])
-    expect(amountField('tanto').problems).toEqual([{ line: 1, text: 'tanto', reason: 'amount' }])
+  it('tells an amount typed in a field of its own from nothing and from nonsense', () => {
+    expect(amountField('')).toEqual({ value: null, wrong: false })
+    expect(amountField(' 1.200,5 ')).toEqual({ value: 1200.5, wrong: false })
+    expect(amountField('tanto')).toEqual({ value: null, wrong: true })
   })
 
   it('knows the month before', () => {
@@ -254,20 +198,18 @@ describe('the forecast', () => {
     render(<ForecastView api={api} project={project} now={now} />)
     const form = await screen.findByRole('form', { name: text.inputsTitle('P1') })
     const field = (label: string) => within(form).getByLabelText(label)
+    const cell = (column: string, row: number) => field(text.cell(column, row))
     expect((field(text.toInvoice) as HTMLInputElement).value).toBe('12000')
     // A figure that is not one is told under its field, and the month is not saved.
-    fireEvent.change(field(text.externals), { target: { value: 'Studio Blu; tante' } })
+    fireEvent.change(cell(text.columns.name, 1), { target: { value: 'Studio Blu' } })
+    fireEvent.change(cell(text.columns.hours, 1), { target: { value: 'tante' } })
     fireEvent.change(field(text.revenue), { target: { value: 'boh' } })
     fireEvent.click(within(form).getByRole('button', { name: text.saveInputs }))
-    expect(
-      within(form).getByText(
-        messages.lines.line(1, 'Studio Blu; tante', 'amount', text.shapes.externals),
-      ),
-    ).toBeTruthy()
-    expect(within(form).getByText(messages.lines.single.amount())).toBeTruthy()
-    expect(within(form).getByRole('status').textContent).toBe(messages.lines.notSaved)
+    expect(within(form).getByText(text.wrong.hours(1))).toBeTruthy()
+    expect(within(form).getByText(messages.amountWrong)).toBeTruthy()
+    expect(within(form).getByRole('status').textContent).toBe(messages.notSaved)
     expect(api.saveForecastSettings).not.toHaveBeenCalled()
-    fireEvent.change(field(text.externals), { target: { value: 'Studio Blu; 20' } })
+    fireEvent.change(cell(text.columns.hours, 1), { target: { value: '20' } })
     fireEvent.change(field(text.revenue), { target: { value: '7.000,50' } })
     fireEvent.change(field(text.budgetCosts), { target: { value: '' } })
     fireEvent.change(field(text.totalCosts), { target: { value: '60000' } })
@@ -300,23 +242,29 @@ describe('the forecast', () => {
     expect(await screen.findByText(text.setupIntro)).toBeTruthy()
     const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     await waitFor(() => expect(model.value).toBe('amministrazione/Previsionale.xlsx'))
+    const rates = within(screen.getByRole('group', { name: text.rates }))
+    const externals = within(screen.getByRole('group', { name: text.externalRates }))
+    const set = (group: typeof rates, column: string, row: number, value: string) =>
+      fireEvent.change(group.getByLabelText(text.cell(column, row)), { target: { value } })
     fireEvent.change(screen.getByLabelText(text.hoursPerDay), { target: { value: '7.5' } })
-    fireEvent.change(screen.getByLabelText(text.rates), { target: { value: 'Rossi Mario' } })
-    fireEvent.change(screen.getByLabelText(text.externalRates), {
-      target: { value: 'Studio Blu; P1; 300' },
-    })
+    // A rate without its figure, an external without its cost: told, and nothing is saved.
+    set(rates, text.columns.person, 1, 'Rossi Mario')
+    set(externals, text.columns.name, 1, 'Studio Blu')
+    set(externals, text.columns.code, 1, 'p1')
+    set(externals, text.columns.rate, 1, '500')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
-    expect(
-      screen.getByText(messages.lines.line(1, 'Rossi Mario', 'shape', text.shapes.rates)),
-    ).toBeTruthy()
-    expect(screen.getAllByRole('alert')).toHaveLength(2)
+    expect(screen.getByText(text.wrong.rate(1))).toBeTruthy()
+    expect(screen.getByText(text.wrong.external(1))).toBeTruthy()
     expect(api.saveForecastSettings).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText(text.rates), {
-      target: { value: 'Rossi Mario; 400\nRossi Mario; P2; 630' },
-    })
-    fireEvent.change(screen.getByLabelText(text.externalRates), {
-      target: { value: 'Studio Blu; P1; 300; 500' },
-    })
+
+    set(rates, text.columns.rate, 1, '400')
+    fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
+    set(rates, text.columns.person, 2, 'Rossi Mario')
+    set(rates, text.columns.code, 2, 'p2')
+    set(rates, text.columns.rate, 2, '630')
+    fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
+    fireEvent.click(rates.getByRole('button', { name: text.removeRow(3) }))
+    set(externals, text.columns.cost, 1, '300')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', {
@@ -331,6 +279,32 @@ describe('the forecast', () => {
       }),
     )
     expect(await screen.findByText('P1')).toBeTruthy()
+  })
+
+  it('chooses the model from the dialog of the system, and says when it is elsewhere', async () => {
+    const api = fakeApi({
+      forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
+      forecastCandidates: vi.fn(async () => ok([])),
+      chooseProjectPath: vi
+        .fn<OctoApi['chooseProjectPath']>()
+        .mockResolvedValueOnce({ ok: false, code: 'path_outside_project' })
+        .mockResolvedValueOnce(ok(null))
+        .mockResolvedValue(ok('amministrazione/Altro.xlsx')),
+    })
+    render(<ForecastView api={api} project={project} now={now} />)
+    const model = (await screen.findByLabelText(text.modelPath)) as HTMLInputElement
+    const choose = screen.getByRole('button', {
+      name: `${messages.choosePath}: ${text.modelPath}`,
+    })
+    fireEvent.click(choose)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/fuori dalla cartella/)
+    // The PM closes the dialog: nothing changes.
+    fireEvent.click(choose)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(model.value).toBe('')
+    fireEvent.click(choose)
+    await waitFor(() => expect(model.value).toBe('amministrazione/Altro.xlsx'))
+    expect(api.chooseProjectPath).toHaveBeenLastCalledWith('p-1', 'file', ['xlsx'])
   })
 
   it('keeps the model empty when more than one could be it, and shows a failed save', async () => {

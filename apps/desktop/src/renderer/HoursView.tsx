@@ -2,9 +2,10 @@ import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { LineProblems } from './LineProblems.tsx'
-import { type LineProblem, type Lines, readLines } from './lines.ts'
+import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { dateText, dateTimeText, errorText, messages } from './messages.ts'
+import { PathField } from './PathField.tsx'
+import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import { Unlinked } from './Unlinked.tsx'
 
 type HoursApi = Pick<
@@ -15,6 +16,7 @@ type HoursApi = Pick<
   | 'hoursView'
   | 'readTrackerHours'
   | 'readTimesheets'
+  | 'chooseProjectPath'
 >
 
 type Props = {
@@ -29,7 +31,6 @@ type Props = {
 const text = messages.hours
 const NO_CANDIDATES: HoursCandidates = { timesheets: [], worklogs: [] }
 const LIST_SEPARATOR = ','
-const ALIAS_SEPARATOR = '='
 
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 
@@ -185,6 +186,15 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
     </section>
   )
 
+  /** The exports are kept in a folder of the project: chosen from the dialog of the system. */
+  async function chooseFolder(): Promise<string | null> {
+    setError(null)
+    const result = await api.chooseProjectPath(project.id, 'folder', [])
+    if (result.ok) return result.value
+    setError(result.code)
+    return null
+  }
+
   function changePeriod(next: HoursPeriod) {
     setPeriod(next)
     if (next.from !== '' && next.to !== '') void loadView(next)
@@ -201,7 +211,14 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
         <section aria-label={text.setupTitle}>
           <h3>{text.setupTitle}</h3>
           <p className="hint">{text.setupIntro}</p>
-          <SettingsForm settings={settings} candidates={candidates} codes={[]} onSave={save} />
+          <SettingsForm
+            settings={settings}
+            candidates={candidates}
+            codes={[]}
+            people={[]}
+            onSave={save}
+            onChooseFolder={chooseFolder}
+          />
         </section>
         {timesheets}
         {tracker}
@@ -257,7 +274,9 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
           settings={settings}
           candidates={candidates}
           codes={view?.projectCodes ?? []}
+          people={view?.reconciliation.rows.map((row) => row.person) ?? []}
           onSave={save}
+          onChooseFolder={chooseFolder}
         />
       </details>
     </div>
@@ -380,19 +399,14 @@ function Comparison({ view, onExpect }: { view: View; onExpect: (row: HoursRow) 
 
 const listOf = (value: string): string[] => value.split(LIST_SEPARATOR).map((part) => part.trim())
 const joined = (values: string[]): string => values.join(`${LIST_SEPARATOR} `)
-const aliasLines = (settings: HoursSettings): string =>
-  settings.aliases
-    .map((alias) => `${alias.worklog} ${ALIAS_SEPARATOR} ${alias.timesheet}`)
-    .join('\n')
-/** `name on the tracker = name in the timesheet` per line. */
-export const aliasesOf = (lines: string): Lines<HoursSettings['aliases'][number]> =>
-  readLines(lines, (line) => {
-    const [worklog = '', timesheet = '', ...rest] = line
-      .split(ALIAS_SEPARATOR)
-      .map((name) => name.trim())
-    if (worklog === '' || timesheet === '' || rest.length > 0) return { reason: 'shape' }
-    return { value: { worklog, timesheet } }
-  })
+type AliasKey = 'worklog' | 'timesheet'
+const ALIAS_COLUMNS: RowsColumn<AliasKey>[] = [
+  { key: 'worklog', label: text.aliasColumns.worklog },
+  { key: 'timesheet', label: text.aliasColumns.timesheet },
+]
+
+/** The fields of the form that hold one typed value. */
+type TextField = Exclude<keyof Draft, 'aliases'>
 
 type Draft = {
   timesheetPath: string
@@ -402,7 +416,7 @@ type Draft = {
   cutoff: string
   noWorklogExpected: string
   noTimesheetExpected: string
-  aliases: string
+  aliases: Row<AliasKey>[]
 }
 
 const draftOf = (settings: HoursSettings): Draft => ({
@@ -413,22 +427,27 @@ const draftOf = (settings: HoursSettings): Draft => ({
   cutoff: settings.cutoff,
   noWorklogExpected: joined(settings.noWorklogExpected),
   noTimesheetExpected: joined(settings.noTimesheetExpected),
-  aliases: aliasLines(settings),
+  aliases: orOneRow([...settings.aliases], ALIAS_COLUMNS),
 })
 
 function SettingsForm({
   settings,
   candidates,
   codes,
+  people,
   onSave,
+  onChooseFolder,
 }: {
   settings: HoursSettings
   candidates: HoursCandidates
   codes: string[]
+  /** The names found on either side: proposed where a name is typed. */
+  people: string[]
   onSave: (settings: HoursSettings) => Promise<void>
+  onChooseFolder: () => Promise<string | null>
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
-  const [unread, setUnread] = useState<LineProblem[]>([])
+  const [unread, setUnread] = useState<string[]>([])
   useEffect(() => setDraft(draftOf(settings)), [settings])
   // The only place found is proposed without asking.
   useEffect(() => {
@@ -443,7 +462,7 @@ function SettingsForm({
     }))
   }, [candidates])
 
-  const field = (name: keyof Draft, label: string, options: string[] = [], type = 'text') => (
+  const field = (name: TextField, label: string, options: string[] = [], type = 'text') => (
     <label>
       {label}
       <input
@@ -470,9 +489,13 @@ function SettingsForm({
       className="settings-form"
       onSubmit={(event) => {
         event.preventDefault()
-        const aliases = aliasesOf(draft.aliases)
-        setUnread(aliases.problems)
-        if (aliases.problems.length > 0) return
+        const wrong = draft.aliases.flatMap((row, index) =>
+          blankRow(row) || (row.worklog.trim() !== '' && row.timesheet.trim() !== '')
+            ? []
+            : [text.aliasWrong(index + 1)],
+        )
+        setUnread(wrong)
+        if (wrong.length > 0) return
         void onSave({
           timesheetPath: draft.timesheetPath,
           worklogPath: draft.worklogPath,
@@ -481,12 +504,26 @@ function SettingsForm({
           cutoff: draft.cutoff,
           noWorklogExpected: listOf(draft.noWorklogExpected),
           noTimesheetExpected: listOf(draft.noTimesheetExpected),
-          aliases: aliases.values,
+          aliases: draft.aliases
+            .filter((row) => !blankRow(row))
+            .map((row) => ({ worklog: row.worklog.trim(), timesheet: row.timesheet.trim() })),
         })
       }}
     >
-      {field('timesheetPath', text.timesheetPath, candidates.timesheets)}
-      {field('worklogPath', text.worklogPath, candidates.worklogs)}
+      <PathField
+        label={text.timesheetPath}
+        value={draft.timesheetPath}
+        candidates={candidates.timesheets}
+        onChange={(timesheetPath) => setDraft((current) => ({ ...current, timesheetPath }))}
+        onChoose={onChooseFolder}
+      />
+      <PathField
+        label={text.worklogPath}
+        value={draft.worklogPath}
+        candidates={candidates.worklogs}
+        onChange={(worklogPath) => setDraft((current) => ({ ...current, worklogPath }))}
+        onChoose={onChooseFolder}
+      />
       <p className="hint">{text.worklogHint}</p>
       {field('projects', text.projects)}
       {codes.length > 0 && (
@@ -498,17 +535,17 @@ function SettingsForm({
       {field('cutoff', text.cutoff, [], 'date')}
       {field('noWorklogExpected', text.noWorklogExpected)}
       {field('noTimesheetExpected', text.noTimesheetExpected)}
-      <label>
-        {text.aliases}
-        <textarea
-          value={draft.aliases}
-          onChange={(event) => {
-            const { value } = event.target
-            setDraft((current) => ({ ...current, aliases: value }))
-          }}
-        />
-      </label>
-      <LineProblems problems={unread} shape={text.shapes.aliases} />
+      <h4>{text.aliases}</h4>
+      <RowsField
+        label={text.aliases}
+        columns={ALIAS_COLUMNS.map((column) => ({ ...column, suggestions: people }))}
+        rows={draft.aliases}
+        onChange={(aliases) => setDraft((current) => ({ ...current, aliases }))}
+        addLabel={text.addAlias}
+        cellLabel={(column, row) => text.aliasCell(text.aliasColumns[column], row)}
+        removeLabel={text.removeAlias}
+      />
+      <FieldProblems lines={unread} />
       <div className="actions">
         <button
           type="submit"
@@ -519,11 +556,7 @@ function SettingsForm({
         {(draft.timesheetPath.trim() === '' || draft.worklogPath.trim() === '') && (
           <span className="hint">{text.saveNeeds}</span>
         )}
-        {unread.length > 0 && (
-          <span className="field-problems" role="status">
-            {messages.lines.notSaved}
-          </span>
-        )}
+        {unread.length > 0 && <NotSaved text={messages.notSaved} />}
       </div>
     </form>
   )
