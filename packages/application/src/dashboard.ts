@@ -15,16 +15,26 @@ import {
   parseTrackerHistory,
   phaseOf,
   type RequirementRow,
+  TRACKER_SUMMARY_PATH,
   type TrackerData,
   type TrendGranularity,
+  trackerSummary,
   unclearRequirements,
 } from '@octo/domain'
-import type { Clock, DashboardSettingsStore, ExportCandidates, TrackerExports } from './ports.ts'
+import type {
+  Clock,
+  DashboardSettingsStore,
+  ExportCandidates,
+  MemoryWriter,
+  TrackerExports,
+} from './ports.ts'
 
 export type DashboardDeps = {
   settings: DashboardSettingsStore
   exports: TrackerExports
   clock: Clock
+  /** With a writer, the tracker in numbers is kept as a text of the project. */
+  writer?: MemoryWriter
 }
 
 /** The period of the trend as the interface asks for it: two days and the size of a step. */
@@ -123,6 +133,12 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
     async saveSettings(project, settings) {
       const clean = cleanDashboardSettings(settings)
       await deps.settings.save(project.folder, clean)
+      // The numbers follow the perimeter and the phases just saved; no export yet, no numbers.
+      if (deps.writer && clean.exportPath !== '') {
+        const data = await read(project, clean).catch(() => null)
+        if (data)
+          await deps.writer.write(project.folder, TRACKER_SUMMARY_PATH, trackerSummary(data, clean))
+      }
       return clean
     },
 

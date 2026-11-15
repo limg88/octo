@@ -1,6 +1,12 @@
-import { type DashboardSettings, DEFAULT_DASHBOARD_SETTINGS, type Project } from '@octo/domain'
+import {
+  type DashboardSettings,
+  DEFAULT_DASHBOARD_SETTINGS,
+  type Project,
+  TRACKER_SUMMARY_PATH,
+} from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import { createDashboard, type DashboardSettingsStore, type TrackerExports } from '../src/index.ts'
+import { memoryWriter } from './fakes.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const NOW = new Date('2026-06-30T12:00:00Z')
@@ -65,7 +71,11 @@ const HISTORY = {
   },
 }
 
-function setup(initial: Partial<DashboardSettings> = {}, files: Record<string, unknown> = {}) {
+function setup(
+  initial: Partial<DashboardSettings> = {},
+  files: Record<string, unknown> = {},
+  writer?: ReturnType<typeof memoryWriter>,
+) {
   let saved: DashboardSettings = { ...DEFAULT_DASHBOARD_SETTINGS, ...initial }
   const settings: DashboardSettingsStore = {
     load: async () => saved,
@@ -81,10 +91,32 @@ function setup(initial: Partial<DashboardSettings> = {}, files: Record<string, u
     },
     candidates: async () => ({ exports: Object.keys(files), histories: [] }),
   }
-  return createDashboard({ settings, exports, clock: { now: () => NOW } })
+  return createDashboard({
+    settings,
+    exports,
+    clock: { now: () => NOW },
+    ...(writer ? { writer } : {}),
+  })
 }
 
 describe('dashboard', () => {
+  it('keeps the tracker in numbers as a text, following the perimeter just saved', async () => {
+    const writer = memoryWriter()
+    const dashboard = setup({ exportPath: 'export.json' }, { 'export.json': EXPORT }, writer)
+    const saved = await dashboard.settings(project)
+
+    await dashboard.saveSettings(project, { ...saved, tags: ['Team'] })
+    expect(writer.files.get(TRACKER_SUMMARY_PATH)).toContain('- Bug nel perimetro: 2')
+    await dashboard.saveSettings(project, { ...saved, tags: [] })
+    expect(writer.files.get(TRACKER_SUMMARY_PATH)).toContain('- Bug nel perimetro: 3')
+
+    // No export, or one that cannot be read: the settings are saved and no number is written.
+    const none = memoryWriter()
+    await setup({}, {}, none).saveSettings(project, { ...saved, exportPath: '' })
+    await setup({}, {}, none).saveSettings(project, { ...saved, exportPath: 'manca.json' })
+    expect(none.files.size).toBe(0)
+  })
+
   it('computes the view from the export, counting days up to its date', async () => {
     const dashboard = setup(
       { exportPath: 'export.json', tags: ['Team'] },

@@ -16,6 +16,7 @@ import {
   JOBS_FOLDER,
   jobPath,
   LETTERHEAD_PATH,
+  type LiveSource,
   type ModelSettings,
   OWN_KINDS_FOLDER,
   type OwnKindInput,
@@ -50,6 +51,8 @@ export type DeliverablesDeps = {
   ids: IdGenerator
   /** The models the PM chose for the project; without, the default of Claude Code. */
   models?: (project: Project) => Promise<ModelSettings>
+  /** What Octo reads directly for the project, told to the writer of every draft. */
+  liveSources?: (project: Project) => Promise<LiveSource[]>
 }
 
 export type StartInput = {
@@ -178,6 +181,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         projectFolder: project.folder,
         kind,
         model: chosen?.write ?? null,
+        liveSources: (await deps.liveSources?.(project)) ?? [],
         onModel: (used) => {
           models.write = used
         },

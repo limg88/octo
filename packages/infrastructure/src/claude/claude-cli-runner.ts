@@ -32,7 +32,10 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
       runStructured(config, {
         projectFolder: request.projectFolder,
         input: request.question,
-        systemPrompt: askSystemPrompt(await projectRules(request.projectFolder)),
+        systemPrompt: askSystemPrompt(
+          await projectRules(request.projectFolder),
+          request.liveSources,
+        ),
         schema: draftAnswerSchema,
         onProgress: request.onProgress,
         signal: request.signal,

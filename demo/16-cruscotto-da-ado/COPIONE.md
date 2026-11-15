@@ -28,7 +28,14 @@ Durata: 3 minuti. Mostra che il cruscotto non dipende più da un file esportato 
 5. **Guarda l'andamento.**
    Atteso: non compare la nota «Senza cronologia»: gli ingressi e le uscite seguono i cambi di stato letti da Azure DevOps.
 
-6. **Rileggi quando vuoi.** Apri «Impostazioni del cruscotto» e premi di nuovo «Leggi da Azure DevOps».
+6. **Guarda il riepilogo in numeri.** Nel terminale:
+   ```bash
+   cat .tmp/demo-16/Aurora/_octo/cruscotto/riepilogo.md
+   ```
+   Atteso: la data dei dati, il perimetro, i bug per fase e storie e bug per sprint e stato.
+   Dimostra: i conteggi li fa il codice. Chi risponde in «Chiedi» e chi scrive un deliverable li cita da qui, con la loro data, al posto di contare o di usare un'esportazione vecchia trovata nella cartella.
+
+7. **Rileggi quando vuoi.** Apri «Impostazioni del cruscotto» e premi di nuovo «Leggi da Azure DevOps».
    Atteso: una nuova lettura, con la nuova ora. Tag, periodi e note che avevi messo restano.
 
 ## Che cosa dimostra

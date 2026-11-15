@@ -6,6 +6,7 @@ import {
   type DraftAnswer,
   type Evidence,
   isDomainError,
+  type LiveSource,
   type ModelSettings,
   type Project,
   type QuestionRecord,
@@ -27,6 +28,8 @@ export type AskQuestionDeps = {
   ids: IdGenerator
   /** The models the PM chose for the project; without, the default of Claude Code. */
   models?: (project: Project) => Promise<ModelSettings>
+  /** What Octo reads directly for the project, told to the agent with every question. */
+  liveSources?: (project: Project) => Promise<LiveSource[]>
 }
 
 export type AskQuestionInput = {
@@ -67,6 +70,7 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
         projectFolder: input.project.folder,
         question,
         model: chosen,
+        liveSources: (await deps.liveSources?.(input.project)) ?? [],
         onModel: (used) => {
           model = used
         },

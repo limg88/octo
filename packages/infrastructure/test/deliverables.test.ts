@@ -6,6 +6,7 @@ import { createDeliverables } from '@octo/application'
 import { deliverableKind, type ModelSettings, type Project } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { askSystemPrompt, liveSourcesPrompt } from '../src/claude/ask-prompt.ts'
 import { extract } from '../src/extract/extract.ts'
 import {
   createClaudeDeliverableWriter,
@@ -162,7 +163,37 @@ describe('what the writer and the red team are told', () => {
   }
 
   it('gives the writer the craft, the PM additions and the binding rules of the project', () => {
+    const live = [
+      {
+        system: 'Azure DevOps',
+        path: '_octo/fonti/ADO',
+        what: 'one file per work item',
+        readAt: '2026-11-15T10:06:54.804Z',
+      },
+      {
+        system: 'Client tracker, in numbers',
+        path: '_octo/cruscotto/riepilogo.md',
+        what: 'counts',
+        readAt: null,
+        computed: true,
+      },
+    ]
+    const withLive = writerSystemPrompt(
+      { ...request, liveSources: live },
+      'Niente numeri oltre 72 ore.',
+    )
+    // What Octo reads directly is told before the rules, with its age and how it meets them.
+    expect(withLive).toContain(
+      '- Azure DevOps: `_octo/fonti/ADO` (one file per work item; read 2026-11-15T10:06:54.804Z).',
+    )
+    expect(withLive).toContain('reading time not recorded). Cite these numbers as they are')
+    expect(withLive).toMatch(/compare the dates and use the fresher one/)
+    expect(withLive.indexOf('<live_sources>')).toBeLessThan(withLive.indexOf('<project_rules>'))
+    expect(askSystemPrompt('Regola.', live)).toContain('<live_sources>')
+    expect(askSystemPrompt(null, [])).not.toContain('<live_sources>')
+    expect(liveSourcesPrompt(undefined)).toBe('')
     const prompt = writerSystemPrompt(request, 'Niente numeri oltre 72 ore.')
+    expect(prompt).not.toContain('<live_sources>')
 
     expect(prompt).toContain('Email al cliente')
     expect(prompt).toContain('One request only')

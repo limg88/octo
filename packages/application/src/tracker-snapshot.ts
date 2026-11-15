@@ -2,8 +2,11 @@ import {
   cleanDashboardSettings,
   DomainError,
   type Project,
+  parseTrackerExport,
   TRACKER_HISTORY_PATH,
   TRACKER_SNAPSHOT_PATH,
+  TRACKER_SUMMARY_PATH,
+  trackerSummary,
 } from '@octo/domain'
 import { secretKey } from './feeds.ts'
 import type {
@@ -70,6 +73,15 @@ export function createTrackerSnapshots(deps: TrackerSnapshotsDeps): TrackerSnaps
         historyPath: TRACKER_HISTORY_PATH,
       }),
     )
+    // The same reading in numbers, as a text a report can cite instead of counting.
+    const parsed = parseTrackerExport({ exported_at: snapshot.exportedAt, items: snapshot.items })
+    if (parsed) {
+      await deps.writer.write(
+        project.folder,
+        TRACKER_SUMMARY_PATH,
+        trackerSummary(parsed, settings),
+      )
+    }
     return {
       at: snapshot.exportedAt,
       items: snapshot.items.length,

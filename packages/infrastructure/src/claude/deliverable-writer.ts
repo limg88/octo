@@ -9,7 +9,7 @@ import {
   WBS_STATES,
 } from '@octo/domain'
 import { z } from 'zod'
-import { draftAnswerSchema } from './ask-prompt.ts'
+import { draftAnswerSchema, liveSourcesPrompt } from './ask-prompt.ts'
 import { type ClaudeCliConfig, projectRules, runStructured } from './structured-run.ts'
 
 const redTeamSchema = z.object({
@@ -91,6 +91,8 @@ ${kind.instructions}`,
 the ones above and win where they differ, except for what must never reach a client.
 ${fenced(PM_OPEN, PM_CLOSE, request.projectInstructions)}`)
   }
+  const live = liveSourcesPrompt(request.liveSources).trim()
+  if (live !== '') parts.push(live)
   if (rules) {
     parts.push(`The Project Manager wrote the rules below for this project. They are binding on what you may
 state: when a rule forbids something (for example numbers from a snapshot that is too old), do not

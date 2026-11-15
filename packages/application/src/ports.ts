@@ -19,6 +19,7 @@ import type {
   HoursPeriod,
   HoursSettings,
   JiraFeedConfig,
+  LiveSource,
   MailMessage,
   ModelSettings,
   ProgressSettings,
@@ -50,6 +51,8 @@ export type AskRequest = {
   question: string
   /** The model to use; absent or null: the default of Claude Code on this seat. */
   model?: string | null
+  /** What Octo reads directly for the project: the freshest data of each system. */
+  liveSources?: readonly LiveSource[]
   /** Told which model answers, as soon as the run says it. */
   onModel?: (model: string) => void
   onProgress?: (progress: AgentProgress) => void
@@ -217,6 +220,7 @@ export type DraftRequest = {
   inputs: Readonly<Record<string, string>>
   /** A change asked in words on the draft shown; null for the first draft. */
   revision: { draft: DeliverableDraft; request: string } | null
+  liveSources?: readonly LiveSource[]
   model?: string | null
   onModel?: (model: string) => void
   onProgress?: (progress: AgentProgress) => void

@@ -18,6 +18,7 @@ import {
   createModels,
   createProgress,
   createProjects,
+  createSourceMap,
   createSources,
   createTeam,
   createTrackerSnapshots,
@@ -215,8 +216,9 @@ function start(): void {
   const team = createTeam({ store: createFsTeamStore(), writer })
   const models = createModels({ store: createFsModelSettings() })
   const chosenModels = (project: Project) => models.get(project)
+  const hoursSettings = createFsHoursSettings()
   const hours = createHours({
-    settings: createFsHoursSettings(),
+    settings: hoursSettings,
     files,
     sources: settings,
     secrets,
@@ -231,6 +233,7 @@ function start(): void {
   const trackerExports = createFsTrackerExports()
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, feeds, documents })
+  const liveSources = createSourceMap({ sources, feeds, hours: hoursSettings, files })
   const periodic = () => void feedAll(projects, feeding, window)
   setTimeout(periodic, FIRST_SYNC_DELAY_MS)
   setInterval(periodic, SYNC_INTERVAL_MS)
@@ -249,8 +252,14 @@ function start(): void {
       clock,
       ids,
       models: chosenModels,
+      liveSources,
     }),
-    dashboard: createDashboard({ settings: dashboardSettings, exports: trackerExports, clock }),
+    dashboard: createDashboard({
+      settings: dashboardSettings,
+      exports: trackerExports,
+      clock,
+      writer,
+    }),
     alignments: createAlignments({
       settings: createFsAlignmentSettings(),
       dashboard: dashboardSettings,
@@ -279,6 +288,7 @@ function start(): void {
       clock,
       ids,
       models: chosenModels,
+      liveSources,
     }),
     models,
     folderDialogTitle: FOLDER_DIALOG_TITLE,

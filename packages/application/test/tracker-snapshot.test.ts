@@ -6,6 +6,7 @@ import {
   type Project,
   TRACKER_HISTORY_PATH,
   TRACKER_SNAPSHOT_PATH,
+  TRACKER_SUMMARY_PATH,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import {
@@ -86,6 +87,10 @@ describe('reading the tracker for the dashboard', () => {
       exported_at: SNAPSHOT.exportedAt,
       bugs: SNAPSHOT.history,
     })
+    // The same reading in numbers, counted by the code for the perimeter of the dashboard.
+    expect(writer.files.get(TRACKER_SUMMARY_PATH)).toContain(
+      '- Dati del tracker al: 2026-11-15T07:00:00.000Z',
+    )
     // What the PM had set stays: only the two files change.
     expect(settings()).toMatchObject({
       exportPath: TRACKER_SNAPSHOT_PATH,
