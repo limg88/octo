@@ -31,6 +31,7 @@ import {
   NO_RISKS,
   NO_TEAM,
   NO_TODAY_SETTINGS,
+  opensAsDocument,
   orderToday,
   parseInvite,
   parseMailDocument,
@@ -744,6 +745,31 @@ describe('the register of the risks', () => {
     )
     expect(riskItems(waiting).map((entry) => entry.facts.kind)).toEqual(['risk', 'risk_candidates'])
     expect(riskItems(closed).map((entry) => entry.facts.kind)).toEqual(['risk'])
+  })
+})
+
+describe('a source opened from a click', () => {
+  it('opens documents only: a script or a program of the folder is never run', () => {
+    for (const path of [
+      'wiki/stato.md',
+      'Documenti/Offerta Aurora.DOCX',
+      '_octo/posta/2026-11/a.md',
+      'dati\\export.json',
+    ]) {
+      expect(opensAsDocument(path), path).toBe(true)
+    }
+    for (const path of [
+      'avvia.command',
+      'Strumenti/setup.exe',
+      'Octo.app',
+      'pagina.html',
+      'script.sh',
+      'senza-estensione',
+      '.md',
+      'nota.md/programma',
+    ]) {
+      expect(opensAsDocument(path), path).toBe(false)
+    }
   })
 })
 

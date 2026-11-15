@@ -30,6 +30,7 @@ import {
   FULL_ALLOCATION,
   isDomainError,
   MODEL_CHOICES,
+  opensAsDocument,
   PHASES,
   pathInProject,
   RISK_STATES,
@@ -821,7 +822,11 @@ export function registerIpc(deps: IpcDeps): void {
     const project = await deps.projects.get(projectId)
     // Only a file the reader accepts as part of the project is handed to the system.
     const found = await deps.evidence.read(project.folder, path)
-    if (found.kind === 'found') await shell.openPath(resolve(project.folder, path))
+    if (found.kind !== 'found') return null
+    const file = resolve(project.folder, path)
+    // A script or a program of a shared folder is never run from a click on a source.
+    if (opensAsDocument(path)) await shell.openPath(file)
+    else shell.showItemInFolder(file)
     return null
   })
 }

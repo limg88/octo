@@ -107,3 +107,29 @@ export function starterFiles(name: string): StarterFile[] {
     },
   ]
 }
+
+/** What a file of the project is opened as: documents only. */
+const DOCUMENT_EXTENSIONS = new Set([
+  'md',
+  'markdown',
+  'txt',
+  'csv',
+  'json',
+  'vtt',
+  'log',
+  'pdf',
+  'docx',
+  'xlsx',
+  'pptx',
+])
+
+/**
+ * Whether a file may be handed to the system to open. A path can come from what a model read in
+ * the project, and a shared folder can hold a script or a program: only what is a document by its
+ * name is opened; anything else is shown in its folder, for the person to decide.
+ */
+export function opensAsDocument(path: string): boolean {
+  const name = path.split(PATH_SEPARATORS).at(-1) ?? ''
+  const dot = name.lastIndexOf('.')
+  return dot > 0 && DOCUMENT_EXTENSIONS.has(name.slice(dot + 1).toLowerCase())
+}
