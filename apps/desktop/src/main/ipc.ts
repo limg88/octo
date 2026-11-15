@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   AgentRunner,
@@ -823,9 +823,10 @@ export function registerIpc(deps: IpcDeps): void {
     // Only a file the reader accepts as part of the project is handed to the system.
     const found = await deps.evidence.read(project.folder, path)
     if (found.kind !== 'found') return null
-    const file = resolve(project.folder, path)
-    // A script or a program of a shared folder is never run from a click on a source.
-    if (opensAsDocument(path)) await shell.openPath(file)
+    // The file is judged and opened by where it really is: a link named as a document that leads
+    // to a script or a program of a shared folder is never run from a click on a source.
+    const file = await realpath(resolve(project.folder, path))
+    if (opensAsDocument(file)) await shell.openPath(file)
     else shell.showItemInFolder(file)
     return null
   })
