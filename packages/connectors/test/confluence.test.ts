@@ -229,6 +229,17 @@ describe('the Confluence connector', () => {
     )
   })
 
+  it('lists the people a page mentions, so their names are hidden like any other', async () => {
+    const named = page('9', AURORA.id, '2026-11-06T10:00:00.000Z', {
+      paragraphs: [[{ type: 'mention', attrs: { id: 'u1', text: '@Carla Bianchi' } }]],
+    })
+    const { connector, ctx, limits } = await setup({ pages: [named] })
+    const batch = await connector.sync(ctx(['space:100']), null, limits)
+    const item = batch.items.find((found) => found.externalId === 'page:9')
+    expect(item?.people.map((person) => person.displayName)).toEqual(['Carla Bianchi'])
+    expect(item?.peopleIncomplete).toBeUndefined()
+  })
+
   it('refuses a cursor it did not write and an answer it cannot read', async () => {
     const { connector, ctx, fake, limits } = await setup()
     for (const raw of [

@@ -99,6 +99,8 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
   - *Chiamate ammesse*: quattro, tutte GET (account, elenco degli spazi, pagine di uno spazio, una pagina). Dal collegamento «pagina successiva» che il sistema restituisce si prende solo il punto da cui ripartire, mai l'indirizzo.
   - *Una pagina, un file* in `_octo/fonti/Confluence/`, con la nota sull'età dei dati come le altre fonti; lettura incrementale: a ogni lettura si scorre l'elenco delle pagine degli spazi e si riscrivono solo quelle cambiate.
   - *Limiti*: una pagina cancellata non viene tolta finché non si cambia il perimetro; il testo di una pagina è letto fino a 64.000 caratteri; una pagina che nomina più di 50 persone resta fuori; l'autore non è riportato.
+  - *Persone nominate*: le persone menzionate nel testo di una pagina sono elencate fra le persone dell'elemento, come per Jira, così i loro nomi sono nascosti al modello come gli altri (prima non lo erano: corretto il 15/11/2026).
+  - *Demo*: il collegamento è il secondo passo della demo 22, il giro completo di tutte le sezioni.
   - *Non verificato*: su un Confluence vero. Provato contro un sito finto con le forme dell'interfaccia v2 (`packages/connectors/test/support/fake-confluence.ts`), nei test e nella finestra vera.
 - **Interfaccia isolata**: nessun accesso a Node, un solo ponte con richieste validate; ogni errore arriva come codice e l'interfaccia lo spiega a parole.
 - **Versioni delle dipendenze**: solo rilasci pubblicati da almeno 14 giorni.

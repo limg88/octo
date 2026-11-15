@@ -132,9 +132,9 @@ export function RowsField<Key extends string>({
       </div>
       {columns.map(
         (column) =>
-          column.suggestions?.length && (
+          (column.suggestions?.length ?? 0) > 0 && (
             <datalist key={column.key} id={`${id}-${column.key}`}>
-              {column.suggestions.map((suggestion) => (
+              {(column.suggestions ?? []).map((suggestion) => (
                 <option key={suggestion} value={suggestion} />
               ))}
             </datalist>

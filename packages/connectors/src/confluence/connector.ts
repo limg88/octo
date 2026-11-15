@@ -5,6 +5,7 @@ import type {
   ConnectorCheck,
   ConnectorContext,
   ExternalItem,
+  ExternalPerson,
   PerimeterOption,
   SyncBatch,
   SyncLimits,
@@ -126,16 +127,18 @@ function listedOf(entry: unknown): Listed {
   return { id, title, changedAt, version, webui }
 }
 
+type PageBody = { text: string; mentions: ExternalPerson[]; refused: boolean }
+
 /**
  * The text of a page from its body in Atlassian Document Format, which Confluence gives as a
  * JSON text. A page with no body, or one that is not readable, has no text: it is still a page.
  */
-function bodyOf(json: unknown): { text: string; refused: boolean } {
+function bodyOf(json: unknown): PageBody {
   const value =
     isRecord(json) && isRecord(json.body) && isRecord(json.body.atlas_doc_format)
       ? json.body.atlas_doc_format.value
       : undefined
-  if (typeof value !== 'string' || value === '') return { text: '', refused: false }
+  if (typeof value !== 'string' || value === '') return { text: '', mentions: [], refused: false }
   let doc: unknown
   try {
     doc = JSON.parse(value)
@@ -143,7 +146,7 @@ function bodyOf(json: unknown): { text: string; refused: boolean } {
     return bad()
   }
   const read = readAdf(doc)
-  return { text: read.text, refused: read.mentionsRefused }
+  return { text: read.text, mentions: read.mentions, refused: read.mentionsRefused }
 }
 
 /**
@@ -201,7 +204,8 @@ export function createConfluenceConnector(
       author: null,
       url: listed.webui === null ? null : `${browse}/wiki${listed.webui}`,
       perimeter: [`space:${space}`],
-      people: [],
+      // The people the text mentions: listed, so their names are hidden like an assignee's.
+      people: body.mentions,
       bytes: new TextEncoder().encode(`# ${listed.title}\n\n${body.text}\n`),
       // A page that names more people than can be hidden is left out, never sent as it is.
       ...(body.refused ? { peopleIncomplete: true as const } : {}),
