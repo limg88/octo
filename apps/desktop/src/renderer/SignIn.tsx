@@ -1,6 +1,7 @@
 import type { SessionView } from '@octo/application'
 import { useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 
 type Props = {
@@ -32,7 +33,10 @@ export function SignIn({ api, session, error, onSignedIn }: Props) {
     <div className="shell shell-alone">
       <main>
         <div className="notice">
-          <h1>{messages.appName}</h1>
+          <div className="brand brand-alone">
+            <Logo size={32} />
+            <h1>{messages.brand}</h1>
+          </div>
           <h2>{text.title}</h2>
           {session === null ? (
             <p className="progress">{text.checking}</p>

@@ -1945,6 +1945,18 @@ details.advanced[open] > summary {
   line-height: 1;
 }
 
+/* On the way in the mark stands alone, above the words. */
+.brand-alone {
+  padding: 0 0 4px;
+}
+
+.brand-alone h1 {
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.065em;
+  line-height: 1;
+}
+
 .logo {
   flex: none;
   display: block;
@@ -2406,6 +2418,21 @@ fieldset.metrics {
 
 .today-day {
   min-width: 0;
+}
+
+/* The actions of the page keep their line, however long the line of the sources beside them. */
+.today-head .actions {
+  flex: none;
+  flex-wrap: nowrap;
+}
+
+.today-head .actions button {
+  white-space: nowrap;
+}
+
+/* Several warnings stand close together, flush with the page: the list stays near the top. */
+.today > .notice-bar {
+  margin: 0;
 }
 
 .today .today-judgement {
