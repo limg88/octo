@@ -85,7 +85,7 @@ export function SetupGuide({ api, project }: Props) {
         </p>
       )}
       <div className="actions">
-        <button type="button" disabled={busy} onClick={() => void fill()}>
+        <button type="button" className="primary" disabled={busy} onClick={() => void fill()}>
           {messages.guideFill}
         </button>
       </div>

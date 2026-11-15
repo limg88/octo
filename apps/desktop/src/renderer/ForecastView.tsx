@@ -147,7 +147,12 @@ export function ForecastView({ api, project, now = () => new Date() }: Props) {
           <Table rows={view.forecast.rows} />
           <Gaps view={view} />
           <div className="actions">
-            <button type="button" disabled={compiling} onClick={() => void compile()}>
+            <button
+              type="button"
+              className="primary"
+              disabled={compiling}
+              onClick={() => void compile()}
+            >
               {text.compile}
             </button>
           </div>

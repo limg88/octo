@@ -243,7 +243,7 @@ function Result({
       >
         {alignment.missing.length > 0 && (
           <div className="actions">
-            <button type="button" onClick={onExport}>
+            <button type="button" className="primary" onClick={onExport}>
               {text.exportMissing}
             </button>
           </div>

@@ -251,7 +251,7 @@ function Step({
       </table>
       {drift >= CENT && <p className="hint">{text.drift(text.money(drift))}</p>}
       <div className="actions">
-        <button type="button" onClick={() => onCompile(request.n)}>
+        <button type="button" className="primary" onClick={() => onCompile(request.n)}>
           {text.compile(request.n)}
         </button>
       </div>

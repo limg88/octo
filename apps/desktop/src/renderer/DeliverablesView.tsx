@@ -90,7 +90,7 @@ export function DeliverablesView({ api, project }: Props) {
   return (
     <section className="deliverables" aria-label={messages.deliverablesTab}>
       <nav className="deliverable-list" aria-label={messages.deliverablesTab}>
-        <button type="button" onClick={() => setShown({ view: 'catalog' })}>
+        <button type="button" className="primary" onClick={() => setShown({ view: 'catalog' })}>
           {messages.deliverableNew}
         </button>
         <button type="button" className="quiet" onClick={() => setShown({ view: 'register' })}>
@@ -420,7 +420,7 @@ function Review({
             <button type="submit" className="quiet-submit" disabled={busy || !request.trim()}>
               {messages.deliverableChangeSubmit}
             </button>
-            <button type="button" className="approve" disabled={busy} onClick={onApprove}>
+            <button type="button" className="primary" disabled={busy} onClick={onApprove}>
               {messages.deliverableApprove}
             </button>
           </div>
