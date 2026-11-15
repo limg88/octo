@@ -50,12 +50,13 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
   /** The project on the page now: a draft that comes back for another one is not shown here. */
   const live = useRef<string | null>(project.id)
   live.current = project.id
-  useEffect(
-    () => () => {
+  // When the page goes away nothing that comes back is shown; when it is put back, it is again.
+  useEffect(() => {
+    live.current = project.id
+    return () => {
       live.current = null
-    },
-    [],
-  )
+    }
+  }, [project.id])
   const [progress, setProgress] = useState<AgentProgress | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
 

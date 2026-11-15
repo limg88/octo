@@ -118,12 +118,13 @@ export function TodayView({
   /** The project on the page now: an answer that comes back for another one is dropped. */
   const live = useRef<string | null>(project.id)
   live.current = project.id
-  useEffect(
-    () => () => {
+  // When the page goes away nothing that comes back is shown; when it is put back, it is again.
+  useEffect(() => {
+    live.current = project.id
+    return () => {
       live.current = null
-    },
-    [],
-  )
+    }
+  }, [project.id])
 
   const focus = givenFocus ?? ownFocus
   const setFocus = (next: TodayFocus) => {

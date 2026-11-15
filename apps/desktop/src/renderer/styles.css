@@ -9,6 +9,8 @@
   --muted: light-dark(#606064, #a9a9af);
   --line: light-dark(#dedee1, #2a2a2d);
   --field-line: light-dark(#c8c8cd, #3b3b40);
+  /* The edge of a field one types in is told from the ground by itself: 3 to 1 at least. */
+  --input-line: light-dark(#8c8c93, #6c6c73);
   /* Violet: the main action, what is selected, the focus, the citation in view, the mark. */
   --accent: light-dark(#5040c4, #b9acff);
   --accent-hover: light-dark(#5f50cb, #c6bbff);
@@ -173,7 +175,7 @@ select,
 textarea {
   min-height: 32px;
   padding: 5px 10px;
-  border: 1px solid var(--field-line);
+  border: 1px solid var(--input-line);
   border-radius: var(--radius);
   background-color: var(--bg);
   box-shadow: var(--shadow-control);

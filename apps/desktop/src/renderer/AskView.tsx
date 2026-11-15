@@ -31,12 +31,13 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
   /** The project on the page now: an answer that comes back for another one is not shown here. */
   const live = useRef<string | null>(project.id)
   live.current = project.id
-  useEffect(
-    () => () => {
+  // When the page goes away nothing that comes back is shown; when it is put back, it is again.
+  useEffect(() => {
+    live.current = project.id
+    return () => {
       live.current = null
-    },
-    [],
-  )
+    }
+  }, [project.id])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the question is taken once, when it arrives.
   useEffect(() => {
