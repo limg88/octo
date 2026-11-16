@@ -17,6 +17,11 @@ export type UpdateProgress = { received: number; total: number }
 
 /** The file that lists the SHA-256 of every other file of a release, as `shasum` writes it. */
 export const CHECKSUMS_ASSET = 'SHA256SUMS'
+/**
+ * The signature of that list, made by who publishes Octo with a key kept away from where the
+ * releases are published: a release without it, or with another's, is never installed.
+ */
+export const CHECKSUMS_SIGNATURE_ASSET = 'SHA256SUMS.sig'
 
 const VERSION = /^v?(\d+)\.(\d+)\.(\d+)$/
 const CHECKSUM_LINE = /^([0-9a-f]{64})\s+\*?(.+)$/i

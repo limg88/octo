@@ -54,6 +54,8 @@ export const DOMAIN_ERROR_CODES = [
   'update_download_failed',
   'update_checksum_missing',
   'update_checksum_mismatch',
+  'update_signature_missing',
+  'update_signature_invalid',
   'update_not_installable',
   'team_invalid',
   'project_name_invalid',

@@ -1499,6 +1499,10 @@ const errors: Record<ErrorCode, string> = {
     'Non riesco a scaricare la versione nuova: controlla la connessione e riprova.',
   update_checksum_missing:
     'La versione nuova non dichiara la sua impronta: non la installo, perché non posso verificarla.',
+  update_signature_missing:
+    'La versione nuova non porta la firma di chi pubblica Octo: non la installo.',
+  update_signature_invalid:
+    'La firma della versione nuova non è quella di chi pubblica Octo: non la installo. Non riprovare: avvisa chi ti ha dato Octo.',
   update_checksum_mismatch:
     'Il file scaricato non è quello pubblicato: non lo installo. Riprova; se succede ancora, scarica Octo a mano.',
   update_not_installable:

@@ -1,0 +1,7 @@
+{
+  "comment": "Public keys (Ed25519, SPKI, base64) of who publishes Octo. An installed Octo installs only a release whose SHA256SUMS is signed with one of them. Written by scripts/release-keys.mjs; the private keys never enter the repository.",
+  "keys": [
+    "MCowBQYDK2VwAyEA2LhdzEZj8PAFkeL4HYxTnNXFcleSn06cGLzRhzZEfwI=",
+    "MCowBQYDK2VwAyEAsqnC2NItsl1IwJsFt/YvhdS+BCNe5MlQwGXfUsE/8uo="
+  ]
+}

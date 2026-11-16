@@ -577,6 +577,14 @@ export interface ReleaseDownloads {
   ): Promise<{ path: string; sha256: string }>
 }
 
+/** Tells whether a text was signed by who publishes Octo. */
+export interface ReleaseVerifier {
+  /** False when no key is known: without a key nothing can be told to be the publisher's. */
+  readonly canVerify: boolean
+  /** True when the signature is of one of the publisher's keys over exactly this text. */
+  verify(text: string, signature: string): boolean
+}
+
 /** Puts a downloaded Octo in place of the running one and starts it. */
 export interface UpdateApplier {
   /**

@@ -78,7 +78,26 @@ Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo
 `pnpm dist` produce in `apps/desktop/release/` un `.dmg` e uno `.zip` su Mac e un `.exe` su Windows. Su GitHub il flusso «Installatori» li crea a ogni tag `v*` o su richiesta. Non sono firmati: al primo avvio il sistema chiede conferma.
 
 ## Aggiornamenti
-Un tag `vX.Y.Z` pubblica una release con gli installatori e il file `SHA256SUMS`. Un Octo installato controlla all'avvio e ogni sei ore l'ultima release di `limg88/octo`: se è più nuova lo dice in cima alla pagina, e con «Aggiorna e riavvia» scarica il file per il suo sistema, ne verifica l'impronta, si sostituisce e riparte. Lanciato dai sorgenti non cerca aggiornamenti. Chi ha già una versione senza questa funzione deve installare la nuova a mano una volta.
+Un Octo installato controlla all'avvio e ogni sei ore l'ultima release di `limg88/octo`: se è più nuova lo dice in cima alla pagina, e con «Aggiorna e riavvia» scarica il file per il suo sistema, lo verifica, si sostituisce e riparte. Lanciato dai sorgenti non cerca aggiornamenti.
+
+Installa solo una release **firmata da chi pubblica Octo**: la lista `SHA256SUMS` deve avere accanto `SHA256SUMS.sig`, fatta con una chiave Ed25519 la cui metà pubblica è dentro l'app (`apps/desktop/release-keys.json`). La chiave privata sta solo sul computer di chi pubblica, mai nel repository né su GitHub: chi prendesse il controllo del repository non potrebbe far installare una versione sua. Non serve un Developer ID di Apple: è un'altra firma, che riguarda macOS e non Octo.
+
+Una volta sola:
+```bash
+pnpm release:keys            # la chiave «primaria», in ~/.octo-release, con una passphrase
+pnpm release:keys riserva    # una seconda, da tenere scollegata: se perdi la prima, firmi con questa
+git add apps/desktop/release-keys.json && git commit -m "chore: the keys Octo's releases are signed with"
+```
+Copia le due chiavi private fuori dal computer. Senza nessuna delle due gli Octo installati non si aggiornano più: va reinstallata a mano una versione con chiavi nuove. Un Octo costruito senza chiavi in `release-keys.json` non propone aggiornamenti.
+
+A ogni versione:
+```bash
+git tag v0.2.0 && git push origin v0.2.0   # GitHub costruisce i file e prepara la release in bozza
+pnpm release:sign v0.2.0                   # sul tuo computer: firma la lista e pubblica la release
+```
+Finché non firmi, la versione resta una bozza e nessun Octo la vede. Serve la GitHub CLI (`gh`) con l'accesso fatto.
+
+Chi ha una versione senza questa funzione deve installare la nuova a mano una volta.
 
 ## Demo
 Vedi [demo/README.md](demo/README.md).

@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   bundleOf,
+  createEd25519Verifier,
   createGithubReleaseFeed,
   createHttpDownloads,
   createUpdateApplier,
@@ -99,6 +100,43 @@ describe('the releases of Octo', () => {
     await expect(feed().latest()).rejects.toThrow('no version')
     latest = { status: 200, body: { tag_name: 'v2.0.0' } }
     expect(await feed().latest()).toEqual({ version: 'v2.0.0', notes: '', assets: [] })
+  })
+})
+
+describe('the signature of who publishes Octo', () => {
+  const pair = () => {
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+    return {
+      publicKey: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+      sign: (text: string) => sign(null, Buffer.from(text, 'utf8'), privateKey).toString('base64'),
+    }
+  }
+  const LIST = `${'a'.repeat(64)}  Octo-1.4.0-mac-arm64.zip\n`
+
+  it('accepts a text signed with one of the keys the app carries, and nothing else', () => {
+    const primary = pair()
+    const backup = pair()
+    const stranger = pair()
+    const verifier = createEd25519Verifier([primary.publicKey, ` ${backup.publicKey}\n`])
+    expect(verifier.canVerify).toBe(true)
+    expect(verifier.verify(LIST, primary.sign(LIST))).toBe(true)
+    expect(verifier.verify(LIST, `${backup.sign(LIST)}\n`)).toBe(true)
+    // Another key, another text, or something that is no signature at all.
+    expect(verifier.verify(LIST, stranger.sign(LIST))).toBe(false)
+    expect(verifier.verify(LIST.replace('a', 'b'), primary.sign(LIST))).toBe(false)
+    expect(verifier.verify(LIST, 'non una firma')).toBe(false)
+    expect(verifier.verify(LIST, '')).toBe(false)
+  })
+
+  it('knows no key when none is given or none can be read, and then accepts nothing', () => {
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      .publicKey.export({ type: 'spki', format: 'der' })
+      .toString('base64')
+    for (const keys of [[], ['non una chiave'], [rsa]]) {
+      const verifier = createEd25519Verifier(keys)
+      expect(verifier.canVerify).toBe(false)
+      expect(verifier.verify(LIST, pair().sign(LIST))).toBe(false)
+    }
   })
 })
 

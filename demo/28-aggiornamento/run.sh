@@ -4,6 +4,7 @@
 # as 0.2.0 (the one "published"); a publisher on this computer stands for GitHub.
 # macOS only: on Windows the same click starts the installer, which this demo does not build.
 # TAMPERED=1 publishes a list of checksums that does not match the file: Octo refuses it.
+# FORGED=1 signs the list with a key that is not the publisher's; UNSIGNED=1 does not sign it.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 work="$root/.tmp/demo-28"
@@ -36,12 +37,18 @@ package "$NEW"
 ditto -c -k --keepParent "$root/apps/desktop/release/$built/Octo.app" \
   "$work/pubblicati/Octo-$NEW-mac-$arch.zip"
 
-node demo/lib/fake-releases.ts "$work/pubblicati" "$NEW" ${TAMPERED:+tampered} > "$work/publisher.log" &
+mode=""
+[[ "${TAMPERED:-0}" == "1" ]] && mode="tampered"
+[[ "${FORGED:-0}" == "1" ]] && mode="forged"
+[[ "${UNSIGNED:-0}" == "1" ]] && mode="unsigned"
+node demo/lib/fake-releases.ts "$work/pubblicati" "$NEW" $mode > "$work/publisher.log" &
 publisher=$!
 trap 'kill "$publisher" 2>/dev/null || true' EXIT
-until [[ -s "$work/publisher.log" ]]; do sleep 0.1; done
+until [[ "$(wc -l < "$work/publisher.log")" -ge 2 ]]; do sleep 0.1; done
 
-export OCTO_UPDATE_URL="$(head -1 "$work/publisher.log")"
+export OCTO_UPDATE_URL="$(sed -n 1p "$work/publisher.log")"
+# The key the demo publisher signs with: the real one is built into the app.
+export OCTO_UPDATE_KEY="$(sed -n 2p "$work/publisher.log")"
 export OCTO_DATA_DIR="$work/dati"
 export OCTO_DEMO_IDENTITY="Paola Verdi <pm@example.test>"
 export OCTO_DEMO_PLAIN_SECRETS=1
@@ -61,4 +68,4 @@ TXT
 read -r _
 echo "Octo installato ora: versione $(version_of)"
 echo "Richieste arrivate a chi pubblica:"
-tail -n +2 "$work/publisher.log"
+tail -n +3 "$work/publisher.log"

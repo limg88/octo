@@ -43,6 +43,7 @@ import {
   createClaudeDeliverableWriter,
   createClaudeTodayJudge,
   createConnectorFeedReader,
+  createEd25519Verifier,
   createFeedRecords,
   createFileVault,
   createFixedIdentityProvider,
@@ -87,6 +88,7 @@ import {
   withShellPath,
 } from '@octo/infrastructure'
 import { app, BrowserWindow, safeStorage, shell } from 'electron'
+import releaseKeys from '../../release-keys.json' with { type: 'json' }
 import { CHANNELS } from '../shared/api.ts'
 import { registerIpc } from './ipc.ts'
 
@@ -113,6 +115,8 @@ const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
 const VERBALE_FOLDER_VARIABLE = 'OCTO_VERBALE_DIR'
 /** Demos and tests only: a publisher of releases on this computer instead of the real one. */
 const UPDATE_URL_VARIABLE = 'OCTO_UPDATE_URL'
+/** Demos and tests only: the key that publisher signs with. Read only together with its address. */
+const UPDATE_KEY_VARIABLE = 'OCTO_UPDATE_KEY'
 /** Where the releases of Octo are published. */
 const RELEASES_REPOSITORY = 'limg88/octo'
 const UPDATE_FOLDER = 'octo-aggiornamento'
@@ -226,7 +230,11 @@ function updatesOf(): Updates {
   const baseUrl = process.env[UPDATE_URL_VARIABLE]
   const workFolder = join(app.getPath('temp'), UPDATE_FOLDER)
   const looksForOne = app.isPackaged || baseUrl !== undefined
+  // The keys of who publishes Octo are built into the app. A demo names its own publisher and,
+  // with it, the key that publisher signs with: never a key alone, for the real releases.
+  const demoKey = baseUrl === undefined ? undefined : process.env[UPDATE_KEY_VARIABLE]
   return createUpdates({
+    verifier: createEd25519Verifier(demoKey === undefined ? releaseKeys.keys : [demoKey]),
     feed: looksForOne
       ? createGithubReleaseFeed({
           repository: RELEASES_REPOSITORY,

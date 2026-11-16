@@ -1,4 +1,10 @@
-import { CHECKSUMS_ASSET, DomainError, type Release, type UpdateProgress } from '@octo/domain'
+import {
+  CHECKSUMS_ASSET,
+  CHECKSUMS_SIGNATURE_ASSET,
+  DomainError,
+  type Release,
+  type UpdateProgress,
+} from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import { createUpdates } from '../src/index.ts'
 
@@ -8,7 +14,7 @@ const asset = (name: string) => ({ name, url: `https://example.test/${name}`, si
 const release: Release = {
   version: 'v1.4.0',
   notes: 'Novità.',
-  assets: [asset(FILE), asset(CHECKSUMS_ASSET)],
+  assets: [asset(FILE), asset(CHECKSUMS_ASSET), asset(CHECKSUMS_SIGNATURE_ASSET)],
 }
 
 function setup(
@@ -19,10 +25,14 @@ function setup(
     download?: Error
     apply?: Error
     current?: string
+    /** What the publisher's key says of the list: by default the signature is theirs. */
+    signed?: boolean
+    hasKey?: boolean
   } = {},
 ) {
   const applied: string[] = []
   const asked: string[] = []
+  const verified: Array<[string, string]> = []
   const updates = createUpdates({
     current: options.current ?? '1.3.0',
     target: { platform: 'darwin', arch: 'arm64' },
@@ -36,6 +46,7 @@ function setup(
     downloads: {
       text: async (wanted) => {
         asked.push(wanted.name)
+        if (wanted.name === CHECKSUMS_SIGNATURE_ASSET) return 'firma'
         const given = options.checksums ?? `${SHA}  ${FILE}\n`
         if (given instanceof Error) throw given
         return given
@@ -47,6 +58,13 @@ function setup(
         return { path: `/tmp/${wanted.name}`, sha256: options.sha256 ?? SHA }
       },
     },
+    verifier: {
+      canVerify: options.hasKey ?? true,
+      verify: (text, signature) => {
+        verified.push([text, signature])
+        return options.signed ?? true
+      },
+    },
     applier: {
       apply: async (path) => {
         if (options.apply) throw options.apply
@@ -54,7 +72,7 @@ function setup(
       },
     },
   })
-  return { updates, applied, asked }
+  return { updates, applied, asked, verified }
 }
 
 describe('Octo that replaces itself with a newer one', () => {
@@ -71,7 +89,7 @@ describe('Octo that replaces itself with a newer one', () => {
     const { updates, applied, asked } = setup()
     const steps: UpdateProgress[] = []
     await updates.install((step) => steps.push(step))
-    expect(asked).toEqual([CHECKSUMS_ASSET, FILE])
+    expect(asked).toEqual([CHECKSUMS_ASSET, CHECKSUMS_SIGNATURE_ASSET, FILE])
     expect(steps).toEqual([{ received: 100, total: 100 }])
     expect(applied).toEqual([`/tmp/${FILE}`])
   })
@@ -87,12 +105,40 @@ describe('Octo that replaces itself with a newer one', () => {
     await expect(unlisted.updates.install()).rejects.toMatchObject({
       code: 'update_checksum_missing',
     })
-    const noList = setup({ release: { ...release, assets: [asset(FILE)] } })
+    const noList = setup({
+      release: { ...release, assets: [asset(FILE), asset(CHECKSUMS_SIGNATURE_ASSET)] },
+    })
     await expect(noList.updates.install()).rejects.toMatchObject({
       code: 'update_checksum_missing',
     })
     expect(noList.asked).toEqual([])
     expect(unlisted.applied).toEqual([])
+  })
+
+  it('believes a list of checksums only when the publisher signed it', async () => {
+    const forged = setup({ signed: false })
+    await expect(forged.updates.install()).rejects.toMatchObject({
+      code: 'update_signature_invalid',
+    })
+    // The signature is checked over the list as it came, before the file is even asked for.
+    expect(forged.verified).toEqual([[`${SHA}  ${FILE}\n`, 'firma']])
+    expect(forged.asked).toEqual([CHECKSUMS_ASSET, CHECKSUMS_SIGNATURE_ASSET])
+    expect(forged.applied).toEqual([])
+
+    const unsigned = setup({
+      release: { ...release, assets: [asset(FILE), asset(CHECKSUMS_ASSET)] },
+    })
+    await expect(unsigned.updates.install()).rejects.toMatchObject({
+      code: 'update_signature_missing',
+    })
+    expect(unsigned.asked).toEqual([])
+
+    // An Octo built without the publisher's key offers nothing: it could accept nothing.
+    const keyless = setup({ hasKey: false })
+    expect(await keyless.updates.check()).toBeNull()
+    await expect(keyless.updates.install()).rejects.toMatchObject({
+      code: 'update_signature_invalid',
+    })
   })
 
   it('says what stopped it: nothing newer, a download that failed, an app that cannot be replaced', async () => {

@@ -17,6 +17,8 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "release:keys": "node scripts/release-keys.mjs",
+    "release:sign": "node scripts/release-sign.mjs",
     "e2e": "pnpm build && node e2e/app.e2e.mjs"
   },
   "devDependencies": {
