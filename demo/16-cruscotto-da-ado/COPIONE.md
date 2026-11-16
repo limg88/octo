@@ -22,10 +22,10 @@ Durata: 3 minuti. Mostra che il cruscotto non dipende più da un file esportato 
    Atteso: nessun file da scegliere a mano. In alto c'è «Leggi da Azure DevOps».
 
 4. **Premi «Leggi da Azure DevOps».**
-   Atteso: «Lette 3 voci, 1 con la cronologia, alle …», poi il cruscotto: «Dati aggiornati», 1 bug aperto, in verifica, con il commento «Corretto: in attesa del test del cliente».
+   Atteso: «Lette 3 voci, 3 con la cronologia, alle …» (bug e storie: delle storie servono i commenti e la data di chiusura), poi il cruscotto: «Dati aggiornati», 1 bug aperto, in verifica, con il commento «Corretto: in attesa del test del cliente».
    Dimostra: i dati sono di adesso, non di un file vecchio. Nella cartella del progetto ci sono `_octo/cruscotto/azure-devops.json` e `_octo/cruscotto/azure-devops-cronologia.json`.
 
-5. **Guarda l'andamento.**
+5. **Guarda l'andamento**, nella scheda «Andamento».
    Atteso: non compare la nota «Senza cronologia»: gli ingressi e le uscite seguono i cambi di stato letti da Azure DevOps.
 
 6. **Guarda il riepilogo in numeri.** Nel terminale:

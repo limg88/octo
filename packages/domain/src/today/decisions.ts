@@ -1,3 +1,4 @@
+import { workdaysBetween } from '../workdays.ts'
 import {
   COUNTED_KINDS,
   type MailTurn,
@@ -5,7 +6,6 @@ import {
   type TodayItem,
   type TodayKind,
   type TodayReturn,
-  workdaysBetween,
 } from './model.ts'
 
 export const DECISION_STATES = ['done', 'later', 'muted'] as const

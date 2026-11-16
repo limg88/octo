@@ -104,6 +104,15 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
           onChange={(event) => change({ stuckDays: Number(event.target.value) })}
         />
       </label>
+      <label>
+        {text.answerWorkdays}
+        <input
+          type="number"
+          min={0}
+          value={draft.answerWorkdays}
+          onChange={(event) => change({ answerWorkdays: Number(event.target.value) })}
+        />
+      </label>
       {view && view.periods.length > 0 && (
         <KnownList
           label={text.periods}

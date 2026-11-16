@@ -4,6 +4,7 @@ import type {
   AlignmentChoices,
   AlignmentFile,
   AlignmentView,
+  DashboardComment,
   DashboardRange,
   DashboardView,
   ExportCandidates,
@@ -19,6 +20,7 @@ import type {
   ProgressFile,
   ProgressView,
   ProjectOverview,
+  Reminder,
   SessionView,
   TodayView,
   TrackerHoursRun,
@@ -121,6 +123,10 @@ export const CHANNELS = {
   dashboardSettingsSave: 'dashboard:settings:save',
   dashboardCandidates: 'dashboard:candidates',
   dashboardView: 'dashboard:view',
+  dashboardOpenItem: 'dashboard:item:open',
+  dashboardComment: 'dashboard:comment',
+  dashboardReminder: 'dashboard:reminder',
+  dashboardRefresh: 'dashboard:tracker:refresh',
   hoursSettingsGet: 'hours:settings:get',
   hoursSettingsSave: 'hours:settings:save',
   hoursCandidates: 'hours:candidates',
@@ -342,7 +348,23 @@ export type OctoApi = {
   /** Tracker exports found in the project folder, to propose to the PM. */
   dashboardCandidates(projectId: string): Promise<Result<ExportCandidates>>
   /** The dashboard over a period; every number is computed by the app from the tracker export. */
-  dashboardView(projectId: string, range: DashboardRange): Promise<Result<DashboardView>>
+  dashboardView(
+    projectId: string,
+    range: DashboardRange,
+    /** The sprint to show in place of the running one. */
+    sprint?: string | null,
+  ): Promise<Result<DashboardView>>
+  /** Opens an item where the tracker keeps it, in the browser; false when it has no address. */
+  openTrackerItem(projectId: string, id: string): Promise<Result<boolean>>
+  /** Asks Claude to comment the numbers of a period; the code checks what it says. */
+  commentDashboard(projectId: string, range: DashboardRange): Promise<Result<DashboardComment>>
+  /** Asks Claude a reminder for an item that waits for an answer: to copy, never sent. */
+  draftReminder(projectId: string, id: string): Promise<Result<Reminder>>
+  /**
+   * Reads Azure DevOps again when the reading the dashboard uses is old; null when there was
+   * nothing to read.
+   */
+  refreshTrackerSnapshot(projectId: string): Promise<Result<TrackerSnapshotRun | null>>
   hoursSettings(projectId: string): Promise<Result<HoursSettings>>
   saveHoursSettings(projectId: string, settings: HoursSettings): Promise<Result<HoursSettings>>
   /** Where the timesheets and the tracker hours seem to be kept in the project folder. */

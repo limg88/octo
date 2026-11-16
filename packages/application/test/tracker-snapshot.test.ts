@@ -61,7 +61,15 @@ function setup(
   }
   const writer = memoryWriter()
   const secrets = memoryVault()
+  const clock = { now: new Date('2026-11-15T07:10:00.000Z') }
   const snapshots = createTrackerSnapshots({
+    exports: {
+      readJson: async (_folder, path) => {
+        const written = writer.files.get(path)
+        return written === undefined ? null : JSON.parse(written)
+      },
+    },
+    clock: { now: () => clock.now },
     settings,
     sources: memorySourceSettings({ ...NO_SOURCES, ado }),
     secrets,
@@ -84,7 +92,17 @@ function setup(
         }
       : {}),
   })
-  return { snapshots, writer, secrets, asked, settings: () => saved }
+  return {
+    snapshots,
+    writer,
+    secrets,
+    asked,
+    clock,
+    settings: () => saved,
+    pointAt: (exportPath: string) => {
+      saved = { ...saved, exportPath }
+    },
+  }
 }
 
 describe('reading the tracker for the dashboard', () => {
@@ -124,8 +142,10 @@ describe('reading the tracker for the dashboard', () => {
       withHistory: 1,
     })
 
-    // The source of «Fonti» and its credential, and the bug types of the dashboard.
-    expect(asked).toEqual([{ config, secret: 'pat', types: ['Bug', 'Defect'] }])
+    // The source of «Fonti» and its credential; bugs and stories are read with their history.
+    expect(asked).toEqual([
+      { config, secret: 'pat', types: ['Bug', 'Defect', 'User Story', 'Story'] },
+    ])
     expect(JSON.parse(writer.files.get(TRACKER_SNAPSHOT_PATH) ?? '')).toEqual({
       exported_at: SNAPSHOT.exportedAt,
       items: SNAPSHOT.items,
@@ -181,5 +201,57 @@ describe('reading the tracker for the dashboard', () => {
     await expect(snapshots.read(project)).rejects.toThrow('unreachable')
     expect(writer.files.get(TRACKER_SNAPSHOT_PATH)).toBe(before)
     expect(settings().exportPath).toBe(TRACKER_SNAPSHOT_PATH)
+  })
+})
+
+describe('reading the tracker again by itself', () => {
+  it('reads when Octo’s own reading is old enough, and not before', async () => {
+    const { snapshots, secrets, asked, clock } = setup()
+    secrets.all.set('p-1/ado', 'pat')
+    // The dashboard is still on an export kept by hand: nothing is read behind the PM's back.
+    expect(await snapshots.refresh(project)).toBeNull()
+    await snapshots.read(project)
+    // Ten minutes after the reading.
+    expect(await snapshots.refresh(project)).toBeNull()
+    expect(asked).toHaveLength(1)
+    clock.now = new Date('2026-11-15T09:00:00.000Z')
+    expect(await snapshots.refresh(project)).toMatchObject({ items: 2 })
+    expect(asked).toHaveLength(2)
+    // A shorter age asked by who opens the page.
+    expect(await snapshots.refresh(project, 60 * 1000)).toMatchObject({ items: 2 })
+  })
+
+  it('reads when the file does not say when it was written', async () => {
+    const { snapshots, secrets, writer, pointAt } = setup()
+    secrets.all.set('p-1/ado', 'pat')
+    pointAt(TRACKER_SNAPSHOT_PATH)
+    expect(await snapshots.refresh(project)).toMatchObject({ items: 2 })
+    writer.files.set(TRACKER_SNAPSHOT_PATH, JSON.stringify({ items: [] }))
+    expect(await snapshots.refresh(project)).toMatchObject({ items: 2 })
+  })
+
+  it('does nothing without the source, without its credential, or while a reading runs', async () => {
+    const unlinked = setup(null)
+    unlinked.pointAt(TRACKER_SNAPSHOT_PATH)
+    expect(await unlinked.snapshots.refresh(project)).toBeNull()
+    const noSecret = setup()
+    noSecret.pointAt(TRACKER_SNAPSHOT_PATH)
+    expect(await noSecret.snapshots.refresh(project)).toBeNull()
+
+    let release: () => void = () => {}
+    const slow: TrackerSnapshotReader = {
+      read: () =>
+        new Promise((resolve) => {
+          release = () => resolve(SNAPSHOT)
+        }),
+    }
+    const busy = setup(config, slow)
+    busy.secrets.all.set('p-1/ado', 'pat')
+    busy.pointAt(TRACKER_SNAPSHOT_PATH)
+    const first = busy.snapshots.refresh(project)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(await busy.snapshots.refresh(project)).toBeNull()
+    release()
+    expect(await first).toMatchObject({ items: 2 })
   })
 })

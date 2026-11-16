@@ -83,8 +83,13 @@ export type DashboardSettings = {
   storyTypes: string[]
   /** Days in the same state after which an open bug is shown as stuck. */
   stuckDays: number
-  /** Planning periods whose stories are checked for unclear requirements; none: all. */
+  /**
+   * Planning periods whose stories are checked for unclear requirements. None: the stories of
+   * the sprint that comes next, or all of them when nothing tells which it is.
+   */
   requirementPeriods: string[]
+  /** Working days a question in a last comment may wait before the item is one to chase. */
+  answerWorkdays: number
   /** States the PM mapped by hand; every other state is mapped by its name. */
   phases: Record<string, Phase>
   /**
@@ -104,6 +109,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   storyTypes: ['User Story', 'Story'],
   stuckDays: 30,
   requirementPeriods: [],
+  answerWorkdays: 2,
   phases: {},
   handoverStates: [],
   decisions: NO_DECISIONS,

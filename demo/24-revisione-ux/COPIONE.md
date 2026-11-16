@@ -33,7 +33,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
 
 5. **Dai bug fermi al bug.** In «Da tenere d'occhio» premi «Apri «Cruscotto»» sulla riga dei bug fermi.
    Atteso: «Cruscotto» si apre sul conteggio «di cui Fermi da oltre 30 giorni», già premuto, con l'elenco di quei soli bug. Sotto i conteggi una riga spiega: gli aperti sono in lavorazione o in verifica, i fermi sono una parte degli aperti, i validati non sono più aperti. Premi «Validati, in attesa di rilascio»: l'elenco cambia e ha tante righe quante ne dice il numero.
-   Scegli un bug: a destra identificativo, assegnatario, stato, giorni nello stato e l'ultimo commento. Grafico, periodi e requisiti sono sotto, come prima.
+   Scegli un bug: a destra identificativo, assegnatario, stato, giorni nello stato e l'ultimo commento. Il periodo è in cima; grafico e requisiti stanno nelle schede «Andamento» e «Sprint» (demo 34).
    Dimostra: ogni conteggio apre il suo elenco; la relazione fra i numeri è scritta.
 
 6. **Dal bug alla domanda.** Torna su «di cui Fermi…», scegli il primo bug e premi «Chiedi di questo bug».

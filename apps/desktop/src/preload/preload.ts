@@ -140,8 +140,16 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.dashboardSettingsSave, { projectId, settings }),
   dashboardCandidates: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardCandidates, { projectId }),
-  dashboardView: (projectId, range) =>
-    ipcRenderer.invoke(CHANNELS.dashboardView, { projectId, range }),
+  dashboardView: (projectId, range, sprint) =>
+    ipcRenderer.invoke(CHANNELS.dashboardView, { projectId, range, sprint: sprint ?? null }),
+  openTrackerItem: (projectId, id) =>
+    ipcRenderer.invoke(CHANNELS.dashboardOpenItem, { projectId, id }),
+  commentDashboard: (projectId, range) =>
+    ipcRenderer.invoke(CHANNELS.dashboardComment, { projectId, range }),
+  draftReminder: (projectId, id) =>
+    ipcRenderer.invoke(CHANNELS.dashboardReminder, { projectId, id }),
+  refreshTrackerSnapshot: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.dashboardRefresh, { projectId }),
   onDeliverableProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
       listener(projectId, progress)

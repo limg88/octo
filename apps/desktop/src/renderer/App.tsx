@@ -406,7 +406,7 @@ export function App({ api, notify = systemNotify }: Props) {
                 canJudge={agent?.available === true}
                 onOpenSection={setTab}
                 onOpenBugs={(filter) => {
-                  setDashboardFocus({ filter, bugId: null })
+                  setDashboardFocus({ ...NO_DASHBOARD_FOCUS, filter })
                   setTab('dashboard')
                 }}
                 onAsk={askAbout}
@@ -440,6 +440,7 @@ export function App({ api, notify = systemNotify }: Props) {
               <DashboardView
                 api={api}
                 project={selected}
+                canAsk={agent?.available === true}
                 onOpenSources={() => setTab('sources')}
                 onAsk={askAbout}
                 focus={dashboardFocus}

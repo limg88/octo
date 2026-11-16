@@ -335,10 +335,15 @@ try {
   assert.equal(await figure('Bug aperti'), '15')
   assert.equal(await figure('In verifica'), '5')
   assert.equal(await figure('Fermi da oltre 30 giorni'), '11')
+  // Demo 34: the dashboard is read in three parts; the period on top holds for all of them.
+  const part = (name) => page.locator('.dashboard-tabs').getByRole('tab', { name, exact: true })
+  await part('Andamento').click()
   const trendRows = page.locator('.trend tbody tr')
   assert.equal(await trendRows.count(), 8)
   await page.getByRole('button', { name: '12 mesi' }).click()
   await assertEventuallyAsync(async () => (await trendRows.count()) === 12)
+  await page.screenshot({ path: `${work}/cruscotto-andamento.png` })
+  await part('Bug').click()
   await page.screenshot({ path: `${work}/cruscotto.png` })
   const open07 = page.getByRole('region', { name: 'Qualità: i bug del perimetro' })
   // Demo 24: a count opens its list, with as many rows as it counts, and a bug shows its detail.
@@ -356,11 +361,26 @@ try {
   await open07.getByRole('textbox').fill('Sentito il cliente: dati entro venerdì')
   await open07.getByRole('button', { name: 'Salva la nota' }).click()
   await open07.getByText(/Nota tua/).waitFor({ timeout: TIMEOUT_MS })
+  // Demo 34: a row of a split is a filter of the list, and the filters come off together.
+  const firstSplit = open07.locator('.breakdown-row').first()
+  const splitCount = Number(await firstSplit.locator('.breakdown-count').innerText())
+  await firstSplit.click()
+  await assertEventuallyAsync(async () => (await open07.locator('.entry').count()) === splitCount)
+  await open07.getByRole('button', { name: 'Togli i filtri' }).click()
+  await assertEventuallyAsync(async () => (await open07.locator('.entry').count()) === 15)
+  await part('Sprint').click()
   const requirements07 = page.getByRole('region', { name: 'Requisiti poco chiari' })
   await requirements07.getByText(/ancora da definire con il cliente/).waitFor()
   assert.equal(await requirements07.locator('tbody tr').count(), 4)
   await requirements07.getByRole('button', { name: 'È chiaro' }).last().click()
   await assertEventuallyAsync(async () => (await requirements07.locator('tbody tr').count()) === 3)
+  // Demo 34: a decision can be undone right after, and is listed with the way to take it back.
+  await page.getByRole('button', { name: 'Annulla', exact: true }).click()
+  await assertEventuallyAsync(async () => (await requirements07.locator('tbody tr').count()) === 4)
+  await requirements07.getByRole('button', { name: 'È chiaro' }).last().click()
+  await assertEventuallyAsync(async () => (await requirements07.locator('tbody tr').count()) === 3)
+  await page.screenshot({ path: `${work}/cruscotto-sprint.png` })
+  await part('Bug').click()
   const decisions = JSON.parse(
     readFileSync(`${work}/Aurora/_octo/.impostazioni/dashboard.json`, 'utf8'),
   ).decisions
@@ -760,7 +780,7 @@ try {
   await page.getByRole('tab', { name: 'Cruscotto' }).click()
   await page.locator('.dashboard-settings summary').click()
   await page.getByRole('button', { name: 'Leggi da Azure DevOps' }).click()
-  await page.getByText(/Lette \d voci, 1 con la cronologia/).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByText(/Lette \d voci, \d con la cronologia/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('su 1 bug nel perimetro').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText(/Dati aggiornati/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('in attesa del test del cliente').waitFor({ timeout: TIMEOUT_MS })

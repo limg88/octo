@@ -1,6 +1,7 @@
 import type { DomainErrorCode } from '../errors.ts'
 import type { ForecastGap } from '../forecast/compile.ts'
 import type { HoursStatus } from '../hours/reconcile.ts'
+import { utcDay, workdaysBetween } from '../workdays.ts'
 
 /** Where in the day a signal stands: the first is a warning above everything else. */
 export const TODAY_BANDS = ['alert', 'due', 'waiting', 'numbers', 'watch'] as const
@@ -247,21 +248,6 @@ export const TODAY_LIMIT = 7
 export const isToDo = (item: TodayItem): boolean => item.band !== 'watch' && item.band !== 'alert'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const SATURDAY = 6
-const SUNDAY = 0
-
-const utcDay = (day: string): Date => new Date(`${day}T00:00:00.000Z`)
-const isWorkday = (date: Date): boolean =>
-  date.getUTCDay() !== SATURDAY && date.getUTCDay() !== SUNDAY
-
-/** Working days from a day (excluded) to another (included); 0 when the second is not later. */
-export function workdaysBetween(from: string, to: string): number {
-  let count = 0
-  for (let at = utcDay(from).getTime() + DAY_MS; at <= utcDay(to).getTime(); at += DAY_MS) {
-    if (isWorkday(new Date(at))) count += 1
-  }
-  return count
-}
 
 /** Whole days from a day to another; negative when the second comes first. */
 export const daysBetweenDays = (from: string, to: string): number =>

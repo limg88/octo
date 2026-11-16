@@ -7,6 +7,7 @@ import type {
   AskQuestion,
   Backups,
   Dashboard,
+  DashboardAdvice,
   Deliverables,
   Documents,
   EvidenceReader,
@@ -28,7 +29,9 @@ import type {
   Updates,
 } from '@octo/application'
 import {
+  DEFAULT_DASHBOARD_SETTINGS,
   DomainError,
+  EXPORT_WARNING_HOURS,
   FEED_NAMES,
   FULL_ALLOCATION,
   isDomainError,
@@ -63,6 +66,7 @@ export type IpcDeps = {
   feeding: Feeding
   deliverables: Deliverables
   dashboard: Dashboard
+  dashboardAdvice: DashboardAdvice
   hours: Hours
   forecasts: Forecasts
   progress: Progress
@@ -203,6 +207,8 @@ const kindSaveInput = byProject.extend({
 })
 const instructionsSaveInput = byKind.extend({ text: z.string().max(MAX_INSTRUCTIONS_LENGTH) })
 
+/** Opening the dashboard reads the tracker again when its reading is older than a day. */
+const EXPORT_WARNING_MS = EXPORT_WARNING_HOURS * 60 * 60 * 1000
 const MAX_DECISIONS = 5000
 const dated = { id: rule, at: rule }
 const dashboardSettingsInput = byProject.extend({
@@ -215,6 +221,7 @@ const dashboardSettingsInput = byProject.extend({
     storyTypes: ruleList,
     stuckDays: z.number(),
     requirementPeriods: ruleList,
+    answerWorkdays: z.number().default(DEFAULT_DASHBOARD_SETTINGS.answerWorkdays),
     phases: z.record(rule, z.enum(PHASES)),
     handoverStates: ruleList,
     decisions: z.object({
@@ -226,9 +233,13 @@ const dashboardSettingsInput = byProject.extend({
     }),
   }),
 })
+const dashboardRange = z.object({ from: rule, to: rule, granularity: z.enum(['week', 'month']) })
 const dashboardViewInput = byProject.extend({
-  range: z.object({ from: rule, to: rule, granularity: z.enum(['week', 'month']) }),
+  range: dashboardRange,
+  sprint: rule.nullable().default(null),
 })
+const dashboardCommentInput = byProject.extend({ range: dashboardRange })
+const trackerItemInput = byProject.extend({ id: rule })
 
 const hoursSettingsInput = byProject.extend({
   settings: z.object({
@@ -889,7 +900,27 @@ export function registerIpc(deps: IpcDeps): void {
   )
 
   handle(CHANNELS.dashboardView, dashboardViewInput, async (input) =>
-    deps.dashboard.view(await deps.projects.get(input.projectId), input.range),
+    deps.dashboard.view(await deps.projects.get(input.projectId), input.range, input.sprint),
+  )
+
+  // The address is built here from the source of the project: the window never gives one.
+  handle(CHANNELS.dashboardOpenItem, trackerItemInput, async ({ projectId, id }) => {
+    const url = await deps.dashboard.itemUrl(await deps.projects.get(projectId), id)
+    if (url === null) return false
+    await shell.openExternal(url)
+    return true
+  })
+
+  handle(CHANNELS.dashboardComment, dashboardCommentInput, async ({ projectId, range }) =>
+    deps.dashboardAdvice.comment(await deps.projects.get(projectId), range),
+  )
+
+  handle(CHANNELS.dashboardReminder, trackerItemInput, async ({ projectId, id }) =>
+    deps.dashboardAdvice.reminder(await deps.projects.get(projectId), id),
+  )
+
+  handle(CHANNELS.dashboardRefresh, byProject, async ({ projectId }) =>
+    deps.trackerSnapshots.refresh(await deps.projects.get(projectId), EXPORT_WARNING_MS),
   )
 
   handle(CHANNELS.hoursSettingsGet, byProject, async ({ projectId }) =>

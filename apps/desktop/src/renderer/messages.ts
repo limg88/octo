@@ -1085,7 +1085,8 @@ export const messages = {
     none: 'Nessuno',
     tags: 'Solo gli elementi con questi tag (nessuno: tutti)',
     stuckDays: 'Giorni nello stesso stato dopo i quali un bug è «fermo»',
-    periods: 'Periodi di pianificazione da controllare per i requisiti (nessuno: tutti)',
+    periods:
+      'Periodi di pianificazione da controllare per i requisiti (nessuno: il prossimo sprint)',
     handover:
       'Stati in cui la correzione passa a chi la verifica (nessuno: tutta la fase di verifica)',
     phasesTitle: 'Come leggo gli stati dei bug',
@@ -1157,6 +1158,116 @@ export const messages = {
       S4: 'Sospeso o bloccato',
       S5: 'Punti da chiarire nel testo',
     } as Record<string, string>,
+    tabsLabel: 'Parti del cruscotto',
+    tabs: { sprint: 'Sprint', bugs: 'Bug', trend: 'Andamento' },
+    refreshing: 'I dati hanno più di un giorno: rileggo Azure DevOps…',
+    undo: 'Annulla',
+    decided: 'Fatto.',
+    sinceStart: (delta: number) =>
+      delta === 0
+        ? 'come a inizio periodo'
+        : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} da inizio periodo`,
+    noHistoryDelta: 'Senza cronologia non confronto i numeri con l’inizio del periodo.',
+    breakdownsLabel: 'Dove si concentrano',
+    facets: { severity: 'Per gravità', environment: 'Per ambiente', assignee: 'Per persona' },
+    facetNames: { severity: 'Gravità', environment: 'Ambiente', assignee: 'Persona' },
+    notStated: 'Non indicato',
+    ofWhichStuck: (count: number) =>
+      count === 0 ? '' : `${count} ${count === 1 ? 'fermo' : 'fermi'}`,
+    filterBy: (facet: string, value: string) => `Solo ${facet.toLowerCase()}: ${value}`,
+    search: 'Cerca per id o titolo',
+    order: 'Ordina per',
+    orders: { days: 'Giorni nello stato', severity: 'Gravità', created: 'Data di apertura' },
+    activeFilters: 'Filtri',
+    removeFilter: (name: string) => `Togli il filtro ${name}`,
+    clearFilters: 'Togli i filtri',
+    shown: (shown: number, of: number) => `${shown} di ${of}`,
+    openInTracker: 'Apri su Azure DevOps',
+    notLinked: 'Questa voce non ha un indirizzo sul tracker.',
+    waitingTitle: (count: number) => `Da sollecitare: ${count}`,
+    waitingIntro: (days: number) =>
+      `Bug e storie non chiusi il cui ultimo commento chiede qualcosa e aspetta da almeno ${days} ${days === 1 ? 'giorno lavorativo' : 'giorni lavorativi'}. Li trova il codice; Octo non scrive nel tracker e non invia nulla.`,
+    waitingNone: 'Nessuna voce aspetta una risposta.',
+    waitingNoneFromClient: 'Nessuna voce aspetta una risposta dal cliente.',
+    onlyClient: 'Solo in attesa del cliente',
+    sidesUnknown:
+      'Per distinguere chi aspetta il cliente servono le persone delle due parti in «Impostazioni».',
+    asked: (by: string, when: string, days: number) =>
+      `${by} · ${when} · ${days} ${days === 1 ? 'giorno lavorativo' : 'giorni lavorativi'}`,
+    kinds: { bug: 'Bug', story: 'Storia' },
+    draftReminder: 'Prepara il sollecito',
+    draftingReminder: 'Claude scrive il sollecito…',
+    reminderFor: (to: string | null) => (to ? `Sollecito per ${to}` : 'Sollecito'),
+    reminderHint: 'È una bozza da copiare: la mandi tu, da dove vuoi.',
+    copy: 'Copia',
+    copied: 'Copiato.',
+    needsClaude: 'Serve Claude Code su questo computer.',
+    sprintLabel: 'Sprint',
+    sprintRunning: 'in corso',
+    sprintDates: (from: string, to: string) => `dal ${from} al ${to}`,
+    sprintNoDates:
+      'Il calendario del progetto non ha un periodo con il nome di questo sprint: non so quando finisce. Aggiungilo in «Impostazioni», fra persone e calendario.',
+    sprintEnding: 'Lo sprint è agli ultimi giorni',
+    noSprint:
+      'Nessuno sprint in corso: le voci del tracker non portano uno sprint, oppure il calendario del progetto non ha un periodo con il suo nome che comprende oggi. Scegline uno dal menu, se c’è.',
+    noSprintAtAll: 'Le voci del perimetro non portano uno sprint.',
+    storiesTitle: 'Storie dello sprint',
+    stages: {
+      all: 'Storie',
+      todo: 'Da fare',
+      work: 'In lavorazione',
+      verify: 'In verifica',
+      validated: 'Validate',
+      closed: 'Chiuse',
+    },
+    stageFilter: 'Scegli quali storie elencare',
+    noStories: 'Nessuna storia con questo filtro.',
+    sprintBugsTitle: 'Bug dello sprint',
+    sprintBugsOpen: 'Aperti',
+    sprintBugsClosed: 'Validati o chiusi',
+    showSprintBugs: (count: number) => `Mostra i ${count} bug`,
+    riskTitle: (count: number) =>
+      `A rischio: ${count} ${count === 1 ? 'storia non è' : 'storie non sono'} ancora in verifica`,
+    comparisonTitle: 'Sprint a confronto',
+    comparisonIntro:
+      'Storie che oggi stanno in ogni sprint. «Chiuse in tempo» conta quelle validate o chiuse entro l’ultimo giorno, dalla cronologia.',
+    comparisonColumns: {
+      sprint: 'Sprint',
+      stories: 'Storie',
+      done: 'Validate o chiuse',
+      inTime: 'Chiuse in tempo',
+      open: 'Ancora aperte',
+      bugs: 'Bug entrati',
+    },
+    comparisonUnknown:
+      'Senza cronologia delle storie o senza le date dello sprint il dato non c’è.',
+    requirementsScope: (sprint: string | null, byHand: boolean) =>
+      byHand
+        ? 'Controllo i periodi scelti nelle impostazioni.'
+        : sprint
+          ? `Controllo solo le storie del prossimo sprint: ${sprint}.`
+          : 'Non so quale sia il prossimo sprint: controllo tutte le storie da lavorare.',
+    decisionsLabel: 'Decisioni prese',
+    decisionsTitle: (count: number) => `Decisioni prese: ${count}`,
+    decisionsNone: 'Nessuna decisione presa.',
+    decisionKinds: { clear: 'È chiaro', signal: 'Segnale tolto', note: 'Nota' },
+    decisionColumns: { item: 'Voce', decision: 'Decisione', since: 'Da quando' },
+    restore: 'Ripristina',
+    removeNote: 'Togli la nota',
+    itemGone: 'non più nel tracker',
+    flowBefore: (value: number | null) => (value === null ? '' : `periodo prima: ${value} gg`),
+    commentTitle: 'Che cosa dice Claude dei numeri',
+    commentIntro:
+      'A richiesta. I numeri restano quelli calcolati qui: una frase con un numero diverso, o con una voce che il tracker non ha, non viene mostrata.',
+    comment: 'Commenta il periodo',
+    commenting: 'Claude legge i numeri…',
+    commentAgain: 'Commenta di nuovo',
+    commentOf: (when: string) => `Scritto il ${when}`,
+    commentOld: 'I dati o il periodo sono cambiati da quando è stato scritto.',
+    commentEmpty: 'Claude non ha trovato nulla da segnalare in questo periodo.',
+    commentDropped: (count: number) =>
+      `${count} ${count === 1 ? 'frase tolta' : 'frasi tolte'}: ${count === 1 ? 'citava' : 'citavano'} numeri o voci che qui non ci sono.`,
+    answerWorkdays: 'Giorni lavorativi dopo i quali una domanda senza risposta è «da sollecitare»',
     phase: {
       work: 'Lavorazione',
       verify: 'Verifica',
@@ -1523,6 +1634,7 @@ const errors: Record<ErrorCode, string> = {
   deliverable_busy: 'Sto già scrivendo questo deliverable.',
   request_empty: 'Scrivi che cosa vuoi cambiare.',
   tracker_export_not_set: 'Scegli il file dell’esportazione del tracker.',
+  tracker_item_not_waiting: 'Questa voce non aspetta più una risposta: rileggi il tracker.',
   tracker_export_missing: 'Il file dell’esportazione non c’è più nella cartella del progetto.',
   tracker_export_unreadable: 'Questo file non è un’esportazione del tracker che so leggere.',
   dashboard_range_invalid: 'Il periodo non è valido o è troppo lungo per il passo scelto.',

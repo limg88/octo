@@ -105,6 +105,8 @@ export function parseTrackerHistory(value: unknown): Map<string, ItemHistory> | 
   return histories
 }
 
+const MIN_ANSWER_WORKDAYS = 0
+const MAX_ANSWER_WORKDAYS = 60
 const MIN_STUCK_DAYS = 1
 const MAX_STUCK_DAYS = 3650
 
@@ -135,6 +137,12 @@ export function cleanDashboardSettings(settings: DashboardSettings): DashboardSe
   const stuckDays = Number.isFinite(settings.stuckDays)
     ? Math.min(MAX_STUCK_DAYS, Math.max(MIN_STUCK_DAYS, Math.round(settings.stuckDays)))
     : DEFAULT_DASHBOARD_SETTINGS.stuckDays
+  const answerWorkdays = Number.isFinite(settings.answerWorkdays)
+    ? Math.min(
+        MAX_ANSWER_WORKDAYS,
+        Math.max(MIN_ANSWER_WORKDAYS, Math.round(settings.answerWorkdays)),
+      )
+    : DEFAULT_DASHBOARD_SETTINGS.answerWorkdays
   const orDefault = (values: string[], fallback: string[]) =>
     values.length > 0 ? values : fallback
   return {
@@ -146,6 +154,7 @@ export function cleanDashboardSettings(settings: DashboardSettings): DashboardSe
     storyTypes: orDefault(cleanList(settings.storyTypes), DEFAULT_DASHBOARD_SETTINGS.storyTypes),
     stuckDays,
     requirementPeriods: cleanList(settings.requirementPeriods),
+    answerWorkdays,
     phases,
     handoverStates: cleanList(settings.handoverStates),
     decisions: cleanDecisions(settings.decisions),

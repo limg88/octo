@@ -35,6 +35,7 @@ export const DOMAIN_ERROR_CODES = [
   'tracker_export_not_set',
   'tracker_export_missing',
   'tracker_export_unreadable',
+  'tracker_item_not_waiting',
   'dashboard_range_invalid',
   'dashboard_settings_invalid',
   'hours_sources_not_set',

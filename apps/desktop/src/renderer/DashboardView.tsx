@@ -1,23 +1,29 @@
 import type {
+  DashboardComment,
   DashboardRange,
   ExportCandidates,
   TrackerSnapshotRun,
   DashboardView as View,
 } from '@octo/application'
-import type { BugRow, DashboardSettings, Project, RequirementRow } from '@octo/domain'
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type DashboardDecisions,
+  type DashboardSettings,
+  type Project,
+  withoutTrackerDecision,
+} from '@octo/domain'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { BUG_FILTERS, type BugFilter, type DashboardFocus, NO_DASHBOARD_FOCUS } from './context.ts'
+import { DASHBOARD_TABS, type DashboardFocus, NO_DASHBOARD_FOCUS } from './context.ts'
+import { DashboardBugs } from './DashboardBugs.tsx'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
-import { type DataColumn, DataTable } from './DataTable.tsx'
+import { DashboardSprint } from './DashboardSprint.tsx'
+import { DashboardTrend } from './DashboardTrend.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
 import { Failure } from './Failure.tsx'
-import { dateText, dateTimeText, messages } from './messages.ts'
+import { dateTimeText, messages } from './messages.ts'
 import { useSavedNote } from './SavedNote.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
-import { TrendChart } from './TrendChart.tsx'
 import { Unlinked } from './Unlinked.tsx'
-import { useSelection } from './use-selection.ts'
 
 type DashboardApi = Pick<
   OctoApi,
@@ -26,7 +32,12 @@ type DashboardApi = Pick<
   | 'dashboardCandidates'
   | 'dashboardView'
   | 'readTrackerSnapshot'
+  | 'refreshTrackerSnapshot'
   | 'chooseProjectPath'
+  | 'openTrackerItem'
+  | 'commentDashboard'
+  | 'draftReminder'
+  | 'onSourcesChanged'
 >
 
 type Props = {
@@ -34,6 +45,8 @@ type Props = {
   project: Project
   /** The present moment; a test passes its own. */
   now?: () => Date
+  /** Whether Claude can be asked on this computer: for the comment and for the reminders. */
+  canAsk?: boolean
   /** Takes the PM to where the systems are linked. */
   onOpenSources?: () => void
   /** Takes a question about a bug to «Chiedi», written and not yet asked. */
@@ -46,12 +59,18 @@ type Props = {
 const text = messages.dashboard
 const DEFAULT_PRESET: RangePreset = 'w8'
 const NO_CANDIDATES: ExportCandidates = { exports: [], histories: [] }
+/** How long a decision just taken can be undone with one click. */
+const UNDO_MS = 8000
 
-/** Bugs and requirements of the project, computed by the app from the tracker export. */
+/**
+ * The sprint, the bugs and their trend, computed by the app from the tracker export and read in
+ * three parts. The period chosen on top holds for all of them.
+ */
 export function DashboardView({
   api,
   project,
   now = () => new Date(),
+  canAsk = false,
   onOpenSources,
   onAsk,
   focus: givenFocus,
@@ -75,6 +94,15 @@ export function DashboardView({
   const [loading, setLoading] = useState(false)
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerSnapshotRun | null>(null)
+  /** The sprint the PM chose in place of the running one. */
+  const sprint = useRef<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [comment, setComment] = useState<DashboardComment | null>(null)
+  const [commenting, setCommenting] = useState(false)
+  const [commentError, setCommentError] = useState<ErrorCode | null>(null)
+  /** The decisions as they were before the last one, while it can still be undone. */
+  const [undo, setUndo] = useState<DashboardDecisions | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadView = useCallback(
     async (wanted: DashboardRange) => {
@@ -82,7 +110,7 @@ export function DashboardView({
       const mine = request.current
       setLoading(true)
       setError(null)
-      const result = await api.dashboardView(project.id, wholeDays(wanted))
+      const result = await api.dashboardView(project.id, wholeDays(wanted), sprint.current)
       // Another period, or another project, was asked meanwhile: this answer is not shown.
       if (mine !== request.current) return
       setLoading(false)
@@ -103,13 +131,29 @@ export function DashboardView({
     setReading(false)
     setRun(null)
     setOwnFocus(NO_DASHBOARD_FOCUS)
+    sprint.current = null
+    setComment(null)
+    setCommentError(null)
+    setUndo(null)
     void api.dashboardSettings(project.id).then(async (result) => {
       if (!current) return
       if (!result.ok) return setError(result.code)
       setSettings(result.value)
-      if (result.value.exportPath !== '') return loadView(range)
-      const found = await api.dashboardCandidates(project.id)
-      if (current && found.ok) setCandidates(found.value)
+      if (result.value.exportPath === '') {
+        const found = await api.dashboardCandidates(project.id)
+        if (current && found.ok) setCandidates(found.value)
+        return
+      }
+      await loadView(range)
+      // What is shown is shown at once; a reading older than a day is asked again meanwhile.
+      setRefreshing(true)
+      const fresh = await api.refreshTrackerSnapshot(project.id)
+      if (!current) return
+      setRefreshing(false)
+      if (!fresh.ok) return setError(fresh.code)
+      if (fresh.value === null) return
+      setRun(fresh.value)
+      await loadView(range)
     })
     return () => {
       current = false
@@ -117,14 +161,46 @@ export function DashboardView({
     }
   }, [api, project.id, loadView])
 
-  async function save(next: DashboardSettings) {
+  // A periodic reading may have read the tracker again: the page follows it.
+  const shownRange = useRef(range)
+  shownRange.current = range
+  const configured = settings !== null && settings.exportPath !== ''
+  useEffect(() => {
+    if (!configured) return
+    return api.onSourcesChanged((projectId) => {
+      if (projectId === project.id) void loadView(shownRange.current)
+    })
+  }, [api, project.id, configured, loadView])
+
+  useEffect(
+    () => () => {
+      if (undoTimer.current) clearTimeout(undoTimer.current)
+    },
+    [],
+  )
+
+  /** Saves the settings; a decision on an item says so by itself, with the way back. */
+  async function save(next: DashboardSettings, decision = false): Promise<boolean> {
     setError(null)
     savedNote.clear()
     const result = await api.saveDashboardSettings(project.id, next)
-    if (!result.ok) return setError(result.code)
+    if (!result.ok) {
+      setError(result.code)
+      return false
+    }
     setSettings(result.value)
-    savedNote.saved()
+    if (!decision) savedNote.saved()
     if (result.value.exportPath !== '') await loadView(range)
+    return true
+  }
+
+  async function askComment() {
+    setCommenting(true)
+    setCommentError(null)
+    const result = await api.commentDashboard(project.id, wholeDays(range))
+    setCommenting(false)
+    if (result.ok) setComment(result.value)
+    else setCommentError(result.code)
   }
 
   /** The export and its history are JSON files of the project. */
@@ -203,9 +279,23 @@ export function DashboardView({
     )
   }
 
-  const decide = (change: Partial<DashboardSettings['decisions']>) =>
-    save({ ...settings, decisions: { ...settings.decisions, ...change } })
+  /** Keeps a decision on an item, and for a while the way to take it back. */
+  async function decideAs(decisions: DashboardDecisions, undoable = true) {
+    const before = settings?.decisions
+    if (!settings || !before) return
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndo(null)
+    if (!(await save({ ...settings, decisions }, true)) || !undoable) return
+    setUndo(before)
+    undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS)
+  }
+  const decide = (change: Partial<DashboardDecisions>) =>
+    decideAs({ ...settings.decisions, ...change })
   const at = () => now().toISOString()
+  const openItem = (id: string) =>
+    void api.openTrackerItem(project.id, id).then((result) => {
+      if (!result.ok) setError(result.code)
+    })
 
   if (settings.exportPath === '') {
     return (
@@ -228,7 +318,7 @@ export function DashboardView({
               settings={settings}
               candidates={candidates}
               view={null}
-              onSave={save}
+              onSave={async (next) => void (await save(next))}
               onChooseFile={chooseFile}
             />
           </section>
@@ -241,16 +331,6 @@ export function DashboardView({
     <div className="dashboard">
       {error && <Failure code={error} />}
       {savedNote.note}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        <DashboardSettingsForm
-          settings={settings}
-          candidates={candidates}
-          view={view}
-          onSave={save}
-          onChooseFile={chooseFile}
-        />
-      </details>
       <section className="dashboard-range" aria-label={text.rangeTitle}>
         <fieldset className="chips" aria-label={text.rangeTitle}>
           {RANGE_PRESETS.map((candidate) => (
@@ -313,383 +393,96 @@ export function DashboardView({
         {readButton(false)}
       </div>
       {reader}
+      <details className="dashboard-settings">
+        <summary>{text.settings}</summary>
+        <DashboardSettingsForm
+          settings={settings}
+          candidates={candidates}
+          view={view}
+          onSave={async (next) => void (await save(next))}
+          onChooseFile={chooseFile}
+        />
+      </details>
+      {refreshing && view && view.age !== 'fresh' && <Waiting>{text.refreshing}</Waiting>}
+      {undo && (
+        <p className="badge badge-ok saved-note" role="status">
+          {text.decided}{' '}
+          <button type="button" className="quiet" onClick={() => void decideAs(undo, false)}>
+            {text.undo}
+          </button>
+        </p>
+      )}
       {view && (
         <>
-          <Quality
-            view={view}
-            stuckDays={settings.stuckDays}
-            focus={focus}
-            onFocus={setFocus}
-            onAsk={onAsk}
-            onNote={(id, note) =>
-              decide({ notes: [...settings.decisions.notes, { id, at: at(), text: note }] })
-            }
-          />
-          <section aria-label={text.trendTitle}>
-            <h3>{text.trendTitle}</h3>
-            {view.bugs.trendSource === 'approximate' && (
-              <p className="hint">{text.trendApproximate}</p>
-            )}
-            <TrendChart trend={view.bugs.trend} />
-          </section>
-          {view.bugs.flow && (
-            <section aria-label={text.flowTitle}>
-              <h3>{text.flowTitle}</h3>
-              <p className="hint">{text.flowIntro}</p>
-              <dl className="figures">
-                <Figure
-                  label={text.toVerify}
-                  value={text.days(view.bugs.flow.toVerify.median)}
-                  note={text.sample(view.bugs.flow.toVerify.sample)}
-                />
-                <Figure
-                  label={text.toValidated}
-                  value={text.days(view.bugs.flow.toValidated.median)}
-                  note={text.sample(view.bugs.flow.toValidated.sample)}
-                />
-                <Figure
-                  label={text.toClosed}
-                  value={text.days(view.bugs.flow.toClosed.median)}
-                  note={text.sample(view.bugs.flow.toClosed.sample)}
-                />
-              </dl>
-            </section>
+          <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
+            {DASHBOARD_TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={focus.tab === tab}
+                className={focus.tab === tab ? 'tab tab-selected' : 'tab'}
+                onClick={() => setFocus({ ...focus, tab })}
+              >
+                {text.tabs[tab]}
+              </button>
+            ))}
+          </div>
+          {focus.tab === 'bugs' && (
+            <DashboardBugs
+              view={view}
+              stuckDays={settings.stuckDays}
+              answerWorkdays={settings.answerWorkdays}
+              focus={focus}
+              onFocus={setFocus}
+              canAsk={canAsk}
+              onAsk={onAsk}
+              onNote={(id, note) =>
+                void decide({ notes: [...settings.decisions.notes, { id, at: at(), text: note }] })
+              }
+              onOpenItem={view.linked ? openItem : undefined}
+              onReminder={(id) => api.draftReminder(project.id, id)}
+            />
           )}
-          <section aria-label={text.requirementsTitle}>
-            <h3>{text.requirementsTitle}</h3>
-            {view.requirements.length === 0 ? (
-              <p className="hint">{text.noRequirements}</p>
-            ) : (
-              <RequirementTable
-                rows={view.requirements}
-                onClear={(id) =>
-                  decide({
-                    excludedRequirements: [
-                      ...settings.decisions.excludedRequirements,
-                      { id, at: at() },
-                    ],
-                  })
-                }
-                onRemoveSignal={(id, signal) =>
-                  decide({
-                    removedSignals: [
-                      ...settings.decisions.removedSignals,
-                      { id, signal, at: at() },
-                    ],
-                  })
-                }
-              />
-            )}
-          </section>
+          {focus.tab === 'sprint' && (
+            <DashboardSprint
+              view={view}
+              periodsByHand={settings.requirementPeriods.length > 0}
+              onSprint={(name) => {
+                sprint.current = name === '' ? null : name
+                void loadView(range)
+              }}
+              onClear={(id) =>
+                void decide({
+                  excludedRequirements: [
+                    ...settings.decisions.excludedRequirements,
+                    { id, at: at() },
+                  ],
+                })
+              }
+              onRemoveSignal={(id, signal) =>
+                void decide({
+                  removedSignals: [...settings.decisions.removedSignals, { id, signal, at: at() }],
+                })
+              }
+              onRestore={(row) => void decideAs(withoutTrackerDecision(settings.decisions, row))}
+              onOpenItem={view.linked ? openItem : undefined}
+            />
+          )}
+          {focus.tab === 'trend' && (
+            <DashboardTrend
+              view={view}
+              range={wholeDays(range)}
+              comment={comment}
+              commenting={commenting}
+              commentError={commentError}
+              canAsk={canAsk}
+              onComment={() => void askComment()}
+              onOpenItem={view.linked ? openItem : undefined}
+            />
+          )}
         </>
       )}
     </div>
-  )
-}
-
-function Figure({ label, value, note }: { label: string; value: string | number; note?: string }) {
-  return (
-    <div className="figure">
-      <dt>{label}</dt>
-      <dd>
-        {value}
-        {note && <span className="figure-note">{note}</span>}
-      </dd>
-    </div>
-  )
-}
-
-/** The rows a filter lists: the open bugs, a part of them, or the validated ones. */
-function rowsOf(view: View, filter: BugFilter): BugRow[] {
-  const { open, validated } = view.bugs
-  if (filter === 'validated') return validated
-  if (filter === 'stuck') return open.filter((row) => row.stuck)
-  if (filter === 'open') return open
-  return open.filter((row) => row.phase === filter)
-}
-
-const TAG = /<[^>]+>/g
-/** A comment of the tracker as plain words: its markup is not shown. */
-const plain = (value: string): string => value.replace(TAG, ' ').replace(/\s+/g, ' ').trim()
-
-type QualityProps = {
-  view: View
-  stuckDays: number
-  focus: DashboardFocus
-  onFocus: (focus: DashboardFocus) => void
-  onAsk: ((question: string) => void) | undefined
-  onNote: (id: string, note: string) => void
-}
-
-/**
- * The bugs of the project: each count opens its own list, and the bug in view shows beside it
- * what was last said about it. Every count is the number of rows its list holds.
- */
-function Quality({ view, stuckDays, focus, onFocus, onAsk, onNote }: QualityProps) {
-  const rows = rowsOf(view, focus.filter)
-  const selectedId = useSelection(
-    rows.map((row) => row.id),
-    focus.bugId,
-  )
-  const selected = rows.find((row) => row.id === selectedId) ?? null
-  const count = (filter: BugFilter) => rowsOf(view, filter).length
-  const labels: Record<BugFilter, string> = {
-    open: text.open,
-    work: text.work,
-    verify: text.verify,
-    stuck: text.stuck(stuckDays),
-    validated: text.validated,
-  }
-  return (
-    <section className="quality" aria-label={text.qualityTitle}>
-      <h3>{text.qualityTitle}</h3>
-      <fieldset className="metrics" aria-label={text.filterLabel}>
-        {BUG_FILTERS.map((filter) => {
-          const part = filter === 'work' || filter === 'verify' || filter === 'stuck'
-          return (
-            <button
-              key={filter}
-              type="button"
-              className={focus.filter === filter ? 'metric metric-selected' : 'metric'}
-              aria-pressed={focus.filter === filter}
-              onClick={() => onFocus({ filter, bugId: focus.bugId })}
-            >
-              <span className="metric-value">{count(filter)}</span>
-              <span className="metric-label">
-                {part && <span className="metric-part">{text.ofWhich} </span>}
-                {labels[filter]}
-              </span>
-              {filter === 'open' && (
-                <span className="metric-part">{text.total(view.bugs.total)}</span>
-              )}
-            </button>
-          )
-        })}
-      </fieldset>
-      <p className="hint">
-        {text.relation(count('open'), count('stuck'), count('validated'), stuckDays)}
-      </p>
-      <div className="split">
-        <div className="split-list">
-          {rows.length === 0 ? (
-            <p className="hint">{focus.filter === 'open' ? text.noOpen : text.noneInFilter}</p>
-          ) : (
-            <ul
-              className="entries entries-scroll"
-              aria-label={`${text.bugList}: ${labels[focus.filter]}`}
-            >
-              {rows.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    className={row.id === selectedId ? 'entry entry-selected' : 'entry'}
-                    aria-pressed={row.id === selectedId}
-                    onClick={() => onFocus({ filter: focus.filter, bugId: row.id })}
-                  >
-                    <span className="entry-meta">
-                      <span className="mono">#{row.id}</span>
-                      <span>{row.assignee ?? text.unassigned}</span>
-                      <span>{row.state}</span>
-                      <span className={row.stuck ? 'pill pill-warning' : 'pill'}>
-                        {text.days(row.daysInState)}
-                        {row.stuck && ` · ${text.stuckBadge}`}
-                      </span>
-                    </span>
-                    <strong className="entry-title">{row.title}</strong>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <section className="panel split-detail" aria-label={text.bugDetail}>
-          {selected ? (
-            <BugDetail key={selected.id} row={selected} onAsk={onAsk} onNote={onNote} />
-          ) : (
-            <p className="hint panel-body">{messages.detail.none}</p>
-          )}
-        </section>
-      </div>
-    </section>
-  )
-}
-
-function BugDetail({
-  row,
-  onAsk,
-  onNote,
-}: {
-  row: BugRow
-  onAsk: ((question: string) => void) | undefined
-  onNote: (id: string, note: string) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (draft.trim() !== '') onNote(row.id, draft)
-    setEditing(false)
-  }
-  return (
-    <>
-      <div className="panel-head">
-        <span className="eyebrow">{text.bugDetail}</span>
-        <span className="pill pill-source mono">#{row.id}</span>
-      </div>
-      <div className="panel-body">
-        <h4 className="detail-title">{row.title}</h4>
-        <p>
-          {row.assignee ?? text.unassigned} · {row.state}{' '}
-          <span className="cell-note">{text.phase[row.phase]}</span>
-        </p>
-        <p className="hint">
-          {text.inState(row.daysInState)}
-          {row.stuck && <span className="status status-warning">{text.stuckBadge}</span>}
-          {' · '}
-          {text.created} {dateText(row.createdAt)}
-          {row.severity && ` · ${text.severity}: ${row.severity}`}
-          {row.environment && ` · ${text.environment}: ${row.environment}`}
-        </p>
-        {row.note && (
-          <div className="box">
-            <strong>{text.noteOf(dateText(row.note.at))}</strong>
-            <p className="quote">{row.note.text}</p>
-          </div>
-        )}
-        {row.lastComment ? (
-          <div className="box box-source">
-            <strong>{text.lastComment(row.lastComment.by, dateText(row.lastComment.at))}</strong>
-            <p className="quote">{plain(row.lastComment.text)}</p>
-          </div>
-        ) : (
-          !row.note && <p className="hint">{text.noComment}</p>
-        )}
-        {editing ? (
-          <form className="note-form" onSubmit={submit}>
-            <textarea
-              aria-label={text.noteLabel(row.id)}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <button type="submit">{text.saveNote}</button>
-            <button type="button" className="quiet" onClick={() => setEditing(false)}>
-              {text.cancel}
-            </button>
-          </form>
-        ) : (
-          <div className="actions">
-            {onAsk && (
-              <button
-                type="button"
-                className="primary"
-                onClick={() => onAsk(text.askSeed(row.id, row.title, row.state, row.daysInState))}
-              >
-                {text.askAbout}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setDraft(row.note?.text ?? '')
-                setEditing(true)
-              }}
-            >
-              {text.addNote}
-            </button>
-          </div>
-        )}
-      </div>
-    </>
-  )
-}
-
-function RequirementTable({
-  rows,
-  onClear,
-  onRemoveSignal,
-}: {
-  rows: RequirementRow[]
-  onClear: (id: string) => void
-  onRemoveSignal: (id: string, signal: string) => void
-}) {
-  const columns: DataColumn<RequirementRow>[] = [
-    {
-      key: 'id',
-      label: text.columnId,
-      width: '70px',
-      cell: (row) => row.id,
-      sort: (row) => row.id,
-      text: (row) => row.id,
-    },
-    {
-      key: 'title',
-      label: text.columnTitle,
-      cell: (row) => (
-        <>
-          {row.title}
-          {row.unclear && <p className="cell-text">«…{row.unclear.context}…»</p>}
-        </>
-      ),
-      sort: (row) => row.title,
-      text: (row) => row.title,
-    },
-    {
-      key: 'state',
-      label: text.columnState,
-      width: '110px',
-      cell: (row) => row.state,
-      sort: (row) => row.state,
-      text: (row) => row.state,
-    },
-    {
-      key: 'period',
-      label: text.columnPeriod,
-      width: '90px',
-      cell: (row) => row.period ?? '—',
-      sort: (row) => row.period,
-      text: (row) => row.period ?? '',
-    },
-    {
-      key: 'signals',
-      label: text.columnSignals,
-      width: '290px',
-      cell: (row) => (
-        <ul className="signals">
-          {row.signals.map((signal) => (
-            <li key={signal} className="signal status-warning">
-              <span>
-                {signal} · {text.signals[signal]}
-              </span>
-              <button
-                type="button"
-                className="signal-remove"
-                aria-label={text.removeSignal(signal)}
-                title={text.removeSignal(signal)}
-                onClick={() => onRemoveSignal(row.id, signal)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      ),
-      sort: (row) => row.signals.length,
-      text: (row) => row.signals.map((signal) => `${signal} ${text.signals[signal]}`).join(' '),
-    },
-    {
-      key: 'clear',
-      label: '',
-      name: text.markClear,
-      kind: 'actions',
-      width: '100px',
-      cell: (row) => (
-        <button type="button" title={text.markClearHint} onClick={() => onClear(row.id)}>
-          {text.markClear}
-        </button>
-      ),
-    },
-  ]
-  return (
-    <DataTable label={text.columnSignals} columns={columns} rows={rows} rowKey={(row) => row.id} />
   )
 }

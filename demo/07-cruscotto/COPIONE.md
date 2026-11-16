@@ -22,22 +22,22 @@ Durata: 4 minuti. Mostra il cruscotto calcolato da Octo da un'esportazione del t
    Atteso: «Dati aggiornati»; Bug aperti **15** su 30 nel perimetro; In lavorazione **10**; In verifica **5**; Validati, in attesa di rilascio **2**; Fermi da oltre 30 giorni **11**.
    Dimostra: i 6 bug dell'altro fornitore restano fuori; «aperto» vuol dire che qualcuno deve ancora fare qualcosa prima del rilascio.
 
-4. **Guarda l'andamento.** Sotto «Andamento» ci sono le ultime 8 settimane: barre per entrati e usciti, linea per gli aperti a fine settimana, e, aprendo «Mostra i numeri», la stessa cosa in tabella.
+4. **Guarda l'andamento.** Apri la scheda «Andamento» in cima alla pagina: ci sono le ultime 8 settimane: barre per entrati e usciti, linea per gli aperti a fine settimana, e, aprendo «Mostra i numeri», la stessa cosa in tabella.
    Premi «12 mesi».
    Atteso: il grafico passa a dodici passi mensili.
    Premi «Scelgo io», cambia «Dal» e il «Passo».
    Atteso: il grafico segue le date e il passo scelti.
    Dimostra: il periodo non è fisso alla settimana.
 
-5. **Guarda dove si fermano i bug.**
+5. **Guarda dove si fermano i bug**, nella stessa scheda «Andamento».
    Atteso: tre mediane in giorni — dall'apertura alla verifica, dalla verifica alla validazione, dalla validazione alla chiusura — ciascuna con il numero di bug su cui è calcolata.
 
 6. **Scrivi una nota su un bug fermo.** Nella prima riga di «Bug aperti» premi «Scrivi una nota», scrivi `Sentito il cliente: dati entro venerdì` e premi «Salva la nota».
    Atteso: la nota compare nella riga come «Nota tua», con la data, al posto dell'ultimo commento del tracker.
    Dimostra: la decisione del PM resta nel progetto, non nel tracker.
 
-7. **Guarda i requisiti poco chiari.**
-   Atteso: quattro storie; la prima, «Esportazione in Excel», ha tre segnali (S1, S2, S5) e la frase «…ancora da definire con il cliente…».
+7. **Guarda i requisiti poco chiari**, nella scheda «Sprint».
+   Atteso: quattro storie; la prima, «Esportazione in Excel», ha tre segnali («Non ancora raffinato», «Criteri di accettazione assenti», «Punti da chiarire nel testo») e la frase «…ancora da definire con il cliente…».
    Premi «È chiaro» su «Stampa etichette».
    Atteso: la storia esce dall'elenco.
 

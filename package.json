@@ -20,7 +20,8 @@
     "release:keys": "node scripts/release-keys.mjs",
     "release:passphrase": "node scripts/release-rekey.mjs",
     "release:sign": "node scripts/release-sign.mjs",
-    "e2e": "pnpm build && node e2e/app.e2e.mjs"
+    "e2e": "pnpm build && node e2e/app.e2e.mjs",
+    "e2e:cruscotto": "pnpm build && node e2e/cruscotto.e2e.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

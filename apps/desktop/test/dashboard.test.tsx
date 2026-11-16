@@ -83,6 +83,12 @@ const view: View = {
       toValidated: { median: null, sample: 0 },
       toClosed: { median: 30, sample: 4 },
     },
+    before: { open: 3, work: 2, verify: 1, stuck: 0, validated: 2 },
+    flowBefore: {
+      toVerify: { median: 9, sample: 5 },
+      toValidated: { median: null, sample: 0 },
+      toClosed: { median: null, sample: 0 },
+    },
   },
   requirements: [
     {
@@ -102,6 +108,116 @@ const view: View = {
   ],
   periods: ['P1', 'P2'],
   tags: ['Team', 'Altro', 'Terzo'],
+  linked: true,
+  waiting: [
+    {
+      id: '301',
+      type: 'story',
+      title: 'Formato della data',
+      state: 'Active',
+      assignee: 'Carla Bianchi',
+      askedBy: 'Mario Rossi',
+      askedAt: '2026-06-22T09:00:00Z',
+      workdays: 6,
+      question: 'Quale formato serve?',
+      fromClient: true,
+    },
+    {
+      id: '302',
+      type: 'bug',
+      title: 'Arrotondamento',
+      state: 'Active',
+      assignee: null,
+      askedBy: 'Carla Bianchi',
+      askedAt: '2026-06-25T09:00:00Z',
+      workdays: 3,
+      question: 'Potete confermare la regola?',
+      fromClient: false,
+    },
+  ],
+  tellsSides: true,
+  sprints: ['Sprint 11', 'Sprint 12'],
+  currentSprint: 'Sprint 12',
+  upcomingSprint: 'Sprint 13',
+  sprint: {
+    name: 'Sprint 12',
+    from: '2026-06-15',
+    to: '2026-07-01',
+    stories: [
+      {
+        id: '401',
+        title: 'Invio conferma',
+        state: 'Active',
+        stage: 'work',
+        assignee: 'Luca',
+        daysInState: 6,
+      },
+      {
+        id: '402',
+        title: 'Stampa ordine',
+        state: 'Closed',
+        stage: 'closed',
+        assignee: null,
+        daysInState: null,
+      },
+    ],
+    byStage: { todo: 0, work: 1, verify: 0, validated: 0, closed: 1 },
+    bugs: [
+      {
+        id: '101',
+        title: 'Totale sbagliato',
+        state: '04 - In Progress',
+        stage: 'work',
+        assignee: null,
+        daysInState: 45,
+      },
+    ],
+    bugsOpen: 1,
+    bugsClosed: 0,
+    ending: true,
+    atRisk: [
+      {
+        id: '401',
+        title: 'Invio conferma',
+        state: 'Active',
+        stage: 'work',
+        assignee: 'Luca',
+        daysInState: 6,
+      },
+    ],
+  },
+  comparison: [
+    {
+      name: 'Sprint 11',
+      from: '2026-06-01',
+      to: '2026-06-14',
+      stories: 5,
+      done: 4,
+      doneInTime: 3,
+      open: 1,
+      bugsEntered: 2,
+    },
+    {
+      name: 'Sprint 12',
+      from: null,
+      to: null,
+      stories: 2,
+      done: 1,
+      doneInTime: null,
+      open: 1,
+      bugsEntered: null,
+    },
+  ],
+  decisions: [
+    {
+      kind: 'clear',
+      id: '501',
+      title: 'Vecchio requisito',
+      at: '2026-06-10T08:00:00Z',
+      signal: null,
+      text: null,
+    },
+  ],
 }
 
 type Api = Pick<
@@ -112,6 +228,11 @@ type Api = Pick<
   | 'dashboardCandidates'
   | 'dashboardView'
   | 'readTrackerSnapshot'
+  | 'refreshTrackerSnapshot'
+  | 'openTrackerItem'
+  | 'commentDashboard'
+  | 'draftReminder'
+  | 'onSourcesChanged'
 >
 
 function fakeApi(overrides: Partial<Api> = {}) {
@@ -124,10 +245,27 @@ function fakeApi(overrides: Partial<Api> = {}) {
     readTrackerSnapshot: vi.fn(async () =>
       ok({ at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 }),
     ),
+    refreshTrackerSnapshot: vi.fn(async () => ok(null)),
+    openTrackerItem: vi.fn(async () => ok(true)),
+    commentDashboard: vi.fn(async () =>
+      ok({
+        at: '2026-06-30T10:00:00.000Z',
+        exportedAt: view.exportedAt,
+        range: wholeDays(presetRange('w8', NOW)),
+        sentences: [{ text: 'Il bug #101 è fermo da 45 giorni.', ids: ['101'] }],
+        dropped: 1,
+      }),
+    ),
+    draftReminder: vi.fn(async (_id: string, id: string) =>
+      ok({ id, to: 'Carla Bianchi', text: 'Buongiorno Carla,\nserve il formato.' }),
+    ),
+    onSourcesChanged: vi.fn(() => () => {}),
     ...overrides,
   }
   return api
 }
+
+const openTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
 
 afterEach(cleanup)
 
@@ -141,12 +279,16 @@ describe('dashboard', () => {
     expect(within(open).getAllByText(new RegExp(text.stuckBadge)).length).toBeGreaterThan(0)
     expect(within(open).getByText(/In attesa del dato/)).toBeTruthy()
     expect(screen.getByText(text.total(10))).toBeTruthy()
-    expect(screen.getByText(text.days(12))).toBeTruthy()
-    expect(screen.getByText(text.days(null))).toBeTruthy()
-    expect(screen.getByRole('img', { name: text.trendTitle })).toBeTruthy()
-    expect(screen.getByText(/il formato è TBD/)).toBeTruthy()
     expect(screen.getByText(new RegExp(text.age.fresh))).toBeTruthy()
-    expect(api.dashboardView).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)))
+    expect(api.dashboardView).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)), null)
+    openTab(text.tabs.trend)
+    expect(screen.getByText(text.days(12))).toBeTruthy()
+    expect(screen.getAllByText(text.days(null)).length).toBeGreaterThan(0)
+    expect(screen.getByRole('img', { name: text.trendTitle })).toBeTruthy()
+    // The stretch before, beside the median of the period.
+    expect(screen.getByText(new RegExp(text.flowBefore(9)))).toBeTruthy()
+    openTab(text.tabs.sprint)
+    expect(screen.getByText(/il formato è TBD/)).toBeTruthy()
   })
 
   it('reads Azure DevOps on request, from the first setup, and shows the dashboard from it', async () => {
@@ -205,6 +347,7 @@ describe('dashboard', () => {
     expect(read.closest('details')).toBeNull()
     fireEvent.click(read)
     await waitFor(() => expect(api.readTrackerSnapshot).toHaveBeenCalledWith('p-1'))
+    openTab(text.tabs.trend)
     expect(screen.getByText(text.trendNumbers).closest('details')?.open).toBe(false)
   })
 
@@ -225,21 +368,21 @@ describe('dashboard', () => {
     await screen.findByRole('region', { name: text.qualityTitle })
     fireEvent.click(screen.getByRole('button', { name: text.presets.y1 }))
     await waitFor(() =>
-      expect(api.dashboardView).toHaveBeenLastCalledWith('p-1', {
-        from: '2025-07-01',
-        to: '2026-06-30T23:59:59.999Z',
-        granularity: 'month',
-      }),
+      expect(api.dashboardView).toHaveBeenLastCalledWith(
+        'p-1',
+        { from: '2025-07-01', to: '2026-06-30T23:59:59.999Z', granularity: 'month' },
+        null,
+      ),
     )
     fireEvent.click(screen.getByRole('button', { name: text.presets.custom }))
     fireEvent.change(screen.getByLabelText(text.from), { target: { value: '2024-01-01' } })
     fireEvent.change(screen.getByLabelText(text.granularity), { target: { value: 'week' } })
     await waitFor(() =>
-      expect(api.dashboardView).toHaveBeenLastCalledWith('p-1', {
-        from: '2024-01-01',
-        to: '2026-06-30T23:59:59.999Z',
-        granularity: 'week',
-      }),
+      expect(api.dashboardView).toHaveBeenLastCalledWith(
+        'p-1',
+        { from: '2024-01-01', to: '2026-06-30T23:59:59.999Z', granularity: 'week' },
+        null,
+      ),
     )
   })
 
@@ -257,7 +400,8 @@ describe('dashboard', () => {
     expect(vi.mocked(api.saveDashboardSettings).mock.calls[0]?.[1].decisions.notes).toEqual([
       { id: '101', at, text: 'Sentito il cliente' },
     ])
-    fireEvent.click(screen.getByRole('button', { name: text.removeSignal('S5') }))
+    openTab(text.tabs.sprint)
+    fireEvent.click(screen.getByRole('button', { name: text.removeSignal(text.signals.S5 ?? '') }))
     await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalledTimes(2))
     expect(
       vi.mocked(api.saveDashboardSettings).mock.calls[1]?.[1].decisions.removedSignals,
@@ -350,7 +494,9 @@ describe('dashboard', () => {
     render(<DashboardView api={stale} project={project} now={now} />)
     expect(await screen.findByText(new RegExp(text.age.stale))).toBeTruthy()
     expect(screen.getByText(text.noOpen)).toBeTruthy()
+    openTab(text.tabs.sprint)
     expect(screen.getByText(text.noRequirements)).toBeTruthy()
+    openTab(text.tabs.trend)
     expect(screen.getByText(text.trendApproximate)).toBeTruthy()
     cleanup()
     const broken = fakeApi({
@@ -388,14 +534,16 @@ describe('the bugs as counts that open their lists', () => {
     expect(within(quality).getByText(text.relation(1, 1, 2, configured.stuckDays))).toBeTruthy()
 
     fireEvent.click(within(filters).getByRole('button', { name: new RegExp(text.validated) }))
-    const list = within(quality).getByRole('list')
+    const list = within(quality).getByRole('list', { name: new RegExp(text.bugList) })
     expect(within(list).getAllByRole('button')).toHaveLength(2)
     const detail = within(quality).getByRole('region', { name: text.bugDetail })
     expect(detail.textContent).toContain('Data nel PDF')
     expect(detail.textContent).toContain(text.noComment)
 
     fireEvent.click(within(list).getByText('Etichetta del riepilogo'))
-    expect(focus).toHaveBeenLastCalledWith({ filter: 'validated', bugId: '202' })
+    expect(focus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tab: 'bugs', filter: 'validated', bugId: '202' }),
+    )
     expect(detail.textContent).toContain('Etichetta del riepilogo')
     fireEvent.click(within(detail).getByRole('button', { name: text.askAbout }))
     expect(asked).toEqual([text.askSeed('202', 'Etichetta del riepilogo', '10 - Validated', 3)])
@@ -421,5 +569,421 @@ describe('the bugs as counts that open their lists', () => {
     await act(async () => answers[0]?.(ok(view)))
     expect(screen.getByText(text.total(77))).toBeTruthy()
     expect(screen.queryByText(text.total(10))).toBeNull()
+  })
+})
+
+const withBugs: View = {
+  ...view,
+  bugs: {
+    ...view.bugs,
+    open: [
+      { ...(view.bugs.open[0] as View['bugs']['open'][number]), severity: '1 - Critical' },
+      {
+        ...(view.bugs.open[0] as View['bugs']['open'][number]),
+        id: '102',
+        title: 'Etichetta tagliata',
+        severity: '3 - Medium',
+        environment: 'Test',
+        assignee: 'Luca',
+        daysInState: 4,
+        stuck: false,
+      },
+    ],
+  },
+}
+
+describe('the list of bugs, split and filtered', () => {
+  it('filters by a row of a split, by words, and takes the filters off', async () => {
+    const api = fakeApi({ dashboardView: vi.fn(async () => ok(withBugs)) })
+    render(<DashboardView api={api} project={project} now={now} />)
+    const quality = await screen.findByRole('region', { name: text.qualityTitle })
+    const list = () => within(quality).getByRole('list', { name: new RegExp(text.bugList) })
+    expect(within(list()).getAllByRole('button')).toHaveLength(2)
+    // The count says how it moved since the start of the period: 2 open now, 3 then.
+    expect(within(quality).getAllByText(text.sinceStart(-1)).length).toBeGreaterThan(0)
+    expect(within(quality).getAllByText(text.sinceStart(0)).length).toBeGreaterThan(0)
+    expect(within(quality).getAllByText(text.sinceStart(1)).length).toBeGreaterThan(0)
+
+    const splits = within(quality).getByRole('group', { name: text.breakdownsLabel })
+    // Every bug states its severity, some their environment and person: three splits.
+    expect(within(splits).getAllByRole('heading')).toHaveLength(3)
+    const luca = within(splits).getByRole('button', {
+      name: text.filterBy(text.facetNames.assignee, 'Luca'),
+    })
+    fireEvent.click(luca)
+    expect(within(list()).getAllByRole('button')).toHaveLength(1)
+    expect(within(quality).getByText(new RegExp(text.shown(1, 2)))).toBeTruthy()
+    // The same row takes its filter off.
+    fireEvent.click(luca)
+    expect(within(list()).getAllByRole('button')).toHaveLength(2)
+
+    fireEvent.click(
+      within(splits).getByRole('button', {
+        name: text.filterBy(text.facetNames.environment, text.notStated),
+      }),
+    )
+    expect(within(list()).getByText('Totale sbagliato')).toBeTruthy()
+    fireEvent.click(
+      within(quality).getByRole('button', {
+        name: text.removeFilter(`${text.facetNames.environment}: ${text.notStated}`),
+      }),
+    )
+    fireEvent.change(within(quality).getByLabelText(text.search), { target: { value: 'etich' } })
+    expect(within(list()).getAllByRole('button')).toHaveLength(1)
+    fireEvent.change(within(quality).getByLabelText(text.search), { target: { value: 'zzz' } })
+    expect(within(quality).getByText(text.noneInFilter)).toBeTruthy()
+    fireEvent.click(within(quality).getByRole('button', { name: text.clearFilters }))
+    fireEvent.change(within(quality).getByLabelText(text.order), { target: { value: 'severity' } })
+    expect(within(list()).getAllByRole('button')[0]?.textContent).toContain('Totale sbagliato')
+  })
+
+  it('opens a bug where the tracker keeps it, when it has an address', async () => {
+    const api = fakeApi()
+    const shown = render(<DashboardView api={api} project={project} now={now} />)
+    const detail = await screen.findByRole('region', { name: text.bugDetail })
+    fireEvent.click(within(detail).getByRole('button', { name: text.openInTracker }))
+    expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '101')
+    shown.unmount()
+
+    const failing = fakeApi({
+      openTrackerItem: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    })
+    render(<DashboardView api={failing} project={project} now={now} />)
+    const again = await screen.findByRole('region', { name: text.bugDetail })
+    fireEvent.click(within(again).getByRole('button', { name: text.openInTracker }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    cleanup()
+
+    const unlinked = fakeApi({
+      dashboardView: vi.fn(async () =>
+        ok({ ...view, linked: false, bugs: { ...view.bugs, before: null } }),
+      ),
+    })
+    render(<DashboardView api={unlinked} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.bugDetail })
+    // No bug of the list states severity, environment or person: nothing to split by.
+    expect(screen.queryByRole('group', { name: text.breakdownsLabel })).toBeNull()
+    expect(screen.queryByRole('button', { name: text.openInTracker })).toBeNull()
+    // Without a history nothing is compared with the start of the period, and the page says so.
+    expect(screen.getByText(new RegExp(text.noHistoryDelta))).toBeTruthy()
+  })
+})
+
+describe('the items to chase', () => {
+  it('lists who waits for the client, or everybody, and drafts a reminder to copy', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const api = fakeApi()
+    render(<DashboardView api={api} project={project} now={now} canAsk />)
+    const waiting = await screen.findByRole('list', { name: text.waitingTitle(1) })
+    expect(within(waiting).getByText('Formato della data')).toBeTruthy()
+    expect(within(waiting).getByText('«Quale formato serve?»')).toBeTruthy()
+
+    fireEvent.click(within(waiting).getByRole('button', { name: text.draftReminder }))
+    expect(await screen.findByText(text.reminderFor('Carla Bianchi'))).toBeTruthy()
+    expect(api.draftReminder).toHaveBeenCalledWith('p-1', '301')
+    fireEvent.click(screen.getByRole('button', { name: text.copy }))
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('Buongiorno Carla,\nserve il formato.'),
+    )
+    expect(await screen.findByText(text.copied)).toBeTruthy()
+    fireEvent.click(within(waiting).getByRole('button', { name: text.openInTracker }))
+    expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '301')
+
+    fireEvent.click(screen.getByLabelText(text.onlyClient))
+    const everybody = screen.getByRole('list', { name: text.waitingTitle(2) })
+    expect(within(everybody).getByText('Arrotondamento')).toBeTruthy()
+  })
+
+  it('says why a reminder cannot be drafted', async () => {
+    const api = fakeApi({
+      draftReminder: vi.fn(async () => ({
+        ok: false as const,
+        code: 'tracker_item_not_waiting' as const,
+      })),
+    })
+    const shown = render(<DashboardView api={api} project={project} now={now} canAsk />)
+    const waiting = await screen.findByRole('list', { name: text.waitingTitle(1) })
+    fireEvent.click(within(waiting).getByRole('button', { name: text.draftReminder }))
+    expect((await screen.findByRole('alert')).textContent).toContain('non aspetta più')
+    shown.unmount()
+
+    // Without Claude on this computer the button is there, and says what is missing.
+    render(<DashboardView api={fakeApi()} project={project} now={now} />)
+    await screen.findByRole('list', { name: text.waitingTitle(1) })
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: text.draftReminder }).disabled,
+    ).toBe(true)
+    expect(screen.getByText(text.needsClaude)).toBeTruthy()
+  })
+
+  it('says when nobody waits, and when the team does not tell the two sides', async () => {
+    const nobody = fakeApi({
+      dashboardView: vi.fn(async () =>
+        ok({ ...view, waiting: view.waiting.filter((row) => !row.fromClient) }),
+      ),
+    })
+    const shown = render(<DashboardView api={nobody} project={project} now={now} />)
+    expect(await screen.findByText(text.waitingNoneFromClient)).toBeTruthy()
+    shown.unmount()
+
+    const sides = fakeApi({
+      dashboardView: vi.fn(async () => ok({ ...view, tellsSides: false })),
+    })
+    const unknown = render(<DashboardView api={sides} project={project} now={now} />)
+    expect(await screen.findByText(text.sidesUnknown)).toBeTruthy()
+    expect(screen.getByRole('list', { name: text.waitingTitle(2) })).toBeTruthy()
+    unknown.unmount()
+
+    const empty = fakeApi({
+      dashboardView: vi.fn(async () => ok({ ...view, tellsSides: false, waiting: [] })),
+    })
+    render(<DashboardView api={empty} project={project} now={now} />)
+    expect(await screen.findByText(text.waitingNone)).toBeTruthy()
+  })
+})
+
+describe('the sprint', () => {
+  async function openSprint(api = fakeApi()) {
+    render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.sprint)
+    return { api, stories: screen.getByRole('region', { name: text.storiesTitle }) }
+  }
+
+  it('shows the stories by stage, what is at risk while it ends, and its bugs', async () => {
+    const { stories } = await openSprint()
+    expect(within(stories).getByText(text.sprintEnding)).toBeTruthy()
+    expect(within(stories).getByText(text.riskTitle(1))).toBeTruthy()
+    const stages = within(stories).getByRole('group', { name: text.stageFilter })
+    fireEvent.click(within(stages).getByRole('button', { name: new RegExp(text.stages.closed) }))
+    const table = within(stories).getByRole('table', { name: text.storiesTitle })
+    expect(within(table).getByText('Stampa ordine')).toBeTruthy()
+    expect(within(table).queryByText('Invio conferma')).toBeNull()
+    fireEvent.click(within(stages).getByRole('button', { name: new RegExp(text.stages.verify) }))
+    expect(within(stories).getByText(text.noStories)).toBeTruthy()
+
+    const bugs = screen.getByRole('region', { name: text.sprintBugsTitle })
+    expect(within(bugs).getByText(text.showSprintBugs(1))).toBeTruthy()
+    const compared = screen.getByRole('region', { name: text.comparisonTitle })
+    expect(within(compared).getByText('Sprint 11')).toBeTruthy()
+    expect(within(compared).getByText(text.comparisonUnknown)).toBeTruthy()
+    expect(screen.getByText(text.requirementsScope('Sprint 13', false))).toBeTruthy()
+  })
+
+  it('shows another sprint when the PM chooses it', async () => {
+    const { api, stories } = await openSprint()
+    fireEvent.change(within(stories).getByLabelText(new RegExp(text.sprintLabel)), {
+      target: { value: 'Sprint 11' },
+    })
+    await waitFor(() =>
+      expect(api.dashboardView).toHaveBeenLastCalledWith(
+        'p-1',
+        wholeDays(presetRange('w8', NOW)),
+        'Sprint 11',
+      ),
+    )
+  })
+
+  it('says what is missing when no sprint runs, or when its days are not known', async () => {
+    const none = fakeApi({
+      dashboardView: vi.fn(async () => ok({ ...view, sprint: null, currentSprint: null })),
+    })
+    await openSprint(none)
+    expect(screen.getByText(text.noSprint)).toBeTruthy()
+    cleanup()
+    const never = fakeApi({
+      dashboardView: vi.fn(async () =>
+        ok({ ...view, sprint: null, sprints: [], comparison: [], upcomingSprint: null }),
+      ),
+    })
+    await openSprint(never)
+    expect(screen.getByText(text.noSprintAtAll)).toBeTruthy()
+    expect(screen.getByText(text.requirementsScope(null, false))).toBeTruthy()
+    cleanup()
+    const undated = fakeApi({
+      dashboardSettings: vi.fn(async () => ok({ ...configured, requirementPeriods: ['P2'] })),
+      dashboardView: vi.fn(async () =>
+        ok({
+          ...view,
+          linked: false,
+          sprint: view.sprint && {
+            ...view.sprint,
+            from: null,
+            to: null,
+            ending: false,
+            atRisk: [],
+          },
+        }),
+      ),
+    })
+    await openSprint(undated)
+    expect(screen.getByText(text.sprintNoDates)).toBeTruthy()
+    expect(screen.getByText(text.requirementsScope('Sprint 13', true))).toBeTruthy()
+  })
+})
+
+describe('the decisions taken', () => {
+  it('are listed, taken back, and undone right after', async () => {
+    const api = fakeApi({
+      dashboardSettings: vi.fn(async () =>
+        ok({
+          ...configured,
+          decisions: {
+            excludedRequirements: [{ id: '501', at: '2026-06-10T08:00:00Z' }],
+            removedSignals: [],
+            notes: [],
+          },
+        }),
+      ),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.sprint)
+    const decisions = screen.getByRole('region', { name: text.decisionsLabel })
+    expect(within(decisions).getByText(/Vecchio requisito/)).toBeTruthy()
+    fireEvent.click(within(decisions).getByRole('button', { name: text.restore }))
+    await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalledTimes(1))
+    const saved = () => vi.mocked(api.saveDashboardSettings).mock.calls.at(-1)?.[1].decisions
+    expect(saved()?.excludedRequirements).toEqual([])
+    // A decision says so by itself, with the way back; it is not a save of the settings.
+    fireEvent.click(await screen.findByRole('button', { name: text.undo }))
+    await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalledTimes(2))
+    expect(saved()?.excludedRequirements).toEqual([{ id: '501', at: '2026-06-10T08:00:00Z' }])
+    await waitFor(() => expect(screen.queryByRole('button', { name: text.undo })).toBeNull())
+    expect(screen.queryByText(messages.saved)).toBeNull()
+  })
+
+  it('offers no way back when the decision could not be kept, and says none was taken', async () => {
+    const api = fakeApi({
+      saveDashboardSettings: vi.fn(async () => ({
+        ok: false as const,
+        code: 'unexpected' as const,
+      })),
+      dashboardView: vi.fn(async () => ok({ ...view, decisions: [] })),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.sprint)
+    expect(screen.getByText(text.decisionsNone)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.markClear }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: text.undo })).toBeNull()
+  })
+})
+
+describe('the comment of Claude', () => {
+  it('is asked on the period, shown with what was thrown away, and marked old when the period changes', async () => {
+    const api = fakeApi()
+    render(<DashboardView api={api} project={project} now={now} canAsk />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.trend)
+    const comment = screen.getByRole('region', { name: text.commentTitle })
+    fireEvent.click(within(comment).getByRole('button', { name: text.comment }))
+    expect(await within(comment).findByText(/Il bug #101 è fermo da 45 giorni/)).toBeTruthy()
+    expect(api.commentDashboard).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)))
+    expect(within(comment).getByText(text.commentDropped(1))).toBeTruthy()
+    expect(within(comment).queryByText(text.commentOld)).toBeNull()
+    fireEvent.click(within(comment).getByRole('button', { name: text.openInTracker }))
+    expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '101')
+    expect(within(comment).getByRole('button', { name: text.commentAgain })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: text.presets.m3 }))
+    expect(await within(comment).findByText(text.commentOld)).toBeTruthy()
+  })
+
+  it('says when there is nothing to say, when it fails, and when Claude is not there', async () => {
+    const empty = fakeApi({
+      commentDashboard: vi
+        .fn<Api['commentDashboard']>()
+        .mockResolvedValueOnce({ ok: false, code: 'agent_failed' })
+        .mockResolvedValue(
+          ok({
+            at: '2026-06-30T10:00:00.000Z',
+            exportedAt: view.exportedAt,
+            range: wholeDays(presetRange('w8', NOW)),
+            sentences: [],
+            dropped: 0,
+          }),
+        ),
+    })
+    const shown = render(<DashboardView api={empty} project={project} now={now} canAsk />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.trend)
+    fireEvent.click(screen.getByRole('button', { name: text.comment }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.comment }))
+    expect(await screen.findByText(text.commentEmpty)).toBeTruthy()
+    shown.unmount()
+
+    render(<DashboardView api={fakeApi()} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    openTab(text.tabs.trend)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: text.comment }).disabled).toBe(
+      true,
+    )
+  })
+})
+
+describe('the tracker read again by itself', () => {
+  it('is read on opening when its reading is old, and the page follows', async () => {
+    const stale: View = { ...view, age: 'warning' }
+    let release: (
+      result: Result<{ at: string; items: number; withHistory: number } | null>,
+    ) => void = () => {}
+    const api = fakeApi({
+      dashboardView: vi
+        .fn<Api['dashboardView']>()
+        .mockResolvedValueOnce(ok(stale))
+        .mockResolvedValue(ok(view)),
+      refreshTrackerSnapshot: vi.fn(
+        () =>
+          new Promise<Result<{ at: string; items: number; withHistory: number } | null>>(
+            (resolve) => {
+              release = resolve
+            },
+          ),
+      ),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    expect(await screen.findByText(text.refreshing)).toBeTruthy()
+    await act(async () =>
+      release(ok({ at: '2026-06-30T09:30:00.000Z', items: 12, withHistory: 3 })),
+    )
+    expect(await screen.findByText(/Lette 12 voci, 3 con la cronologia/)).toBeTruthy()
+    expect(await screen.findByText(new RegExp(text.age.fresh))).toBeTruthy()
+    expect(api.dashboardView).toHaveBeenCalledTimes(2)
+  })
+
+  it('says why it could not be read again', async () => {
+    const api = fakeApi({
+      refreshTrackerSnapshot: vi.fn(async () => ({
+        ok: false as const,
+        code: 'feed_unreachable' as const,
+      })),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('region', { name: text.qualityTitle })).toBeTruthy()
+  })
+
+  it('follows a periodic reading of its own project, and no other', async () => {
+    let tell: (projectId: string) => void = () => {}
+    const stop = vi.fn()
+    const api = fakeApi({
+      onSourcesChanged: vi.fn((listener: (projectId: string) => void) => {
+        tell = listener
+        return stop
+      }),
+    })
+    const shown = render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    await waitFor(() => expect(api.onSourcesChanged).toHaveBeenCalled())
+    await act(async () => tell('another'))
+    expect(api.dashboardView).toHaveBeenCalledTimes(1)
+    await act(async () => tell('p-1'))
+    await waitFor(() => expect(api.dashboardView).toHaveBeenCalledTimes(2))
+    shown.unmount()
+    expect(stop).toHaveBeenCalled()
   })
 })

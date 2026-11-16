@@ -578,6 +578,37 @@ export interface TodayJudge {
   ): Promise<ProposedSentence[]>
 }
 
+/** A sentence Claude proposes on the numbers of the tracker; the code checks ids and numbers. */
+export type ProposedComment = { text: string; ids: string[] }
+
+/** An item that waits for an answer, as Claude is told it to write the reminder. */
+export type ItemToChase = {
+  id: string
+  type: 'bug' | 'story'
+  title: string
+  state: string
+  assignee: string | null
+  askedBy: string
+  askedAt: string
+  workdays: number
+  question: string
+}
+
+/** A reminder as Claude drafts it: whom it is for, and the words. Nobody sends it but the PM. */
+export type ProposedReminder = { to: string | null; text: string }
+
+/**
+ * Claude beside the dashboard, read-only on the project folder: it comments the numbers the code
+ * computed and drafts a reminder for an item that waits. It never counts, and never sends.
+ * Failures are DomainErrors with an `agent_*` code.
+ */
+export interface TrackerAdvisor {
+  comment(request: JudgeRequest & { figures: unknown }): Promise<ProposedComment[]>
+  reminder(
+    request: JudgeRequest & { item: ItemToChase; from: string | null },
+  ): Promise<ProposedReminder>
+}
+
 /** What a sign-in gives: who the person is and what renews the sign-in without asking again. */
 export type SignedIn = { identity: Identity; refreshToken: string | null }
 

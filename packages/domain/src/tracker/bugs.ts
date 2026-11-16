@@ -44,6 +44,17 @@ export type TrendBucket = {
 /** How long bugs wait between the steps of their way out, in days. */
 export type FlowStep = { median: number | null; sample: number }
 
+/** The bugs in numbers at one instant: what the counts of the page say. */
+export type BugCounts = {
+  open: number
+  work: number
+  verify: number
+  stuck: number
+  validated: number
+}
+
+export type BugFlow = { toVerify: FlowStep; toValidated: FlowStep; toClosed: FlowStep }
+
 export type BugDashboard = {
   open: BugRow[]
   /** Validated and not yet released: no longer open, still to follow until they leave. */
@@ -55,12 +66,26 @@ export type BugDashboard = {
   trend: TrendBucket[]
   /** `history`: from recorded changes. `approximate`: from the present state only. */
   trendSource: 'history' | 'approximate'
-  flow: { toVerify: FlowStep; toValidated: FlowStep; toClosed: FlowStep } | null
+  flow: BugFlow | null
+  /**
+   * The same numbers at the start of the range, from the recorded changes; null without a
+   * history: nothing is estimated.
+   */
+  before: BugCounts | null
+  /** The flow of the stretch of the same length that ends where the range starts. */
+  flowBefore: BugFlow | null
 }
 
 export type TrendRange = { from: Date; to: Date; granularity: TrendGranularity }
 
 const daysBetween = (from: number, to: number): number => Math.floor((to - from) / DAY_MS)
+
+/**
+ * Whether an item has stayed in its state longer than the project allows: more days than the
+ * threshold, never the same number. One rule for the dashboard and for the page of the day.
+ */
+export const isStuck = (daysInState: number | null, stuckDays: number): boolean =>
+  daysInState !== null && daysInState > stuckDays
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 
 /** The first instant of the week (Monday) or of the month a date falls in, in UTC. */
@@ -195,13 +220,15 @@ function firstEntry(
 
 /**
  * Where bugs stop on their way out: from opening to the first verification, from there to the
- * validation, from there to the closing. Only bugs that reached verification since `since` count.
+ * validation, from there to the closing. Only bugs that reached verification since `since`, and
+ * before `until` when it is given, count.
  */
 function flowOf(
   histories: readonly ItemHistory[],
   settings: DashboardSettings,
   since: number,
-): BugDashboard['flow'] {
+  until = Number.POSITIVE_INFINITY,
+): BugFlow {
   const toVerify: number[] = []
   const toValidated: number[] = []
   const toClosed: number[] = []
@@ -211,7 +238,7 @@ function flowOf(
   for (const history of histories) {
     const created = Date.parse(history.createdAt)
     const verify = firstEntry(history, handedOver, since)
-    if (verify === null) continue
+    if (verify === null || verify >= until) continue
     toVerify.push((verify - created) / DAY_MS)
     const validated = firstEntry(history, inPhase('validated'), verify)
     if (validated === null) continue
@@ -220,6 +247,33 @@ function flowOf(
     if (closed !== null) toClosed.push((closed - validated) / DAY_MS)
   }
   return { toVerify: step(toVerify), toValidated: step(toValidated), toClosed: step(toClosed) }
+}
+
+/**
+ * The numbers of the page as they were at an instant, from the recorded changes: a bug counts
+ * while it has a tag of the scope, and is stuck when it had been in its state for too long then.
+ */
+export function countsAt(
+  histories: readonly ItemHistory[],
+  settings: DashboardSettings,
+  instant: number,
+): BugCounts {
+  const counts: BugCounts = { open: 0, work: 0, verify: 0, stuck: 0, validated: 0 }
+  for (const history of histories) {
+    const created = Date.parse(history.createdAt)
+    if (created > instant) continue
+    if (!inScope(valueAt(history.tags, instant)?.tags ?? [], settings)) continue
+    const entry = valueAt(history.states, instant)
+    // A bug whose first recorded state comes later was already there, and being worked on.
+    const phase = entry ? phaseOf(entry.state, settings) : 'work'
+    if (phase === 'validated') counts.validated += 1
+    if (!isOpenPhase(phase)) continue
+    counts.open += 1
+    counts[phase === 'verify' ? 'verify' : 'work'] += 1
+    const since = entry ? Date.parse(entry.at) : created
+    if (isStuck(daysBetween(since, instant), settings.stuckDays)) counts.stuck += 1
+  }
+  return counts
 }
 
 /** The PM's latest note on an item. */
@@ -244,7 +298,7 @@ function rowOf(item: TrackerItem, settings: DashboardSettings, now: number): Bug
     environment: item.environment,
     createdAt: item.createdAt,
     daysInState,
-    stuck: daysInState !== null && daysInState > settings.stuckDays,
+    stuck: isStuck(daysInState, settings.stuckDays),
     lastComment: item.comments.at(-1) ?? null,
     note: noteOf(item.id, settings),
   }
@@ -278,6 +332,13 @@ export function bugDashboard(
         return history ? [openMoments(history, settings)] : []
       })
     : scoped.map((item) => approximateMoments(item, settings))
+  // What was in scope at a past instant is told by the history, also for bugs that left it since.
+  const allHistories = histories
+    ? bugs.flatMap((item) => {
+        const history = histories.get(item.id)
+        return history ? [history] : []
+      })
+    : []
   const scopedHistories = histories
     ? scoped.flatMap((item) => {
         const history = histories.get(item.id)
@@ -294,5 +355,14 @@ export function bugDashboard(
     trend: trendOf(moments, range),
     trendSource: histories ? 'history' : 'approximate',
     flow: histories ? flowOf(scopedHistories, settings, range.from.getTime()) : null,
+    before: histories ? countsAt(allHistories, settings, range.from.getTime()) : null,
+    flowBefore: histories
+      ? flowOf(
+          scopedHistories,
+          settings,
+          2 * range.from.getTime() - range.to.getTime(),
+          range.from.getTime(),
+        )
+      : null,
   }
 }

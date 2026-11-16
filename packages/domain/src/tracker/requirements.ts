@@ -8,6 +8,7 @@ import {
   type TrackerData,
   type TrackerItem,
 } from './model.ts'
+import { sameSprint } from './sprint.ts'
 
 /** Why a requirement looks unclear. Each signal is a check of the code on the tracker's data. */
 export const REQUIREMENT_SIGNALS = ['S1', 'S2', 'S3', 'S4', 'S5'] as const
@@ -68,13 +69,21 @@ function signalsOf(item: TrackerItem, unclear: RequirementRow['unclear']): Requi
 
 /**
  * The stories still to be worked on whose requirement shows at least one sign of being unclear,
- * the ones with more signs first. A story already developed or closed is past this question.
+ * the ones with more signs first. A story already developed or closed is past this question, and
+ * one that is not about to be planned is not asked it yet.
  */
 export function unclearRequirements(
   data: TrackerData,
   settings: DashboardSettings,
+  /** The sprint that comes next: with no period chosen by hand, only its stories are checked. */
+  upcomingSprint: string | null = null,
 ): RequirementRow[] {
   const periods = new Set(settings.requirementPeriods)
+  const planned = (item: TrackerItem): boolean => {
+    if (periods.size > 0) return item.period !== null && periods.has(item.period)
+    if (upcomingSprint === null) return true
+    return item.sprint !== null && sameSprint(item.sprint, upcomingSprint)
+  }
   const excluded = new Set(settings.decisions.excludedRequirements.map((entry) => entry.id))
   const removed = new Set(
     settings.decisions.removedSignals.map((entry) => `${entry.id} ${entry.signal}`),
@@ -83,7 +92,7 @@ export function unclearRequirements(
     .filter((item) => !excluded.has(item.id))
     .filter((item) => isOfType(item, settings.storyTypes) && inScope(item.tags, settings))
     .filter((item) => phaseOf(item.state, settings) === 'work')
-    .filter((item) => periods.size === 0 || (item.period !== null && periods.has(item.period)))
+    .filter(planned)
     .map((item) => {
       const unclear = unclearIn(item)
       return {

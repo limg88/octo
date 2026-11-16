@@ -1,12 +1,28 @@
-import type { CheckedAnswer, TodayKind } from '@octo/domain'
+import { type BugQuery, type CheckedAnswer, NO_BUG_QUERY, type TodayKind } from '@octo/domain'
 
 /** Which bugs the dashboard lists: the open ones, a part of them, or the validated ones. */
 export const BUG_FILTERS = ['open', 'work', 'verify', 'stuck', 'validated'] as const
 export type BugFilter = (typeof BUG_FILTERS)[number]
 
+/** The parts the dashboard is read in. */
+export const DASHBOARD_TABS = ['sprint', 'bugs', 'trend'] as const
+export type DashboardTab = (typeof DASHBOARD_TABS)[number]
+
 /** What the PM was looking at in the dashboard, kept while they go to another section and back. */
-export type DashboardFocus = { filter: BugFilter; bugId: string | null }
-export const NO_DASHBOARD_FOCUS: DashboardFocus = { filter: 'open', bugId: null }
+export type DashboardFocus = {
+  tab: DashboardTab
+  filter: BugFilter
+  bugId: string | null
+  /** The filters of the list of bugs beyond the count chosen. */
+  query: BugQuery
+}
+/** The page opens on the bugs: they are there whatever the tracker says of sprints. */
+export const NO_DASHBOARD_FOCUS: DashboardFocus = {
+  tab: 'bugs',
+  filter: 'open',
+  bugId: null,
+  query: NO_BUG_QUERY,
+}
 
 /** The signals of the day by where they come from, for the filters of the page. */
 export const TODAY_GROUPS = [

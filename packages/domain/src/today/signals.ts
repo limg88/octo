@@ -5,16 +5,11 @@ import type { Forecast } from '../forecast/compile.ts'
 import type { Reconciliation } from '../hours/reconcile.ts'
 import type { SourceState } from '../sources.ts'
 import type { ProjectTeam } from '../team/model.ts'
-import type { BugRow } from '../tracker/bugs.ts'
+import { type BugRow, isStuck } from '../tracker/bugs.ts'
 import type { ExportAge } from '../tracker/export.ts'
 import type { RequirementRow } from '../tracker/requirements.ts'
-import {
-  daysBetweenDays,
-  type HoursPersonFact,
-  isMonthClosing,
-  type TodayItem,
-  workdaysBetween,
-} from './model.ts'
+import { SPRINT_ENDING_WORKDAYS, workdaysBetween } from '../workdays.ts'
+import { daysBetweenDays, type HoursPersonFact, isMonthClosing, type TodayItem } from './model.ts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
@@ -153,7 +148,7 @@ export function bugItems(
   stuckDays: number,
   exportedAt: string | null,
 ): TodayItem[] {
-  const stuck = open.filter((bug) => bug.daysInState !== null && bug.daysInState >= stuckDays)
+  const stuck = open.filter((bug) => isStuck(bug.daysInState, stuckDays))
   if (stuck.length === 0) return []
   return [
     {
@@ -197,9 +192,6 @@ export function requirementItems(
     },
   ]
 }
-
-/** Days before the end of a sprint in which what is not aligned is due. */
-export const SPRINT_ENDING_WORKDAYS = 2
 
 /** The last day of the sprint the project is set on; null when no period of the calendar has its name. */
 export function sprintEnd(sprint: string, team: ProjectTeam): string | null {

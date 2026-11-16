@@ -58,6 +58,7 @@ const settingsSchema = z.object({
   storyTypes: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.storyTypes),
   stuckDays: z.number().default(DEFAULT_DASHBOARD_SETTINGS.stuckDays),
   requirementPeriods: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.requirementPeriods),
+  answerWorkdays: z.number().default(DEFAULT_DASHBOARD_SETTINGS.answerWorkdays),
   phases: z.record(z.string(), z.enum(PHASES)).default(DEFAULT_DASHBOARD_SETTINGS.phases),
   handoverStates: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.handoverStates),
   decisions: z

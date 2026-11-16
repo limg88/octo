@@ -26,7 +26,7 @@ Durata: 5 minuti. Otto difetti segnalati sull'app installata, uno per passo.
    Atteso: si apre «Impostazioni» sulla parte «Pagina «Oggi»»: gli indirizzi che Octo considera tuoi, il campo per aggiungerne, i tipi di segnalazione che non mostri. In «Oggi» il blocco non c'è più.
    Dimostra: ciò che si imposta una volta non occupa la pagina di ogni giorno.
 
-4. **Cruscotto: segnali in riga, tabella ordinabile e filtrabile.** Apri «Cruscotto» e scorri ai requisiti poco chiari.
+4. **Cruscotto: segnali in riga, tabella ordinabile e filtrabile.** Apri «Cruscotto», scheda «Sprint», e scorri ai requisiti poco chiari.
    Atteso: ogni segnale è un'etichetta intera con la sua «×» dentro; l'etichetta non si spezza su due righe e «È chiaro» resta nella sua colonna. Premi l'intestazione «Id»: le righe si ordinano e compare ▲; ancora: ▼; ancora: l'ordine di partenza. Scrivi una parola in «Filtra»: restano le righe che la contengono, con «n di m».
    Dimostra: le colonne tengono il loro posto; ogni tabella si ordina e si filtra allo stesso modo.
 

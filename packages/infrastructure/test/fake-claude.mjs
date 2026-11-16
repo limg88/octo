@@ -121,6 +121,50 @@ if (args.join(' ').includes('A Project Manager opens the page of the day of one 
   process.exit(0)
 }
 
+// A run of the comment on the dashboard: sentences made only of the numbers given, one that
+// names the bug stuck longest, and one with a number of its own that the code must throw away.
+if (args.join(' ').includes('reads the dashboard of the bugs and of the sprint')) {
+  const { figures } = JSON.parse(question)
+  const { now, atPeriodStart, stuckLongest } = figures.bugs
+  const worst = stuckLongest[0]
+  const sentences = [
+    {
+      text: atPeriodStart
+        ? `I bug aperti sono ${now.open}, erano ${atPeriodStart.open} all'inizio del periodo.`
+        : `I bug aperti sono ${now.open}.`,
+      ids: [],
+    },
+  ]
+  if (worst) {
+    sentences.push({
+      text: `Il bug #${worst.id} è fermo da ${worst.daysInState} giorni: è il primo da guardare.`,
+      ids: [worst.id],
+    })
+  }
+  sentences.push({ text: 'La chiusura migliora del 73 per cento.', ids: [] })
+  emit({ type: 'result', is_error: false, structured_output: { sentences } })
+  process.exit(0)
+}
+
+// A run of the reminder for an item that waits: a few lines that quote the question.
+if (args.join(' ').includes('wants to chase an answer on one item of the tracker')) {
+  const { item, from } = JSON.parse(question)
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      to: item.assignee,
+      text: [
+        `Buongiorno${item.assignee ? ` ${item.assignee}` : ''},`,
+        `torno sulla voce #${item.id} «${item.title}». Il ${item.askedAt.slice(0, 10)} ${item.askedBy} chiedeva: «${item.question}»`,
+        `Sono passati ${item.workdays} giorni lavorativi e ci serve una risposta per andare avanti.`,
+        ...(from ? [`Grazie, ${from}`] : ['Grazie']),
+      ].join('\n'),
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the judge of the risks: one risk, with its source in the project.
 if (args.join(' ').includes('You look for the risks of one project')) {
   const { alreadyInTheRegister } = JSON.parse(question)

@@ -279,6 +279,16 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     saveDashboardSettings: vi.fn(async () => ok(DEFAULT_DASHBOARD_SETTINGS)),
     dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),
     readTrackerSnapshot: vi.fn(async () => ok({ at: '', items: 0, withHistory: 0 })),
+    refreshTrackerSnapshot: vi.fn(async () => ok(null)),
+    openTrackerItem: vi.fn(async () => ok(false)),
+    commentDashboard: vi.fn(async () => ({
+      ok: false as const,
+      code: 'agent_not_installed' as const,
+    })),
+    draftReminder: vi.fn(async () => ({
+      ok: false as const,
+      code: 'agent_not_installed' as const,
+    })),
     dashboardView: vi.fn(async () => ({
       ok: false as const,
       code: 'tracker_export_not_set' as const,

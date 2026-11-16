@@ -9,6 +9,7 @@ import {
   createAskQuestion,
   createBackups,
   createDashboard,
+  createDashboardAdvice,
   createDeliverables,
   createDocuments,
   createFeeding,
@@ -34,6 +35,8 @@ import {
   type Session,
   settingsOwnedBy,
   type Today,
+  TRACKER_REFRESH_MS,
+  type TrackerSnapshots,
   type Updates,
 } from '@octo/application'
 import { backupFileName, DomainError, firstEntered, type Project } from '@octo/domain'
@@ -43,6 +46,7 @@ import {
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
   createClaudeTodayJudge,
+  createClaudeTrackerAdvisor,
   createConnectorFeedReader,
   createEd25519Verifier,
   createFeedRecords,
@@ -133,8 +137,13 @@ const FIRST_SYNC_DELAY_MS = 10 * 1000
  */
 const DEV_SYNC_SECONDS_VARIABLE = 'OCTO_DEV_SYNC_SECONDS'
 const devSyncSeconds = Number(process.env[DEV_SYNC_SECONDS_VARIABLE] ?? '')
-const syncIntervalMs =
-  Number.isFinite(devSyncSeconds) && devSyncSeconds > 0 ? devSyncSeconds * 1000 : SYNC_INTERVAL_MS
+const devSync = Number.isFinite(devSyncSeconds) && devSyncSeconds > 0
+const syncIntervalMs = devSync ? devSyncSeconds * 1000 : SYNC_INTERVAL_MS
+/**
+ * How old the reading of the tracker must be before a periodic reading asks it again: an hour,
+ * or in a demo every time, so that what changed on the tracker is seen without waiting.
+ */
+const trackerRefreshMs = devSync ? 0 : TRACKER_REFRESH_MS
 /** Demos and tests only: a fake Jira or Azure DevOps on this computer instead of the real one. */
 const DEV_JIRA_VARIABLE = 'OCTO_DEV_JIRA_URL'
 const DEV_CONFLUENCE_VARIABLE = 'OCTO_DEV_CONFLUENCE_URL'
@@ -218,6 +227,7 @@ async function feedAll(
   session: Session,
   projects: Projects,
   feeding: Feeding,
+  trackers: Pick<TrackerSnapshots, 'refresh'>,
   today: Pick<Today, 'view'>,
   window: BrowserWindow,
 ): Promise<void> {
@@ -228,6 +238,10 @@ async function feedAll(
     } catch (error) {
       console.error('[octo] periodic reading failed', error)
     }
+    // The tracker of the dashboard, when Octo reads it by itself and its reading is old enough.
+    await trackers
+      .refresh(project, trackerRefreshMs)
+      .catch((error: unknown) => console.error('[octo] the tracker could not be read', error))
     if (!window.isDestroyed()) window.webContents.send(CHANNELS.sourcesChanged, project.id)
     await tellEntered(today, project, window).catch((error: unknown) =>
       console.error('[octo] the page of the day could not be computed', error),
@@ -449,7 +463,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
   }
   const periodic = () => {
     readingIn(syncIntervalMs)
-    void feedAll(session, projects, feeding, today, window)
+    void feedAll(session, projects, feeding, trackerSnapshots, today, window)
   }
   // At every start the sign-in kept on this computer is renewed; a demo person is simply in.
   void (demoPerson ? session.signIn() : session.resume())
@@ -476,6 +490,25 @@ function start(seatEnv: Record<string, string | undefined>): void {
     clock,
     writer,
     team: (project) => team.get(project),
+    sources: settings,
+  })
+  const trackerSnapshots = createTrackerSnapshots({
+    settings: dashboardSettings,
+    sources: settings,
+    secrets,
+    tracker: createAdoTrackerReader({ devEndpoints }),
+    writer,
+    team: (project) => team.get(project),
+    exports: trackerExports,
+    clock,
+  })
+  const dashboardAdvice = createDashboardAdvice({
+    dashboard,
+    advisor: createClaudeTrackerAdvisor(claude),
+    clock,
+    author: () => identity()?.name ?? null,
+    models: chosenModels,
+    liveSources,
   })
   const alignments = createAlignments({
     settings: createFsAlignmentSettings(),
@@ -572,14 +605,8 @@ function start(seatEnv: Record<string, string | undefined>): void {
     newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
     meetingsDialogTitle: MEETINGS_DIALOG_TITLE,
     team,
-    trackerSnapshots: createTrackerSnapshots({
-      settings: dashboardSettings,
-      sources: settings,
-      secrets,
-      tracker: createAdoTrackerReader({ devEndpoints }),
-      writer,
-      team: (project) => team.get(project),
-    }),
+    trackerSnapshots,
+    dashboardAdvice,
     backups: createBackups({
       registry,
       sourceStates,
