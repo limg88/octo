@@ -196,6 +196,9 @@ describe('what the page of the day keeps in the project', () => {
       mailTurns: [{ conversation: 'aurora: budget', turn: 'not_mine' as const, at: '2026-11-16' }],
       present: [{ key: 'bugs-stuck', kind: 'bugs_stuck' as const, weight: 3 }],
       resolved: [{ key: 'hours:2026-10', kind: 'hours' as const, day: '2026-11-16' }],
+      lastSeenAt: '2026-11-16T09:00:00.000Z',
+      seen: [{ key: 'bugs-stuck', kind: 'bugs_stuck' as const, weight: 2 }],
+      notify: false,
     }
     await store.save(folder, settings)
     expect(await store.load(folder)).toEqual(settings)

@@ -51,6 +51,9 @@ const settingsSchema = z.object({
     .default([]),
   present: z.array(z.object({ key: z.string(), kind: z.string(), weight: z.number() })).default([]),
   resolved: z.array(z.object({ key: z.string(), kind: z.string(), day: z.string() })).default([]),
+  lastSeenAt: z.string().nullable().default(null),
+  seen: z.array(z.object({ key: z.string(), kind: z.string(), weight: z.number() })).default([]),
+  notify: z.boolean().default(true),
 })
 
 const evaluationSchema = z.object({
@@ -132,6 +135,7 @@ export function createFsTodayStore(): TodayStore {
           ...signal,
           kind: signal.kind as TodayKind,
         })),
+        seen: parsed.data.seen.map((signal) => ({ ...signal, kind: signal.kind as TodayKind })),
       })
     },
     save: (projectFolder, settings) => writeJson(settingsFile(projectFolder), settings),

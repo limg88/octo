@@ -115,6 +115,18 @@ export const messages = {
       'Ciò che viene prima, scelto da una regola: una riunione vicina, una scadenza, ciò che avevi rimandato a oggi, una mail importante, ciò che è peggiorato.',
     nowList: 'Cose che vengono prima',
     nowSummary: 'Perché contano oggi, secondo Claude',
+    marks: { new: 'Nuovo', worse: 'Peggiorato' },
+    nextReading: (minutes: number) =>
+      minutes <= 0
+        ? 'Prossima lettura fra poco'
+        : minutes === 1
+          ? 'Prossima lettura fra 1 minuto'
+          : `Prossima lettura fra ${minutes} minuti`,
+    notifyBody: (project: string) => `${project} · entra in «Adesso»`,
+    notifyLabel: 'Avvisami con una notifica del sistema quando una voce entra in «Adesso»',
+    notifyHint:
+      'Una notifica al più per ogni lettura delle fonti, e nessuna mentre stai guardando «Oggi» di questo progetto.',
+    countLabel: (count: number) => (count === 1 ? '1 cosa da fare' : `${count} cose da fare`),
     nowSource: 'Apri la fonte',
     nowWhy: {
       meetingSoon: (minutes: number) =>

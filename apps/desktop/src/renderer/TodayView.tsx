@@ -7,6 +7,7 @@ import {
   TODAY_LIMIT,
   type TodayItem,
   type TodayKind,
+  type TodayMark,
   type TodayTarget,
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -45,6 +46,8 @@ type TodayApi = Pick<
   | 'cancelEvaluateToday'
   | 'onTodayProgress'
   | 'onSourcesChanged'
+  | 'markTodaySeen'
+  | 'nextReading'
   | 'fill'
   | 'openEvidence'
   | 'risks'
@@ -71,9 +74,16 @@ type Props = {
   onFocus?: (focus: TodayFocus) => void
   /** Opens the settings of the page, kept with those of the project. */
   onOpenSettings?: () => void
+  /** Tells how many things the page asks of the PM, each time it is computed. */
+  onCount?: (count: number) => void
+  /** How long the page stays open before the PM is taken to have looked at it. */
+  visitAfterMs?: number
 }
 
 const text = messages.today
+const MINUTE_MS = 60 * 1000
+/** A page passed through is not a page looked at: it counts after these seconds. */
+const VISIT_AFTER_MS = 5 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
 const MONDAY = 1
 const WEEK_DAYS = 7
@@ -87,6 +97,9 @@ const SECTION_OF: Partial<Record<TodayTarget, Section>> = {
   alignment: 'alignment',
   deliverables: 'deliverables',
 }
+
+/** The tracker of the client as the page names it among its sources. */
+const TRACKER_SOURCE = 'Tracker del cliente'
 
 /** What the PM just decided of a signal, while it can still be taken back. */
 type Decided = { key: string; title: string; state: Exclude<TodayDecisionChoice, 'open'> }
@@ -114,6 +127,8 @@ export function TodayView({
   focus: givenFocus,
   onFocus,
   onOpenSettings,
+  onCount,
+  visitAfterMs = VISIT_AFTER_MS,
 }: Props) {
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
@@ -146,7 +161,44 @@ export function TodayView({
     onFocus?.(next)
   }
 
-  const show = useCallback((next: View) => setView(next), [])
+  const [nextReadingAt, setNextReadingAt] = useState<string | null>(null)
+  /** The minute it is now: what is said in minutes is said again when it changes. */
+  const [minute, setMinute] = useState(() => Date.now())
+  /** The project whose page the PM was already taken to have looked at, since it was opened. */
+  const visited = useRef<string | null>(null)
+
+  const show = useCallback(
+    (next: View) => {
+      setView(next)
+      onCount?.(next.count)
+    },
+    [onCount],
+  )
+
+  const askNextReading = useCallback(async () => {
+    const projectId = project.id
+    const result = await api.nextReading()
+    if (live.current === projectId && result.ok) setNextReadingAt(result.value)
+  }, [api, project.id])
+
+  useEffect(() => {
+    const timer = setInterval(() => setMinute(Date.now()), MINUTE_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  // The PM is taken to have looked at the page when it stayed open for a while: then what is
+  // on it is no longer new. Once when the page opens, and again whenever something is marked.
+  useEffect(() => {
+    if (view === null) return
+    const projectId = project.id
+    if (visited.current === projectId && Object.keys(view.marks).length === 0) return
+    const timer = setTimeout(() => {
+      if (document.visibilityState !== 'visible') return
+      visited.current = projectId
+      void api.markTodaySeen(projectId)
+    }, visitAfterMs)
+    return () => clearTimeout(timer)
+  }, [api, project.id, view, visitAfterMs])
 
   const evaluate = useCallback(
     async (everything: boolean) => {
@@ -174,11 +226,12 @@ export function TodayView({
     if (live.current !== projectId) return
     if (!result.ok) return setError(result.code)
     show(result.value)
+    void askNextReading()
     const mark = `${projectId}:${result.value.day}`
     if (!result.value.evaluationDue || !canJudge || asked.current === mark) return
     asked.current = mark
     void evaluate(false)
-  }, [api, project.id, show, canJudge, evaluate])
+  }, [api, project.id, show, canJudge, evaluate, askNextReading])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new project starts from its own page.
   useEffect(() => {
@@ -333,7 +386,15 @@ export function TodayView({
     {
       key: 'what',
       label: text.watchWhat,
-      cell: (item) => <strong>{signalText(item).title}</strong>,
+      cell: (item) => {
+        const mark = view?.marks[item.key]
+        return (
+          <>
+            {mark && <span className="pill pill-new">{text.marks[mark]}</span>}{' '}
+            <strong>{signalText(item).title}</strong>
+          </>
+        )
+      },
       sort: (item) => signalText(item).title,
       text: (item) => signalText(item).title,
     },
@@ -383,6 +444,17 @@ export function TodayView({
   ]
 
   const alerts = view.items.filter((item) => item.band === 'alert')
+  // A source that is a warning already says how old it is: it is not said twice.
+  const warned = new Set(
+    alerts.flatMap((item) =>
+      item.facts.kind === 'source'
+        ? [item.facts.source]
+        : item.facts.kind === 'tracker_old'
+          ? [TRACKER_SOURCE]
+          : [],
+    ),
+  )
+  const fresh = view.freshness.filter((entry) => !warned.has(entry.source))
   const watch = view.items.filter((item) => item.band === 'watch' && !firstKeys.has(item.key))
   const groups = TODAY_GROUPS.map((group) => ({
     group,
@@ -400,14 +472,19 @@ export function TodayView({
       <header className="today-head">
         <div className="today-day">
           <h3>{text.title(dayText(view.day))}</h3>
-          {view.freshness.length > 0 && (
+          {(nextReadingAt !== null || fresh.length > 0) && (
             <p className="hint today-freshness">
-              {view.freshness
-                .map(
+              {[
+                ...(nextReadingAt === null
+                  ? []
+                  : [
+                      text.nextReading(Math.ceil((Date.parse(nextReadingAt) - minute) / MINUTE_MS)),
+                    ]),
+                ...fresh.map(
                   (entry) =>
                     `${entry.source}: ${entry.readAt ? dateTimeText(entry.readAt) : text.freshnessNever}`,
-                )
-                .join(' · ')}
+                ),
+              ].join(' · ')}
             </p>
           )}
         </div>
@@ -464,6 +541,7 @@ export function TodayView({
               <li key={entry.item.key}>
                 <SignalRow
                   item={entry.item}
+                  mark={view.marks[entry.item.key]}
                   why={nowText(entry)}
                   selected={entry.item.key === selectedKey}
                   judging={judging}
@@ -537,6 +615,7 @@ export function TodayView({
                     <li key={item.key}>
                       <SignalRow
                         item={item}
+                        mark={view.marks[item.key]}
                         selected={item.key === selectedKey}
                         judging={judging}
                         onSelect={() => select(item.key)}
@@ -679,6 +758,8 @@ function SignalRow(props: {
   item: TodayItem
   /** Why the signal comes first now, when it does: said before anything else. */
   why?: string
+  /** What changed in it since the PM last looked at the page. */
+  mark?: TodayMark | undefined
   selected: boolean
   judging: boolean
   onSelect: () => void
@@ -695,6 +776,7 @@ function SignalRow(props: {
       onClick={props.onSelect}
     >
       <span className="entry-meta">
+        {props.mark && <span className="pill pill-new">{text.marks[props.mark]}</span>}
         {props.why !== undefined && <span className="pill pill-warning">{props.why}</span>}
         {props.why === undefined && item.dueBecause && (
           <span className="pill pill-warning">{text.dueShort[item.dueBecause]}</span>

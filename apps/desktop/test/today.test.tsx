@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AllProjectsView } from '../src/renderer/AllProjectsView.tsx'
 import { App } from '../src/renderer/App.tsx'
 import { errorText, messages } from '../src/renderer/messages.ts'
+import { systemNotify } from '../src/renderer/notify.ts'
 import { RiskRegister } from '../src/renderer/RiskRegister.tsx'
 import { SignIn } from '../src/renderer/SignIn.tsx'
 import { TodayView } from '../src/renderer/TodayView.tsx'
@@ -103,6 +104,9 @@ const view = (overrides: Partial<View> = {}): View => ({
   items: [source, hours, mail, bugs, risk],
   now: [],
   nowSummary: [],
+  marks: {},
+  count: 0,
+  notify: true,
   hidden: 1,
   hiddenItems: [],
   resolvedToday: [],
@@ -139,6 +143,8 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
       changed = listener
       return () => {}
     },
+    markTodaySeen: vi.fn(async () => ok(null)),
+    nextReading: vi.fn(async () => ok<string | null>(null)),
     fill: vi.fn(async () => ok([])),
     openEvidence: vi.fn(async () => ok(null)),
     assignMeeting: vi.fn(async () => ok(first)),
@@ -159,6 +165,33 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
 
 afterEach(cleanup)
 
+describe('the notice of the system', () => {
+  it('shows a notice and tells when it is clicked, and does nothing where there is none', () => {
+    const made: Array<{ title: string; body: string | undefined; onclick: (() => void) | null }> =
+      []
+    class FakeNotification {
+      constructor(title: string, options: { body?: string }) {
+        made.push({ title, body: options.body, onclick: null })
+        const notice = made[made.length - 1] as (typeof made)[number]
+        Object.defineProperty(this, 'onclick', {
+          set: (click: () => void) => {
+            notice.onclick = click
+          },
+        })
+      }
+    }
+    // Where the system has no notices, nothing is done and nothing fails.
+    expect(() => systemNotify('a', 'b', () => {})).not.toThrow()
+    vi.stubGlobal('Notification', FakeNotification)
+    const clicked = vi.fn()
+    systemNotify('Titolo', 'Aurora', clicked)
+    expect(made.map(({ title, body }) => [title, body])).toEqual([['Titolo', 'Aurora']])
+    made[0]?.onclick?.()
+    expect(clicked).toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('the page of the day', () => {
   it('shows what is due, where it comes from, why it is here and what Claude judged', async () => {
     const { api } = todayApi()
@@ -168,7 +201,8 @@ describe('the page of the day', () => {
     // A source that is not read is a warning above everything else.
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('Jira: non si legge da 3 giorni')
-    expect(screen.getByText(/Posta: .* · Jira: mai letta/)).toBeTruthy()
+    // A source that is a warning is not said a second time among how fresh the others are.
+    expect(screen.getByText(/^Posta: [^·]*$/)).toBeTruthy()
 
     const list = screen.getByRole('list', { name: text.list })
     const [first, second] = within(list).getAllByRole('button') as [HTMLElement, HTMLElement]
@@ -372,6 +406,58 @@ describe('the page of the day', () => {
     )
     await waitFor(() => expect(api.setMailTurn).toHaveBeenCalledWith('p-1', mail.key, 'mine'))
     expect(api.decideToday).not.toHaveBeenCalled()
+  })
+
+  it('marks what is new or worse since the last look, and says the PM has looked', async () => {
+    const counted: number[] = []
+    const { api } = todayApi(
+      view({
+        now: [{ item: hours, rule: 'due' }],
+        marks: { [hours.key]: 'worse', [mail.key]: 'new', [bugs.key]: 'new' },
+        count: 2,
+      }),
+    )
+    render(
+      <TodayView
+        api={api}
+        project={aurora}
+        canJudge
+        onOpenSection={() => {}}
+        onCount={(count) => counted.push(count)}
+        visitAfterMs={0}
+      />,
+    )
+    const first = await screen.findByRole('list', { name: text.nowList })
+    expect(first.textContent).toContain(text.marks.worse)
+    expect(screen.getByRole('list', { name: text.list }).textContent).toContain(text.marks.new)
+    expect(screen.getByRole('table', { name: text.watch }).textContent).toContain(text.marks.new)
+    // The page tells how much it asks, and that it stayed open long enough to be looked at.
+    expect(counted).toEqual([2])
+    await waitFor(() => expect(api.markTodaySeen).toHaveBeenCalledWith('p-1'))
+  })
+
+  it('says the PM has looked once, and again only when something is marked', async () => {
+    const { api, changed } = todayApi()
+    render(
+      <TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} visitAfterMs={0} />,
+    )
+    await waitFor(() => expect(api.markTodaySeen).toHaveBeenCalledTimes(1))
+    // A reading ends and nothing is new: there is nothing more to have looked at.
+    await act(async () => changed())
+    await waitFor(() => expect(api.todayView).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(api.markTodaySeen).toHaveBeenCalledTimes(1)
+  })
+
+  it('says when the sources are read next, in minutes', async () => {
+    const soon = new Date(Date.now() + 12 * 60 * 1000 - 5000).toISOString()
+    const { api } = todayApi(view(), { nextReading: vi.fn(async () => ok<string | null>(soon)) })
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    expect(await screen.findByText(new RegExp(`^${text.nextReading(12)} · Posta: `))).toBeTruthy()
+    expect(text.nextReading(1)).toBe('Prossima lettura fra 1 minuto')
+    expect(text.nextReading(0)).toBe('Prossima lettura fra poco')
   })
 
   it('remembers done, later and not interested, each with one gesture', async () => {

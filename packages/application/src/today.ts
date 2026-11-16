@@ -27,6 +27,7 @@ import {
   mailItems,
   mailThreads,
   mailTurnsOf,
+  marksOf,
   meetingItems,
   meetingsOn,
   monthDueItems,
@@ -52,12 +53,15 @@ import {
   type TodayFreshness,
   type TodayItem,
   type TodayKind,
+  type TodayMark,
   type TodaySettings,
+  todayCount,
   trackerAgeItems,
   unassignedMeetingItems,
   withDecision,
   withMailTurn,
   withoutDecision,
+  withVisit,
 } from '@octo/domain'
 import type { Alignments } from './alignment.ts'
 import type { Dashboard } from './dashboard.ts'
@@ -120,6 +124,12 @@ export type TodayView = {
   hidden: number
   /** Those of them a decision keeps away, each with its decision: read, and taken back. */
   hiddenItems: HiddenItem[]
+  /** The signals that are new or got worse since the PM last looked at the page, by key. */
+  marks: Record<string, TodayMark>
+  /** How many things the page asks of the PM today: beside its name in the sidebar. */
+  count: number
+  /** Whether the system tells the PM when a signal comes first. */
+  notify: boolean
   /** The kinds of the signals that went away by themselves today, one for each signal. */
   resolvedToday: TodayKind[]
   /** The last day of the sprint the project is set on, when it is still to come. */
@@ -174,6 +184,10 @@ export type Today = {
    */
   mailTurn(project: Project, key: string, turn: MailTurn | null): Promise<TodayView>
   saveAddresses(project: Project, addresses: readonly string[]): Promise<TodayView>
+  /** The PM looked at the page: what is on it now is no longer new the next time. */
+  visited(project: Project): Promise<void>
+  /** Whether the system tells the PM when a signal comes first. */
+  setNotify(project: Project, notify: boolean): Promise<TodayView>
   /** Asks Claude to weigh the mail that waits; once a week also for the risks. */
   evaluate(project: Project, input?: EvaluateInput): Promise<TodayView>
   /** Every project in brief, from what the code computes: Claude is never asked. */
@@ -409,6 +423,9 @@ export function createToday(deps: TodayDeps): Today {
             (sentence) => sentence.verified && firstKeys.has(sentence.key),
           )
         : [],
+      marks: marksOf(computed.page.items, computed.settings),
+      count: todayCount(computed.page.items, first),
+      notify: computed.settings.notify,
       hidden: computed.page.hidden,
       hiddenItems: computed.page.hiddenItems,
       resolvedToday: computed.settings.resolved
@@ -605,6 +622,19 @@ export function createToday(deps: TodayDeps): Today {
         cleanTodaySettings({ ...settings, ownAddresses: [...addresses] }),
       )
       return view(project)
+    },
+
+    async visited(project) {
+      const computed = await compute(project)
+      await deps.store.save(
+        project.folder,
+        withVisit(computed.settings, computed.page.items, computed.now.toISOString()),
+      )
+    },
+
+    async setNotify(project, notify) {
+      const computed = await compute(project)
+      return keep(project, computed, { ...computed.settings, notify })
     },
 
     async evaluate(project, input = {}) {

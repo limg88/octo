@@ -18,6 +18,7 @@ import {
   dismissCandidate,
   draftItems,
   type Forecast,
+  firstEntered,
   forecastItems,
   hoursItems,
   identityAddresses,
@@ -30,6 +31,7 @@ import {
   mailItems,
   mailThreads,
   mailTurnsOf,
+  marksOf,
   meetingItems,
   meetingsOn,
   monthDueItems,
@@ -56,6 +58,7 @@ import {
   sprintEnd,
   type TodayItem,
   threadSubject,
+  todayCount,
   trackerAgeItems,
   updateRisk,
   type WaitingMail,
@@ -63,6 +66,7 @@ import {
   withDecision,
   withMailTurn,
   withoutDecision,
+  withVisit,
   workdaysBetween,
 } from '../src/index.ts'
 
@@ -1321,5 +1325,73 @@ describe('what comes first now', () => {
       NOW,
     )
     expect(chosen.map((entry) => entry.item.key)).toEqual(['heavy', 'a', 'b'])
+  })
+})
+
+describe('what changed since the PM last looked at the page', () => {
+  const bugs = (weight: number) => item({ key: 'bugs', weight })
+  const draft = (weight: number) =>
+    item({
+      key: 'draft:1',
+      weight,
+      facts: {
+        kind: 'draft',
+        id: '1',
+        title: 'Stato',
+        status: 'review',
+        days: weight,
+        fixFirst: false,
+      },
+    })
+
+  it('marks nothing before the first look: everything would be new', () => {
+    expect(marksOf([bugs(1)], NO_TODAY_SETTINGS)).toEqual({})
+  })
+
+  it('marks what was not there, and what counts more of what is wrong', () => {
+    const seen = withVisit(NO_TODAY_SETTINGS, [bugs(2), draft(1)], '2026-11-16T09:00:00.000Z')
+    expect(seen.lastSeenAt).toBe('2026-11-16T09:00:00.000Z')
+    expect(seen.seen).toEqual([
+      { key: 'bugs', kind: 'bugs_stuck', weight: 2 },
+      { key: 'draft:1', kind: 'draft', weight: 1 },
+    ])
+    expect(marksOf([bugs(2), draft(1)], seen)).toEqual({})
+    // One more bug is worse; one more day of a draft that waits is only one more day.
+    expect(marksOf([bugs(3), draft(2), item({ key: 'other' })], seen)).toEqual({
+      bugs: 'worse',
+      other: 'new',
+    })
+    expect(marksOf([bugs(1)], seen)).toEqual({})
+    // The same signal under a new key is not new.
+    expect(marksOf([item({ key: 'mail:c:x', formerKeys: ['bugs'] })], seen)).toEqual({})
+  })
+
+  it('counts what comes first and what is to do, once each, and nothing that is only watched', () => {
+    const due = item({ key: 'due', band: 'due', dueBecause: 'month_end' })
+    const worse = item({ key: 'worse', band: 'watch', returned: { why: 'worse', was: 1, now: 2 } })
+    const items = [
+      due,
+      worse,
+      item({ key: 'waiting', band: 'waiting' }),
+      item({ key: 'watch', band: 'watch' }),
+      item({ key: 'alert', band: 'alert' }),
+    ]
+    expect(todayCount(items, nowItems(items, NOW))).toBe(3)
+    expect(todayCount([], [])).toBe(0)
+  })
+
+  it('tells the first signal that comes first now and did not at the reading before', () => {
+    const now = nowItems(
+      [
+        item({ key: 'a', band: 'due', dueBecause: 'month_end', weight: 2 }),
+        item({ key: 'b', band: 'due', dueBecause: 'month_end', weight: 1 }),
+      ],
+      NOW,
+    )
+    // At the first reading there is nothing to compare with.
+    expect(firstEntered(undefined, now)).toBeNull()
+    expect(firstEntered([], now)?.item.key).toBe('a')
+    expect(firstEntered(['a'], now)?.item.key).toBe('b')
+    expect(firstEntered(['a', 'b', 'gone'], now)).toBeNull()
   })
 })

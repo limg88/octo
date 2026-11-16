@@ -1962,6 +1962,16 @@ details.advanced[open] > summary {
   font-weight: 400;
 }
 
+.nav-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--panel);
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
 .nav-item-selected,
 .nav-item-selected:hover:not(:disabled) {
   background: var(--accent-soft);
@@ -2173,6 +2183,11 @@ details.advanced[open] > summary {
 
 .today-now .today-title {
   margin: 0;
+}
+
+.pill-new {
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .today-now-summary {

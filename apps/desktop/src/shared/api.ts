@@ -55,6 +55,7 @@ import type {
   SourceState,
   StoredMeeting,
   TemplateFormat,
+  TodayItem,
   TodayKind,
   UpdateOffer,
   UpdateProgress,
@@ -169,6 +170,11 @@ export const CHANNELS = {
   todayCancel: 'today:cancel',
   todayProgress: 'today:progress',
   todayOverview: 'today:overview',
+  todayVisited: 'today:visited',
+  todayNotify: 'today:notify',
+  todayEntered: 'today:entered',
+  nextReading: 'sources:next-reading',
+  windowFocus: 'window:focus',
   risksGet: 'risks:get',
   risksPropose: 'risks:propose',
   risksAccept: 'risks:accept',
@@ -439,6 +445,19 @@ export type OctoApi = {
   onTodayProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Every project in brief; Claude is never asked. */
   todayOverview(): Promise<Result<ProjectOverview[]>>
+  /** The PM looked at the page of a project: what is on it is no longer new the next time. */
+  markTodaySeen(projectId: string): Promise<Result<null>>
+  /** Whether the system tells the PM when a signal of the project comes first. */
+  setTodayNotify(projectId: string, notify: boolean): Promise<Result<TodayView>>
+  /**
+   * Tells when, after a periodic reading, a signal comes first that did not before. Returns the
+   * function that stops listening.
+   */
+  onTodayEntered(listener: (entered: TodayEntered) => void): () => void
+  /** When the sources of every project are read next by themselves; null when not known. */
+  nextReading(): Promise<Result<string | null>>
+  /** Brings the window of Octo in front of the others. */
+  focusWindow(): Promise<Result<null>>
   risks(projectId: string): Promise<Result<RiskRegister>>
   proposeRisks(projectId: string): Promise<Result<RiskRegister>>
   acceptRisk(projectId: string, candidateId: string, title: string): Promise<Result<RiskRegister>>
@@ -458,3 +477,6 @@ export type OctoApi = {
 
 /** What the PM can say of a signal of the day. */
 export type TodayDecisionChoice = 'done' | 'later' | 'muted' | 'open'
+
+/** A signal that comes first now and did not at the reading before, with its project. */
+export type TodayEntered = { projectId: string; projectName: string; item: TodayItem }

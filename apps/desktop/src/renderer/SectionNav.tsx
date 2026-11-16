@@ -4,6 +4,8 @@ import { SECTION_GROUPS, SECTION_LABELS, SECTIONS, type Section } from './sectio
 type Props = {
   current: Section
   onSelect: (section: Section) => void
+  /** How many things wait in a section, said beside its name; nothing is said of zero. */
+  counts?: Partial<Record<Section, { count: number; label: string }>>
 }
 
 /** Where the arrow keys go from a section: the one before or after it, round the list. */
@@ -13,7 +15,7 @@ const STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 }
  * The sections of a project in the sidebar, grouped by how often they are used. One list for the
  * keyboard: the arrows move through all of it, whatever the group.
  */
-export function SectionNav({ current, onSelect }: Props) {
+export function SectionNav({ current, onSelect, counts = {} }: Props) {
   function onKey(event: KeyboardEvent<HTMLButtonElement>, section: Section) {
     const step = STEPS[event.key]
     if (step === undefined) return
@@ -50,6 +52,11 @@ export function SectionNav({ current, onSelect }: Props) {
               onKeyDown={(event) => onKey(event, section)}
             >
               {SECTION_LABELS[section]}
+              {(counts[section]?.count ?? 0) > 0 && (
+                <span className="nav-count" title={counts[section]?.label}>
+                  {counts[section]?.count}
+                </span>
+              )}
             </button>
           ))}
         </div>

@@ -1,6 +1,6 @@
 import type { AgentStatus, SessionView } from '@octo/application'
 import type { Assignment, Project, RestoreOutcome } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AlignmentView } from './AlignmentView.tsx'
 import { AllProjectsView } from './AllProjectsView.tsx'
@@ -18,6 +18,7 @@ import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
 import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
+import { type SystemNotify, systemNotify } from './notify.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
 import { ProjectSettings, type SettingsPart } from './ProjectSettings.tsx'
@@ -27,17 +28,20 @@ import { SignIn } from './SignIn.tsx'
 import { SECTION_LABELS, type Section } from './sections.ts'
 import { ThemeToggle } from './ThemeToggle.tsx'
 import { TodayView } from './TodayView.tsx'
+import { signalText } from './today-text.ts'
 import { UpdateNotice } from './UpdateNotice.tsx'
 import { useTheme } from './use-theme.ts'
 
 type Props = {
   api: OctoApi
+  /** How a notice of the system is shown: the system's own, unless a test says otherwise. */
+  notify?: SystemNotify
 }
 
 /** How many projects the number keys reach. */
 const SHORTCUT_PROJECTS = 9
 
-export function App({ api }: Props) {
+export function App({ api, notify = systemNotify }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agent, setAgent] = useState<AgentStatus | null>(null)
@@ -56,6 +60,11 @@ export function App({ api }: Props) {
   const [askSeed, setAskSeed] = useState<string | null>(null)
   const [handoff, setHandoff] = useState<Handoff | null>(null)
   const [todayFocus, setTodayFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
+  /** How many things the page of the day asks of the PM, said beside its name. */
+  const [todayCount, setTodayCount] = useState(0)
+  /** The section in view now, for what is told later: a reading that ends, a notice. */
+  const tabNow = useRef(tab)
+  tabNow.current = tab
   const [dashboardFocus, setDashboardFocus] = useState<DashboardFocus>(NO_DASHBOARD_FOCUS)
   /** The part of the settings a page sent the PM to; null: the settings open as usual. */
   const [settingsPart, setSettingsPart] = useState<SettingsPart | null>(null)
@@ -95,6 +104,48 @@ export function App({ api }: Props) {
       setSelectedId(result.value[0]?.id ?? null)
     })
   }, [api, signedIn])
+
+  // What the page of the day asks is counted for the project in view. While the page is open
+  // it says so itself; elsewhere it is asked at the start and after every reading.
+  useEffect(() => {
+    setTodayCount(0)
+    if (!signedIn || selectedId === null) return
+    let current = true
+    const count = () =>
+      void api.todayView(selectedId).then((result) => {
+        if (current && result.ok) setTodayCount(result.value.count)
+      })
+    if (tabNow.current !== 'today') count()
+    const stop = api.onSourcesChanged((projectId) => {
+      if (projectId === selectedId && tabNow.current !== 'today') count()
+    })
+    return () => {
+      current = false
+      stop()
+    }
+  }, [api, signedIn, selectedId])
+
+  // A signal that comes first after a reading is told by the system, unless the PM is looking
+  // at that very page; a click on the notice opens it.
+  useEffect(
+    () =>
+      api.onTodayEntered((entered) => {
+        const watching =
+          document.hasFocus() && !overview && tab === 'today' && selectedId === entered.projectId
+        if (watching) return
+        notify(
+          signalText(entered.item).title,
+          messages.today.notifyBody(entered.projectName),
+          () => {
+            void api.focusWindow()
+            setOverview(false)
+            setSelectedId(entered.projectId)
+            setTab('today')
+          },
+        )
+      }),
+    [api, notify, overview, tab, selectedId],
+  )
 
   // Whether the project is the person's in the company system: asked once per project.
   useEffect(() => {
@@ -265,7 +316,15 @@ export function App({ api }: Props) {
           onManage={() => openDialog('manage')}
           onOverview={() => setOverview(true)}
         />
-        {selected && !overview && <SectionNav current={tab} onSelect={openSection} />}
+        {selected && !overview && (
+          <SectionNav
+            current={tab}
+            onSelect={openSection}
+            counts={{
+              today: { count: todayCount, label: messages.today.countLabel(todayCount) },
+            }}
+          />
+        )}
         <div className="sidebar-foot">
           {session?.identity && (
             <p className="agent">
@@ -353,6 +412,7 @@ export function App({ api }: Props) {
                 onAsk={askAbout}
                 focus={todayFocus}
                 onFocus={setTodayFocus}
+                onCount={setTodayCount}
                 onOpenSettings={() => {
                   setSettingsPart('today')
                   setTab('sources')

@@ -6,7 +6,10 @@ import { Failure } from './Failure.tsx'
 import { messages } from './messages.ts'
 import { useSavedNote } from './SavedNote.tsx'
 
-type TodaySettingsApi = Pick<OctoApi, 'todayView' | 'muteTodayKind' | 'saveOwnAddresses'>
+type TodaySettingsApi = Pick<
+  OctoApi,
+  'todayView' | 'muteTodayKind' | 'saveOwnAddresses' | 'setTodayNotify'
+>
 
 type Props = { api: TodaySettingsApi; project: Project }
 
@@ -57,6 +60,13 @@ export function TodaySettings({ api, project }: Props) {
     else setError(result.code)
   }
 
+  async function notify(on: boolean) {
+    setError(null)
+    const result = await api.setTodayNotify(project.id, on)
+    if (result.ok) show(result.value)
+    else setError(result.code)
+  }
+
   if (view === null) {
     return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
   }
@@ -85,6 +95,17 @@ export function TodaySettings({ api, project }: Props) {
         <button type="button" onClick={() => void saveAddresses()}>
           {text.saveAddresses}
         </button>
+      </div>
+      <div className="field">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={view.notify}
+            onChange={(event) => void notify(event.target.checked)}
+          />{' '}
+          {text.notifyLabel}
+        </label>
+        <span className="hint">{text.notifyHint}</span>
       </div>
       <h4>{text.mutedTitle}</h4>
       {view.mutedKinds.length === 0 ? (

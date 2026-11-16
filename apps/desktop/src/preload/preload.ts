@@ -170,6 +170,16 @@ const api: OctoApi = {
     return () => ipcRenderer.removeListener(CHANNELS.todayProgress, handler)
   },
   todayOverview: () => ipcRenderer.invoke(CHANNELS.todayOverview),
+  markTodaySeen: (projectId) => ipcRenderer.invoke(CHANNELS.todayVisited, { projectId }),
+  setTodayNotify: (projectId, notify) =>
+    ipcRenderer.invoke(CHANNELS.todayNotify, { projectId, notify }),
+  onTodayEntered: (listener) => {
+    const handler = (_event: unknown, entered: Parameters<typeof listener>[0]) => listener(entered)
+    ipcRenderer.on(CHANNELS.todayEntered, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.todayEntered, handler)
+  },
+  nextReading: () => ipcRenderer.invoke(CHANNELS.nextReading),
+  focusWindow: () => ipcRenderer.invoke(CHANNELS.windowFocus),
   risks: (projectId) => ipcRenderer.invoke(CHANNELS.risksGet, { projectId }),
   proposeRisks: (projectId) => ipcRenderer.invoke(CHANNELS.risksPropose, { projectId }),
   acceptRisk: (projectId, candidateId, title) =>

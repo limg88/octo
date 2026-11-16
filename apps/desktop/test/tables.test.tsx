@@ -220,7 +220,7 @@ describe('rows typed one field each', () => {
 describe('the settings of the page of the day', () => {
   const text = messages.today
   const view = (part: Partial<TodayView>): TodayView =>
-    ({ ownAddresses: [], addedAddresses: [], mutedKinds: [], ...part }) as TodayView
+    ({ ownAddresses: [], addedAddresses: [], mutedKinds: [], notify: true, ...part }) as TodayView
 
   it('shows whose mail is the PM’s, saves other addresses, and shows a kind again', async () => {
     const api = {
@@ -231,9 +231,19 @@ describe('the settings of the page of the day', () => {
         ok(view({ addedAddresses: addresses, mutedKinds: ['mail_waiting'] })),
       ),
       muteTodayKind: vi.fn(async () => ok(view({}))),
+      setTodayNotify: vi.fn(async (_id: string, notify: boolean) =>
+        ok(view({ notify, ownAddresses: ['paola@octo.example'], mutedKinds: ['mail_waiting'] })),
+      ),
     }
     render(<TodaySettings api={api} project={project} />)
     expect(await screen.findByText(text.addressesKnown('paola@octo.example'))).toBeTruthy()
+
+    // The notice of the system is on until the PM turns it off.
+    const notice = screen.getByLabelText(text.notifyLabel) as HTMLInputElement
+    expect(notice.checked).toBe(true)
+    fireEvent.click(notice)
+    await waitFor(() => expect(api.setTodayNotify).toHaveBeenCalledWith('p-1', false))
+    await waitFor(() => expect(notice.checked).toBe(false))
 
     fireEvent.change(screen.getByLabelText(text.addresses), {
       target: { value: 'p.rossi@cliente.example\n\n' },
@@ -256,6 +266,7 @@ describe('the settings of the page of the day', () => {
       todayView: vi.fn(async (): Promise<Result<TodayView>> => ({ ok: false, code: 'unexpected' })),
       saveOwnAddresses: vi.fn(),
       muteTodayKind: vi.fn(),
+      setTodayNotify: vi.fn(),
     }
     const first = render(<TodaySettings api={failing} project={project} />)
     expect(await screen.findByRole('alert')).toBeTruthy()
@@ -269,11 +280,17 @@ describe('the settings of the page of the day', () => {
       muteTodayKind: vi.fn(
         async (): Promise<Result<TodayView>> => ({ ok: false, code: 'unexpected' }),
       ),
+      setTodayNotify: vi.fn(
+        async (): Promise<Result<TodayView>> => ({ ok: false, code: 'unexpected' }),
+      ),
     }
     render(<TodaySettings api={api} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: text.saveAddresses }))
     expect(await screen.findByRole('alert')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.unmute }))
     await waitFor(() => expect(api.muteTodayKind).toHaveBeenCalled())
+    fireEvent.click(screen.getByLabelText(text.notifyLabel))
+    await waitFor(() => expect(api.setTodayNotify).toHaveBeenCalled())
+    expect(await screen.findByRole('alert')).toBeTruthy()
   })
 })

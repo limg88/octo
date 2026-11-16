@@ -574,6 +574,35 @@ describe('the page of the day', () => {
     expect(none.judge.explained).toEqual([])
   })
 
+  it('marks what is new since the PM last looked, counts what is asked, and keeps the notice on or off', async () => {
+    let drafts: Deliverable[] = []
+    const { today, store } = setup({ deliverables: { list: async () => drafts } })
+    const first = await today.view(project)
+    // Never looked at: nothing is marked. The meeting of the day and the mail to answer are asked.
+    expect(first.marks).toEqual({})
+    expect(first.count).toBe(2)
+    expect(first.notify).toBe(true)
+    await today.visited(project)
+    expect(store.settings.lastSeenAt).toBe('2026-11-16T09:00:00.000Z')
+    expect(store.settings.seen.map((signal) => signal.key)).toEqual([
+      'meeting:uid-1:2026-11-16T14:00:00.000Z',
+      'mail:budget',
+    ])
+    drafts = [
+      { id: 'd-1', title: 'Stato', status: 'review', createdAt: '2026-11-16T08:00:00.000Z' },
+    ] as Deliverable[]
+    const second = await today.view(project)
+    expect(second.marks).toEqual({ 'draft:d-1': 'new' })
+    expect(second.count).toBe(3)
+    await today.visited(project)
+    expect((await today.view(project)).marks).toEqual({})
+
+    const off = await today.setNotify(project, false)
+    expect(off.notify).toBe(false)
+    expect(store.settings.notify).toBe(false)
+    expect((await today.setNotify(project, true)).notify).toBe(true)
+  })
+
   it('says what comes first now, by rule: a meeting about to start, what was put off', async () => {
     const { today, at } = setup()
     // At ten the meeting of four in the afternoon is far: nothing comes first.

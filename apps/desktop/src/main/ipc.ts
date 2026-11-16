@@ -85,6 +85,8 @@ export type IpcDeps = {
   session: Session
   today: Today
   risks: Risks
+  /** When the sources of every project are read next by themselves; null when not known. */
+  nextReading: () => string | null
 }
 
 /** The words of the dialogs of a backup: they are the interface's, not this file's. */
@@ -365,6 +367,7 @@ const todayDecideInput = byProject.extend({
   until: rule.nullable(),
 })
 const todayMuteInput = byProject.extend({ kind: rule, muted: z.boolean() })
+const todayNotifyInput = byProject.extend({ notify: z.boolean() })
 const todayMailTurnInput = byProject.extend({
   key: z.string().max(MAX_QUESTION_LENGTH),
   turn: z.enum(MAIL_TURNS).nullable(),
@@ -448,6 +451,20 @@ export function registerIpc(deps: IpcDeps): void {
     return null
   })
   handle(CHANNELS.todayOverview, none, async () => deps.today.overview(await deps.projects.list()))
+  handle(CHANNELS.todayVisited, byProject, async ({ projectId }) => {
+    await deps.today.visited(await deps.projects.get(projectId))
+    return null
+  })
+  handle(CHANNELS.todayNotify, todayNotifyInput, async ({ projectId, notify }) =>
+    deps.today.setNotify(await deps.projects.get(projectId), notify),
+  )
+  handle(CHANNELS.nextReading, none, async () => deps.nextReading())
+  handle(CHANNELS.windowFocus, none, async () => {
+    if (deps.window.isMinimized()) deps.window.restore()
+    deps.window.show()
+    deps.window.focus()
+    return null
+  })
 
   handle(CHANNELS.risksGet, byProject, async ({ projectId }) =>
     deps.risks.register(await deps.projects.get(projectId)),

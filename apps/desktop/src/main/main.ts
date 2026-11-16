@@ -33,9 +33,10 @@ import {
   type Projects,
   type Session,
   settingsOwnedBy,
+  type Today,
   type Updates,
 } from '@octo/application'
-import { backupFileName, DomainError, type Project } from '@octo/domain'
+import { backupFileName, DomainError, firstEntered, type Project } from '@octo/domain'
 import {
   createAdoTrackerReader,
   createAppleMailArchive,
@@ -126,6 +127,14 @@ const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
 const FIRST_SYNC_DELAY_MS = 10 * 1000
+/**
+ * Demos and tests only: the seconds between two readings, so that a demo does not wait a quarter
+ * of an hour to show what a reading brings.
+ */
+const DEV_SYNC_SECONDS_VARIABLE = 'OCTO_DEV_SYNC_SECONDS'
+const devSyncSeconds = Number(process.env[DEV_SYNC_SECONDS_VARIABLE] ?? '')
+const syncIntervalMs =
+  Number.isFinite(devSyncSeconds) && devSyncSeconds > 0 ? devSyncSeconds * 1000 : SYNC_INTERVAL_MS
 /** Demos and tests only: a fake Jira or Azure DevOps on this computer instead of the real one. */
 const DEV_JIRA_VARIABLE = 'OCTO_DEV_JIRA_URL'
 const DEV_CONFLUENCE_VARIABLE = 'OCTO_DEV_CONFLUENCE_URL'
@@ -175,6 +184,32 @@ function mailArchive(): MailArchive {
   return { between: missing, read: missing }
 }
 
+/** What came first on the page of the day of each project at the reading before, by its key. */
+const firstBefore = new Map<string, string[]>()
+
+/**
+ * Tells the window when, after a reading, a signal of a project comes first that did not before:
+ * one for a reading at most. The words and the notice of the system are the interface's.
+ */
+async function tellEntered(
+  today: Pick<Today, 'view'>,
+  project: Project,
+  window: BrowserWindow,
+): Promise<void> {
+  const view = await today.view(project)
+  const entered = view.notify ? firstEntered(firstBefore.get(project.id), view.now) : null
+  firstBefore.set(
+    project.id,
+    view.now.map((entry) => entry.item.key),
+  )
+  if (entered === null || window.isDestroyed()) return
+  window.webContents.send(CHANNELS.todayEntered, {
+    projectId: project.id,
+    projectName: project.name,
+    item: entered.item,
+  })
+}
+
 /**
  * Feeds the memory of every project of who is signed in, one after the other, and tells the
  * window. While nobody is signed in nothing is read.
@@ -183,6 +218,7 @@ async function feedAll(
   session: Session,
   projects: Projects,
   feeding: Feeding,
+  today: Pick<Today, 'view'>,
   window: BrowserWindow,
 ): Promise<void> {
   if (session.current() === null) return
@@ -193,6 +229,9 @@ async function feedAll(
       console.error('[octo] periodic reading failed', error)
     }
     if (!window.isDestroyed()) window.webContents.send(CHANNELS.sourcesChanged, project.id)
+    await tellEntered(today, project, window).catch((error: unknown) =>
+      console.error('[octo] the page of the day could not be computed', error),
+    )
   }
 }
 
@@ -403,12 +442,23 @@ function start(seatEnv: Record<string, string | undefined>): void {
   const window = createWindow()
   const feeding = createFeeding({ writer, sources, meetings, feeds, documents })
   const liveSources = createSourceMap({ sources, meetings, feeds, hours: hoursSettings, files })
-  const periodic = () => void feedAll(session, projects, feeding, window)
+  /** When the sources are read next by themselves: the page of the day says it. */
+  let nextReadingAt: string | null = null
+  const readingIn = (delayMs: number) => {
+    nextReadingAt = new Date(Date.now() + delayMs).toISOString()
+  }
+  const periodic = () => {
+    readingIn(syncIntervalMs)
+    void feedAll(session, projects, feeding, today, window)
+  }
   // At every start the sign-in kept on this computer is renewed; a demo person is simply in.
   void (demoPerson ? session.signIn() : session.resume())
     .catch((error: unknown) => console.error('[octo] sign-in at start failed', error))
-    .then(() => setTimeout(periodic, FIRST_SYNC_DELAY_MS))
-  setInterval(periodic, SYNC_INTERVAL_MS)
+    .then(() => {
+      readingIn(FIRST_SYNC_DELAY_MS)
+      setTimeout(periodic, FIRST_SYNC_DELAY_MS)
+    })
+  setInterval(periodic, syncIntervalMs)
   const deliverables = createDeliverables({
     writer: createClaudeDeliverableWriter(claude),
     renderer: createWordRenderer(),
@@ -475,6 +525,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
   })
   registerIpc({
     window,
+    nextReading: () => nextReadingAt,
     session,
     today,
     risks,

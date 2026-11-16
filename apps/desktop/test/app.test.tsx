@@ -130,6 +130,9 @@ const emptyToday: TodayView = {
   items: [],
   now: [],
   nowSummary: [],
+  marks: {},
+  count: 0,
+  notify: true,
   hidden: 0,
   hiddenItems: [],
   resolvedToday: [],
@@ -286,6 +289,11 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     cancelSignIn: vi.fn(async () => ok(null)),
     signOut: vi.fn(async () => ok({ identity: null, configured: true })),
     todayView: vi.fn(async () => ok(emptyToday)),
+    markTodaySeen: vi.fn(async () => ok(null)),
+    setTodayNotify: vi.fn(async () => ok(emptyToday)),
+    onTodayEntered: () => () => {},
+    nextReading: vi.fn(async () => ok<string | null>(null)),
+    focusWindow: vi.fn(async () => ok(null)),
     decideToday: vi.fn(async () => ok(emptyToday)),
     muteTodayKind: vi.fn(async () => ok(emptyToday)),
     setMailTurn: vi.fn(async () => ok(emptyToday)),
@@ -335,6 +343,74 @@ async function askQuestion(text: string) {
 afterEach(cleanup)
 
 describe('App', () => {
+  it('says beside «Oggi» how many things wait, and counts again after a reading elsewhere', async () => {
+    let changed: (projectId: string) => void = () => {}
+    let count = 3
+    const { api } = fakeApi({
+      todayView: vi.fn(async () => ok({ ...emptyToday, count })),
+      onSourcesChanged: (listener) => {
+        changed = listener
+        return () => {}
+      },
+    })
+    render(<App api={api} />)
+    // The page of the day is open: it says itself how much it asks.
+    const today = await screen.findByRole('tab', { name: /^Oggi/ })
+    await waitFor(() => expect(today.textContent).toBe('Oggi3'))
+    // In another section the count is asked after every reading of this project.
+    await openAsk()
+    count = 0
+    await act(async () => changed('altro'))
+    expect(today.textContent).toBe('Oggi3')
+    await act(async () => changed('p-1'))
+    // Nothing is said of zero.
+    await waitFor(() => expect(today.textContent).toBe('Oggi'))
+  })
+
+  it('tells with a notice of the system a signal that comes first, unless the PM is looking', async () => {
+    let entered: Parameters<Parameters<OctoApi['onTodayEntered']>[0]>[0] | null = null
+    let tell: Parameters<OctoApi['onTodayEntered']>[0] = () => {}
+    const notices: Array<{ title: string; body: string; click: () => void }> = []
+    const { api } = fakeApi({
+      listProjects: async () => ok([aurora, boreale]),
+      onTodayEntered: (listener) => {
+        tell = listener
+        return () => {}
+      },
+    })
+    render(<App api={api} notify={(title, body, click) => notices.push({ title, body, click })} />)
+    await screen.findByRole('tab', { name: /^Oggi/ })
+    const item = {
+      key: 'bugs-stuck',
+      band: 'due' as const,
+      facts: { kind: 'bugs_stuck' as const, count: 6, stuckDays: 30, oldestDays: 90 },
+      weight: 6,
+      target: 'dashboard' as const,
+      asOf: null,
+    }
+    entered = { projectId: boreale.id, projectName: boreale.name, item }
+    const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    // Another project than the one in view: the PM is told.
+    await act(async () => tell(entered as NonNullable<typeof entered>))
+    expect(notices.map(({ title, body }) => [title, body])).toEqual([
+      ['6 bug fermi da più di 30 giorni', messages.today.notifyBody(boreale.name)],
+    ])
+    // The page of that very project is in front: nothing is told.
+    await act(async () =>
+      tell({ ...entered, projectId: aurora.id, projectName: aurora.name } as never),
+    )
+    expect(notices).toHaveLength(1)
+    // A click on the notice brings Octo in front, on the page of the day of that project.
+    await openAsk()
+    await act(async () => notices[0]?.click())
+    expect(api.focusWindow).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /^Oggi/ }).getAttribute('aria-selected')).toBe('true'),
+    )
+    expect(screen.getByRole('heading', { name: boreale.name })).toBeTruthy()
+    focus.mockRestore()
+  })
+
   it('shows the answer with each source checked and what is left to check', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)

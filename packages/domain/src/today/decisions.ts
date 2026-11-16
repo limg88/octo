@@ -36,6 +36,12 @@ export type TodaySettings = {
   present: PresentSignal[]
   /** The signals that went away by themselves, with the day they did. */
   resolved: ResolvedSignal[]
+  /** When the PM last looked at the page; null when never. */
+  lastSeenAt: string | null
+  /** The signals that were on the page then: what came since is marked. */
+  seen: PresentSignal[]
+  /** Whether the system tells the PM when a signal comes first. */
+  notify: boolean
 }
 
 /** A signal as the page last computed it. */
@@ -53,6 +59,9 @@ export const NO_TODAY_SETTINGS: TodaySettings = {
   mailTurns: [],
   present: [],
   resolved: [],
+  lastSeenAt: null,
+  seen: [],
+  notify: true,
 }
 
 /** Signals remembered at most from a computation to the next. */
@@ -271,6 +280,9 @@ export function cleanTodaySettings(settings: TodaySettings): TodaySettings {
     mailTurns: (settings.mailTurns ?? []).slice(-MAX_MAIL_TURNS),
     present: (settings.present ?? []).slice(-MAX_PRESENT),
     resolved: settings.resolved ?? [],
+    lastSeenAt: settings.lastSeenAt ?? null,
+    seen: (settings.seen ?? []).slice(-MAX_PRESENT),
+    notify: settings.notify ?? true,
     mutedKinds: [...new Set(settings.mutedKinds)],
     ownAddresses: [
       ...new Set(
