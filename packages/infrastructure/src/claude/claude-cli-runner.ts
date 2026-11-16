@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import type { AgentRunner, AgentStatus } from '@octo/application'
-import { askSystemPrompt, draftAnswerSchema } from './ask-prompt.ts'
+import { askInput, askSystemPrompt, draftAnswerSchema } from './ask-prompt.ts'
 import {
   type ClaudeCliConfig,
   projectRules,
@@ -31,7 +31,7 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
     ask: async (request) =>
       runStructured(config, {
         projectFolder: request.projectFolder,
-        input: request.question,
+        input: askInput(request.question, request.history),
         systemPrompt: askSystemPrompt(
           await projectRules(request.projectFolder),
           request.liveSources,

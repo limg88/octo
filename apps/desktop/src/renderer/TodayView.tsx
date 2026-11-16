@@ -1,6 +1,7 @@
 import type { AgentProgress, TodayView as View } from '@octo/application'
 import {
   isToDo,
+  type MailTurn,
   type Project,
   TODAY_LIMIT,
   type TodayItem,
@@ -16,6 +17,7 @@ import {
   TODAY_GROUPS,
   type TodayFocus,
 } from './context.ts'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Failure } from './Failure.tsx'
 import { dateTimeText, messages, progressText } from './messages.ts'
 import { RiskRegister } from './RiskRegister.tsx'
@@ -29,7 +31,7 @@ type TodayApi = Pick<
   | 'todayView'
   | 'decideToday'
   | 'muteTodayKind'
-  | 'saveOwnAddresses'
+  | 'setMailTurn'
   | 'evaluateToday'
   | 'cancelEvaluateToday'
   | 'onTodayProgress'
@@ -58,6 +60,8 @@ type Props = {
   /** The filter and the row in view, kept by who shows the page while the PM is elsewhere. */
   focus?: TodayFocus
   onFocus?: (focus: TodayFocus) => void
+  /** Opens the settings of the page, kept with those of the project. */
+  onOpenSettings?: () => void
 }
 
 const text = messages.today
@@ -100,6 +104,7 @@ export function TodayView({
   onAsk,
   focus: givenFocus,
   onFocus,
+  onOpenSettings,
 }: Props) {
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
@@ -109,7 +114,6 @@ export function TodayView({
   const [judging, setJudging] = useState(false)
   const [step, setStep] = useState<AgentProgress | null>(null)
   const [showRisks, setShowRisks] = useState(false)
-  const [addresses, setAddresses] = useState('')
   const [ownFocus, setOwnFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
   const [decided, setDecided] = useState<Decided | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
@@ -132,10 +136,7 @@ export function TodayView({
     onFocus?.(next)
   }
 
-  const show = useCallback((next: View) => {
-    setView(next)
-    setAddresses(next.addedAddresses.join('\n'))
-  }, [])
+  const show = useCallback((next: View) => setView(next), [])
 
   const evaluate = useCallback(
     async (everything: boolean) => {
@@ -218,6 +219,16 @@ export function TodayView({
     if (state === 'open') setFocus({ ...focus, key: item.key })
   }
 
+  /** The PM's word on whose turn a conversation of the mail is. */
+  async function mailTurn(key: string, turn: MailTurn) {
+    const projectId = project.id
+    setError(null)
+    const result = await api.setMailTurn(projectId, key, turn)
+    if (live.current !== projectId) return
+    if (result.ok) show(result.value)
+    else setError(result.code)
+  }
+
   async function mute(kind: TodayKind, muted: boolean) {
     const projectId = project.id
     setError(null)
@@ -236,16 +247,6 @@ export function TodayView({
     setReading(false)
     if (!result.ok) setError(result.code)
     await load()
-  }
-
-  async function saveAddresses() {
-    const projectId = project.id
-    setError(null)
-    const lines = addresses.split('\n').filter((line) => line.trim() !== '')
-    const result = await api.saveOwnAddresses(projectId, lines)
-    if (live.current !== projectId) return
-    if (result.ok) show(result.value)
-    else setError(result.code)
   }
 
   /** Hands a file of the project to the system; the row says so while the system takes it. */
@@ -312,6 +313,59 @@ export function TodayView({
       </div>
     )
   }
+
+  const watchColumns: DataColumn<TodayItem>[] = [
+    {
+      key: 'what',
+      label: text.watchWhat,
+      cell: (item) => <strong>{signalText(item).title}</strong>,
+      sort: (item) => signalText(item).title,
+      text: (item) => signalText(item).title,
+    },
+    {
+      key: 'detail',
+      label: text.watchDetail,
+      width: '34%',
+      cell: (item) => <span className="hint">{signalText(item).detail}</span>,
+      text: (item) => signalText(item).detail,
+    },
+    {
+      key: 'actions',
+      label: '',
+      name: text.watchActions,
+      kind: 'actions',
+      width: '290px',
+      cell: (item) => {
+        const title = signalText(item).title
+        return (
+          <>
+            {item.facts.kind === 'mail_follow' && (
+              <button
+                type="button"
+                className="quiet"
+                title={text.mineHint}
+                aria-label={`${text.mine}: ${title}`}
+                onClick={() => void mailTurn(item.key, 'mine')}
+              >
+                {text.mine}
+              </button>
+            )}
+            <button type="button" className="quiet" onClick={() => open(item)}>
+              {text.open[item.target]}
+            </button>
+            <button
+              type="button"
+              className="quiet"
+              aria-label={`${text.mute}: ${title}`}
+              onClick={() => void decide({ key: item.key, title }, 'muted')}
+            >
+              ×
+            </button>
+          </>
+        )
+      },
+    },
+  ]
 
   const alerts = view.items.filter((item) => item.band === 'alert')
   const watch = view.items.filter((item) => item.band === 'watch')
@@ -448,6 +502,7 @@ export function TodayView({
                   choosingLater={later === selected.key}
                   onOpen={() => open(selected)}
                   onAsk={onAsk}
+                  onNotMine={() => void mailTurn(selected.key, 'not_mine')}
                   onDecide={(state, until) =>
                     void decide(
                       { key: selected.key, title: signalText(selected).title },
@@ -479,32 +534,12 @@ export function TodayView({
       {watch.length > 0 && (
         <>
           <h4 className="today-title">{text.watch}</h4>
-          <ul className="today-watch">
-            {watch.map((item) => {
-              const words = signalText(item)
-              return (
-                <li key={item.key}>
-                  <span>
-                    <strong>{words.title}</strong>
-                    <span className="hint"> {words.detail}</span>
-                  </span>
-                  <span className="actions">
-                    <button type="button" className="quiet" onClick={() => open(item)}>
-                      {text.open[item.target]}
-                    </button>
-                    <button
-                      type="button"
-                      className="quiet"
-                      aria-label={`${text.mute}: ${words.title}`}
-                      onClick={() => void decide({ key: item.key, title: words.title }, 'muted')}
-                    >
-                      ×
-                    </button>
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+          <DataTable
+            label={text.watch}
+            columns={watchColumns}
+            rows={watch}
+            rowKey={(item) => item.key}
+          />
         </>
       )}
 
@@ -518,44 +553,13 @@ export function TodayView({
       ))}
       {view.hidden > 0 && <p className="hint">{text.hidden(view.hidden)}</p>}
 
-      <details className="advanced">
-        <summary>{text.settings}</summary>
-        <p className="hint">
-          {view.ownAddresses.length > 0
-            ? text.addressesKnown(view.ownAddresses.join(', '))
-            : text.addressesNone}
-        </p>
-        <div className="field">
-          <label htmlFor="today-addresses">{text.addresses}</label>
-          <textarea
-            id="today-addresses"
-            rows={2}
-            value={addresses}
-            onChange={(event) => setAddresses(event.target.value)}
-          />
-          <span className="hint">{text.addressesHint}</span>
-        </div>
+      {onOpenSettings && (
         <div className="actions">
-          <button type="button" onClick={() => void saveAddresses()}>
-            {text.saveAddresses}
+          <button type="button" className="quiet" onClick={onOpenSettings}>
+            {text.settings}
           </button>
         </div>
-        {view.mutedKinds.length > 0 && (
-          <>
-            <h4>{text.mutedTitle}</h4>
-            <ul className="today-watch">
-              {view.mutedKinds.map((kind) => (
-                <li key={kind}>
-                  <span>{text.kinds[kind]}</span>
-                  <button type="button" className="quiet" onClick={() => void mute(kind, false)}>
-                    {text.unmute}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </details>
+      )}
     </section>
   )
 }
@@ -620,6 +624,8 @@ type DetailProps = {
   choosingLater: boolean
   onOpen: () => void
   onAsk: ((question: string) => void) | undefined
+  /** Says the conversation of this mail is not the PM's to answer. */
+  onNotMine: () => void
   onDecide: (state: TodayDecisionChoice, until?: string | null) => void
   onAskLater: () => void
 }
@@ -724,6 +730,16 @@ function SignalDetail(props: DetailProps) {
           >
             {text.later}
           </button>
+          {facts.kind === 'mail_reply' && (
+            <button
+              type="button"
+              className="quiet"
+              title={text.notMineHint}
+              onClick={props.onNotMine}
+            >
+              {text.notMine}
+            </button>
+          )}
           <button type="button" className="quiet" onClick={() => props.onDecide('muted')}>
             {facts.kind === 'mail_reply'
               ? text.noAnswerNeeded

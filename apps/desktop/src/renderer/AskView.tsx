@@ -1,6 +1,13 @@
 import type { AgentProgress } from '@octo/application'
-import type { Project, QuestionRecord } from '@octo/domain'
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import {
+  type Conversation,
+  conversationOf,
+  conversationsOf,
+  LEGACY_CONVERSATION,
+  type Project,
+  type QuestionRecord,
+} from '@octo/domain'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import type { Handoff } from './context.ts'
@@ -19,11 +26,31 @@ type Props = {
   onDraft?: (handoff: Handoff) => void
 }
 
-/** The conversation with one project: past questions, the one in progress, the composer. */
+/** A question being answered, and the conversation it was asked in (null: one just started). */
+type Pending = { question: string; chat: string | null }
+
+/** With fewer conversations than this all are in sight: a filter would only take room. */
+const FILTER_FROM_CHATS = 6
+const chats = messages.askChats
+
+const chatTitle = (chat: Conversation): string =>
+  chat.id === LEGACY_CONVERSATION ? chats.legacy : chat.title
+
+/**
+ * The conversations with one project. The page opens on a new one, empty; those already had are
+ * listed beside it and are taken up again where they were left, each question knowing the ones
+ * before it in the same conversation.
+ */
 export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Props) {
   const [records, setRecords] = useState<QuestionRecord[]>([])
   const [question, setQuestion] = useState('')
-  const [pending, setPending] = useState<string | null>(null)
+  const [pending, setPending] = useState<Pending | null>(null)
+  /** The conversation in view; null: a new one, with nothing asked yet. */
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [sought, setSought] = useState('')
+  /** The conversation in view when an answer comes back: the PM may have moved meanwhile. */
+  const viewing = useRef<string | null>(null)
+  viewing.current = chatId
   const [progress, setProgress] = useState<AgentProgress | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const end = useRef<HTMLDivElement>(null)
@@ -53,6 +80,8 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
     setError(null)
     setPending(null)
     setProgress(null)
+    setChatId(null)
+    setSought('')
     void api.listQuestions(project.id).then((result) => {
       if (!current) return
       if (result.ok) setRecords(result.value)
@@ -71,112 +100,175 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
   // biome-ignore lint/correctness/useExhaustiveDependencies: what is watched is how much there is to read.
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' })
-  }, [records.length, pending])
+  }, [records.length, pending, chatId])
+
+  const conversations = useMemo(() => conversationsOf(records), [records])
+  const words = sought.trim().toLocaleLowerCase('it')
+  const listed = conversations.filter((chat) =>
+    chatTitle(chat).toLocaleLowerCase('it').includes(words),
+  )
+  const shown = chatId === null ? [] : records.filter((record) => conversationOf(record) === chatId)
+  const pendingHere = pending !== null && pending.chat === chatId
+
+  function openChat(next: string | null) {
+    setChatId(next)
+    setError(null)
+    if (next === null) field.current?.focus()
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     const asked = question.trim()
     if (asked.length === 0 || pending !== null) return
-    setPending(asked)
+    const chat = chatId
+    setPending({ question: asked, chat })
     setQuestion('')
     setError(null)
     const projectId = project.id
-    const result = await api.ask(projectId, asked)
+    const result = await api.ask(projectId, asked, chat)
     if (live.current !== projectId) return
     setPending(null)
     setProgress(null)
-    if (result.ok) setRecords((previous) => [...previous, result.value])
-    else setError(result.code)
+    if (!result.ok) return setError(result.code)
+    setRecords((previous) => [...previous, result.value])
+    // The conversation just started is now one of the list: the page stays on it.
+    if (viewing.current === chat) setChatId(conversationOf(result.value))
   }
 
   return (
     <section className="ask" aria-label={messages.ask}>
-      <div className="conversation">
-        {records.length === 0 && pending === null && <p className="hint">{messages.askEmpty}</p>}
-        {records.map((record) => (
-          <article key={record.id} className="exchange">
-            <p className="question">{record.question}</p>
-            <p className="asked-at">
-              {dateTimeText(record.askedAt)}
-              {record.model && ` · ${messages.models.used(record.model)}`}
-            </p>
-            {record.answer && (
-              <AnswerView
-                answer={record.answer}
-                onOpenSource={(path) => api.openEvidence(project.id, path)}
-                actions={
-                  onDraft && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        record.answer &&
-                        onDraft({ question: record.question, answer: record.answer })
-                      }
-                    >
-                      {messages.askDraft}
-                    </button>
-                  )
-                }
-              />
-            )}
-            {record.error && <p className="warning">{errorText(record.error)}</p>}
-          </article>
-        ))}
-        {pending !== null && (
-          <article className="exchange">
-            <p className="question">{pending}</p>
-            <Waiting>{progress ? progressText(progress) : messages.working}</Waiting>
-          </article>
-        )}
-        {error && (
-          <p className="warning" role="alert">
-            {errorText(error)}
-          </p>
-        )}
-        <div ref={end} />
-      </div>
-      {pending === null && (
-        // biome-ignore lint/a11y/useSemanticElements: a group of buttons, not a set of form fields.
-        <div className="actions" role="group" aria-label={messages.askReadyTitle}>
-          {messages.askReady.map((ready) => (
-            <button
-              key={ready.label}
-              type="button"
-              className="quiet"
-              title={ready.question}
-              onClick={() => setQuestion(ready.question)}
-            >
-              {ready.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <form className="composer" onSubmit={(event) => void submit(event)}>
-        <textarea
-          ref={field}
-          aria-label={messages.askPlaceholder}
-          placeholder={messages.askPlaceholder}
-          value={question}
-          rows={2}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) void submit(event)
-          }}
-        />
-        <BusyButton
-          type="submit"
-          busy={pending !== null}
-          busyLabel={messages.wait.asking}
-          disabled={question.trim().length === 0}
+      <nav className="ask-chats" aria-label={chats.title}>
+        <button
+          type="button"
+          className="primary"
+          aria-current={chatId === null ? 'page' : undefined}
+          onClick={() => openChat(null)}
         >
-          {messages.askSubmit}
-        </BusyButton>
-        {pending !== null && (
-          <button type="button" onClick={() => void api.cancelAsk(project.id)}>
-            {messages.askCancel}
-          </button>
+          {chats.fresh}
+        </button>
+        {conversations.length >= FILTER_FROM_CHATS && (
+          <input
+            type="search"
+            aria-label={chats.filter}
+            placeholder={chats.filter}
+            value={sought}
+            onChange={(event) => setSought(event.target.value)}
+          />
         )}
-      </form>
+        {conversations.length === 0 ? (
+          <p className="hint">{chats.none}</p>
+        ) : (
+          <ul>
+            {listed.map((chat) => (
+              <li key={chat.id}>
+                <button
+                  type="button"
+                  className={chat.id === chatId ? 'ask-chat ask-chat-selected' : 'ask-chat'}
+                  aria-current={chat.id === chatId ? 'page' : undefined}
+                  title={chatTitle(chat)}
+                  onClick={() => openChat(chat.id)}
+                >
+                  <span className="ask-chat-title">{chatTitle(chat)}</span>
+                  <span className="hint">
+                    {chats.about(dateTimeText(chat.lastAt), chat.records.length)}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {listed.length === 0 && <li className="hint">{chats.nothingFound}</li>}
+          </ul>
+        )}
+      </nav>
+      <div className="ask-main">
+        <div className="conversation">
+          {shown.length === 0 && !pendingHere && (
+            <p className="hint">{chatId === null ? chats.freshHint : messages.askEmpty}</p>
+          )}
+          {shown.map((record) => (
+            <article key={record.id} className="exchange">
+              <p className="question">{record.question}</p>
+              <p className="asked-at">
+                {dateTimeText(record.askedAt)}
+                {record.model && ` · ${messages.models.used(record.model)}`}
+              </p>
+              {record.answer && (
+                <AnswerView
+                  answer={record.answer}
+                  onOpenSource={(path) => api.openEvidence(project.id, path)}
+                  actions={
+                    onDraft && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          record.answer &&
+                          onDraft({ question: record.question, answer: record.answer })
+                        }
+                      >
+                        {messages.askDraft}
+                      </button>
+                    )
+                  }
+                />
+              )}
+              {record.error && <p className="warning">{errorText(record.error)}</p>}
+            </article>
+          ))}
+          {pending !== null && pendingHere && (
+            <article className="exchange">
+              <p className="question">{pending.question}</p>
+              <Waiting>{progress ? progressText(progress) : messages.working}</Waiting>
+            </article>
+          )}
+          {error && (
+            <p className="warning" role="alert">
+              {errorText(error)}
+            </p>
+          )}
+          <div ref={end} />
+        </div>
+        {pending === null && (
+          // biome-ignore lint/a11y/useSemanticElements: a group of buttons, not a set of form fields.
+          <div className="actions" role="group" aria-label={messages.askReadyTitle}>
+            {messages.askReady.map((ready) => (
+              <button
+                key={ready.label}
+                type="button"
+                className="quiet"
+                title={ready.question}
+                onClick={() => setQuestion(ready.question)}
+              >
+                {ready.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <form className="composer" onSubmit={(event) => void submit(event)}>
+          <textarea
+            ref={field}
+            aria-label={messages.askPlaceholder}
+            placeholder={messages.askPlaceholder}
+            value={question}
+            rows={2}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) void submit(event)
+            }}
+          />
+          <BusyButton
+            type="submit"
+            busy={pending !== null}
+            busyLabel={messages.wait.asking}
+            disabled={question.trim().length === 0}
+          >
+            {messages.askSubmit}
+          </BusyButton>
+          {pending !== null && (
+            <button type="button" onClick={() => void api.cancelAsk(project.id)}>
+              {messages.askCancel}
+            </button>
+          )}
+        </form>
+      </div>
     </section>
   )
 }

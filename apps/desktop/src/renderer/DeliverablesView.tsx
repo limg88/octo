@@ -16,7 +16,9 @@ import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import type { OpenSource } from './CitationPanel.tsx'
 import type { Handoff } from './context.ts'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { citedPaths, handoffField, handoffText } from './handoff-text.ts'
+import { KindTemplate, type KindTemplateApi } from './KindTemplate.tsx'
 import { MeetingField } from './MeetingField.tsx'
 import { dateText, errorText, messages, progressText } from './messages.ts'
 import { BusyButton, Waiting } from './Spinner.tsx'
@@ -183,20 +185,6 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
                 void changeCatalog(() => api.removeDeliverableKind(project.id, kindId))
               }
             />
-            <ModelFile
-              key={`letterhead-${project.id}`}
-              text={LETTERHEAD_TEXT}
-              has={() => api.hasLetterhead(project.id)}
-              choose={() => api.chooseLetterhead(project.id)}
-              remove={() => api.removeLetterhead(project.id)}
-            />
-            <ModelFile
-              key={`deck-${project.id}`}
-              text={DECK_MODEL_TEXT}
-              has={() => api.hasDeckModel(project.id)}
-              choose={() => api.chooseDeckModel(project.id)}
-              remove={() => api.removeDeckModel(project.id)}
-            />
           </>
         )}
         {shown.view === 'register' && (
@@ -204,8 +192,17 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
         )}
         {shown.view === 'own' && (
           <OwnKindForm
+            api={api}
+            project={project}
             kind={shown.kindId ? kindOf(shown.kindId) : undefined}
-            onSave={(input) => void changeCatalog(() => api.saveDeliverableKind(project.id, input))}
+            onSave={(input, withTemplate) =>
+              void changeCatalog(async () => {
+                const saved = await api.saveDeliverableKind(project.id, input)
+                // The kind exists only once saved: its template is chosen right after.
+                if (!saved.ok || !withTemplate) return saved
+                return api.chooseKindTemplate(project.id, saved.value.id)
+              })
+            }
           />
         )}
         {formKind && (
@@ -386,6 +383,7 @@ function KindForm({
           </BusyButton>
         </div>
       </form>
+      <KindTemplate api={api} project={project} kind={kind} />
       <details className="project-instructions">
         <summary>{messages.deliverableProjectInstructions}</summary>
         <p className="hint">{messages.deliverableProjectInstructionsHint}</p>
@@ -648,6 +646,58 @@ function RedTeam({
   )
 }
 
+/** The columns of the register, in the order of their headings. */
+function registerColumns(titleOf: (kindId: string) => string): DataColumn<Deliverable>[] {
+  const [created, kind, title, status, draft, review, rounds] = messages.deliverableRegisterHead
+  const minutes = (
+    key: string,
+    label: string | undefined,
+    of: (deliverable: Deliverable) => number,
+  ): DataColumn<Deliverable> => ({
+    key,
+    label: label ?? '',
+    kind: 'number',
+    width: '110px',
+    cell: (deliverable) => of(deliverable),
+    sort: (deliverable) => of(deliverable),
+  })
+  return [
+    {
+      key: 'created',
+      label: created ?? '',
+      width: '100px',
+      cell: (deliverable) => dateText(deliverable.createdAt),
+      sort: (deliverable) => deliverable.createdAt,
+    },
+    {
+      key: 'kind',
+      label: kind ?? '',
+      width: '200px',
+      cell: (deliverable) => titleOf(deliverable.kindId),
+      sort: (deliverable) => titleOf(deliverable.kindId),
+      text: (deliverable) => titleOf(deliverable.kindId),
+    },
+    {
+      key: 'title',
+      label: title ?? '',
+      cell: (deliverable) => deliverable.title,
+      sort: (deliverable) => deliverable.title,
+      text: (deliverable) => deliverable.title,
+    },
+    {
+      key: 'status',
+      label: status ?? '',
+      width: '130px',
+      cell: (deliverable) => messages.deliverableStatus[deliverable.status],
+      sort: (deliverable) => messages.deliverableStatus[deliverable.status],
+      text: (deliverable) => messages.deliverableStatus[deliverable.status],
+    },
+    minutes('draft', draft, (deliverable) => costOf(deliverable).draftMinutes),
+    minutes('review', review, (deliverable) => costOf(deliverable).reviewMinutes),
+    minutes('rounds', rounds, (deliverable) => costOf(deliverable).rounds),
+  ]
+}
+
 function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: string) => string }) {
   const totals = registerTotals(all)
   return (
@@ -657,31 +707,12 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
       {all.length === 0 ? (
         <p className="hint">{messages.deliverableRegisterEmpty}</p>
       ) : (
-        <table className="register">
-          <thead>
-            <tr>
-              {messages.deliverableRegisterHead.map((head) => (
-                <th key={head}>{head}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {all.map((deliverable) => {
-              const cost = costOf(deliverable)
-              return (
-                <tr key={deliverable.id}>
-                  <td>{dateText(deliverable.createdAt)}</td>
-                  <td>{titleOf(deliverable.kindId)}</td>
-                  <td>{deliverable.title}</td>
-                  <td>{messages.deliverableStatus[deliverable.status]}</td>
-                  <td>{cost.draftMinutes}</td>
-                  <td>{cost.reviewMinutes}</td>
-                  <td>{cost.rounds}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <DataTable
+          label={messages.deliverableRegister}
+          columns={registerColumns(titleOf)}
+          rows={all}
+          rowKey={(deliverable) => deliverable.id}
+        />
       )}
       <p className="badge">
         {messages.deliverableRegisterTotals(
@@ -692,77 +723,6 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
         )}
       </p>
     </>
-  )
-}
-
-type ModelText = { title: string; none: string; set: string; hint: string; choose: string }
-const LETTERHEAD_TEXT: ModelText = {
-  title: messages.letterheadTitle,
-  none: messages.letterheadNone,
-  set: messages.letterheadSet,
-  hint: messages.letterheadHint,
-  choose: messages.letterheadChoose,
-}
-const DECK_MODEL_TEXT: ModelText = {
-  title: messages.deckModelTitle,
-  none: messages.deckModelNone,
-  set: messages.deckModelSet,
-  hint: messages.deckModelHint,
-  choose: messages.deckModelChoose,
-}
-
-/** A file of the PM the deliverables of the project are written on, chosen once. */
-function ModelFile({
-  text,
-  has,
-  choose,
-  remove,
-}: {
-  text: ModelText
-  has: () => Promise<Result<boolean>>
-  choose: () => Promise<Result<unknown>>
-  remove: () => Promise<Result<unknown>>
-}) {
-  const [present, setPresent] = useState<boolean | null>(null)
-  const [error, setError] = useState<ErrorCode | null>(null)
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the readers are made anew at each render; the file is read once.
-  useEffect(() => {
-    void has().then((result) => {
-      if (result.ok) setPresent(result.value)
-    })
-  }, [])
-
-  async function change(step: () => Promise<Result<unknown>>) {
-    setError(null)
-    const result = await step()
-    if (!result.ok) setError(result.code)
-    const now = await has()
-    if (now.ok) setPresent(now.value)
-  }
-
-  if (present === null) return null
-  return (
-    <section className="letterhead" aria-label={text.title}>
-      <h4>{text.title}</h4>
-      <p className={present ? 'badge badge-ok' : 'badge'}>{present ? text.set : text.none}</p>
-      <p className="hint">{text.hint}</p>
-      {error && (
-        <p className="warning" role="alert">
-          {errorText(error)}
-        </p>
-      )}
-      <div className="actions">
-        <button type="button" onClick={() => void change(choose)}>
-          {text.choose}
-        </button>
-        {present && (
-          <button type="button" className="quiet" onClick={() => void change(remove)}>
-            {messages.letterheadRemove}
-          </button>
-        )}
-      </div>
-    </section>
   )
 }
 
@@ -777,17 +737,22 @@ const EMPTY_KIND: OwnKindInput = {
 
 /** A kind of deliverable described in words by the PM: new, or one of theirs to change. */
 function OwnKindForm({
+  api,
+  project,
   kind,
   onSave,
 }: {
+  api: KindTemplateApi
+  project: Project
   kind: DeliverableKind | undefined
-  onSave: (input: OwnKindInput) => void
+  /** Saves the kind; with `withTemplate` the PM is then asked for the file of its template. */
+  onSave: (input: OwnKindInput, withTemplate: boolean) => void
 }) {
   const [input, setInput] = useState<OwnKindInput>(kind ? ownKindInput(kind) : EMPTY_KIND)
   const set = (change: Partial<OwnKindInput>) => setInput({ ...input, ...change })
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    onSave(input)
+    onSave(input, false)
   }
   const ready = input.title.trim() !== '' && input.instructions.trim() !== ''
 
@@ -849,10 +814,20 @@ function OwnKindForm({
             onChange={(event) => set({ checklist: event.target.value.split('\n') })}
           />
         </label>
+        {kind ? (
+          <KindTemplate api={api} project={project} kind={kind} />
+        ) : (
+          <p className="hint">{messages.kindTemplate.newKindHint}</p>
+        )}
         <div className="actions">
           <button type="submit" disabled={!ready}>
             {messages.ownKindSave}
           </button>
+          {!kind && (
+            <button type="button" disabled={!ready} onClick={() => onSave(input, true)}>
+              {messages.kindTemplate.saveAndChoose}
+            </button>
+          )}
         </div>
       </form>
     </>

@@ -1,6 +1,6 @@
 // Composition root of the desktop app: the only place where adapters meet use cases.
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,11 +27,13 @@ import {
   createTeam,
   createToday,
   createTrackerSnapshots,
+  createUpdates,
   type Feeding,
   type MailArchive,
   type Projects,
   type Session,
   settingsOwnedBy,
+  type Updates,
 } from '@octo/application'
 import { backupFileName, DomainError, type Project } from '@octo/domain'
 import {
@@ -62,6 +64,8 @@ import {
   createFsTeamStore,
   createFsTodayStore,
   createFsTrackerExports,
+  createGithubReleaseFeed,
+  createHttpDownloads,
   createJiraHoursReader,
   createJsonBackupFiles,
   createJsonFeedIndexes,
@@ -71,6 +75,7 @@ import {
   createJsonSourceStates,
   createOidcIdentityProvider,
   createSignInConfig,
+  createUpdateApplier,
   createWarehouseTimesheetReader,
   createWordRenderer,
   createWorkerTextExtractor,
@@ -78,6 +83,8 @@ import {
   fixedPersonOf,
   locateClaude,
   type SecretCipher,
+  shellPath,
+  withShellPath,
 } from '@octo/infrastructure'
 import { app, BrowserWindow, safeStorage, shell } from 'electron'
 import { CHANNELS } from '../shared/api.ts'
@@ -86,6 +93,8 @@ import { registerIpc } from './ipc.ts'
 const WINDOW_SIZE = { width: 1280, height: 860, minWidth: 900, minHeight: 600 }
 const FOLDER_DIALOG_TITLE = 'Scegli la cartella del progetto'
 const LETTERHEAD_DIALOG_TITLE = 'Scegli il documento Word da usare come carta intestata'
+const KIND_TEMPLATE_DIALOG_TITLE =
+  'Scegli il documento Word o la presentazione da usare come modello di questo tipo'
 const DECK_MODEL_DIALOG_TITLE = 'Scegli la presentazione da usare come modello'
 const NEW_PROJECT_DIALOG_TITLE = 'Scegli dove creare la cartella del progetto'
 const MEETINGS_DIALOG_TITLE = 'Scegli la cartella in cui Verbale esporta le riunioni'
@@ -102,6 +111,13 @@ const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
 /** Demos and tests only: a folder that stands for Verbale's own data on this computer. */
 const VERBALE_FOLDER_VARIABLE = 'OCTO_VERBALE_DIR'
+/** Demos and tests only: a publisher of releases on this computer instead of the real one. */
+const UPDATE_URL_VARIABLE = 'OCTO_UPDATE_URL'
+/** Where the releases of Octo are published. */
+const RELEASES_REPOSITORY = 'limg88/octo'
+const UPDATE_FOLDER = 'octo-aggiornamento'
+/** Where Octo keeps the version it last ran as, to know when it has just been updated. */
+const LAST_VERSION_FILE = 'version.json'
 const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
@@ -196,7 +212,65 @@ function createWindow(): BrowserWindow {
   return window
 }
 
-function start(): void {
+/** The environment Claude Code is found and run with: the app's own, with the terminal's PATH. */
+async function seatEnvironment(): Promise<Record<string, string | undefined>> {
+  const fromShell = await shellPath({ platform: process.platform, env: process.env })
+  return withShellPath(process.env, fromShell)
+}
+
+/**
+ * Octo that replaces itself with a newer one. Only an installed Octo looks for one: run from the
+ * sources there is nothing to replace, unless a demo points it at its own publisher.
+ */
+function updatesOf(): Updates {
+  const baseUrl = process.env[UPDATE_URL_VARIABLE]
+  const workFolder = join(app.getPath('temp'), UPDATE_FOLDER)
+  const looksForOne = app.isPackaged || baseUrl !== undefined
+  return createUpdates({
+    feed: looksForOne
+      ? createGithubReleaseFeed({
+          repository: RELEASES_REPOSITORY,
+          ...(baseUrl === undefined ? {} : { baseUrl }),
+        })
+      : { latest: async () => null },
+    downloads: createHttpDownloads({ folder: workFolder }),
+    applier: createUpdateApplier({
+      platform: process.platform,
+      execPath: process.execPath,
+      pid: process.pid,
+      workFolder,
+      quit: () => app.quit(),
+      // An Octo given its own data folder starts again with it: the system would not pass it on.
+      relaunch: process.env[DATA_FOLDER_VARIABLE] === undefined ? 'system' : 'direct',
+    }),
+    current: app.getVersion(),
+    target: { platform: process.platform, arch: process.arch },
+  })
+}
+
+/**
+ * The version of this Octo, when the one that ran before here was another one and the system is
+ * a Mac: an unsigned app that changes loses there the access to the disk it was given.
+ */
+function updatedVersion(dataFolder: string): string | null {
+  const file = join(dataFolder, LAST_VERSION_FILE)
+  const current = app.getVersion()
+  let previous: unknown = null
+  try {
+    previous = JSON.parse(readFileSync(file, 'utf8')).version
+  } catch {
+    // Never run before, or run by an Octo that did not keep its version.
+  }
+  if (previous !== current) {
+    mkdirSync(dataFolder, { recursive: true })
+    writeFileSync(file, JSON.stringify({ version: current }))
+  }
+  return typeof previous === 'string' && previous !== current && process.platform === MAC
+    ? current
+    : null
+}
+
+function start(seatEnv: Record<string, string | undefined>): void {
   const dataFolder = process.env[DATA_FOLDER_VARIABLE] ?? app.getPath('userData')
   const clock = { now: () => new Date() }
   const ids = { next: () => randomUUID() }
@@ -206,11 +280,11 @@ function start(): void {
   const claude = {
     command: locateClaude({
       platform: process.platform,
-      env: process.env,
+      env: seatEnv,
       home: homedir(),
       exists: existsSync,
     }),
-    env: process.env,
+    env: seatEnv,
   }
   const agent = createClaudeCliRunner(claude)
   const secrets = createFileVault(dataFolder, secretCipher())
@@ -343,6 +417,7 @@ function start(): void {
     exports: trackerExports,
     clock,
     writer,
+    team: (project) => team.get(project),
   })
   const alignments = createAlignments({
     settings: createFsAlignmentSettings(),
@@ -351,6 +426,7 @@ function start(): void {
     sources: settings,
     records: createFeedRecords(files),
     writer,
+    team: (project) => team.get(project),
   })
   const forecasts = createForecasts({
     settings: createFsForecastSettings(),
@@ -404,8 +480,18 @@ function start(): void {
     alignments,
     hours,
     forecasts,
-    progress: createProgress({ settings: createFsProgressSettings(), files, sheets, writer }),
+    progress: createProgress({
+      settings: createFsProgressSettings(),
+      files,
+      sheets,
+      writer,
+      records: createFeedRecords(files),
+      invoicesFolder: async (project) =>
+        (await settings.load(project.folder)).dwsi?.targetFolder ?? null,
+    }),
     agent,
+    updates: updatesOf(),
+    updatedTo: updatedVersion(dataFolder),
     projects,
     questions,
     evidence,
@@ -422,6 +508,7 @@ function start(): void {
     preferences: createPreferences({ store: createJsonPreferences(dataFolder) }),
     folderDialogTitle: FOLDER_DIALOG_TITLE,
     letterheadDialogTitle: LETTERHEAD_DIALOG_TITLE,
+    kindTemplateDialogTitle: KIND_TEMPLATE_DIALOG_TITLE,
     deckModelDialogTitle: DECK_MODEL_DIALOG_TITLE,
     newProjectDialogTitle: NEW_PROJECT_DIALOG_TITLE,
     meetingsDialogTitle: MEETINGS_DIALOG_TITLE,
@@ -432,6 +519,7 @@ function start(): void {
       secrets,
       tracker: createAdoTrackerReader({ devEndpoints }),
       writer,
+      team: (project) => team.get(project),
     }),
     backups: createBackups({
       registry,
@@ -446,4 +534,4 @@ function start(): void {
 }
 
 app.on('window-all-closed', () => app.quit())
-void app.whenReady().then(start)
+void app.whenReady().then(async () => start(await seatEnvironment()))

@@ -1,4 +1,10 @@
-import type { ForecastGap, HoursPersonFact, TodayFacts, TodayItem } from '@octo/domain'
+import type {
+  ForecastGap,
+  HoursPersonFact,
+  MailReplyWhy,
+  TodayFacts,
+  TodayItem,
+} from '@octo/domain'
 import { dateTimeText, errorText } from './messages.ts'
 
 /** What a signal says to the PM: a line to read first, and one that explains it. */
@@ -85,6 +91,33 @@ function sourceText(facts: Extract<TodayFacts, { kind: 'source' }>): SignalText 
   }
 }
 
+/** Why a mail is the PM's to answer, in the words of the page. */
+const REPLY_WHY: Readonly<Record<MailReplyWhy, string>> = {
+  only_me: 'Sei l’unico destinatario.',
+  judged: 'Claude: la richiesta è rivolta a te.',
+  chosen: 'Hai detto tu che tocca a te.',
+}
+
+/** Why a mail the PM is written to is only followed. */
+function followWhy(facts: Extract<TodayFacts, { kind: 'mail_follow' }>): string {
+  switch (facts.why) {
+    case 'answered_by_own':
+      return facts.who
+        ? `Ha già risposto ${personOf(facts.who)}.`
+        : 'Ha già risposto uno dei nostri.'
+    case 'someone_else':
+      return facts.who ? `Rivolta a ${facts.who}.` : 'Rivolta a un’altra persona.'
+    case 'everyone':
+      return 'Rivolta a tutti, senza chiedere a te.'
+    case 'nobody':
+      return 'Non chiede nulla: è per conoscenza.'
+    case 'chosen':
+      return 'Hai detto tu che non tocca a te.'
+    case 'unjudged':
+      return `Sei fra ${count(facts.recipients, 'destinatario', 'destinatari')}: Claude non l’ha ancora letta.`
+  }
+}
+
 function alignmentDetail(facts: Extract<TodayFacts, { kind: 'alignment' }>): string {
   return [
     facts.missing > 0 ? count(facts.missing, 'voce senza ticket', 'voci senza ticket') : '',
@@ -114,7 +147,20 @@ export function signalText(item: TodayItem): SignalText {
     case 'mail_reply':
       return {
         title: `Rispondi a ${personOf(facts.from)} · «${facts.subject}»`,
-        detail: `Aspetta ${since(facts.days)}.`,
+        detail: [`Aspetta ${since(facts.days)}.`, facts.why ? REPLY_WHY[facts.why] : '']
+          .filter((part) => part !== '')
+          .join(' '),
+      }
+    case 'mail_follow':
+      return {
+        title: `Da seguire: «${facts.subject}» · ${personOf(facts.from)}`,
+        detail: [
+          followWhy(facts),
+          facts.judgement ? `Claude: importanza ${facts.judgement.importance}.` : '',
+          facts.mails > 1 ? `${facts.mails} mail in questa conversazione.` : '',
+        ]
+          .filter((part) => part !== '')
+          .join(' '),
       }
     case 'mail_waiting':
       return {
@@ -221,6 +267,7 @@ export function ageText(item: TodayItem): string {
   const facts = item.facts
   switch (facts.kind) {
     case 'mail_reply':
+    case 'mail_follow':
     case 'mail_waiting':
     case 'draft':
     case 'meeting_unassigned':

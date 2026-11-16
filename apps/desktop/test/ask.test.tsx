@@ -12,6 +12,7 @@ const aurora: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora',
 const boreale: Project = { ...aurora, id: 'p-2', name: 'Boreale' }
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 const text = messages.citation
+const chats = messages.askChats
 
 const answer: CheckedAnswer = {
   text: 'Il collaudo è mercoledì [1]. Serve un dataset [2]. Lo slot è confermato [3]. Forse [9].',
@@ -173,6 +174,9 @@ describe('the conversation with a project', () => {
     expect(used).toHaveBeenCalled()
     expect(api.ask).not.toHaveBeenCalled()
 
+    // The page opens on a new conversation; what was asked before is one click away.
+    expect(screen.getByText(chats.freshHint)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(chats.legacy) }))
     fireEvent.click(await screen.findByRole('button', { name: messages.askDraft }))
     expect(drafts).toEqual([{ question: record.question, answer }])
   })
@@ -199,6 +203,96 @@ describe('the conversation with a project', () => {
     rerender(<AskView api={api} project={boreale} />)
     await act(async () => finish(ok(record)))
     expect(screen.queryByText(record.question)).toBeNull()
-    expect(screen.getByText(messages.askEmpty)).toBeTruthy()
+    expect(screen.getByText(chats.freshHint)).toBeTruthy()
+  })
+
+  const asked = (id: string, question: string, conversationId: string, at: string) => ({
+    ...record,
+    id,
+    question,
+    conversationId,
+    askedAt: at,
+  })
+
+  it('opens on a new conversation, takes an old one up again and asks inside it', async () => {
+    const old = asked('q-2', 'Chi è il referente del cliente?', 'c-1', '2026-11-15T10:00:00.000Z')
+    const api = askApi({
+      listQuestions: vi.fn(async () => ok([record, old])),
+      ask: vi.fn(async (_project: string, question: string, conversationId: string | null) =>
+        ok(asked('q-9', question, conversationId ?? 'c-nuova', '2026-11-16T12:00:00.000Z')),
+      ),
+    })
+    render(<AskView api={api} project={aurora} />)
+    const list = await screen.findByRole('navigation', { name: chats.title })
+    const fresh = within(list).getByRole('button', { name: chats.fresh })
+    expect(fresh.getAttribute('aria-current')).toBe('page')
+    expect(screen.queryByText(old.question, { selector: '.question' })).toBeNull()
+
+    // The conversation asked in last comes first; the questions of before are one conversation.
+    const names = within(list)
+      .getAllByRole('button')
+      .map((button) => button.textContent ?? '')
+    expect(names[1]).toContain(chats.legacy)
+    expect(names[2]).toContain(old.question)
+
+    fireEvent.click(within(list).getByRole('button', { name: new RegExp(old.question) }))
+    expect(screen.getByText(old.question, { selector: '.question' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(messages.askPlaceholder), {
+      target: { value: 'E il suo sostituto?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    await waitFor(() => expect(api.ask).toHaveBeenCalledWith('p-1', 'E il suo sostituto?', 'c-1'))
+    expect(await screen.findByText('E il suo sostituto?', { selector: '.question' })).toBeTruthy()
+    expect(screen.getByText(old.question, { selector: '.question' })).toBeTruthy()
+
+    // A new conversation starts with no id, and the page stays on it once it has one.
+    fireEvent.click(fresh)
+    expect(screen.getByText(chats.freshHint)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(messages.askPlaceholder), {
+      target: { value: 'Quando è il collaudo?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    await waitFor(() => expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando è il collaudo?', null))
+    expect(await screen.findByText('Quando è il collaudo?', { selector: '.question' })).toBeTruthy()
+    expect(fresh.getAttribute('aria-current')).toBeNull()
+    expect(screen.queryByText(old.question, { selector: '.question' })).toBeNull()
+  })
+
+  it('finds a conversation among many, and keeps an answer for the one it was asked in', async () => {
+    const many = Array.from({ length: 7 }, (_unused, at) =>
+      asked(`q-${at}`, `Domanda sul rilascio ${at}`, `c-${at}`, `2026-11-0${at + 1}T10:00:00.000Z`),
+    )
+    let finish: (result: Result<QuestionRecord>) => void = () => {}
+    const api = askApi({
+      listQuestions: vi.fn(async () => ok(many)),
+      ask: vi.fn(() => new Promise<Result<QuestionRecord>>((resolve) => (finish = resolve))),
+    })
+    render(<AskView api={api} project={aurora} />)
+    const list = await screen.findByRole('navigation', { name: chats.title })
+    const filter = await within(list).findByRole('searchbox', { name: chats.filter })
+    fireEvent.change(filter, { target: { value: 'rilascio 3' } })
+    expect(within(list).getAllByRole('button')).toHaveLength(2)
+    fireEvent.change(filter, { target: { value: 'niente' } })
+    expect(within(list).getByText(chats.nothingFound)).toBeTruthy()
+    fireEvent.change(filter, { target: { value: '' } })
+
+    // Asked in one conversation, read in another: the answer waits in its own.
+    fireEvent.click(within(list).getByRole('button', { name: /rilascio 3/ }))
+    fireEvent.change(screen.getByLabelText(messages.askPlaceholder), {
+      target: { value: 'E poi?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    expect(await screen.findByText('E poi?', { selector: '.question' })).toBeTruthy()
+    fireEvent.click(within(list).getByRole('button', { name: /rilascio 5/ }))
+    expect(screen.queryByText('E poi?', { selector: '.question' })).toBeNull()
+    await act(async () => finish(ok(asked('q-99', 'E poi?', 'c-3', '2026-11-16T12:00:00.000Z'))))
+    expect(screen.queryByText('E poi?', { selector: '.question' })).toBeNull()
+    fireEvent.click(within(list).getByRole('button', { name: /rilascio 3/ }))
+    expect(screen.getByText('E poi?', { selector: '.question' })).toBeTruthy()
+  })
+
+  it('says so when no conversation was had yet', async () => {
+    render(<AskView api={askApi({ listQuestions: vi.fn(async () => ok([])) })} project={aurora} />)
+    expect(await screen.findByText(chats.none)).toBeTruthy()
   })
 })

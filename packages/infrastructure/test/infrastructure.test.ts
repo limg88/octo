@@ -16,6 +16,8 @@ import {
   createJsonProjectRegistry,
   createJsonSetAsideProjects,
   locateClaude,
+  shellPath,
+  withShellPath,
 } from '../src/index.ts'
 
 const FAKE_CLAUDE = fileURLToPath(new URL('./fake-claude.mjs', import.meta.url))
@@ -146,9 +148,59 @@ describe('locateClaude', () => {
     expect(locateClaude({ ...base, platform: 'linux' })).toBe('claude')
   })
 
+  it('finds Claude in a folder of the PATH before the usual places', () => {
+    const env = { PATH: '/usr/bin:/home/paola/.nvm/versions/node/v24/bin' }
+    const found = locateClaude({
+      ...base,
+      env,
+      platform: 'darwin',
+      exists: (path) => path.includes('.nvm') || path.startsWith('/opt'),
+    })
+    expect(found).toBe('/home/paola/.nvm/versions/node/v24/bin/claude')
+  })
+
   it('looks for the native executable on Windows', () => {
     const found = locateClaude({ ...base, platform: 'win32', exists: () => true })
     expect(found.endsWith('claude.exe')).toBe(true)
+  })
+})
+
+describe('shellPath', () => {
+  const env = { SHELL: '/bin/zsh', PATH: '/usr/bin:/bin' }
+
+  it('reads the PATH of the login shell between its marks, whatever the profile prints', async () => {
+    const asked: string[] = []
+    const found = await shellPath({
+      platform: 'darwin',
+      env,
+      run: async (shell, args) => {
+        asked.push(shell, ...args.slice(0, 1))
+        return 'welcome\n__OCTO_PATH__/home/paola/.nvm/bin:/usr/bin__OCTO_PATH__'
+      },
+    })
+    expect(found).toBe('/home/paola/.nvm/bin:/usr/bin')
+    expect(asked).toEqual(['/bin/zsh', '-ilc'])
+  })
+
+  it('gives nothing on Windows, when the shell fails, or when it answers nothing', async () => {
+    const never = async () => {
+      throw new Error('not asked')
+    }
+    expect(await shellPath({ platform: 'win32', env, run: never })).toBeNull()
+    expect(await shellPath({ platform: 'linux', env, run: never })).toBeNull()
+    expect(await shellPath({ platform: 'linux', env: {}, run: async () => 'no marks' })).toBeNull()
+  })
+
+  it('asks the real shell when no other way is given', async () => {
+    const found = await shellPath({ platform: process.platform, env: { SHELL: '/bin/sh' } })
+    if (process.platform !== 'win32') expect(found).toContain('/')
+  })
+
+  it('puts the folders of the shell before those of the app, each once', () => {
+    expect(withShellPath(env, null)).toBe(env)
+    expect(withShellPath(env, '/home/paola/.nvm/bin:/usr/bin').PATH).toBe(
+      '/home/paola/.nvm/bin:/usr/bin:/bin',
+    )
   })
 })
 

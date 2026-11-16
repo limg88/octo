@@ -1,4 +1,5 @@
 import {
+  type MailTurn,
   orderToday,
   type TodayItem,
   type TodayKind,
@@ -29,9 +30,43 @@ export type TodaySettings = {
   mutedKinds: TodayKind[]
   /** Other addresses of the PM, beside the one of the sign-in. */
   ownAddresses: string[]
+  /** The conversations of which the PM said whose turn it is. */
+  mailTurns: MailTurnChoice[]
 }
 
-export const NO_TODAY_SETTINGS: TodaySettings = { decisions: [], mutedKinds: [], ownAddresses: [] }
+/** The PM's word on a conversation of the mail: it is theirs to answer, or it is not. */
+export type MailTurnChoice = { conversation: string; turn: MailTurn; at: string }
+
+export const NO_TODAY_SETTINGS: TodaySettings = {
+  decisions: [],
+  mutedKinds: [],
+  ownAddresses: [],
+  mailTurns: [],
+}
+
+/** Words on conversations kept at most: the oldest go first. */
+export const MAX_MAIL_TURNS = 500
+
+/** The PM's word on each conversation, the last one said. */
+export function mailTurnsOf(settings: Pick<TodaySettings, 'mailTurns'>): Record<string, MailTurn> {
+  return Object.fromEntries(settings.mailTurns.map((choice) => [choice.conversation, choice.turn]))
+}
+
+/** The settings with the PM's word on a conversation; null takes it back. */
+export function withMailTurn(
+  settings: TodaySettings,
+  conversation: string,
+  turn: MailTurn | null,
+  at: string,
+): TodaySettings {
+  const others = settings.mailTurns.filter((choice) => choice.conversation !== conversation)
+  return {
+    ...settings,
+    mailTurns: (turn === null ? others : [...others, { conversation, turn, at }]).slice(
+      -MAX_MAIL_TURNS,
+    ),
+  }
+}
 
 /** Working days after which a signal marked done, and still there, is shown again. */
 export const DONE_GRACE_WORKDAYS = 3
@@ -89,7 +124,10 @@ export function applyDecisions(
       hidden += 1
       continue
     }
-    const decision = byKey.get(item.key)
+    // A decision taken when the signal had another key is the decision on this signal.
+    const decision =
+      byKey.get(item.key) ??
+      (item.formerKeys ?? []).map((key) => byKey.get(key)).find((found) => found !== undefined)
     if (!decision) {
       shown.push(item)
       continue
@@ -126,6 +164,7 @@ const ADDRESS = /^[^\s@]+@[^\s@]+$/
 export function cleanTodaySettings(settings: TodaySettings): TodaySettings {
   return {
     decisions: settings.decisions.slice(-MAX_DECISIONS),
+    mailTurns: (settings.mailTurns ?? []).slice(-MAX_MAIL_TURNS),
     mutedKinds: [...new Set(settings.mutedKinds)],
     ownAddresses: [
       ...new Set(

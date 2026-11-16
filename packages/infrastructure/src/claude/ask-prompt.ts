@@ -1,4 +1,5 @@
 import {
+  type ConversationTurn,
   EXTRACTED_TEXT_FOLDER,
   FEED_NOTE_FILE,
   type LiveSource,
@@ -105,4 +106,30 @@ skills or commands you do not have in this run: you can only read.
 ${RULES_OPEN}
 ${projectRules.replaceAll(RULES_CLOSE, '')}
 ${RULES_CLOSE}`
+}
+
+const HISTORY_OPEN = '<earlier_in_this_conversation>'
+const HISTORY_CLOSE = '</earlier_in_this_conversation>'
+
+/**
+ * The question as the agent receives it. A question that continues a conversation comes with the
+ * turns before it, so that «and the one after?» has something to refer to. They are what was said,
+ * not what is true: every statement of the new answer is found again in the files and cited from
+ * there, never from an earlier answer.
+ */
+export function askInput(question: string, history: readonly ConversationTurn[] = []): string {
+  if (history.length === 0) return question
+  const turns = history
+    .map((turn) => `Question: ${turn.question}\nAnswer: ${turn.answer}`)
+    .join('\n\n')
+    .replaceAll(HISTORY_CLOSE, '')
+  return `${HISTORY_OPEN}
+These are the earlier questions of this conversation and the answers given. Use them only to
+understand what the new question refers to. They are not sources: do not cite them, and check
+again in the files of the project anything you take from them.
+
+${turns}
+${HISTORY_CLOSE}
+
+New question: ${question}`
 }

@@ -172,6 +172,38 @@ describe('askQuestion', () => {
     expect(await questions.list(project.folder)).toEqual([record])
   })
 
+  it('starts a conversation, and tells a question that continues it what came before', async () => {
+    const agent = agentAnswering(draft)
+    const questions = memoryQuestionLog()
+    const ask = createAskQuestion({
+      agent,
+      evidence,
+      questions,
+      clock: steppingClock(),
+      ids: countingIds('q'),
+    })
+
+    const first = await ask({ project, question: 'Quando consegniamo?' })
+    // A new conversation has nothing before it.
+    expect(agent.requests[0]?.history).toEqual([])
+    expect(first.conversationId).toBe('q-2')
+
+    const second = await ask({
+      project,
+      question: 'E il collaudo?',
+      conversationId: first.conversationId ?? null,
+    })
+    expect(second.conversationId).toBe(first.conversationId)
+    expect(agent.requests[1]?.history).toEqual([
+      { question: 'Quando consegniamo?', answer: first.answer?.text },
+    ])
+
+    // Another conversation knows nothing of the first.
+    const other = await ask({ project, question: 'Chi è il referente?', conversationId: null })
+    expect(other.conversationId).not.toBe(first.conversationId)
+    expect(agent.requests[2]?.history).toEqual([])
+  })
+
   it('keeps a failure of the agent as the outcome of the question', async () => {
     const questions = memoryQuestionLog()
     const ask = createAskQuestion({

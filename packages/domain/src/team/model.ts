@@ -73,6 +73,29 @@ export function cleanTeam(team: ProjectTeam): ProjectTeam {
  * The people who were not on the project on any day of a stretch of time: they left before it
  * or joined after it. Their missing hours in that stretch are no anomaly.
  */
+/** The people of the project on the supplier's side, each as a name read in any order. */
+export function ownPeopleKeys(team: ProjectTeam): Set<string> {
+  return new Set(
+    team.people
+      .filter((person) => person.side === 'supplier')
+      .map((person) => personKey(person.name)),
+  )
+}
+
+/**
+ * The items assigned to the supplier's own people: `Rossi Mario` in a tracker is `Mario Rossi` of
+ * the team. An item assigned to nobody is nobody's. While the team lists no person of the
+ * supplier there is nothing to tell the items by, and all are kept.
+ */
+export function assignedToOwnPeople<Item extends { assignee: string | null }>(
+  items: readonly Item[],
+  team: ProjectTeam,
+): Item[] {
+  const own = ownPeopleKeys(team)
+  if (own.size === 0) return [...items]
+  return items.filter((item) => item.assignee !== null && own.has(personKey(item.assignee)))
+}
+
 export function peopleAway(team: ProjectTeam, from: string, to: string): string[] {
   return team.people
     .filter(

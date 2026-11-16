@@ -403,6 +403,15 @@ legend {
   flex: 1;
 }
 
+.update-notice {
+  border-color: var(--accent-edge);
+  background: var(--accent-soft);
+}
+
+.update-notice p {
+  margin: 0;
+}
+
 .notice-bar-warning {
   border-color: transparent;
   background: var(--warning-bg);
@@ -545,9 +554,69 @@ main {
 
 .ask {
   display: flex;
-  flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+
+.ask-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The conversations already had, beside the one in view. */
+.ask-chats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.ask-chats ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ask-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  height: auto;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.ask-chat-selected {
+  background: var(--accent-soft);
+}
+
+.ask-chat-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-weight: 500;
+}
+
+@media (max-width: 1000px) {
+  .ask-chats {
+    width: 180px;
+  }
 }
 
 .conversation {
@@ -1156,6 +1225,45 @@ main > .warning {
   align-items: flex-end;
 }
 
+/* Many values to choose among: the list keeps its height and scrolls inside. */
+.known-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checks-scroll {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.chosen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chosen-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  font-size: 13px;
+}
+
 .chip {
   min-height: 26px;
   padding: 0 10px;
@@ -1252,6 +1360,110 @@ table.data .number {
   white-space: nowrap;
 }
 
+/* A table whose columns keep their place whatever the cells hold. */
+table.data-fixed {
+  table-layout: fixed;
+}
+
+table.data-fixed td {
+  overflow-wrap: anywhere;
+}
+
+table.data td > .status:first-child {
+  margin-left: 0;
+}
+
+table.data .row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.data .column-groups th {
+  position: static;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  border-bottom: 0;
+}
+
+table.data td input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.row-note {
+  margin: 0;
+}
+
+table.data tr:has(+ tr.row-details) td {
+  border-bottom: 0;
+}
+
+.cell-button {
+  display: block;
+  padding-left: 0;
+}
+
+/* A table with more columns than the page is wide scrolls sideways by itself, not the page. */
+.table-wide {
+  overflow-x: auto;
+}
+
+.table-wide table {
+  min-width: 960px;
+}
+
+table.data tfoot td {
+  font-weight: 600;
+  border-bottom: 0;
+}
+
+.data-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-filter input {
+  width: 240px;
+  max-width: 100%;
+}
+
+button.sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+  text-align: inherit;
+  font: inherit;
+  white-space: normal;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.sort:hover {
+  text-decoration: underline;
+}
+
+.sort-mark {
+  font-size: 9px;
+  min-width: 9px;
+  color: var(--accent);
+}
+
 .cell-note {
   display: block;
   font-size: 13px;
@@ -1270,8 +1482,34 @@ table.data .number {
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+/* A signal and the way to take it off are one piece: they never part on two lines. */
+.signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 7px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.signal-remove {
+  padding: 0 5px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.signal-remove:hover {
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .note-form {
@@ -1424,9 +1662,38 @@ fieldset > button {
 }
 
 .rows-head {
-  color: var(--muted);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-self: stretch;
+  padding: 6px 0;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--line);
+  color: var(--text);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+/* A long list scrolls inside its own frame, so its headings and what follows stay in sight. */
+.rows-scroll {
+  max-height: 440px;
+  overflow: auto;
+  padding: 0 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.rows-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rows-bar input {
+  width: 240px;
+  max-width: 100%;
 }
 
 .rows button {
@@ -1915,6 +2182,51 @@ details.advanced[open] > summary {
 
 .today-watch li + li {
   border-top: 1px solid var(--line);
+}
+
+.plain-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plain-rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.plain-rows li + li {
+  border-top: 1px solid var(--line);
+}
+
+.progress-invoices {
+  max-width: none;
+}
+
+.progress-invoices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-invoices-head h4 {
+  margin: 0;
+}
+
+.progress-register {
+  margin: 0;
+}
+
+.settings-panel {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
 }
 
 .today-first {

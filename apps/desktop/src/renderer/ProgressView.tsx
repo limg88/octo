@@ -1,5 +1,6 @@
 import type { ProgressFile, ProgressView as View } from '@octo/application'
 import {
+  type InvoicedOrder,
   orderTotal,
   type ProgressSettings,
   type ProgressStep,
@@ -10,6 +11,7 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { dateText, messages } from './messages.ts'
+import { ProgressInvoices } from './ProgressInvoices.tsx'
 import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
 import { ProgressShares } from './ProgressShares.tsx'
@@ -23,6 +25,7 @@ type ProgressApi = Pick<
   | 'progressCandidates'
   | 'progressView'
   | 'compileProgress'
+  | 'registerProgressInvoices'
   | 'openEvidence'
   | 'chooseProjectPath'
 >
@@ -98,6 +101,16 @@ export function ProgressView({ api, project }: Props) {
     else setError(result.code)
   }
 
+  async function registerInvoices() {
+    setError(null)
+    savedNote.clear()
+    const result = await api.registerProgressInvoices(project.id)
+    if (!result.ok) return setError(result.code)
+    setSettings(result.value)
+    savedNote.saved()
+    await loadView()
+  }
+
   if (settings === null) {
     return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
   }
@@ -129,12 +142,28 @@ export function ProgressView({ api, project }: Props) {
   const { requests } = settings
   const steps = view?.computation.ok ? view.computation.steps : []
   const warnings = view?.warnings ?? []
+  const invoiced = view?.invoices?.order ?? null
+  /** Everything billed and every invoice known to Octo: there is nothing left to ask. */
+  const nothingToAsk = invoiced?.fulfilled === true && invoiced.unregistered.length === 0
 
   return (
     <div className="dashboard">
       {error && <Failure code={error} />}
       {savedNote.note}
-      <Overview settings={settings} onSetup={() => setPanel({ kind: 'setup' })} />
+      <Overview
+        settings={settings}
+        invoiced={invoiced}
+        onSetup={() => setPanel({ kind: 'setup' })}
+      />
+      {view?.invoices && (
+        <ProgressInvoices
+          invoices={view.invoices}
+          order={settings.order}
+          linked={settings.salesOrders}
+          onLink={(salesOrders) => void save({ ...settings, salesOrders })}
+          onRegister={() => void registerInvoices()}
+        />
+      )}
       {warnings
         .filter((warning) => warningRequest(warning) === null)
         .map((warning) => (
@@ -159,15 +188,17 @@ export function ProgressView({ api, project }: Props) {
           }}
         />
       ) : (
-        <div className="actions">
-          <button
-            type="button"
-            className="primary"
-            onClick={() => setPanel({ kind: 'request', n: requests.length + 1 })}
-          >
-            {text.newRequest}
-          </button>
-        </div>
+        !nothingToAsk && (
+          <div className="actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setPanel({ kind: 'request', n: requests.length + 1 })}
+            >
+              {text.newRequest}
+            </button>
+          </div>
+        )
       )}
       {requests.length === 0 && <p className="hint">{text.noRequests}</p>}
       {[...requests].reverse().map((request) => (
@@ -190,13 +221,25 @@ export function ProgressView({ api, project }: Props) {
 }
 
 /** The order at a glance: what it is worth, what was asked, what is left. */
-function Overview({ settings, onSetup }: { settings: ProgressSettings; onSetup: () => void }) {
+function Overview({
+  settings,
+  invoiced,
+  onSetup,
+}: {
+  settings: ProgressSettings
+  /** What the company system has billed of the order; null: Octo knows only its own requests. */
+  invoiced: InvoicedOrder | null
+  onSetup: () => void
+}) {
   const total = orderTotal(settings.positions)
   const asked = settings.requests.reduce((sum, request) => sum + request.amount, 0)
+  // What is billed is a fact of the company system; what was asked through Octo may lag behind it.
+  const done = invoiced ? Math.max(invoiced.invoiced, asked) : asked
   const figures: Array<[string, number]> = [
     [text.orderTotal, total],
     [text.asked, asked],
-    [text.left, total - asked],
+    ...(invoiced ? [[text.invoices.billedTotal, invoiced.invoiced] as [string, number]] : []),
+    [text.left, Math.max(0, total - done)],
   ]
   return (
     <section className="progress-overview" aria-label={text.orderName(settings.order)}>
@@ -214,7 +257,7 @@ function Overview({ settings, onSetup }: { settings: ProgressSettings; onSetup: 
           </div>
         ))}
       </dl>
-      <progress max={total} value={Math.min(asked, total)} aria-label={text.asked} />
+      <progress max={total} value={Math.min(done, total)} aria-label={text.asked} />
     </section>
   )
 }

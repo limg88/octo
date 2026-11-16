@@ -45,23 +45,38 @@ function firstLineOf(path) {
   }
 }
 
+/**
+ * Whom the first line of a mail asks: the whole group, another person named before a comma, or
+ * the Project Manager.
+ */
+function addresseeOf(line, pmName) {
+  if (/\b(a tutti|tutti|all|team)\b/i.test(line))
+    return { addressee: 'everyone', addresseeName: null }
+  const named = /^(?:ciao |buongiorno |gentile )?([A-ZÀ-Ý][a-zà-ÿ]+),/.exec(line)?.[1]
+  const own = (pmName ?? '').split(/\s+/).some((part) => part !== '' && part === named)
+  if (named && !own) return { addressee: 'someone_else', addresseeName: named }
+  return { addressee: 'me', addresseeName: null }
+}
+
 // A run of the judge of the mail: every mail given is weighed, with words copied from its file.
-if (args.join(' ').includes('You rate the mail that waits for an answer')) {
-  const { mails } = JSON.parse(question)
+if (args.join(' ').includes('You read the mail a Project Manager is written to')) {
+  const { mails, pm } = JSON.parse(question)
   emit({
     type: 'result',
     is_error: false,
     structured_output: {
       mails: mails.map((mail) => {
         const money = /budget|ordine|fattur/i.test(mail.subject)
+        const quote = firstLineOf(mail.path)
         return {
           id: mail.id,
           importance: money ? 'alta' : 'media',
           reason: money
             ? 'Riguarda il budget del progetto: va confermato al cliente.'
             : 'Chiede una risposta, ma nulla si ferma nel frattempo.',
-          quote: firstLineOf(mail.path),
+          quote,
           deadline: null,
+          ...addresseeOf(quote, pm?.name ?? null),
         }
       }),
     },
@@ -147,6 +162,46 @@ if (outlined) {
       },
       citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
       missing: ['Rischi del periodo: nessuna fonte li elenca.'],
+    },
+  })
+  process.exit(0)
+}
+
+// A run of a writer given the Word template of the kind: its sections, in its order.
+const sectioned = /<template_sections>\n([\s\S]*?)\n<\/template_sections>/.exec(args.join(' '))
+if (sectioned) {
+  const headings = sectioned[1].split('\n')
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: headings
+        .map((heading, at) =>
+          at === 0
+            ? `${heading}\n\nLa consegna del modulo ordini è fissata al 12 dicembre 2026 [1].`
+            : `${heading}\n\nNessuna fonte del progetto lo dice.`,
+        )
+        .join('\n\n'),
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: headings.slice(1).map((heading) => heading.replace(/^#+\s*/, '')),
+    },
+  })
+  process.exit(0)
+}
+
+// A question that continues a conversation: the answer says what it takes up.
+const earlier =
+  /<earlier_in_this_conversation>[\s\S]*?Question: ([^\n]*)[\s\S]*<\/earlier_in_this_conversation>/.exec(
+    question,
+  )
+if (earlier && !question.includes('#')) {
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: `Riprendo dalla domanda «${earlier[1]}»: la consegna resta fissata al 12 dicembre 2026 [1].`,
+      citations: [{ n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' }],
+      missing: [],
     },
   })
   process.exit(0)

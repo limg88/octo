@@ -6,17 +6,20 @@ import {
   type DeliverableKind,
   type Project,
   type StoredMeeting,
+  type TemplateFormat,
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
 import { handoffField, handoffText } from '../src/renderer/handoff-text.ts'
+import { DECK_MODEL_TEXT, LETTERHEAD_TEXT, ModelFile } from '../src/renderer/ModelFile.tsx'
 import { messages } from '../src/renderer/messages.ts'
 import { DELIVERABLE_INPUT_LIMIT, type OctoApi, type Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
+const words = messages.kindTemplate
 
 const OWN_KIND: DeliverableKind = {
   id: 'proprio-nota-di-rilascio',
@@ -100,12 +103,9 @@ type DeliverablesApi = Pick<
   | 'onDeliverableProgress'
   | 'saveDeliverableKind'
   | 'removeDeliverableKind'
-  | 'hasLetterhead'
-  | 'chooseLetterhead'
-  | 'removeLetterhead'
-  | 'hasDeckModel'
-  | 'chooseDeckModel'
-  | 'removeDeckModel'
+  | 'kindTemplates'
+  | 'chooseKindTemplate'
+  | 'removeKindTemplate'
   | 'openEvidence'
   | 'importedMeetings'
 >
@@ -126,12 +126,9 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
     },
     saveDeliverableKind: vi.fn(async () => ok(OWN_KIND)),
     removeDeliverableKind: vi.fn(async () => ok(null)),
-    hasLetterhead: vi.fn(async () => ok(false)),
-    chooseLetterhead: vi.fn(async () => ok(true)),
-    removeLetterhead: vi.fn(async () => ok(null)),
-    hasDeckModel: vi.fn(async () => ok(false)),
-    chooseDeckModel: vi.fn(async () => ok(true)),
-    removeDeckModel: vi.fn(async () => ok(null)),
+    kindTemplates: vi.fn(async () => ok<Record<string, TemplateFormat[]>>({})),
+    chooseKindTemplate: vi.fn(async () => ok<TemplateFormat | null>('docx')),
+    removeKindTemplate: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
     importedMeetings: vi.fn(async () => ok<StoredMeeting[]>([])),
     ...overrides,
@@ -244,63 +241,66 @@ describe('DeliverablesView', () => {
     expect(screen.queryByText(/\|---\|/)).toBeNull()
   })
 
-  it('lets the PM choose a letterhead for the Word files, and take it away', async () => {
-    const has = vi
-      .fn<OctoApi['hasLetterhead']>()
-      .mockResolvedValueOnce(ok(false))
-      .mockResolvedValueOnce(ok(true))
-      .mockResolvedValue(ok(false))
-    const { api } = fakeApi({ hasLetterhead: has })
+  it('keeps no model file among the kinds: a template belongs to its kind', async () => {
+    const { api } = fakeApi()
     render(<DeliverablesView api={api} project={project} />)
-
-    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.letterheadChoose }))
-    expect(await screen.findByText(messages.letterheadSet)).toBeTruthy()
-    expect(api.chooseLetterhead).toHaveBeenCalledWith('p-1')
-
-    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
-    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
-    expect(api.removeLetterhead).toHaveBeenCalledWith('p-1')
+    await screen.findByRole('button', { name: messages.ownKindNew })
+    expect(screen.queryByText(messages.letterheadTitle)).toBeNull()
+    expect(screen.queryByText(messages.deckModelTitle)).toBeNull()
   })
 
-  it('lets the PM choose a deck for the slides, and take it away', async () => {
-    const has = vi
-      .fn<OctoApi['hasDeckModel']>()
-      .mockResolvedValueOnce(ok(false))
-      .mockResolvedValueOnce(ok(true))
-      .mockResolvedValue(ok(false))
-    const { api } = fakeApi({ hasDeckModel: has })
+  it('lets the PM give a kind its template, see which it has, and take it away', async () => {
+    const templates = vi
+      .fn<OctoApi['kindTemplates']>()
+      .mockResolvedValueOnce(ok({}))
+      .mockResolvedValueOnce(ok({ 'email-cliente': ['docx'], 'voce-di-backlog': ['pptx'] }))
+      .mockResolvedValue(ok({}))
+    const { api } = fakeApi({ kindTemplates: templates })
     render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Email al cliente/ }))
 
-    expect(await screen.findByText(messages.deckModelNone)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.deckModelChoose }))
-    expect(await screen.findByText(messages.deckModelSet)).toBeTruthy()
-    expect(api.chooseDeckModel).toHaveBeenCalledWith('p-1')
-    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
-    expect(await screen.findByText(messages.deckModelNone)).toBeTruthy()
-    expect(api.removeDeckModel).toHaveBeenCalledWith('p-1')
+    const section = await screen.findByRole('region', { name: words.title })
+    expect(within(section).getByText(words.none)).toBeTruthy()
+    fireEvent.click(within(section).getByRole('button', { name: words.choose }))
+    await waitFor(() => expect(api.chooseKindTemplate).toHaveBeenCalledWith('p-1', 'email-cliente'))
+    // Only the template of this kind is shown, with what it does.
+    expect(await within(section).findByText(words.format.docx)).toBeTruthy()
+    expect(within(section).getByText(words.does.docx)).toBeTruthy()
+    expect(within(section).queryByText(words.format.pptx)).toBeNull()
+
+    fireEvent.click(
+      within(section).getByRole('button', { name: words.removeFormat(words.format.docx) }),
+    )
+    await waitFor(() =>
+      expect(api.removeKindTemplate).toHaveBeenCalledWith('p-1', 'email-cliente', 'docx'),
+    )
+    expect(await within(section).findByText(words.none)).toBeTruthy()
   })
 
-  it('explains a file that is not a deck', async () => {
+  it('explains a file that cannot be the template of a kind', async () => {
     const { api } = fakeApi({
-      chooseDeckModel: vi.fn(
-        async () => ({ ok: false, code: 'deck_model_invalid' }) as Result<boolean>,
+      chooseKindTemplate: vi.fn(
+        async () => ({ ok: false, code: 'deck_model_invalid' }) as Result<TemplateFormat | null>,
       ),
     })
     render(<DeliverablesView api={api} project={project} />)
-    fireEvent.click(await screen.findByRole('button', { name: messages.deckModelChoose }))
+    fireEvent.click(await screen.findByRole('button', { name: /Email al cliente/ }))
+    fireEvent.click(await screen.findByRole('button', { name: words.choose }))
     expect(await screen.findByText(/non è una presentazione che posso usare/)).toBeTruthy()
   })
 
-  it('explains a file that is not a letterhead', async () => {
-    const { api } = fakeApi({
-      chooseLetterhead: vi.fn(
-        async () => ({ ok: false, code: 'letterhead_invalid' }) as Result<boolean>,
-      ),
-    })
+  it('saves a kind of the PM and asks for its template right after', async () => {
+    const { api } = fakeApi()
     render(<DeliverablesView api={api} project={project} />)
-    fireEvent.click(await screen.findByRole('button', { name: messages.letterheadChoose }))
-    expect(await screen.findByText(/non è un documento Word che posso usare/)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: messages.ownKindNew }))
+    expect(screen.getByText(words.newKindHint)).toBeTruthy()
+    type(messages.ownKindTitle, 'Nota di rilascio')
+    type(/^Come va scritto/, 'Scrivi le novità.')
+    fireEvent.click(screen.getByRole('button', { name: words.saveAndChoose }))
+    await waitFor(() =>
+      expect(api.chooseKindTemplate).toHaveBeenCalledWith('p-1', 'proprio-nota-di-rilascio'),
+    )
+    expect(api.saveDeliverableKind).toHaveBeenCalledTimes(1)
   })
 
   it('lets the PM describe a kind of their own, change it and remove it', async () => {
@@ -337,6 +337,8 @@ describe('DeliverablesView', () => {
     expect(screen.getByLabelText<HTMLInputElement>(messages.ownKindTitle).value).toBe(
       'Nota di rilascio',
     )
+    // A kind that exists shows its template where it is changed.
+    expect(await screen.findByRole('region', { name: words.title })).toBeTruthy()
     expect(screen.getByLabelText<HTMLTextAreaElement>(/^Che cosa chiederti/).value).toBe(
       'Quale versione *',
     )
@@ -584,5 +586,64 @@ describe('the review beside the draft', () => {
     await act(async () => finish(ok(approved)))
     expect(screen.queryByText(messages.deliverableFiles)).toBeNull()
     expect(screen.getByText(messages.deliverableNone)).toBeTruthy()
+  })
+})
+
+describe('a file the deliverables of the project are written on', () => {
+  const has = () =>
+    vi
+      .fn<() => Promise<Result<boolean>>>()
+      .mockResolvedValueOnce(ok(false))
+      .mockResolvedValueOnce(ok(true))
+      .mockResolvedValue(ok(false))
+
+  it('is chosen and taken away, and a file that cannot be used is explained', async () => {
+    const choose = vi.fn(async () => ok(true))
+    const remove = vi.fn(async () => ok(null))
+    render(<ModelFile text={LETTERHEAD_TEXT} has={has()} choose={choose} remove={remove} />)
+    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadChoose }))
+    expect(await screen.findByText(messages.letterheadSet)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
+    expect(await screen.findByText(messages.letterheadNone)).toBeTruthy()
+    expect(choose).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(1)
+    cleanup()
+
+    const refused = vi.fn(
+      async () => ({ ok: false, code: 'letterhead_invalid' }) as Result<boolean>,
+    )
+    render(
+      <ModelFile
+        text={LETTERHEAD_TEXT}
+        has={async () => ok(false)}
+        choose={refused}
+        remove={remove}
+      />,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: messages.letterheadChoose }))
+    expect(await screen.findByText(/non è un documento Word che posso usare/)).toBeTruthy()
+  })
+
+  it('shows a file of before only while it is there, to be taken away and not chosen', async () => {
+    const remove = vi.fn(async () => ok(null))
+    const present = vi
+      .fn<() => Promise<Result<boolean>>>()
+      .mockResolvedValueOnce(ok(true))
+      .mockResolvedValue(ok(false))
+    render(
+      <ModelFile
+        onlyWhenSet
+        text={DECK_MODEL_TEXT}
+        has={present}
+        choose={async () => ok(true)}
+        remove={remove}
+      />,
+    )
+    expect(await screen.findByText(messages.deckModelSet)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: messages.deckModelChoose })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: messages.letterheadRemove }))
+    await waitFor(() => expect(screen.queryByText(messages.deckModelTitle)).toBeNull())
+    expect(remove).toHaveBeenCalledTimes(1)
   })
 })

@@ -34,6 +34,8 @@ export type ProgressSettings = {
   modelPath: string
   /** The order as the form names it. */
   order: string
+  /** The sales orders of the company system that are this order; none: nothing is compared. */
+  salesOrders: string[]
   /** The total the order declares, to check the positions against; null: not given. */
   total: number | null
   positions: OrderPosition[]
@@ -44,6 +46,7 @@ export type ProgressSettings = {
 export const DEFAULT_PROGRESS_SETTINGS: ProgressSettings = {
   modelPath: '',
   order: '',
+  salesOrders: [],
   total: null,
   positions: [],
   requests: [],
@@ -114,6 +117,9 @@ export function cleanProgressSettings(settings: ProgressSettings): ProgressSetti
   return {
     modelPath: settings.modelPath.trim(),
     order: settings.order.trim(),
+    salesOrders: [...new Set(settings.salesOrders.map((order) => order.trim()))].filter(
+      (order) => order !== '',
+    ),
     total: total !== null && positiveAmount(total) ? cents(total) : null,
     positions,
     requests,

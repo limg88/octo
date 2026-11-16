@@ -198,6 +198,35 @@ function inTemplate(template: Uint8Array, body: string): Uint8Array {
   return zipSync({ ...parts, [DOCUMENT_PART]: strToU8(text) })
 }
 
+const PARAGRAPH = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g
+/** The style of a heading, as Word names it in English and in Italian, with its level. */
+const HEADING_STYLE = /<w:pStyle\s+w:val="(?:Heading|Titolo|heading\s?|titolo\s?)([1-6])"/
+const TEXT_RUN = /<w:t\b[^>]*>([^<]*)<\/w:t>/g
+const XML_ENTITIES: Readonly<Record<string, string>> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+}
+const unescapeXml = (text: string): string =>
+  text.replace(/&(?:amp|lt|gt|quot|apos);/g, (entity) => XML_ENTITIES[entity] ?? entity)
+
+/** The headings of a Word document, each as a Markdown heading of its own level. */
+function headingsOf(template: Uint8Array): string[] {
+  const document = templateParts(template)[DOCUMENT_PART]
+  if (!document) throw new DomainError('letterhead_invalid')
+  const headings: string[] = []
+  for (const [paragraph] of strFromU8(document).matchAll(PARAGRAPH)) {
+    const level = Number(HEADING_STYLE.exec(paragraph)?.[1] ?? 0)
+    const text = unescapeXml(
+      [...paragraph.matchAll(TEXT_RUN)].map((run) => run[1] ?? '').join(''),
+    ).trim()
+    if (level > 0 && text !== '') headings.push(`${'#'.repeat(level)} ${text}`)
+  }
+  return headings
+}
+
 /**
  * A Word document from the Markdown of an approved deliverable: headings, paragraphs, lists and
  * tables, written by the code with their own formatting. The same text always gives the same
@@ -212,6 +241,7 @@ export function createWordRenderer(): DocumentRenderer {
     async checkLetterhead(bytes) {
       inTemplate(bytes, '')
     },
+    wordOutline: async (template) => headingsOf(template),
     deck: async (title, markdown, model) => renderDeck(title, markdown, model),
     deckOutline: async (model) => readDeckOutline(model),
     fillDeck: async (model, deck) => fillDeck(model, deck),

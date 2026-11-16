@@ -54,6 +54,7 @@ const questionSchema = z.object({
     })
     .nullable(),
   error: z.enum(DOMAIN_ERROR_CODES).nullable(),
+  conversationId: z.string().optional(),
   model: z.string().nullable().optional(),
 })
 

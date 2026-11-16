@@ -190,6 +190,14 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     saveDeliverableInstructions: vi.fn(async () => ok(null)),
     saveDeliverableKind: vi.fn(async () => ok(OWN_KIND)),
     removeDeliverableKind: vi.fn(async () => ok(null)),
+    checkForUpdate: vi.fn(async () => ok(null)),
+    installUpdate: vi.fn(async () => ok(null)),
+    onUpdateProgress: () => () => {},
+    updateJustDone: vi.fn(async () => ok(null)),
+    openDiskAccessSettings: vi.fn(async () => ok(null)),
+    kindTemplates: vi.fn(async () => ok({})),
+    chooseKindTemplate: vi.fn(async () => ok(null)),
+    removeKindTemplate: vi.fn(async () => ok(null)),
     hasLetterhead: vi.fn(async () => ok(false)),
     chooseLetterhead: vi.fn(async () => ok(true)),
     removeLetterhead: vi.fn(async () => ok(null)),
@@ -232,6 +240,10 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       ok: false as const,
       code: 'progress_model_not_set' as const,
     })),
+    registerProgressInvoices: vi.fn(async () => ({
+      ok: false as const,
+      code: 'progress_settings_invalid' as const,
+    })),
     forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     saveForecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     forecastCandidates: vi.fn(async () => ok<string[]>([])),
@@ -271,6 +283,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     todayView: vi.fn(async () => ok(emptyToday)),
     decideToday: vi.fn(async () => ok(emptyToday)),
     muteTodayKind: vi.fn(async () => ok(emptyToday)),
+    setMailTurn: vi.fn(async () => ok(emptyToday)),
     saveOwnAddresses: vi.fn(async () => ok(emptyToday)),
     evaluateToday: vi.fn(async () => ok(emptyToday)),
     cancelEvaluateToday: vi.fn(async () => ok(null)),
@@ -324,7 +337,7 @@ describe('App', () => {
     await askQuestion('Quando consegniamo?')
 
     expect(await screen.findByText(messages.toCheck(2))).toBeTruthy()
-    expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?')
+    expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?', null)
     // The first source is in view beside the answer, with what the check found about it.
     const panel = screen.getByRole('complementary', { name: messages.citation.panel })
     expect(within(panel).getByText('Frase riscontrata nel file')).toBeTruthy()
@@ -393,6 +406,10 @@ describe('App', () => {
     const { api } = fakeApi({ listQuestions: async () => ok([failed, verified]) })
     render(<App api={api} />)
     await openAsk()
+    // What was asked before there were conversations is kept together, one click away.
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(messages.askChats.legacy) }),
+    )
 
     expect(await screen.findByText(messages.allVerified(1))).toBeTruthy()
     expect(screen.getByText(/Claude non ha un accesso attivo/)).toBeTruthy()

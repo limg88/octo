@@ -4,6 +4,8 @@ import {
   type Deliverable,
   DomainError,
   type DraftAnswer,
+  kindTemplatePath,
+  LETTERHEAD_PATH,
   MAX_REVIEW_PAUSE_MS,
   MEETINGS_FOLDER,
   meetingMeta,
@@ -42,8 +44,12 @@ const OUTLINE: DeckOutline = {
   ],
 }
 
+/** The headings a Word template gives, as the renderer reads them. */
+const SECTIONS = ['# Premessa', '## Costi']
+
 function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft } = {}) {
   const filled: DeckDraft[] = []
+  const reads: string[] = []
   const memory = memoryWriter()
   const requests: DraftRequest[] = []
   let now = START
@@ -69,6 +75,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft 
       checkLetterhead: async (bytes) => {
         if (bytes.length === 0) throw new DomainError('letterhead_invalid')
       },
+      wordOutline: async () => SECTIONS,
       deck: async (title, _markdown, model) => new Uint8Array(title.length + model.length),
       checkDeckModel: async (bytes) => {
         if (bytes.length === 0) throw new DomainError('deck_model_invalid')
@@ -88,7 +95,10 @@ function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft 
     }),
     files: {
       ...base,
-      read: async () => new Uint8Array([9, 9]),
+      read: async (_folder, path) => {
+        reads.push(path)
+        return new Uint8Array([9, 9])
+      },
       under: async (_folder, folder) =>
         [...memory.files.keys()].filter((path) => path.startsWith(`${folder}/`)),
     },
@@ -96,7 +106,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft 
     clock: { now: () => new Date(now) },
     ids: countingIds('d'),
   })
-  return { service, memory, requests, filled, wait: (ms: number) => (now += ms), options }
+  return { service, memory, requests, filled, reads, wait: (ms: number) => (now += ms), options }
 }
 
 describe('writing a deliverable', () => {
@@ -445,5 +455,74 @@ describe('approving a deliverable', () => {
     expect(requests[0]?.inputs).toEqual({ riunione: folder })
     expect(requests[0]?.kind.instructions).toContain('_octo/riunioni/')
     expect(other.title).toBe(gone)
+  })
+})
+
+describe('the template of a kind of deliverable', () => {
+  const KIND = 'email-cliente'
+
+  it('gives a kind the sections and the paper of its Word template, before the letterhead', async () => {
+    const { service, memory, requests, reads } = setup()
+    expect(await service.templates(project)).toEqual({})
+    await expect(
+      service.setKindTemplate(project, KIND, 'docx', new Uint8Array()),
+    ).rejects.toMatchObject({ code: 'letterhead_invalid' })
+    await expect(
+      service.setKindTemplate(project, 'nessuno', 'docx', new Uint8Array([1])),
+    ).rejects.toMatchObject({ code: 'deliverable_kind_unknown' })
+
+    await service.setLetterhead(project, new Uint8Array([9, 9]))
+    await service.setKindTemplate(project, KIND, 'docx', new Uint8Array([4, 4]))
+    expect(await service.templates(project)).toEqual({ [KIND]: ['docx'] })
+
+    const made = await service.start(project, { kindId: KIND, inputs })
+    expect(requests[0]?.sectionOutline).toEqual(SECTIONS)
+    expect(requests[0]?.deckOutline).toBeUndefined()
+    const approved = await service.approve(project, made.id)
+    expect(memory.files.get(approved.files[1] ?? '')).toBe('<5 bytes>')
+    // The paper is the one of the kind: the letterhead of the project is not even read.
+    expect(reads).toContain(kindTemplatePath(KIND, 'docx'))
+    expect(reads).not.toContain(LETTERHEAD_PATH)
+
+    // Another kind has no template: it is written as before, on the letterhead of the project.
+    await service.start(project, { kindId: 'voce-di-backlog', inputs: { tema: 'Esportare' } })
+    expect(requests[1]?.sectionOutline).toBeUndefined()
+
+    await service.setKindTemplate(project, KIND, 'docx', null)
+    expect(await service.templates(project)).toEqual({})
+  })
+
+  it('writes a kind as slides on its own presentation, whatever the kind', async () => {
+    const { service, requests, reads } = setup()
+    await expect(
+      service.setKindTemplate(project, KIND, 'pptx', new Uint8Array()),
+    ).rejects.toMatchObject({ code: 'deck_model_invalid' })
+    await service.setKindTemplate(project, KIND, 'pptx', new Uint8Array([7, 7, 7]))
+    await service.setKindTemplate(project, KIND, 'docx', new Uint8Array([4, 4]))
+    expect(await service.templates(project)).toEqual({ [KIND]: ['docx', 'pptx'] })
+
+    const made = await service.start(project, { kindId: KIND, inputs })
+    // Written as slides: the outline is the one of the presentation, not the sections of Word.
+    expect(requests[0]?.deckOutline).toEqual(OUTLINE)
+    expect(requests[0]?.sectionOutline).toBeUndefined()
+    const approved = await service.approve(project, made.id)
+    expect(approved.files).toHaveLength(3)
+    expect(reads).toContain(kindTemplatePath(KIND, 'pptx'))
+  })
+
+  it('takes the templates of a kind away with the kind', async () => {
+    const { service } = setup()
+    const own = await service.saveKind(project, {
+      title: 'Nota di rilascio',
+      summary: '',
+      audience: 'client',
+      questions: [],
+      instructions: 'Breve.',
+      checklist: [],
+    })
+    await service.setKindTemplate(project, own.id, 'docx', new Uint8Array([4]))
+    expect(await service.templates(project)).toEqual({ [own.id]: ['docx'] })
+    await service.removeKind(project, own.id)
+    expect(await service.templates(project)).toEqual({})
   })
 })

@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import {
   createProgress,
+  INVOICES_VIEW,
   PROGRESS_FOLDER,
   type ProgressSettingsStore,
   type ProjectFiles,
@@ -21,6 +22,7 @@ const FILLED = new Uint8Array([9])
 const configured: ProgressSettings = {
   modelPath: 'Moduli/Richiesta SAL.xlsx',
   order: 'ORD-77',
+  salesOrders: [],
   total: 1000,
   positions: [
     { code: '1', amount: 600 },
@@ -36,7 +38,33 @@ const configured: ProgressSettings = {
   },
 }
 
-function setup(initial: ProgressSettings = configured, fill?: () => never) {
+/** The invoices of the company system, as rows of its view: one sales order billed 600. */
+const INVOICE_ROWS = [
+  {
+    invoiceid: '2026/1',
+    invoicedate: '2026-03-31',
+    amount: 600,
+    status: 'Open',
+    salesorder: 'SO-1',
+  },
+  {
+    invoiceid: '2026/9',
+    invoicedate: '2026-02-28',
+    amount: 50,
+    status: 'Open',
+    salesorder: 'SO-2',
+  },
+  { nota: 'una riga che non è una fattura' },
+]
+
+function setup(
+  initial: ProgressSettings = configured,
+  fill?: () => never,
+  netsuite: { folder: string | null; rows: Array<Record<string, unknown>> } = {
+    folder: null,
+    rows: [],
+  },
+) {
   let saved = initial
   const settings: ProgressSettingsStore = {
     load: async () => saved,
@@ -76,7 +104,22 @@ function setup(initial: ProgressSettings = configured, fill?: () => never) {
       written.set(path, bytes)
     },
   }
-  return { progress: createProgress({ settings, files, sheets, writer }), filled, written }
+  const asked: string[] = []
+  const records = {
+    rows: async (_folder: string, folder: string, view: string) => {
+      asked.push(`${folder}:${view}`)
+      return netsuite.rows
+    },
+  }
+  const progress = createProgress({
+    settings,
+    files,
+    sheets,
+    writer,
+    records,
+    invoicesFolder: async () => netsuite.folder,
+  })
+  return { progress, filled, written, asked }
 }
 
 describe('progress requests', () => {
@@ -160,5 +203,41 @@ describe('progress requests', () => {
         throw new Error('disk')
       }),
     ).rejects.toThrow('disk')
+  })
+
+  it('reads what the company system billed, only once the PM says which order it is', async () => {
+    const netsuite = { folder: '_octo/fonti/NetSuite', rows: INVOICE_ROWS }
+    const without = setup({ ...configured, requests: [] })
+    expect((await without.progress.view(project)).invoices).toBeNull()
+    expect(without.asked).toEqual([])
+
+    const unlinked = setup({ ...configured, requests: [] }, undefined, netsuite)
+    const first = await unlinked.progress.view(project)
+    expect(first.invoices).toEqual({
+      salesOrders: ['SO-1', 'SO-2'],
+      suggested: ['SO-1'],
+      order: null,
+    })
+    expect(unlinked.asked).toEqual([`_octo/fonti/NetSuite:${INVOICES_VIEW}`])
+    // Nothing is linked: there is nothing to take as a request.
+    expect(await unlinked.progress.registerInvoices(project)).toMatchObject({ requests: [] })
+
+    const linked = setup(
+      { ...configured, requests: [], salesOrders: ['SO-1'] },
+      undefined,
+      netsuite,
+    )
+    const view = await linked.progress.view(project)
+    expect(view.invoices?.order).toMatchObject({ invoiced: 600, remaining: 400, fulfilled: false })
+    expect(view.invoices?.order?.unregistered.map((invoice) => invoice.id)).toEqual(['2026/1'])
+
+    // The invoice Octo did not know becomes a request already made, on the position it bills.
+    const registered = await linked.progress.registerInvoices(project)
+    expect(registered.requests).toEqual([
+      { n: 1, from: '2026-03-01', to: '2026-03-31', amount: 600, note: '2026/1', positions: ['1'] },
+    ])
+    expect((await linked.progress.view(project)).invoices?.order?.unregistered).toEqual([])
+    // Asked again, nothing is added.
+    expect((await linked.progress.registerInvoices(project)).requests).toHaveLength(1)
   })
 })

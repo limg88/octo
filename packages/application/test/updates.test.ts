@@ -1,0 +1,115 @@
+import { CHECKSUMS_ASSET, DomainError, type Release, type UpdateProgress } from '@octo/domain'
+import { describe, expect, it } from 'vitest'
+import { createUpdates } from '../src/index.ts'
+
+const SHA = 'a'.repeat(64)
+const FILE = 'Octo-1.4.0-mac-arm64.zip'
+const asset = (name: string) => ({ name, url: `https://example.test/${name}`, size: 100 })
+const release: Release = {
+  version: 'v1.4.0',
+  notes: 'Novità.',
+  assets: [asset(FILE), asset(CHECKSUMS_ASSET)],
+}
+
+function setup(
+  options: {
+    release?: Release | null | Error
+    checksums?: string | Error
+    sha256?: string
+    download?: Error
+    apply?: Error
+    current?: string
+  } = {},
+) {
+  const applied: string[] = []
+  const asked: string[] = []
+  const updates = createUpdates({
+    current: options.current ?? '1.3.0',
+    target: { platform: 'darwin', arch: 'arm64' },
+    feed: {
+      latest: async () => {
+        const given = options.release === undefined ? release : options.release
+        if (given instanceof Error) throw given
+        return given
+      },
+    },
+    downloads: {
+      text: async (wanted) => {
+        asked.push(wanted.name)
+        const given = options.checksums ?? `${SHA}  ${FILE}\n`
+        if (given instanceof Error) throw given
+        return given
+      },
+      file: async (wanted, onProgress) => {
+        asked.push(wanted.name)
+        if (options.download) throw options.download
+        onProgress?.({ received: 100, total: 100 })
+        return { path: `/tmp/${wanted.name}`, sha256: options.sha256 ?? SHA }
+      },
+    },
+    applier: {
+      apply: async (path) => {
+        if (options.apply) throw options.apply
+        applied.push(path)
+      },
+    },
+  })
+  return { updates, applied, asked }
+}
+
+describe('Octo that replaces itself with a newer one', () => {
+  it('offers the newer version there is for this computer, or nothing', async () => {
+    expect(await setup().updates.check()).toEqual({ version: '1.4.0', notes: 'Novità.' })
+    expect(await setup({ current: '1.4.0' }).updates.check()).toBeNull()
+    expect(await setup({ release: null }).updates.check()).toBeNull()
+    await expect(setup({ release: new Error('offline') }).updates.check()).rejects.toMatchObject({
+      code: 'update_check_failed',
+    })
+  })
+
+  it('reads the checksums first, brings the file down, checks it and puts it in place', async () => {
+    const { updates, applied, asked } = setup()
+    const steps: UpdateProgress[] = []
+    await updates.install((step) => steps.push(step))
+    expect(asked).toEqual([CHECKSUMS_ASSET, FILE])
+    expect(steps).toEqual([{ received: 100, total: 100 }])
+    expect(applied).toEqual([`/tmp/${FILE}`])
+  })
+
+  it('never puts in place a file that is not the one the release declares', async () => {
+    const tampered = setup({ sha256: 'c'.repeat(64) })
+    await expect(tampered.updates.install()).rejects.toMatchObject({
+      code: 'update_checksum_mismatch',
+    })
+    expect(tampered.applied).toEqual([])
+
+    const unlisted = setup({ checksums: `${SHA}  altro.zip\n` })
+    await expect(unlisted.updates.install()).rejects.toMatchObject({
+      code: 'update_checksum_missing',
+    })
+    const noList = setup({ release: { ...release, assets: [asset(FILE)] } })
+    await expect(noList.updates.install()).rejects.toMatchObject({
+      code: 'update_checksum_missing',
+    })
+    expect(noList.asked).toEqual([])
+    expect(unlisted.applied).toEqual([])
+  })
+
+  it('says what stopped it: nothing newer, a download that failed, an app that cannot be replaced', async () => {
+    await expect(setup({ current: '1.4.0' }).updates.install()).rejects.toMatchObject({
+      code: 'update_unavailable',
+    })
+    await expect(setup({ release: null }).updates.install()).rejects.toMatchObject({
+      code: 'update_unavailable',
+    })
+    await expect(
+      setup({ checksums: new Error('offline') }).updates.install(),
+    ).rejects.toMatchObject({ code: 'update_download_failed' })
+    await expect(setup({ download: new Error('reset') }).updates.install()).rejects.toMatchObject({
+      code: 'update_download_failed',
+    })
+    await expect(
+      setup({ apply: new DomainError('update_not_installable') }).updates.install(),
+    ).rejects.toMatchObject({ code: 'update_not_installable' })
+  })
+})

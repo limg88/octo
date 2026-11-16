@@ -9,6 +9,8 @@ import {
   cleanTodaySettings,
   DECISION_STATES,
   IMPORTANCES,
+  MAIL_ADDRESSEES,
+  MAIL_TURNS,
   NO_RISKS,
   NO_TODAY_SETTINGS,
   OCTO_FOLDER,
@@ -44,6 +46,9 @@ const settingsSchema = z.object({
     .default([]),
   mutedKinds: z.array(z.string()).default([]),
   ownAddresses: z.array(z.string()).default([]),
+  mailTurns: z
+    .array(z.object({ conversation: z.string(), turn: z.enum(MAIL_TURNS), at: z.string() }))
+    .default([]),
 })
 
 const evaluationSchema = z.object({
@@ -58,6 +63,8 @@ const evaluationSchema = z.object({
         quote: z.string(),
         quoteVerified: z.boolean(),
         deadline: z.string().nullable().default(null),
+        addressee: z.enum(MAIL_ADDRESSEES).optional(),
+        addresseeName: z.string().nullable().optional(),
       }),
     )
     .default({}),

@@ -103,6 +103,10 @@ export const messages = {
     toDo: 'Da fare oggi',
     toDoCount: (shown: number, all: number) => (shown === all ? `${all}` : `${shown} di ${all}`),
     watch: 'Da tenere d’occhio',
+    watchWhat: 'Che cosa',
+    watchDetail: 'Dettaglio',
+    watchActions: 'Azioni',
+    mutedNone: 'Nessuno: mostro ogni tipo di segnalazione.',
     nothing: 'Oggi Octo non ha nulla da segnalarti.',
     nothingToDo: 'Niente da fare oggi.',
     more: (count: number) => (count === 1 ? 'Mostra l’altra' : `Mostra le altre ${count}`),
@@ -113,6 +117,10 @@ export const messages = {
     later: 'Rimanda',
     mute: 'Non mi interessa',
     noAnswerNeeded: 'Non serve risposta',
+    notMine: 'Non tocca a me',
+    notMineHint: 'La conversazione passa fra quelle da seguire, anche per le prossime mail.',
+    mine: 'Tocca a me',
+    mineHint: 'La mail torna fra quelle a cui rispondere.',
     laterTomorrow: 'A domani',
     laterMonday: 'A lunedì',
     laterWeek: 'Fra una settimana',
@@ -159,12 +167,13 @@ export const messages = {
       unverified: 'frase non trovata nella mail',
       deadline: (day: string) => `chiede una risposta entro il ${day}`,
       explain:
-        'Che una mail aspetti lo calcola Octo. Quanto è importante lo valuta Claude, leggendo il progetto: è un giudizio, con la frase su cui si fonda.',
+        'Che una mail aspetti lo calcola Octo. Se sei l’unico destinatario tocca a te; per le altre Claude legge a chi è rivolta la richiesta e quanto pesa: è un giudizio, con la frase su cui si fonda. Ciò che non tocca a te sta in «Da tenere d’occhio», una riga per conversazione.',
     },
     kinds: {
       source: 'Fonti',
       tracker_old: 'Tracker del cliente',
       mail_reply: 'Mail a cui rispondere',
+      mail_follow: 'Mail da seguire',
       mail_waiting: 'In attesa di altri',
       hours: 'Ore',
       forecast: 'Previsionale',
@@ -240,6 +249,8 @@ export const messages = {
     title: 'Parti delle impostazioni del progetto',
     links: 'Collegamenti',
     team: 'Persone e calendario',
+    today: 'Pagina «Oggi»',
+    deliverables: 'Carta intestata',
     advanced: 'Avanzate',
   },
   advanced: 'Avanzate',
@@ -323,6 +334,18 @@ export const messages = {
     'Un progetto è una cartella del tuo computer. Aggiungine una per fare domande su ciò che contiene.',
   projectShortcut: 'Con ⌘ o Ctrl e un numero passi al progetto in quella posizione.',
   ask: 'Chiedi',
+  askChats: {
+    title: 'Conversazioni',
+    fresh: 'Nuova chat',
+    freshHint:
+      'Chat nuova: fai una domanda. Le domande successive di questa chat tengono conto delle precedenti; le fonti sono ricontrollate a ogni risposta.',
+    none: 'Nessuna chat ancora.',
+    legacy: 'Domande precedenti',
+    filter: 'Cerca fra le chat',
+    nothingFound: 'Nessuna chat corrisponde.',
+    about: (when: string, questions: number) =>
+      `${when} · ${questions === 1 ? '1 domanda' : `${questions} domande`}`,
+  },
   askPlaceholder: 'Chiedi qualcosa su questo progetto…',
   askSubmit: 'Chiedi',
   askCancel: 'Ferma',
@@ -580,6 +603,33 @@ export const messages = {
   },
   progressTab: 'Avanzamento',
   progress: {
+    invoices: {
+      title: 'Che cosa risulta su NetSuite',
+      billedTotal: 'Fatturato su NetSuite',
+      salesOrders: 'Ordini di vendita di NetSuite',
+      linkHint: (order: string) =>
+        `NetSuite non conosce il numero d’ordine del cliente${order === '' ? '' : ` (${order})`}: dimmi quali suoi ordini di vendita sono quest’ordine. Da lì leggo le fatture emesse.`,
+      suggested: (orders: string) =>
+        `Propongo ${orders}: ha fatture con gli stessi importi delle posizioni.`,
+      link: 'Collega',
+      change: (orders: string) => `Ordine di vendita: ${orders} · Cambia`,
+      columnPosition: 'Posizione',
+      columnAmount: 'Importo',
+      columnState: 'Su NetSuite',
+      billed: 'Fatturata',
+      notBilled: 'Non fatturata',
+      invoice: (id: string, day: string, status: string) =>
+        [`fattura ${id}`, day === '' ? '' : `del ${day}`, status].filter(Boolean).join(' · '),
+      fulfilled: 'Ordine evaso: tutto il valore dell’ordine è fatturato.',
+      unregistered: (count: number, ids: string) =>
+        count === 1
+          ? `La fattura ${ids} non è fra le richieste di Octo.`
+          : `${count} fatture non sono fra le richieste di Octo: ${ids}.`,
+      register: 'Registra come richieste già fatte',
+      unmatched: (invoices: string) =>
+        `Fatture sull’ordine che non hanno l’importo di una posizione: ${invoices}.`,
+      how: 'Una posizione risulta fatturata quando sull’ordine di vendita c’è una fattura del suo stesso importo. Le note di credito senza ordine di vendita non sono contate.',
+    },
     loading: 'Preparo l’avanzamento…',
     intro:
       'Qui prepari il modulo con cui chiedi al cliente di riconoscere una quota dell’ordine: una richiesta per fattura. Octo calcola le percentuali di ogni posizione dagli importi che scrivi e compila una copia del modulo: quello vuoto non lo tocca.',
@@ -743,7 +793,6 @@ export const messages = {
     monthData: 'Dati del mese',
     moreData: 'Altri dati',
     forCode: (label: string, code: string) => `${label}, ${code}`,
-    revenueComputed: 'calcolati',
     daysWithUnit: (days: string) => `${days} gg`,
     remedy: {
       save: 'Salva',
@@ -772,7 +821,13 @@ export const messages = {
     columnMarginMonth: 'Margine mese',
     columnMarginEnd: 'Margine finale',
     columnToInvoice: 'Da fatturare',
-    columnNote: 'Note',
+    howComputed: 'Come è calcolato:',
+    columnOwnRevenue: 'Ricavi corretti',
+    columnOwnNote: 'Tua nota',
+    groupComputed: 'Calcolato da Octo',
+    groupOwn: 'Da te, per questo mese',
+    inputsHint:
+      'A sinistra ciò che Octo calcola (sotto ogni riga, come lo ha calcolato), a destra ciò che puoi aggiungere tu: tutto facoltativo. «Ricavi corretti» sostituisce i ricavi calcolati; vuoto, valgono quelli calcolati. «Da fatturare» e «Tua nota» finiscono nel modello così come li scrivi.',
     noRows: 'Il modello non elenca codici di progetto.',
     money: (value: number) =>
       value.toLocaleString('it-IT', {
@@ -1052,6 +1107,27 @@ export const messages = {
   ownKindSave: 'Salva nel catalogo',
   ownKindEdit: 'Modifica',
   ownKindRemove: 'Elimina',
+  kindTemplate: {
+    title: 'Modello di questo tipo',
+    none: 'Nessun modello: il testo segue le istruzioni del tipo ed esce sulla carta intestata del progetto, se c’è.',
+    choose: 'Scegli un modello (.docx o .pptx)',
+    remove: 'Togli',
+    removeFormat: (format: string) => `Togli il modello ${format}`,
+    format: { docx: 'Word', pptx: 'PowerPoint' },
+    does: {
+      docx: 'la bozza ha le sezioni del documento, e il file Word esce sulla sua carta.',
+      pptx: 'la bozza segue le slide della presentazione, e l’approvato esce anche in PowerPoint.',
+    },
+    hint: 'Il modello vale solo per questo tipo di deliverable, in questo progetto. Octo ne tiene una copia nel progetto: l’originale non viene toccato.',
+    newKindHint:
+      'Un tipo può avere un modello Word o PowerPoint: lo scegli con «Salva e scegli un modello».',
+    saveAndChoose: 'Salva e scegli un modello',
+  },
+  deliverableSettings: {
+    title: 'Deliverable',
+    intro:
+      'Qui sta ciò che vale per tutti i deliverable del progetto. Il modello di un tipo si sceglie nel tipo, in «Deliverable».',
+  },
   letterheadTitle: 'Carta intestata',
   letterheadNone: 'Nessuna: i file Word escono su pagina bianca.',
   letterheadSet: 'Impostata: i file Word escono sulla tua carta intestata.',
@@ -1062,6 +1138,8 @@ export const messages = {
   deckModelTitle: 'Modello delle presentazioni',
   deckModelNone: 'Nessuno: lo stato di avanzamento esce solo come testo e Word.',
   deckModelSet: 'Impostato: lo stato di avanzamento approvato esce anche come presentazione.',
+  deckModelLegacyHint:
+    'Scelto prima che i modelli fossero per tipo: vale per i tipi con presentazione che non hanno un modello loro. Puoi toglierlo e sceglierne uno nel tipo.',
   deckModelHint:
     'Scegli una presentazione già fatta per questo cliente, per esempio quella del periodo scorso. Octo ne tiene una copia nel progetto e ne segue la scaletta: le stesse slide, con testi e tabelle aggiornati al periodo che chiedi. Dove il progetto non ha dati la slide viene tolta o la cella resta vuota, e te lo dice: non resta mai un numero del periodo scorso.',
   deckModelChoose: 'Scegli una presentazione',
@@ -1185,9 +1263,49 @@ export const messages = {
   documentsNever: 'Mai convertiti.',
   documentsLastRun: (at: string, written: number, unchanged: number) =>
     `Ultima conversione ${at}: ${written} aggiornati, ${unchanged} già pronti.`,
+  knownList: {
+    chosen: (label: string) => `Scelti: ${label}`,
+    noneChosen: 'Nessuno scelto.',
+    remove: (value: string) => `Togli ${value}`,
+    searchIn: (label: string) => `Cerca: ${label}`,
+    search: (values: number) => `Cerca fra ${values} valori`,
+    nothingFound: 'Nessun valore corrisponde.',
+  },
+  rows: {
+    count: (rows: number) => (rows === 1 ? '1 riga' : `${rows} righe`),
+  },
+  table: {
+    filter: 'Filtra',
+    filterOf: (label: string) => `Filtra: ${label}`,
+    shown: (shown: number, all: number) => `${shown} di ${all}`,
+    none: 'Nessuna riga corrisponde.',
+    sortBy: (label: string) => `Ordina per ${label}`,
+  },
+  ownPeopleOnly: {
+    label: 'Solo le voci assegnate alle nostre persone',
+    hint: 'Le nostre persone sono quelle segnate «fornitore» in Impostazioni › Persone e calendario. Il nome può essere scritto in qualsiasi ordine («Rossi Mario» è «Mario Rossi»). Le voci non assegnate e quelle di chi non è in elenco restano fuori; se l’elenco non ha nessun «fornitore», non filtro nulla.',
+  },
+  diskAccess: {
+    open: 'Apri «Accesso completo al disco»',
+    hint: 'Poi chiudi e riapri Octo.',
+    afterUpdate: (version: string) =>
+      `Octo è ora alla versione ${version}. macOS toglie l’accesso completo al disco a un’app che cambia: se Octo legge la tua posta di Mail, rimettilo (togli Octo dall’elenco con «−», aggiungilo con «+») e riapri Octo.`,
+    done: 'Fatto',
+  },
+  update: {
+    available: (version: string) => `È disponibile Octo ${version}.`,
+    hint: 'L’aggiornamento scarica la versione nuova, la verifica e riavvia Octo: progetti e impostazioni restano dove sono.',
+    install: 'Aggiorna e riavvia',
+    installing: 'Aggiorno…',
+    preparing: 'Preparo lo scaricamento…',
+    downloading: (percent: number) => `Scarico la versione nuova: ${percent}%.`,
+    restarting: 'Scaricata e verificata: Octo si chiude e riparte fra un momento.',
+    later: 'Più tardi',
+  },
   agentMissingTitle: 'Claude non è installato su questo computer',
   agentMissingBody:
     'Octo usa Claude Code con il tuo account. Installalo, accedi una volta dal terminale con «claude» e riapri Octo.',
+  agentRetry: 'Riprova',
   agentReady: (version: string) => `Claude ${version}`,
   citation: {
     panel: 'Fonte citata',
@@ -1287,7 +1405,7 @@ const errors: Record<ErrorCode, string> = {
   source_config_invalid: 'Controlla il giorno di inizio e la cartella: uno dei due non è valido.',
   source_busy: 'Una lettura è già in corso.',
   mail_archive_unreadable:
-    'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo.',
+    'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo. Dopo un aggiornamento di Octo il permesso va rimesso: togli Octo dall’elenco con «−» e aggiungilo di nuovo con «+».',
   mail_reader_missing: 'Su questo sistema la lettura della posta non è ancora disponibile.',
   meetings_root_unreadable:
     'Non riesco ad aprire la cartella in cui Verbale esporta. Controlla in «Impostazioni» che sia quella giusta e che esista su questo computer.',
@@ -1374,6 +1492,17 @@ const errors: Record<ErrorCode, string> = {
   deck_model_invalid:
     'Questo file non è una presentazione che posso usare come modello: serve almeno una slide, dopo la copertina, con un titolo.',
   letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',
+  update_check_failed:
+    'Non riesco a controllare se c’è una versione nuova di Octo. Riprovo più tardi.',
+  update_unavailable: 'Non c’è una versione più nuova per questo computer.',
+  update_download_failed:
+    'Non riesco a scaricare la versione nuova: controlla la connessione e riprova.',
+  update_checksum_missing:
+    'La versione nuova non dichiara la sua impronta: non la installo, perché non posso verificarla.',
+  update_checksum_mismatch:
+    'Il file scaricato non è quello pubblicato: non lo installo. Riprova; se succede ancora, scarica Octo a mano.',
+  update_not_installable:
+    'Non posso sostituire Octo dov’è ora. Spostalo nella cartella Applicazioni (non aprirlo dal disco di installazione) e riprova.',
   unexpected: 'Qualcosa non ha funzionato. Riprova.',
 }
 

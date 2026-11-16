@@ -235,6 +235,7 @@ describe('the alignment', () => {
     await waitFor(() => expect(api.chooseProjectPath).toHaveBeenCalledWith('p-1', 'folder', []))
     type(text.ticketFolder, 'ticket')
     type(text.exportPath, 'dati/sprint.json')
+    fireEvent.click(screen.getByLabelText(messages.ownPeopleOnly.label))
     fireEvent.click(save)
     await waitFor(() =>
       expect(api.saveAlignmentSettings).toHaveBeenCalledWith('p-1', {
@@ -242,6 +243,7 @@ describe('the alignment', () => {
         sprint: 'Sprint 28',
         period: 'PI7',
         tags: ['Squadra', 'Altri'],
+        ownPeopleOnly: true,
         exportPath: 'dati/sprint.json',
         ticketFolder: 'ticket',
         referencePrefixes: ['AZDO'],

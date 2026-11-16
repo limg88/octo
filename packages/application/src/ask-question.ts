@@ -1,10 +1,12 @@
 import {
   type CheckedAnswer,
+  type ConversationTurn,
   checkAnswer,
   cleanQuestion,
   type DomainErrorCode,
   type DraftAnswer,
   type Evidence,
+  earlierTurns,
   isDomainError,
   type LiveSource,
   type ModelSettings,
@@ -35,6 +37,8 @@ export type AskQuestionDeps = {
 export type AskQuestionInput = {
   project: Project
   question: string
+  /** The conversation the question continues; absent or null: it starts a new one. */
+  conversationId?: string | null
   onProgress?: (progress: AgentProgress) => void
   signal?: AbortSignal
 }
@@ -62,6 +66,7 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
   async function outcome(
     input: AskQuestionInput,
     question: string,
+    history: ConversationTurn[],
   ): Promise<Pick<QuestionRecord, 'answer' | 'error' | 'model'>> {
     let model: string | null = null
     try {
@@ -69,6 +74,7 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
       const draft = await deps.agent.ask({
         projectFolder: input.project.folder,
         question,
+        history,
         model: chosen,
         liveSources: (await deps.liveSources?.(input.project)) ?? [],
         onModel: (used) => {
@@ -87,13 +93,20 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
   return async function askQuestion(input) {
     const question = cleanQuestion(input.question)
     const startedAt = deps.clock.now()
-    const result = await outcome(input, question)
+    const id = deps.ids.next()
+    const conversationId = input.conversationId ?? deps.ids.next()
+    // A conversation just started has nothing before it: the history is not even read.
+    const history = input.conversationId
+      ? earlierTurns(await deps.questions.list(input.project.folder), conversationId)
+      : []
+    const result = await outcome(input, question, history)
     const record: QuestionRecord = {
-      id: deps.ids.next(),
+      id,
       projectId: input.project.id,
       question,
       askedAt: startedAt.toISOString(),
       durationMs: deps.clock.now().getTime() - startedAt.getTime(),
+      conversationId,
       ...result,
     }
     await deps.questions.append(input.project.folder, record)

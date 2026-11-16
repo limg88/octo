@@ -9,6 +9,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { BUG_FILTERS, type BugFilter, type DashboardFocus, NO_DASHBOARD_FOCUS } from './context.ts'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { presetRange, RANGE_PRESETS, type RangePreset, wholeDays } from './dashboard-range.ts'
 import { Failure } from './Failure.tsx'
 import { dateText, dateTimeText, messages } from './messages.ts'
@@ -611,59 +612,84 @@ function RequirementTable({
   onClear: (id: string) => void
   onRemoveSignal: (id: string, signal: string) => void
 }) {
-  return (
-    <table className="data">
-      <thead>
-        <tr>
-          <th>{text.columnId}</th>
-          <th>{text.columnTitle}</th>
-          <th>{text.columnState}</th>
-          <th>{text.columnPeriod}</th>
-          <th>{text.columnSignals}</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.id}>
-            <td>{row.id}</td>
-            <td>
-              {row.title}
-              {row.unclear && <p className="cell-text">«…{row.unclear.context}…»</p>}
-            </td>
-            <td>{row.state}</td>
-            <td>{row.period ?? '—'}</td>
-            <td>
-              <ul className="signals">
-                {row.signals.map((signal) => (
-                  <li key={signal}>
-                    <span className="status status-warning">
-                      {signal} · {text.signals[signal]}
-                    </span>
-                    <button
-                      type="button"
-                      className="quiet"
-                      onClick={() => onRemoveSignal(row.id, signal)}
-                    >
-                      {text.removeSignal(signal)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </td>
-            <td>
+  const columns: DataColumn<RequirementRow>[] = [
+    {
+      key: 'id',
+      label: text.columnId,
+      width: '70px',
+      cell: (row) => row.id,
+      sort: (row) => row.id,
+      text: (row) => row.id,
+    },
+    {
+      key: 'title',
+      label: text.columnTitle,
+      cell: (row) => (
+        <>
+          {row.title}
+          {row.unclear && <p className="cell-text">«…{row.unclear.context}…»</p>}
+        </>
+      ),
+      sort: (row) => row.title,
+      text: (row) => row.title,
+    },
+    {
+      key: 'state',
+      label: text.columnState,
+      width: '110px',
+      cell: (row) => row.state,
+      sort: (row) => row.state,
+      text: (row) => row.state,
+    },
+    {
+      key: 'period',
+      label: text.columnPeriod,
+      width: '90px',
+      cell: (row) => row.period ?? '—',
+      sort: (row) => row.period,
+      text: (row) => row.period ?? '',
+    },
+    {
+      key: 'signals',
+      label: text.columnSignals,
+      width: '290px',
+      cell: (row) => (
+        <ul className="signals">
+          {row.signals.map((signal) => (
+            <li key={signal} className="signal status-warning">
+              <span>
+                {signal} · {text.signals[signal]}
+              </span>
               <button
                 type="button"
-                className="no-wrap"
-                title={text.markClearHint}
-                onClick={() => onClear(row.id)}
+                className="signal-remove"
+                aria-label={text.removeSignal(signal)}
+                title={text.removeSignal(signal)}
+                onClick={() => onRemoveSignal(row.id, signal)}
               >
-                {text.markClear}
+                ×
               </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </li>
+          ))}
+        </ul>
+      ),
+      sort: (row) => row.signals.length,
+      text: (row) => row.signals.map((signal) => `${signal} ${text.signals[signal]}`).join(' '),
+    },
+    {
+      key: 'clear',
+      label: '',
+      name: text.markClear,
+      kind: 'actions',
+      width: '100px',
+      cell: (row) => (
+        <button type="button" title={text.markClearHint} onClick={() => onClear(row.id)}>
+          {text.markClear}
+        </button>
+      ),
+    },
+  ]
+  return (
+    <DataTable label={text.columnSignals} columns={columns} rows={rows} rowKey={(row) => row.id} />
   )
 }

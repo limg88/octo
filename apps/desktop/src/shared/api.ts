@@ -39,6 +39,7 @@ import type {
   HoursSettings,
   MailPreview,
   MailSourceConfig,
+  MailTurn,
   MeetingsSourceConfig,
   ModelSettings,
   OwnKindInput,
@@ -53,7 +54,10 @@ import type {
   SourceRun,
   SourceState,
   StoredMeeting,
+  TemplateFormat,
   TodayKind,
+  UpdateOffer,
+  UpdateProgress,
 } from '@octo/domain'
 
 /** A failure that is not one of the expected ones: the detail is in the app's log. */
@@ -98,6 +102,9 @@ export const CHANNELS = {
   deliverablesProgress: 'deliverables:progress',
   instructionsGet: 'deliverables:instructions:get',
   instructionsSave: 'deliverables:instructions:save',
+  kindTemplates: 'deliverables:templates:list',
+  kindTemplateChoose: 'deliverables:templates:choose',
+  kindTemplateRemove: 'deliverables:templates:remove',
   letterheadGet: 'deliverables:letterhead:get',
   letterheadChoose: 'deliverables:letterhead:choose',
   letterheadRemove: 'deliverables:letterhead:remove',
@@ -129,6 +136,12 @@ export const CHANNELS = {
   progressCandidates: 'progress:candidates',
   progressView: 'progress:view',
   progressCompile: 'progress:compile',
+  updateCheck: 'update:check',
+  updateInstall: 'update:install',
+  updateProgress: 'update:progress',
+  updateJustDone: 'update:just-done',
+  diskAccessOpen: 'system:disk-access:open',
+  progressRegisterInvoices: 'progress:invoices:register',
   alignmentSettingsGet: 'alignment:settings:get',
   alignmentSettingsSave: 'alignment:settings:save',
   alignmentView: 'alignment:view',
@@ -150,6 +163,7 @@ export const CHANNELS = {
   todayView: 'today:view',
   todayDecide: 'today:decide',
   todayMute: 'today:mute',
+  todayMailTurn: 'today:mail-turn',
   todayAddresses: 'today:addresses',
   todayEvaluate: 'today:evaluate',
   todayCancel: 'today:cancel',
@@ -194,7 +208,24 @@ export type OctoApi = {
   /** Puts back, as it was, a project taken off the list. */
   restoreProject(projectId: string): Promise<Result<Project>>
   listQuestions(projectId: string): Promise<Result<QuestionRecord[]>>
-  ask(projectId: string, question: string): Promise<Result<QuestionRecord>>
+  /** The newer Octo there is for this computer; null when this one is the latest. */
+  checkForUpdate(): Promise<Result<UpdateOffer | null>>
+  /** Replaces this Octo with the newer one and starts it: when it answers, Octo is closing. */
+  installUpdate(): Promise<Result<null>>
+  onUpdateProgress(listener: (progress: UpdateProgress) => void): () => void
+  /**
+   * The version Octo was just updated to, when this is its first start after an update on a
+   * system that then takes its permissions away; null otherwise. Told once.
+   */
+  updateJustDone(): Promise<Result<string | null>>
+  /** Opens the settings of the system where Octo is given access to the whole disk. */
+  openDiskAccessSettings(): Promise<Result<null>>
+  /** Asks in a conversation, or starts one when `conversationId` is null. */
+  ask(
+    projectId: string,
+    question: string,
+    conversationId: string | null,
+  ): Promise<Result<QuestionRecord>>
   cancelAsk(projectId: string): Promise<Result<null>>
   openEvidence(projectId: string, path: string): Promise<Result<null>>
   mailSource(projectId: string): Promise<Result<MailSourceView>>
@@ -275,6 +306,18 @@ export type OctoApi = {
     kindId: string,
     text: string,
   ): Promise<Result<null>>
+  /** The formats each kind of deliverable has a template in. */
+  kindTemplates(projectId: string): Promise<Result<Record<string, TemplateFormat[]>>>
+  /**
+   * Lets the PM choose a Word document or a presentation as the template of a kind; gives the
+   * format taken, or null when the PM closes the dialog.
+   */
+  chooseKindTemplate(projectId: string, kindId: string): Promise<Result<TemplateFormat | null>>
+  removeKindTemplate(
+    projectId: string,
+    kindId: string,
+    format: TemplateFormat,
+  ): Promise<Result<null>>
   /** Whether the project has a letterhead its Word files are written on. */
   hasLetterhead(projectId: string): Promise<Result<boolean>>
   /** Lets the PM choose a Word document as letterhead; false when the PM closes the dialog. */
@@ -326,6 +369,8 @@ export type OctoApi = {
   progressCandidates(projectId: string): Promise<Result<string[]>>
   /** The share of each order position after each request. */
   progressView(projectId: string): Promise<Result<ProgressView>>
+  /** Takes the invoices of the company system Octo did not know as requests already made. */
+  registerProgressInvoices(projectId: string): Promise<Result<ProgressSettings>>
   /** Writes the filled form of request `n`; the empty form is never touched. */
   compileProgress(projectId: string, n: number): Promise<Result<ProgressFile>>
   alignmentSettings(projectId: string): Promise<Result<AlignmentSettings>>
@@ -382,6 +427,11 @@ export type OctoApi = {
     until: string | null,
   ): Promise<Result<TodayView>>
   muteTodayKind(projectId: string, kind: TodayKind, muted: boolean): Promise<Result<TodayView>>
+  /**
+   * The PM's word on the conversation of a mail signal: theirs to answer, or not. Null takes it
+   * back, and the code and Claude decide again.
+   */
+  setMailTurn(projectId: string, key: string, turn: MailTurn | null): Promise<Result<TodayView>>
   saveOwnAddresses(projectId: string, addresses: string[]): Promise<Result<TodayView>>
   /** Asks Claude to weigh the mail that waits; `all` weighs again what was already weighed. */
   evaluateToday(projectId: string, all: boolean): Promise<Result<TodayView>>

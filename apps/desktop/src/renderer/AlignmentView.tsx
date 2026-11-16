@@ -2,6 +2,7 @@ import type { AlignmentChoices, AlignmentFile, AlignmentView as View } from '@oc
 import type { AlignedPair, AlignmentSettings, Project } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, PathKind } from '../shared/api.ts'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { KnownList } from './KnownList.tsx'
@@ -162,10 +163,31 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
   )
 }
 
+/** What a cell shows: plain words, or something drawn together with the words it stands for. */
+type ListCell = string | { show: ReactNode; words: string }
+type ListRow = { key: string; cells: ListCell[] }
+
+const shownOf = (cell: ListCell | undefined): ReactNode =>
+  typeof cell === 'object' ? cell.show : (cell ?? '')
+const wordsOf = (cell: ListCell | undefined): string =>
+  typeof cell === 'object' ? cell.words : (cell ?? '')
+
+/** Widths of the columns that hold a short code, so that titles get the room. */
+const ID_WIDTH = '80px'
+const TICKET_WIDTH = '140px'
+const STATE_WIDTH = '150px'
+const PAIR_WIDTHS = [ID_WIDTH, undefined, TICKET_WIDTH, '220px', '110px']
+
+function coherenceWords(value: boolean | null): string {
+  if (value === null) return text.coherent.unknown
+  return value ? text.coherent.yes : text.coherent.no
+}
+
 function List({
   title,
   intro,
   columns,
+  widths = [],
   rows,
   folded = false,
   children,
@@ -173,31 +195,29 @@ function List({
   title: string
   intro?: string
   columns: string[]
-  rows: Array<{ key: string; cells: ReactNode[] }>
+  /** A CSS width for each column, in order; a column without one shares the room left. */
+  widths?: ReadonlyArray<string | undefined>
+  rows: ListRow[]
   /** A list read for reference, not acted upon: one line that opens. */
   folded?: boolean
   children?: ReactNode
 }) {
   const table = (
-    <table className="data">
-      <thead>
-        <tr>
-          {columns.map((column) => (
-            <th key={column}>{column}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.key}>
-            {row.cells.map((cell, at) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a cell is its column.
-              <td key={at}>{cell}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      label={title}
+      columns={columns.map(
+        (label, at): DataColumn<ListRow> => ({
+          key: String(at),
+          label,
+          width: widths[at],
+          cell: (row) => shownOf(row.cells[at]),
+          sort: (row) => wordsOf(row.cells[at]),
+          text: (row) => wordsOf(row.cells[at]),
+        }),
+      )}
+      rows={rows}
+      rowKey={(row) => row.key}
+    />
   )
   if (folded) {
     return (
@@ -248,14 +268,14 @@ function Result({
   onOpen: (path: string) => void
 }) {
   const { alignment } = view
-  const pairRow = (pair: AlignedPair, extra: ReactNode[] = []) => ({
+  const pairRow = (pair: AlignedPair, extra: ListCell[] = []): ListRow => ({
     key: pair.item.id,
     cells: [
       pair.item.id,
       pair.item.title,
       keysOf(pair),
       statesOf(pair),
-      <Coherence key="coherence" value={pair.coherent} />,
+      { show: <Coherence value={pair.coherent} />, words: coherenceWords(pair.coherent) },
       ...extra,
     ],
   })
@@ -295,6 +315,7 @@ function Result({
       <List
         title={text.missingTitle}
         columns={[text.columnItem, text.columnTitle, text.columnType, text.columnState]}
+        widths={[ID_WIDTH, undefined, STATE_WIDTH, STATE_WIDTH]}
         rows={alignment.missing.map((item) => ({
           key: item.id,
           cells: [item.id, item.title, item.type, item.state],
@@ -319,6 +340,7 @@ function Result({
       <List
         title={text.needsUpdateTitle}
         columns={[...pairColumns, text.columnTicketSprint]}
+        widths={[...PAIR_WIDTHS, STATE_WIDTH]}
         rows={alignment.needsUpdate.map((pair) =>
           pairRow(pair, [pair.tickets.map((ticket) => ticket.sprint ?? text.noSprint).join(', ')]),
         )}
@@ -327,6 +349,7 @@ function Result({
         <List
           title={text.duplicatesTitle}
           columns={[text.columnItem, text.columnTitle, text.columnTicket]}
+          widths={[ID_WIDTH, undefined, '260px']}
           rows={alignment.duplicates.map((pair) => ({
             key: pair.item.id,
             cells: [pair.item.id, pair.item.title, keysOf(pair)],
@@ -337,6 +360,7 @@ function Result({
         <List
           title={text.orphansTitle}
           columns={[text.columnTicket, text.columnTitle, text.columnIds, text.columnReason]}
+          widths={[TICKET_WIDTH, undefined, STATE_WIDTH, '220px']}
           rows={alignment.orphans.map((orphan) => ({
             key: orphan.ticket.key,
             cells: [
@@ -353,6 +377,7 @@ function Result({
           title={text.suggestionsTitle}
           intro={text.suggestionsIntro}
           columns={[text.columnItem, text.columnTitle, text.columnTicket, text.columnScore]}
+          widths={[ID_WIDTH, undefined, undefined, STATE_WIDTH]}
           rows={alignment.suggestions.map((suggestion) => ({
             key: suggestion.item.id,
             cells: [
@@ -369,12 +394,14 @@ function Result({
         folded
         title={text.linkedTitle}
         columns={pairColumns}
+        widths={PAIR_WIDTHS}
         rows={alignment.linked.map((pair) => pairRow(pair))}
       />
       <List
         folded
         title={text.unreferencedTitle}
         columns={[text.columnTicket, text.columnTitle, text.columnState]}
+        widths={[TICKET_WIDTH, undefined, STATE_WIDTH]}
         rows={alignment.unreferenced.map((ticket) => ({
           key: ticket.key,
           cells: [ticket.key, ticket.title, ticket.status],
@@ -385,7 +412,7 @@ function Result({
 }
 
 /** The fields of the form that hold one typed value. */
-type TextField = Exclude<keyof Draft, 'stateGroups' | 'tags'>
+type TextField = Exclude<keyof Draft, 'stateGroups' | 'tags' | 'ownPeopleOnly'>
 
 /** The known values, with the one in use kept among them even when it is no longer known. */
 const withCurrent = (known: readonly string[], current: string): string[] =>
@@ -395,6 +422,7 @@ type Draft = {
   sprint: string
   period: string
   tags: string[]
+  ownPeopleOnly: boolean
   exportPath: string
   ticketFolder: string
   referencePrefixes: string
@@ -405,6 +433,7 @@ const draftOf = (settings: AlignmentSettings): Draft => ({
   sprint: settings.sprint,
   period: settings.period,
   tags: settings.tags,
+  ownPeopleOnly: settings.ownPeopleOnly,
   exportPath: settings.exportPath,
   ticketFolder: settings.ticketFolder,
   referencePrefixes: listText(settings.referencePrefixes),
@@ -466,6 +495,7 @@ function SettingsForm({
           sprint: draft.sprint,
           period: draft.period,
           tags: draft.tags,
+          ownPeopleOnly: draft.ownPeopleOnly,
           exportPath: draft.exportPath,
           ticketFolder: draft.ticketFolder,
           referencePrefixes: listOf(draft.referencePrefixes),
@@ -509,6 +539,17 @@ function SettingsForm({
         chosen={draft.tags}
         onChange={(tags) => setDraft((current) => ({ ...current, tags }))}
       />
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={draft.ownPeopleOnly}
+          onChange={(event) =>
+            setDraft((current) => ({ ...current, ownPeopleOnly: event.target.checked }))
+          }
+        />
+        {messages.ownPeopleOnly.label}
+      </label>
+      <p className="hint">{messages.ownPeopleOnly.hint}</p>
       {input('referencePrefixes', text.referencePrefixes)}
       <h4>{text.stateGroups}</h4>
       <p className="hint">{text.stateGroupsHint}</p>

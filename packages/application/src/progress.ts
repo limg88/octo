@@ -2,7 +2,12 @@ import {
   cleanProgressSettings,
   computeProgress,
   DomainError,
+  type InvoicedOrder,
+  type InvoiceLine,
+  invoicedOrder,
+  invoiceLineOf,
   isDomainError,
+  knownSalesOrders,
   OCTO_FOLDER,
   type ProgressComputation,
   type ProgressSettings,
@@ -10,8 +15,11 @@ import {
   type Project,
   progressFormCells,
   progressWarnings,
+  suggestedSalesOrders,
+  withInvoicesAsRequests,
 } from '@octo/domain'
 import type {
+  FeedRows,
   MemoryWriter,
   ProgressSettingsStore,
   ProjectFiles,
@@ -23,12 +31,33 @@ export type ProgressDeps = {
   files: ProjectFiles
   sheets: SpreadsheetModel
   writer: MemoryWriter
+  records: FeedRows
+  /** Where the company system is written in the project; null: the project does not read it. */
+  invoicesFolder: (project: Project) => Promise<string | null>
+}
+
+/** The view of the company system that lists the invoices, one row per line. */
+export const INVOICES_VIEW = 'v_invoice_all'
+
+/** What the company system says of the order, and the sales orders it could be. */
+export type ProgressInvoices = {
+  /** Every sales order the invoices of the project name. */
+  salesOrders: string[]
+  /** Those with an invoice of the amount of a position: proposed to the PM. */
+  suggested: string[]
+  /** Null while the PM has not said which sales orders are this order. */
+  order: InvoicedOrder | null
 }
 
 /** Where Octo puts the filled forms. The empty form is never touched. */
 export const PROGRESS_FOLDER = `${OCTO_FOLDER}/avanzamento`
 
-export type ProgressView = { computation: ProgressComputation; warnings: ProgressWarning[] }
+export type ProgressView = {
+  computation: ProgressComputation
+  warnings: ProgressWarning[]
+  /** Null when the project does not read the company system, or it lists no invoice yet. */
+  invoices: ProgressInvoices | null
+}
 /** A filled form, as a path from the project folder. */
 export type ProgressFile = { n: number; path: string }
 
@@ -39,6 +68,8 @@ export type Progress = {
   candidates(project: Project): Promise<string[]>
   /** The share of each position after each request, computed and not written. */
   view(project: Project): Promise<ProgressView>
+  /** Takes the invoices Octo did not know as requests already made; gives the settings back. */
+  registerInvoices(project: Project): Promise<ProgressSettings>
   /** Writes the form of one request. */
   compile(project: Project, n: number): Promise<ProgressFile>
 }
@@ -63,6 +94,13 @@ function fileName(modelPath: string, n: number): string {
 }
 
 export function createProgress(deps: ProgressDeps): Progress {
+  async function invoiceLines(project: Project): Promise<InvoiceLine[]> {
+    const folder = await deps.invoicesFolder(project)
+    if (folder === null) return []
+    const rows = await deps.records.rows(project.folder, folder, INVOICES_VIEW)
+    return rows.flatMap((row) => invoiceLineOf(row) ?? [])
+  }
+
   return {
     settings: (project) => deps.settings.load(project.folder),
 
@@ -84,10 +122,28 @@ export function createProgress(deps: ProgressDeps): Progress {
 
     async view(project) {
       const settings = await deps.settings.load(project.folder)
+      const lines = await invoiceLines(project)
       return {
         computation: computeProgress(settings.positions, settings.requests),
         warnings: progressWarnings(settings),
+        invoices:
+          lines.length === 0
+            ? null
+            : {
+                salesOrders: knownSalesOrders(lines),
+                suggested: suggestedSalesOrders(lines, settings.positions),
+                order: invoicedOrder(settings, lines),
+              },
       }
+    },
+
+    async registerInvoices(project) {
+      const settings = await deps.settings.load(project.folder)
+      const invoiced = invoicedOrder(settings, await invoiceLines(project))
+      if (invoiced === null || invoiced.unregistered.length === 0) return settings
+      const next = cleanProgressSettings(withInvoicesAsRequests(settings, invoiced))
+      await deps.settings.save(project.folder, next)
+      return next
     },
 
     async compile(project, n) {

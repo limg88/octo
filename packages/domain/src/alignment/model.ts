@@ -34,6 +34,8 @@ export type AlignmentSettings = {
   period: string
   /** Tags that mark the client's items that are the supplier's; none: all of them. */
   tags: string[]
+  /** Only the client's items assigned to the supplier's people of the project are compared. */
+  ownPeopleOnly: boolean
   /** The export of the client's tracker, a file of the project. Empty: the one the dashboard reads. */
   exportPath: string
   /** The folder of the project where the tickets are kept, one file each. Empty: the Jira feed's. */
@@ -49,6 +51,7 @@ export const DEFAULT_ALIGNMENT_SETTINGS: AlignmentSettings = {
   sprint: '',
   period: '',
   tags: [],
+  ownPeopleOnly: false,
   exportPath: '',
   ticketFolder: '',
   referencePrefixes: ['AZDO', 'ADO'],
@@ -71,6 +74,7 @@ export function cleanAlignmentSettings(settings: AlignmentSettings): AlignmentSe
     sprint: settings.sprint.trim(),
     period: settings.period.trim(),
     tags: cleanList(settings.tags),
+    ownPeopleOnly: settings.ownPeopleOnly === true,
     exportPath: settings.exportPath.trim(),
     ticketFolder: settings.ticketFolder.trim(),
     referencePrefixes: cleanList(settings.referencePrefixes)

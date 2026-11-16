@@ -1,4 +1,5 @@
 import type { AgentProgress, FeedingStep } from '@octo/application'
+import type { UpdateProgress } from '@octo/domain'
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS, type OctoApi } from '../shared/api.ts'
 
@@ -11,7 +12,19 @@ const api: OctoApi = {
   chooseProjectPath: (projectId, what, extensions) =>
     ipcRenderer.invoke(CHANNELS.projectsChoosePath, { projectId, what, extensions }),
   listQuestions: (projectId) => ipcRenderer.invoke(CHANNELS.questionsList, { projectId }),
-  ask: (projectId, question) => ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question }),
+  checkForUpdate: () => ipcRenderer.invoke(CHANNELS.updateCheck),
+  installUpdate: () => ipcRenderer.invoke(CHANNELS.updateInstall),
+  onUpdateProgress: (listener) => {
+    const handler = (_event: unknown, progress: UpdateProgress) => listener(progress)
+    ipcRenderer.on(CHANNELS.updateProgress, handler)
+    return () => {
+      ipcRenderer.removeListener(CHANNELS.updateProgress, handler)
+    }
+  },
+  updateJustDone: () => ipcRenderer.invoke(CHANNELS.updateJustDone),
+  openDiskAccessSettings: () => ipcRenderer.invoke(CHANNELS.diskAccessOpen),
+  ask: (projectId, question, conversationId) =>
+    ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question, conversationId }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),
   openEvidence: (projectId, path) => ipcRenderer.invoke(CHANNELS.evidenceOpen, { projectId, path }),
   mailSource: (projectId) => ipcRenderer.invoke(CHANNELS.mailGet, { projectId }),
@@ -66,6 +79,11 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.instructionsGet, { projectId, kindId }),
   saveDeliverableInstructions: (projectId, kindId, text) =>
     ipcRenderer.invoke(CHANNELS.instructionsSave, { projectId, kindId, text }),
+  kindTemplates: (projectId) => ipcRenderer.invoke(CHANNELS.kindTemplates, { projectId }),
+  chooseKindTemplate: (projectId, kindId) =>
+    ipcRenderer.invoke(CHANNELS.kindTemplateChoose, { projectId, kindId }),
+  removeKindTemplate: (projectId, kindId, format) =>
+    ipcRenderer.invoke(CHANNELS.kindTemplateRemove, { projectId, kindId, format }),
   hasLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadGet, { projectId }),
   chooseLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadChoose, { projectId }),
   removeLetterhead: (projectId) => ipcRenderer.invoke(CHANNELS.letterheadRemove, { projectId }),
@@ -92,6 +110,8 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.progressSettingsSave, { projectId, settings }),
   progressCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.progressCandidates, { projectId }),
   progressView: (projectId) => ipcRenderer.invoke(CHANNELS.progressView, { projectId }),
+  registerProgressInvoices: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.progressRegisterInvoices, { projectId }),
   compileProgress: (projectId, n) => ipcRenderer.invoke(CHANNELS.progressCompile, { projectId, n }),
   alignmentSettings: (projectId) =>
     ipcRenderer.invoke(CHANNELS.alignmentSettingsGet, { projectId }),
@@ -137,6 +157,8 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.todayDecide, { projectId, key, state, until }),
   muteTodayKind: (projectId, kind, muted) =>
     ipcRenderer.invoke(CHANNELS.todayMute, { projectId, kind, muted }),
+  setMailTurn: (projectId, key, turn) =>
+    ipcRenderer.invoke(CHANNELS.todayMailTurn, { projectId, key, turn }),
   saveOwnAddresses: (projectId, addresses) =>
     ipcRenderer.invoke(CHANNELS.todayAddresses, { projectId, addresses }),
   evaluateToday: (projectId, all) => ipcRenderer.invoke(CHANNELS.todayEvaluate, { projectId, all }),

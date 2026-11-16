@@ -5,7 +5,14 @@ import type {
   SessionView,
   TodayView as View,
 } from '@octo/application'
-import { NO_RISKS, type Project, type RiskRegister as Register, type TodayItem } from '@octo/domain'
+import {
+  type MailFollowWhy,
+  type MailReplyWhy,
+  NO_RISKS,
+  type Project,
+  type RiskRegister as Register,
+  type TodayItem,
+} from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AllProjectsView } from '../src/renderer/AllProjectsView.tsx'
@@ -115,6 +122,7 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
     todayView: vi.fn(async () => ok(first)),
     decideToday: vi.fn(async () => ok(view({ items: [bugs], hidden: 2 }))),
     muteTodayKind: vi.fn(async () => ok(view({ mutedKinds: ['bugs_stuck'] }))),
+    setMailTurn: vi.fn(async () => ok(view({ items: [bugs] }))),
     saveOwnAddresses: vi.fn(async () => ok(view({ addedAddresses: ['altro@example.test'] }))),
     evaluateToday: vi.fn(async () => ok(first)),
     cancelEvaluateToday: vi.fn(async () => ok(null)),
@@ -304,7 +312,16 @@ describe('the page of the day', () => {
   it('reads the sources again, follows a periodic reading and keeps the settings of the page', async () => {
     const offer = view({ muteOffers: ['bugs_stuck'], mutedKinds: ['meeting'] })
     const { api, changed } = todayApi(offer)
-    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const onOpenSettings = vi.fn()
+    render(
+      <TodayView
+        api={api}
+        project={aurora}
+        canJudge
+        onOpenSection={() => {}}
+        onOpenSettings={onOpenSettings}
+      />,
+    )
     fireEvent.click(await screen.findByRole('button', { name: text.readNow }))
     await waitFor(() => expect(api.fill).toHaveBeenCalledWith('p-1'))
     await waitFor(() => expect(api.todayView).toHaveBeenCalledTimes(2))
@@ -315,17 +332,11 @@ describe('the page of the day', () => {
     expect(screen.getByText(text.muteOffer(text.kinds.bugs_stuck))).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.muteKind }))
     await waitFor(() => expect(api.muteTodayKind).toHaveBeenCalledWith('p-1', 'bugs_stuck', true))
-    fireEvent.click(screen.getByRole('button', { name: text.unmute }))
-    await waitFor(() => expect(api.muteTodayKind).toHaveBeenCalledWith('p-1', 'bugs_stuck', false))
 
-    expect(screen.getByText(text.addressesKnown('pm@example.test'))).toBeTruthy()
-    fireEvent.change(screen.getByLabelText(text.addresses), {
-      target: { value: 'altro@example.test\n\n' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: text.saveAddresses }))
-    await waitFor(() =>
-      expect(api.saveOwnAddresses).toHaveBeenCalledWith('p-1', ['altro@example.test']),
-    )
+    // What is set once for the page is kept with the settings of the project, one click away.
+    expect(screen.queryByLabelText(text.addresses)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: text.settings }))
+    expect(onOpenSettings).toHaveBeenCalledTimes(1)
     // A signal only watched is put away with its own small button.
     fireEvent.click(
       screen.getByRole('button', { name: `${text.mute}: 6 bug fermi da più di 30 giorni` }),
@@ -339,7 +350,6 @@ describe('the page of the day', () => {
     const empty = todayApi(view({ items: [], freshness: [], hidden: 0, ownAddresses: [] }))
     render(<TodayView api={empty.api} project={aurora} canJudge onOpenSection={() => {}} />)
     expect(await screen.findByText(text.nothing)).toBeTruthy()
-    expect(screen.getByText(text.addressesNone)).toBeTruthy()
     cleanup()
 
     const many = Array.from({ length: 9 }, (_, index) =>
@@ -963,5 +973,104 @@ describe('the day as a list with its detail', () => {
     expect(api.openEvidence).toHaveBeenCalledTimes(1)
     await act(async () => finish(ok(null)))
     expect(open.getAttribute('aria-busy')).toBeNull()
+  })
+
+  describe('the mail the PM is written to with others', () => {
+    const judgement = {
+      importance: 'alta' as const,
+      reason: 'Recap della sessione.',
+      quote: 'Ciao a tutti, di seguito il recap',
+      quoteVerified: true,
+      deadline: null,
+      addressee: 'everyone' as const,
+      addresseeName: null,
+    }
+    const follow = (
+      id: string,
+      why: MailFollowWhy,
+      more: { who?: string | null; mails?: number; judged?: boolean } = {},
+    ) =>
+      item(
+        `mail:c:${id}`,
+        'watch',
+        {
+          kind: 'mail_follow',
+          id,
+          path: `Posta/2026-11/${id}.md`,
+          from: 'Racis, Claudia <claudia@cliente.example>',
+          subject: `Aurora: ${id}`,
+          days: 3,
+          judgement: more.judged ? judgement : null,
+          why,
+          who: more.who ?? null,
+          conversation: `aurora: ${id}`,
+          mails: more.mails ?? 1,
+          recipients: 12,
+        },
+        { target: 'mail' },
+      )
+    const reply = (why: MailReplyWhy) =>
+      signalText({ ...mail, facts: { ...mail.facts, why } as TodayItem['facts'] }).detail
+
+    it('is said to be followed, with whom it is for, and never asked an answer of', () => {
+      const words = (entry: TodayItem) => signalText(entry)
+      expect(words(follow('recap', 'everyone', { judged: true, mails: 4 }))).toEqual({
+        title: 'Da seguire: «Aurora: recap» · Racis, Claudia',
+        detail:
+          'Rivolta a tutti, senza chiedere a te. Claude: importanza alta. 4 mail in questa conversazione.',
+      })
+      expect(words(follow('data', 'someone_else', { who: 'Cristian Lena' })).detail).toBe(
+        'Rivolta a Cristian Lena.',
+      )
+      expect(words(follow('data', 'someone_else')).detail).toBe('Rivolta a un’altra persona.')
+      expect(words(follow('piano', 'answered_by_own', { who: 'Rossi, Mario' })).detail).toBe(
+        'Ha già risposto Rossi, Mario.',
+      )
+      expect(words(follow('piano', 'answered_by_own')).detail).toBe(
+        'Ha già risposto uno dei nostri.',
+      )
+      expect(words(follow('verbale', 'nobody')).detail).toBe('Non chiede nulla: è per conoscenza.')
+      expect(words(follow('x', 'chosen')).detail).toBe('Hai detto tu che non tocca a te.')
+      expect(words(follow('x', 'unjudged')).detail).toBe(
+        'Sei fra 12 destinatari: Claude non l’ha ancora letta.',
+      )
+      expect(ageText(follow('x', 'unjudged'))).toBe('da 3 giorni')
+      // A mail that is the PM's says why it is.
+      expect(reply('only_me')).toBe('Aspetta da oggi. Sei l’unico destinatario.')
+      expect(reply('judged')).toBe('Aspetta da oggi. Claude: la richiesta è rivolta a te.')
+      expect(reply('chosen')).toBe('Aspetta da oggi. Hai detto tu che tocca a te.')
+    })
+
+    it('is taken as the PM’s own, or given away, with one click', async () => {
+      const followed = follow('recap', 'everyone', { judged: true })
+      const { api } = todayApi(view({ items: [hours, mail, followed] }))
+      render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+      // Only what is the PM's counts as mail to do.
+      expect(
+        (await screen.findByRole('button', { name: new RegExp(`^${text.groups.mail}`) }))
+          .textContent,
+      ).toContain('1')
+      const watched = screen.getByRole('table', { name: text.watch })
+      expect(within(watched).getByText('Da seguire: «Aurora: recap» · Racis, Claudia')).toBeTruthy()
+      fireEvent.click(
+        within(watched).getByRole('button', {
+          name: `${text.mine}: Da seguire: «Aurora: recap» · Racis, Claudia`,
+        }),
+      )
+      await waitFor(() =>
+        expect(api.setMailTurn).toHaveBeenCalledWith('p-1', 'mail:c:recap', 'mine'),
+      )
+    })
+
+    it('lets the PM say a mail asked of them is not theirs, and says a failure', async () => {
+      const refused = vi.fn(
+        async (): Promise<Result<View>> => ({ ok: false, code: 'today_decision_invalid' }),
+      )
+      const { api } = todayApi(view({ items: [mail] }), { setMailTurn: refused })
+      render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+      fireEvent.click(await screen.findByRole('button', { name: text.notMine }))
+      await waitFor(() => expect(refused).toHaveBeenCalledWith('p-1', 'mail:budget', 'not_mine'))
+      expect(await screen.findByRole('alert')).toBeTruthy()
+    })
   })
 })

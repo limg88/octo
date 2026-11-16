@@ -3,6 +3,7 @@ import type {
   AlignmentSettings,
   ArchivedMail,
   Backup,
+  ConversationTurn,
   DashboardSettings,
   DeckDraft,
   DeckOutline,
@@ -33,6 +34,8 @@ import type {
   ProjectTeam,
   QuestionRecord,
   RedTeamReport,
+  Release,
+  ReleaseAsset,
   RiskRegister,
   SheetGrid,
   SignInConfig,
@@ -42,6 +45,7 @@ import type {
   StarterFile,
   TodaySettings,
   TrackerHours,
+  UpdateProgress,
   WarehouseFeedConfig,
 } from '@octo/domain'
 
@@ -58,6 +62,8 @@ export type AgentStatus =
 export type AskRequest = {
   projectFolder: string
   question: string
+  /** The earlier questions of the same conversation with their answers: context, not sources. */
+  history?: readonly ConversationTurn[]
   /** The model to use; absent or null: the default of Claude Code on this seat. */
   model?: string | null
   /** What Octo reads directly for the project: the freshest data of each system. */
@@ -258,6 +264,8 @@ export type DraftRequest = {
   revision: { draft: DeliverableDraft; request: string } | null
   /** With the outline of a model deck, the draft is its slides for the period asked. */
   deckOutline?: DeckOutline
+  /** The headings of the Word template of the kind: the sections the draft must have. */
+  sectionOutline?: readonly string[]
   liveSources?: readonly LiveSource[]
   model?: string | null
   onModel?: (model: string) => void
@@ -293,6 +301,8 @@ export interface DocumentRenderer {
   word(title: string, markdown: string, letterhead?: Uint8Array): Promise<Uint8Array>
   /** Throws a DomainError `letterhead_invalid` when the bytes are not a usable Word document. */
   checkLetterhead(bytes: Uint8Array): Promise<void>
+  /** The headings of a Word document in order, each as a Markdown heading of its level. */
+  wordOutline(template: Uint8Array): Promise<string[]>
   /**
    * The bytes of a presentation with this Markdown as slides, one per section, on the deck given:
    * its cover, its closing slide, its layouts and the look of its tables are kept.
@@ -440,6 +450,12 @@ export interface FeedRecords {
   under(projectFolder: string, folder: string): Promise<FeedRecord[]>
 }
 
+/** Reads back the rows a feed wrote for the views of a system of record. */
+export interface FeedRows {
+  /** The rows of one view, from every file under the folder that holds them. */
+  rows(projectFolder: string, folder: string, view: string): Promise<Array<Record<string, unknown>>>
+}
+
 /** The people and the calendar of a project, kept with Octo's settings of the project. */
 export interface TeamStore {
   load(projectFolder: string): Promise<ProjectTeam>
@@ -480,7 +496,18 @@ export interface RiskRegisterStore {
 }
 
 /** A mail Claude is asked to weigh: where it is in the project, and what it is about. */
-export type MailToJudge = { id: string; path: string; subject: string }
+export type MailToJudge = {
+  id: string
+  path: string
+  subject: string
+  /** Whom the mail is written to, as its header says. */
+  to: string
+  /** How many mails of the same conversation wait: this is the last of them. */
+  mails: number
+}
+
+/** Who the mail is judged for: Claude tells whether a mail asks something of this person. */
+export type JudgedFor = { name: string | null; addresses: readonly string[] }
 
 /** What Claude gives back for a mail: the quote is checked by the code afterwards. */
 export type ProposedJudgement = {
@@ -489,6 +516,9 @@ export type ProposedJudgement = {
   reason: string
   quote: string
   deadline: string | null
+  /** Whom the mail asks something of; absent when the judge does not say. */
+  addressee?: MailJudgement['addressee']
+  addresseeName?: string | null
 }
 
 export type ProposedRisk = { title: string; why: string; path: string; quote: string }
@@ -508,7 +538,9 @@ export type JudgeRequest = {
  * Failures are DomainErrors with an `agent_*` code.
  */
 export interface TodayJudge {
-  mails(request: JudgeRequest & { mails: readonly MailToJudge[] }): Promise<ProposedJudgement[]>
+  mails(
+    request: JudgeRequest & { mails: readonly MailToJudge[]; pm?: JudgedFor },
+  ): Promise<ProposedJudgement[]>
   risks(request: JudgeRequest & { known: readonly string[] }): Promise<ProposedRisk[]>
 }
 
@@ -526,4 +558,30 @@ export interface IdentityProvider {
   signIn(signal: AbortSignal): Promise<SignedIn>
   /** Renews a sign-in without asking; throws `sign_in_failed` when it cannot. */
   renew(refreshToken: string): Promise<SignedIn>
+}
+
+/** Where the releases of Octo are published. */
+export interface ReleaseFeed {
+  /** The latest release; null when none was published yet. */
+  latest(): Promise<Release | null>
+}
+
+/** Brings down the files of a release. */
+export interface ReleaseDownloads {
+  /** A small file of text, as the list of checksums. */
+  text(asset: ReleaseAsset): Promise<string>
+  /** A file kept on this computer, with the SHA-256 of what was written. */
+  file(
+    asset: ReleaseAsset,
+    onProgress?: (progress: UpdateProgress) => void,
+  ): Promise<{ path: string; sha256: string }>
+}
+
+/** Puts a downloaded Octo in place of the running one and starts it. */
+export interface UpdateApplier {
+  /**
+   * Throws a DomainError `update_not_installable` when this Octo cannot be replaced where it
+   * is. When it returns, the running Octo is closing.
+   */
+  apply(filePath: string): Promise<void>
 }

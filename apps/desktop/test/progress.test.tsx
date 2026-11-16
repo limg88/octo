@@ -23,6 +23,7 @@ const second = { n: 2, from: '2026-03-31', to: '', amount: 300, note: '', positi
 const configured: ProgressSettings = {
   modelPath: 'Moduli/Richiesta SAL.xlsx',
   order: 'ORD-77',
+  salesOrders: [],
   total: 1000,
   positions: [
     { code: '1', amount: 600 },
@@ -65,6 +66,7 @@ const view: View = {
     { kind: 'dates_not_chained', n: 2 },
     { kind: 'note_missing', n: 2 },
   ],
+  invoices: null,
 }
 
 type Api = Pick<
@@ -75,6 +77,7 @@ type Api = Pick<
   | 'progressCandidates'
   | 'progressView'
   | 'compileProgress'
+  | 'registerProgressInvoices'
   | 'openEvidence'
 >
 
@@ -88,6 +91,7 @@ function fakeApi(overrides: Partial<Api> = {}) {
     compileProgress: vi.fn(async (_id: string, n: number) =>
       ok({ n, path: `_octo/avanzamento/Richiesta SAL - ${n}.xlsx` }),
     ),
+    registerProgressInvoices: vi.fn(async () => ok(configured)),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
@@ -139,7 +143,11 @@ describe('the requests of an order', () => {
       text.problem.over_positions(1, '2.000,00'),
     ],
   ])('says what makes the requests impossible: %o', async (problem, message) => {
-    const broken: View = { computation: { ok: false, total: 1000, problem }, warnings: [] }
+    const broken: View = {
+      computation: { ok: false, total: 1000, problem },
+      warnings: [],
+      invoices: null,
+    }
     render(
       <ProgressView
         api={fakeApi({ progressView: vi.fn(async () => ok(broken)) })}
@@ -153,7 +161,11 @@ describe('the requests of an order', () => {
   })
 
   it('says when there is no request yet', async () => {
-    const empty: View = { computation: { ok: true, total: 1000, steps: [] }, warnings: [] }
+    const empty: View = {
+      computation: { ok: true, total: 1000, steps: [] },
+      warnings: [],
+      invoices: null,
+    }
     const api = fakeApi({
       progressSettings: vi.fn(async () => ok({ ...configured, order: '', requests: [] })),
       progressView: vi.fn(async () => ok(empty)),
@@ -433,5 +445,131 @@ describe('the settings of the order and of the form', () => {
       />,
     )
     expect((await screen.findByRole('alert')).textContent).toMatch(/non sono valide/)
+  })
+
+  describe('beside what the company system billed', () => {
+    const words = text.invoices
+    const invoice = {
+      id: '2026/1',
+      date: '2026-03-31',
+      amount: 600,
+      status: 'Open',
+      salesOrder: 'SO-1',
+    }
+    const other = {
+      id: '2026/7',
+      date: '2026-04-30',
+      amount: 55,
+      status: 'Open',
+      salesOrder: 'SO-1',
+    }
+    const empty: View = {
+      computation: { ok: true, total: 1000, steps: [] },
+      warnings: [],
+      invoices: null,
+    }
+    const noRequests: ProgressSettings = { ...configured, requests: [] }
+    const billed = (part: Partial<NonNullable<NonNullable<View['invoices']>['order']>>): View => ({
+      ...empty,
+      invoices: {
+        salesOrders: ['SO-1', 'SO-2'],
+        suggested: ['SO-1'],
+        order: {
+          invoices: [invoice, other],
+          invoiced: 655,
+          remaining: 345,
+          positions: [
+            { code: '1', amount: 600, invoice },
+            { code: '2', amount: 400, invoice: null },
+          ],
+          unregistered: [invoice, other],
+          fulfilled: false,
+          ...part,
+        },
+      },
+    })
+
+    it('asks which sales orders are the order, proposing those billed for its amounts', async () => {
+      const unlinked: View = {
+        ...empty,
+        invoices: { salesOrders: ['SO-1', 'SO-2'], suggested: ['SO-1'], order: null },
+      }
+      const api = fakeApi({
+        progressSettings: vi.fn(async () => ok(noRequests)),
+        progressView: vi.fn(async () => ok(unlinked)),
+      })
+      render(<ProgressView api={api} project={project} />)
+      const netsuite = await screen.findByRole('region', { name: words.title })
+      expect(within(netsuite).getByText(words.suggested('SO-1'))).toBeTruthy()
+      expect(within(netsuite).getByLabelText<HTMLInputElement>('SO-1').checked).toBe(true)
+      fireEvent.click(within(netsuite).getByLabelText('SO-2'))
+      press(words.link)
+      await waitFor(() =>
+        expect(api.saveProgressSettings).toHaveBeenCalledWith('p-1', {
+          ...noRequests,
+          salesOrders: ['SO-1', 'SO-2'],
+        }),
+      )
+    })
+
+    it('shows what is billed for each position and takes unknown invoices as requests', async () => {
+      const linked = { ...noRequests, salesOrders: ['SO-1'] }
+      const api = fakeApi({
+        progressSettings: vi.fn(async () => ok(linked)),
+        progressView: vi.fn(async () => ok(billed({}))),
+        registerProgressInvoices: vi.fn(async () => ok({ ...linked, requests: [first] })),
+      })
+      render(<ProgressView api={api} project={project} />)
+      const order = await screen.findByRole('region', { name: text.orderName('ORD-77') })
+      // The order counts what is billed, though nothing was asked through Octo.
+      expect(within(order).getByText(words.billedTotal)).toBeTruthy()
+      expect(within(order).getByText('655,00')).toBeTruthy()
+      expect(within(order).getByText('345,00')).toBeTruthy()
+
+      const netsuite = screen.getByRole('region', { name: words.title })
+      expect(within(netsuite).getByText(words.billed)).toBeTruthy()
+      expect(within(netsuite).getByText(words.notBilled)).toBeTruthy()
+      expect(within(netsuite).getByText(words.unregistered(2, '2026/1, 2026/7'))).toBeTruthy()
+      expect(
+        within(netsuite).getByText(
+          (content) => content.includes('fattura 2026/7') && content.includes('55,00'),
+        ),
+      ).toBeTruthy()
+      press(words.register)
+      await waitFor(() => expect(api.registerProgressInvoices).toHaveBeenCalledWith('p-1'))
+      expect(await screen.findByRole('region', { name: text.requestN(1) })).toBeTruthy()
+
+      // The link can be changed, or left as it is.
+      press(words.change('SO-1'))
+      press(messages.cancel)
+      expect(within(netsuite).getByText(words.billed)).toBeTruthy()
+    })
+
+    it('says an order fulfilled and offers no new request, and says a failure', async () => {
+      const linked = { ...configured, salesOrders: ['SO-1'] }
+      const done = billed({ invoiced: 1000, remaining: 0, unregistered: [], fulfilled: true })
+      const api = fakeApi({
+        progressSettings: vi.fn(async () => ok(linked)),
+        progressView: vi.fn(async () => ok(done)),
+      })
+      render(<ProgressView api={api} project={project} />)
+      expect(await screen.findByText(words.fulfilled)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: text.newRequest })).toBeNull()
+      expect(screen.queryByRole('button', { name: words.register })).toBeNull()
+      cleanup()
+
+      const failing = fakeApi({
+        progressSettings: vi.fn(async () => ok(linked)),
+        progressView: vi.fn(async () => ok(billed({ unregistered: [invoice] }))),
+        registerProgressInvoices: vi.fn(async () => ({
+          ok: false as const,
+          code: 'progress_settings_invalid' as const,
+        })),
+      })
+      render(<ProgressView api={failing} project={project} />)
+      expect(await screen.findByText(words.unregistered(1, '2026/1'))).toBeTruthy()
+      press(words.register)
+      expect((await screen.findByRole('alert')).textContent).toMatch(/non sono valide/)
+    })
   })
 })

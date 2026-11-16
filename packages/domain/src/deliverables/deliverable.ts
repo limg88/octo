@@ -123,6 +123,20 @@ export const LETTERHEAD_PATH = `${OCTO_FOLDER}/.modelli/carta-intestata.docx`
 /** The presentation the slides of a project are written on, when the PM chose one. */
 export const DECK_MODEL_PATH = `${OCTO_FOLDER}/.modelli/presentazione.pptx`
 
+/** The formats a kind of deliverable takes a template in: the ones Octo writes. */
+export const TEMPLATE_FORMATS = ['docx', 'pptx'] as const
+export type TemplateFormat = (typeof TEMPLATE_FORMATS)[number]
+/** Where a project keeps the templates of its kinds of deliverable, one per kind and format. */
+export const KIND_TEMPLATES_FOLDER = `${OCTO_FOLDER}/.modelli/tipi`
+export const kindTemplatePath = (kindId: string, format: TemplateFormat): string =>
+  `${KIND_TEMPLATES_FOLDER}/${kindId}.${format}`
+
+/** The format of a template from the name of its file; null when Octo does not write it. */
+export function templateFormatOf(fileName: string): TemplateFormat | null {
+  const extension = fileName.slice(fileName.lastIndexOf('.') + 1).toLowerCase()
+  return TEMPLATE_FORMATS.find((format) => format === extension) ?? null
+}
+
 export const jobPath = (id: string): string => `${JOBS_FOLDER}/${id}.json`
 export const projectInstructionsPath = (kindId: string): string =>
   `${PROJECT_INSTRUCTIONS_FOLDER}/${kindId}.md`

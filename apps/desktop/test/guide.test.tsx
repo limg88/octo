@@ -151,7 +151,7 @@ describe('the mail of a new project', () => {
     }
     render(<SourcesView api={failing as unknown as OctoApi} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: messages.mailPreview }))
-    expect(await screen.findByText(/Accesso completo al disco/)).toBeTruthy()
+    expect(await screen.findByText(/abilita Octo e riaprilo/)).toBeTruthy()
   })
 })
 

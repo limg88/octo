@@ -25,20 +25,24 @@ import type {
   Team,
   Today,
   TrackerSnapshots,
+  Updates,
 } from '@octo/application'
 import {
   DomainError,
   FEED_NAMES,
   FULL_ALLOCATION,
   isDomainError,
+  MAIL_TURNS,
   MODEL_CHOICES,
   opensAsDocument,
   PHASES,
   pathInProject,
   RISK_STATES,
   TEAM_SIDES,
+  TEMPLATE_FORMATS,
   THEME_CHOICES,
   type TodayKind,
+  templateFormatOf,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { type BrowserWindow, dialog, ipcMain, shell } from 'electron'
@@ -62,10 +66,14 @@ export type IpcDeps = {
   hours: Hours
   forecasts: Forecasts
   progress: Progress
+  updates: Updates
+  /** The version Octo was updated to since it last ran, where that costs it its permissions. */
+  updatedTo: string | null
   alignments: Alignments
   team: Team
   folderDialogTitle: string
   letterheadDialogTitle: string
+  kindTemplateDialogTitle: string
   deckModelDialogTitle: string
   newProjectDialogTitle: string
   meetingsDialogTitle: string
@@ -94,9 +102,16 @@ const BACKUP_EXTENSIONS = ['json']
 const MAX_QUESTION_LENGTH = 4000
 const MAX_RULE_LENGTH = 300
 const none = z.undefined()
+const MAC = 'darwin'
+/** The page of the system settings where an app is given access to the whole disk. */
+const DISK_ACCESS_SETTINGS =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles'
 const preferencesInput = z.object({ theme: z.enum(THEME_CHOICES) })
 const byProject = z.object({ projectId: z.string().min(1) })
-const askInput = byProject.extend({ question: z.string().max(MAX_QUESTION_LENGTH) })
+const askInput = byProject.extend({
+  question: z.string().max(MAX_QUESTION_LENGTH),
+  conversationId: z.string().max(MAX_RULE_LENGTH).nullable().default(null),
+})
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
 const MAX_RULES = 200
 const ruleList = z.array(z.string().max(MAX_RULE_LENGTH)).max(MAX_RULES)
@@ -168,6 +183,7 @@ const MAX_INSTRUCTIONS_LENGTH = 20_000
 /** An id Octo made, used in a file name: letters, digits and dashes only. */
 const id = z.string().regex(/^[A-Za-z0-9-]{1,80}$/)
 const byKind = byProject.extend({ kindId: id })
+const kindTemplateInput = byKind.extend({ format: z.enum(TEMPLATE_FORMATS) })
 const byDeliverable = byProject.extend({ deliverableId: id })
 const deliverableStartInput = byKind.extend({
   inputs: z.record(z.string().max(MAX_RULE_LENGTH), z.string().max(MAX_INPUT_LENGTH)),
@@ -192,6 +208,7 @@ const dashboardSettingsInput = byProject.extend({
     exportPath: rule,
     historyPath: rule,
     tags: ruleList,
+    ownPeopleOnly: z.boolean().default(false),
     bugTypes: ruleList,
     storyTypes: ruleList,
     stuckDays: z.number(),
@@ -262,6 +279,7 @@ const progressSettingsInput = byProject.extend({
   settings: z.object({
     modelPath: rule,
     order: rule,
+    salesOrders: ruleList.default([]),
     total: money,
     positions: z.array(z.object({ code: rule, amount: z.number() })).max(MAX_RULES),
     requests: z
@@ -300,6 +318,7 @@ const alignmentSettingsInput = byProject.extend({
     sprint: rule,
     period: rule,
     tags: ruleList,
+    ownPeopleOnly: z.boolean().default(false),
     exportPath: rule,
     ticketFolder: rule,
     referencePrefixes: ruleList,
@@ -346,6 +365,10 @@ const todayDecideInput = byProject.extend({
   until: rule.nullable(),
 })
 const todayMuteInput = byProject.extend({ kind: rule, muted: z.boolean() })
+const todayMailTurnInput = byProject.extend({
+  key: z.string().max(MAX_QUESTION_LENGTH),
+  turn: z.enum(MAIL_TURNS).nullable(),
+})
 const todayAddressesInput = byProject.extend({ addresses: z.array(rule).max(MAX_ADDRESSES) })
 const todayEvaluateInput = byProject.extend({ all: z.boolean() })
 const riskCandidateInput = byProject.extend({ candidateId: id })
@@ -387,6 +410,10 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.todayDecide, todayDecideInput, async ({ projectId, ...input }) =>
     deps.today.decide(await deps.projects.get(projectId), input),
   )
+  handle(CHANNELS.todayMailTurn, todayMailTurnInput, async ({ projectId, key, turn }) =>
+    deps.today.mailTurn(await deps.projects.get(projectId), key, turn),
+  )
+
   handle(CHANNELS.todayMute, todayMuteInput, async ({ projectId, kind, muted }) =>
     deps.today.muteKind(await deps.projects.get(projectId), kind as TodayKind, muted),
   )
@@ -451,6 +478,28 @@ export function registerIpc(deps: IpcDeps): void {
   )
 
   handle(CHANNELS.agentStatus, none, () => deps.agent.status())
+
+  handle(CHANNELS.updateCheck, none, () => deps.updates.check())
+
+  // Told once: the next time the page asks, there is nothing to say.
+  let updatedTo = deps.updatedTo
+  handle(CHANNELS.updateJustDone, none, async () => {
+    const version = updatedTo
+    updatedTo = null
+    return version
+  })
+
+  handle(CHANNELS.diskAccessOpen, none, async () => {
+    if (process.platform === MAC) await shell.openExternal(DISK_ACCESS_SETTINGS)
+    return null
+  })
+
+  handle(CHANNELS.updateInstall, none, async () => {
+    await deps.updates.install((progress) =>
+      deps.window.webContents.send(CHANNELS.updateProgress, progress),
+    )
+    return null
+  })
   handle(CHANNELS.projectsList, none, () => deps.projects.list())
 
   handle(CHANNELS.projectsAdd, none, async () => {
@@ -550,7 +599,7 @@ export function registerIpc(deps: IpcDeps): void {
     return deps.questions.list(project.folder)
   })
 
-  handle(CHANNELS.questionsAsk, askInput, async ({ projectId, question }) => {
+  handle(CHANNELS.questionsAsk, askInput, async ({ projectId, question, conversationId }) => {
     const project = await deps.projects.get(projectId)
     running.get(projectId)?.abort()
     const controller = new AbortController()
@@ -559,6 +608,7 @@ export function registerIpc(deps: IpcDeps): void {
       return await deps.askQuestion({
         project,
         question,
+        conversationId,
         signal: controller.signal,
         onProgress: (progress) =>
           deps.window.webContents.send(CHANNELS.questionsProgress, projectId, progress),
@@ -720,6 +770,47 @@ export function registerIpc(deps: IpcDeps): void {
     return null
   })
 
+  handle(CHANNELS.kindTemplates, byProject, async ({ projectId }) =>
+    deps.deliverables.templates(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.kindTemplateChoose, byKind, async ({ projectId, kindId }) => {
+    const project = await deps.projects.get(projectId)
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title: deps.kindTemplateDialogTitle,
+      properties: ['openFile'],
+      filters: [{ name: 'Word, PowerPoint', extensions: [...TEMPLATE_FORMATS] }],
+    })
+    const file = choice.filePaths[0]
+    if (choice.canceled || !file) return null
+    const format = templateFormatOf(file)
+    if (format === null) throw new DomainError('letterhead_invalid')
+    const info = await stat(file)
+    if (format === 'docx' && info.size > MAX_LETTERHEAD_BYTES) {
+      throw new DomainError('letterhead_invalid')
+    }
+    if (format === 'pptx' && info.size > MAX_DECK_MODEL_BYTES) {
+      throw new DomainError('deck_model_invalid')
+    }
+    await deps.deliverables.setKindTemplate(
+      project,
+      kindId,
+      format,
+      new Uint8Array(await readFile(file)),
+    )
+    return format
+  })
+
+  handle(CHANNELS.kindTemplateRemove, kindTemplateInput, async ({ projectId, kindId, format }) => {
+    await deps.deliverables.setKindTemplate(
+      await deps.projects.get(projectId),
+      kindId,
+      format,
+      null,
+    )
+    return null
+  })
+
   handle(CHANNELS.letterheadGet, byProject, async ({ projectId }) =>
     deps.deliverables.hasLetterhead(await deps.projects.get(projectId)),
   )
@@ -846,6 +937,10 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.progressView, byProject, async ({ projectId }) =>
     deps.progress.view(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.progressRegisterInvoices, byProject, async ({ projectId }) =>
+    deps.progress.registerInvoices(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.progressCompile, progressCompileInput, async (input) =>

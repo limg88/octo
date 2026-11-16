@@ -53,6 +53,7 @@ const settingsSchema = z.object({
   exportPath: z.string().default(DEFAULT_DASHBOARD_SETTINGS.exportPath),
   historyPath: z.string().default(DEFAULT_DASHBOARD_SETTINGS.historyPath),
   tags: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.tags),
+  ownPeopleOnly: z.boolean().default(false),
   bugTypes: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.bugTypes),
   storyTypes: z.array(z.string()).default(DEFAULT_DASHBOARD_SETTINGS.storyTypes),
   stuckDays: z.number().default(DEFAULT_DASHBOARD_SETTINGS.stuckDays),
@@ -212,6 +213,7 @@ const PROGRESS_FILE = 'progress.json'
 const progressSchema = z.object({
   modelPath: z.string().default(DEFAULT_PROGRESS_SETTINGS.modelPath),
   order: z.string().default(DEFAULT_PROGRESS_SETTINGS.order),
+  salesOrders: z.array(z.string()).default([]),
   total: z.number().nullable().default(DEFAULT_PROGRESS_SETTINGS.total),
   positions: z.array(z.object({ code: z.string(), amount: z.number() })).default([]),
   requests: z
@@ -262,6 +264,7 @@ const alignmentSchema = z.object({
   sprint: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.sprint),
   period: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.period),
   tags: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.tags),
+  ownPeopleOnly: z.boolean().default(false),
   exportPath: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.exportPath),
   ticketFolder: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.ticketFolder),
   referencePrefixes: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.referencePrefixes),

@@ -22,6 +22,14 @@ export type TodayTarget = (typeof TODAY_TARGETS)[number]
 export const IMPORTANCES = ['alta', 'media', 'bassa'] as const
 export type Importance = (typeof IMPORTANCES)[number]
 
+/** Whom a mail asks something of, as Claude reads it: the PM, another, everybody, nobody. */
+export const MAIL_ADDRESSEES = ['me', 'someone_else', 'everyone', 'nobody'] as const
+export type MailAddressee = (typeof MAIL_ADDRESSEES)[number]
+
+/** Whose turn a conversation is, when the PM said so: their word comes before any other. */
+export const MAIL_TURNS = ['mine', 'not_mine'] as const
+export type MailTurn = (typeof MAIL_TURNS)[number]
+
 /** What Claude said of a mail: a judgement, kept apart from what the code computed. */
 export type MailJudgement = {
   importance: Importance
@@ -31,7 +39,22 @@ export type MailJudgement = {
   quoteVerified: boolean
   /** A day the mail asks an answer by, `YYYY-MM-DD`; null when it names none. */
   deadline: string | null
+  /** Whom the mail asks something of; absent in what was judged before this was asked. */
+  addressee?: MailAddressee | undefined
+  /** Who that is, when it is somebody else. */
+  addresseeName?: string | null | undefined
 }
+
+/** Why a mail is the PM's to answer. */
+export type MailReplyWhy = 'only_me' | 'judged' | 'chosen'
+/** Why a mail the PM is written to is only followed. */
+export type MailFollowWhy =
+  | 'answered_by_own'
+  | 'someone_else'
+  | 'everyone'
+  | 'nobody'
+  | 'unjudged'
+  | 'chosen'
 
 /** The people whose hours of a month do not add up. */
 export type HoursPersonFact = {
@@ -59,6 +82,28 @@ export type TodayFacts =
       subject: string
       days: number
       judgement: MailJudgement | null
+      /** Why it is the PM's; absent in what was computed before this was told. */
+      why?: MailReplyWhy
+      /** What the conversation is told by: what the PM's word on whose turn it is goes with. */
+      conversation?: string
+      /** How many mails of the conversation wait. */
+      mails?: number
+    }
+  | {
+      /** A mail the PM is written to with others, that asks nothing of the PM: only followed. */
+      kind: 'mail_follow'
+      id: string
+      path: string
+      from: string
+      subject: string
+      days: number
+      judgement: MailJudgement | null
+      why: MailFollowWhy
+      /** Whom it is for or who took it up, when that is a person. */
+      who: string | null
+      conversation: string
+      mails: number
+      recipients: number
     }
   | { kind: 'mail_waiting'; id: string; path: string; to: string; subject: string; days: number }
   | {
@@ -126,6 +171,8 @@ export type TodayItem = {
   target: TodayTarget
   /** When the data it stands on was read; null when the source does not say. */
   asOf: string | null
+  /** Keys the same signal had before: a decision taken under one of them still holds. */
+  formerKeys?: string[]
   /** Why it is in the band of what is due, when a date moved it there. */
   dueBecause?: 'month_end' | 'sprint_end' | 'deadline'
   returned?: TodayReturn
@@ -149,7 +196,7 @@ const BAND_ORDER: Readonly<Record<TodayBand, number>> = {
 const IMPORTANCE_ORDER: Readonly<Record<Importance, number>> = { alta: 0, media: 1, bassa: 2 }
 
 const importanceRank = (item: TodayItem): number =>
-  item.facts.kind === 'mail_reply' && item.facts.judgement
+  (item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow') && item.facts.judgement
     ? IMPORTANCE_ORDER[item.facts.judgement.importance]
     : IMPORTANCE_ORDER.media
 

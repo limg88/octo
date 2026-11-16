@@ -3,11 +3,18 @@ import {
   cleanProgressSettings,
   computeProgress,
   DEFAULT_PROGRESS_SETTINGS,
+  type InvoiceLine,
+  invoicedOrder,
+  invoiceLineOf,
+  knownSalesOrders,
   type OrderPosition,
+  orderInvoices,
   type ProgressRequest,
   type ProgressSettings,
   progressFormCells,
   progressWarnings,
+  suggestedSalesOrders,
+  withInvoicesAsRequests,
 } from '../src/index.ts'
 
 const positions: OrderPosition[] = [
@@ -93,6 +100,7 @@ describe('the share of each position', () => {
 const settings: ProgressSettings = {
   modelPath: 'Moduli/Richiesta.xlsx',
   order: 'ORD-77',
+  salesOrders: [],
   total: 340000,
   positions,
   requests: [
@@ -201,6 +209,7 @@ describe('the settings of the progress requests', () => {
     const clean = cleanProgressSettings({
       modelPath: ' Moduli/Richiesta.xlsx ',
       order: ' ORD-77 ',
+      salesOrders: [' SO-1 ', 'SO-1', ''],
       total: -1,
       positions: [
         { code: ' 1 ', amount: 100.004 },
@@ -231,6 +240,7 @@ describe('the settings of the progress requests', () => {
     expect(clean).toEqual({
       modelPath: 'Moduli/Richiesta.xlsx',
       order: 'ORD-77',
+      salesOrders: ['SO-1'],
       total: null,
       positions: [{ code: '1', amount: 100 }],
       requests: [
@@ -247,5 +257,145 @@ describe('the settings of the progress requests', () => {
       expect(cleanProgressSettings({ ...DEFAULT_PROGRESS_SETTINGS, form }).form.table).toBeNull()
     }
     expect(cleanProgressSettings({ ...DEFAULT_PROGRESS_SETTINGS, total: 10.004 }).total).toBe(10)
+  })
+})
+
+describe('the order as the company system billed it', () => {
+  const line = (
+    invoiceId: string,
+    amount: number,
+    salesOrder: string,
+    date = '2026-09-30',
+  ): InvoiceLine => ({ invoiceId, date, amount, status: 'Open', salesOrder })
+  const lines = [
+    line('2026/01797', 60000, 'SO-5320', '2026-10-31'),
+    // One invoice on two project codes: its lines are one amount.
+    line('2026/01530', 70000, 'SO-5320'),
+    line('2026/01530', 30000, 'SO-5320'),
+    line('2026/00582', 60000, 'SO-4697', '2026-03-31'),
+    line('2026/01244', -60000, '', '2026-07-31'),
+  ]
+  const linked = { ...settings, requests: [], salesOrders: ['SO-5320'] }
+
+  it('reads a line of an invoice from a row of the view, or nothing', () => {
+    expect(
+      invoiceLineOf({
+        invoiceid: '2026/01530',
+        invoicedate: '2026-09-30T00:00:00.000Z',
+        amount: '42130.0000',
+        status: 'Open',
+        salesorder: 'SO2026_5320',
+      }),
+    ).toEqual({
+      invoiceId: '2026/01530',
+      date: '2026-09-30',
+      amount: 42130,
+      status: 'Open',
+      salesOrder: 'SO2026_5320',
+    })
+    expect(invoiceLineOf({ invoiceid: '2026/1', amount: 10 })).toMatchObject({
+      date: '',
+      salesOrder: '',
+    })
+    expect(invoiceLineOf({ invoiceid: '', amount: 10 })).toBeNull()
+    expect(invoiceLineOf({ invoiceid: '2026/1', amount: 'molti' })).toBeNull()
+    expect(invoiceLineOf({ invoiceid: '2026/1', amount: null })).toBeNull()
+  })
+
+  it('lists the sales orders, and proposes those billed for the amounts of the positions', () => {
+    expect(knownSalesOrders(lines)).toEqual(['SO-4697', 'SO-5320'])
+    // Both have an invoice of 60000, the amount of a position: the PM says which is the order.
+    expect(suggestedSalesOrders(lines, positions)).toEqual(['SO-4697', 'SO-5320'])
+    expect(suggestedSalesOrders(lines, [{ code: 'A', amount: 1 }])).toEqual([])
+  })
+
+  it('adds up the invoices of the orders given, oldest first', () => {
+    expect(orderInvoices(lines, ['SO-5320'])).toEqual([
+      {
+        id: '2026/01530',
+        date: '2026-09-30',
+        amount: 100000,
+        status: 'Open',
+        salesOrder: 'SO-5320',
+      },
+      {
+        id: '2026/01797',
+        date: '2026-10-31',
+        amount: 60000,
+        status: 'Open',
+        salesOrder: 'SO-5320',
+      },
+    ])
+    expect(orderInvoices(lines, [])).toEqual([])
+  })
+
+  it('compares nothing until the PM says which sales orders are the order', () => {
+    expect(invoicedOrder(settings, lines)).toBeNull()
+  })
+
+  it('says what is billed, which position has its invoice and what Octo does not know', () => {
+    const invoiced = invoicedOrder(linked, lines)
+    expect(invoiced).toMatchObject({ invoiced: 160000, remaining: 180000, fulfilled: false })
+    expect(invoiced?.positions.map((position) => position.invoice?.id ?? null)).toEqual([
+      '2026/01530',
+      '2026/01797',
+      null,
+      null,
+    ])
+    expect(invoiced?.unregistered.map((invoice) => invoice.id)).toEqual([
+      '2026/01530',
+      '2026/01797',
+    ])
+
+    // A request that names an invoice as its reference is that invoice, already known.
+    const known = invoicedOrder(
+      { ...linked, requests: [{ ...request(1, 100000), note: 'Fattura 2026/01530' }] },
+      lines,
+    )
+    expect(known?.unregistered.map((invoice) => invoice.id)).toEqual(['2026/01797'])
+  })
+
+  it('says an order fulfilled when what is billed reaches its total', () => {
+    const all = [...lines, line('2026/02000', 180000, 'SO-5320', '2026-11-30')]
+    expect(invoicedOrder(linked, all)).toMatchObject({ remaining: 0, fulfilled: true })
+    expect(invoicedOrder({ ...linked, positions: [] }, all)).toMatchObject({ fulfilled: false })
+  })
+
+  it('takes the invoices it did not know as requests, each to the position of its amount', () => {
+    const invoiced = invoicedOrder(linked, [
+      ...lines,
+      line('2026/01900', 500, 'SO-5320', '2026-11-15'),
+    ])
+    if (invoiced === null) throw new Error('not linked')
+    const { requests } = cleanProgressSettings(withInvoicesAsRequests(linked, invoiced))
+    expect(requests).toEqual([
+      {
+        n: 1,
+        from: '2026-09-01',
+        to: '2026-09-30',
+        amount: 100000,
+        note: '2026/01530',
+        positions: ['00001'],
+      },
+      {
+        n: 2,
+        from: '2026-09-30',
+        to: '2026-10-31',
+        amount: 60000,
+        note: '2026/01797',
+        positions: ['00002'],
+      },
+      // An invoice of no position's amount fills the order from its first open position.
+      {
+        n: 3,
+        from: '2026-10-31',
+        to: '2026-11-15',
+        amount: 500,
+        note: '2026/01900',
+        positions: [],
+      },
+    ])
+    expect(computeProgress(linked.positions, requests)).toMatchObject({ ok: true })
+    expect(invoicedOrder({ ...linked, requests }, lines)?.unregistered).toEqual([])
   })
 })

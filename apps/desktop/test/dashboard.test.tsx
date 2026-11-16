@@ -293,10 +293,15 @@ describe('dashboard', () => {
     )
     expect(api.chooseProjectPath).toHaveBeenLastCalledWith('p-1', 'file', ['json'])
     fireEvent.change(screen.getByLabelText(text.tags), { target: { value: 'Team, Altro' } })
+    // Only the items of the supplier's own people: a tick, off until the PM asks.
+    const own = screen.getByLabelText<HTMLInputElement>(messages.ownPeopleOnly.label)
+    expect(own.checked).toBe(false)
+    fireEvent.click(own)
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() => expect(api.saveDashboardSettings).toHaveBeenCalled())
     expect(await screen.findByText(messages.saved)).toBeTruthy()
     expect(vi.mocked(api.saveDashboardSettings).mock.calls[0]?.[1]).toMatchObject({
+      ownPeopleOnly: true,
       exportPath: 'data/latest.json',
       tags: ['Team', 'Altro'],
     })

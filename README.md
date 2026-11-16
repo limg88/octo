@@ -75,7 +75,10 @@ Il PM chiede modifiche a parole e approva: Octo scrive Markdown e Word in `_octo
 | `pnpm dist` | crea l'installatore per il sistema su cui gira |
 
 ## Installatori
-`pnpm dist` produce in `apps/desktop/release/` un `.dmg` su Mac e un `.exe` su Windows. Su GitHub il flusso «Installatori» li crea entrambi a ogni tag `v*` o su richiesta. Non sono firmati: al primo avvio il sistema chiede conferma.
+`pnpm dist` produce in `apps/desktop/release/` un `.dmg` e uno `.zip` su Mac e un `.exe` su Windows. Su GitHub il flusso «Installatori» li crea a ogni tag `v*` o su richiesta. Non sono firmati: al primo avvio il sistema chiede conferma.
+
+## Aggiornamenti
+Un tag `vX.Y.Z` pubblica una release con gli installatori e il file `SHA256SUMS`. Un Octo installato controlla all'avvio e ogni sei ore l'ultima release di `limg88/octo`: se è più nuova lo dice in cima alla pagina, e con «Aggiorna e riavvia» scarica il file per il suo sistema, ne verifica l'impronta, si sostituisce e riparte. Lanciato dai sorgenti non cerca aggiornamenti. Chi ha già una versione senza questa funzione deve installare la nuova a mano una volta.
 
 ## Demo
 Vedi [demo/README.md](demo/README.md).

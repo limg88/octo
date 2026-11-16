@@ -86,6 +86,15 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         chosen={draft.tags}
         onChange={(tags) => change({ tags })}
       />
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={draft.ownPeopleOnly}
+          onChange={(event) => change({ ownPeopleOnly: event.target.checked })}
+        />
+        {messages.ownPeopleOnly.label}
+      </label>
+      <p className="hint">{messages.ownPeopleOnly.hint}</p>
       <label>
         {text.stuckDays}
         <input

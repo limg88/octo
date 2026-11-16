@@ -1,4 +1,5 @@
 import {
+  assignedToOwnPeople,
   type BugDashboard,
   bucketsOf,
   bugDashboard,
@@ -11,6 +12,7 @@ import {
   isOfType,
   type Phase,
   type Project,
+  type ProjectTeam,
   parseTrackerExport,
   parseTrackerHistory,
   phaseOf,
@@ -33,6 +35,8 @@ export type DashboardDeps = {
   settings: DashboardSettingsStore
   exports: TrackerExports
   clock: Clock
+  /** The people of the project: who the supplier's own are, when only their items count. */
+  team?: (project: Project) => Promise<ProjectTeam>
   /** With a writer, the tracker in numbers is kept as a text of the project. */
   writer?: MemoryWriter
 }
@@ -126,7 +130,16 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
       settings.historyPath === ''
         ? null
         : await deps.exports.readJson(project.folder, settings.historyPath).catch(() => null)
-    return { ...parsed, history: rawHistory === null ? null : parseTrackerHistory(rawHistory) }
+    // The items of other people are left out before anything is counted: no number sees them.
+    const items =
+      settings.ownPeopleOnly && deps.team
+        ? assignedToOwnPeople(parsed.items, await deps.team(project))
+        : parsed.items
+    return {
+      ...parsed,
+      items,
+      history: rawHistory === null ? null : parseTrackerHistory(rawHistory),
+    }
   }
 
   return {

@@ -29,6 +29,7 @@ import {
   type TodayEvaluation,
   type TodayJudge,
   type TodayStore,
+  type TodayView,
 } from '../src/index.ts'
 import { evidenceFrom, memorySourceSettings, memoryVault, memoryWriter } from './fakes.ts'
 
@@ -134,6 +135,8 @@ function scriptedJudge(
           reason: ' Comunica un budget in più. ',
           quote: 'ha approvato un budget aggiuntivo di 8.000 euro',
           deadline: null,
+          addressee: 'me' as const,
+          addresseeName: null,
         }))
       )
     },
@@ -712,5 +715,125 @@ describe('the sign-in', () => {
     expect((await owned.load('/x')).dwsi?.ownerEmail).toBe('')
     who = null
     expect((await owned.load('/x')).dwsi?.ownerEmail).toBe('scritto@a.mano')
+  })
+})
+
+describe('whose turn a mail is, on the page of the day', () => {
+  const RECAP_PATH = 'Posta/2026-11/recap.md'
+  const recap = mailFile(
+    'recap',
+    'Aurora: recap UAT',
+    'Luca Neri <luca@cliente.example>',
+    '2026-11-15T08:00:00.000Z',
+  ).replace(
+    'a: "Paola Verdi <pm@example.test>"',
+    'a: "Paola Verdi <pm@example.test>, Mario Rossi <m.rossi@fornitore.example>"',
+  )
+  const files: Record<string, string> = { ...FILES, [RECAP_PATH]: recap }
+  /** A project with one mail to the PM alone and one written to the PM and to another. */
+  function withRecap(addressee: 'me' | 'everyone' | undefined) {
+    const requests: Array<Parameters<TodayJudge['mails']>[0]> = []
+    const judge: TodayJudge = {
+      mails: async (request) => {
+        requests.push(request)
+        return request.mails.map((mail) => ({
+          id: mail.id,
+          importance: 'media' as const,
+          reason: 'Recap della sessione.',
+          quote: 'ha approvato un budget aggiuntivo di 8.000 euro',
+          deadline: null,
+          ...(addressee ? { addressee, addresseeName: ' ' } : {}),
+        }))
+      },
+      risks: async () => [],
+    }
+    const made = setup({
+      judge,
+      files: {
+        under: async (_folder, folder) =>
+          Object.keys(files).filter((path) => path.startsWith(`${folder}/`)),
+        readText: async (_folder, path) => files[path] ?? null,
+      },
+      evidence: evidenceFrom(
+        Object.fromEntries(
+          Object.entries(files).map(([path, text]) => [
+            path,
+            { kind: 'found', text, modifiedAt: '' },
+          ]),
+        ),
+      ),
+    })
+    return { ...made, requests }
+  }
+  const kindOf = (view: TodayView, id: string) =>
+    view.items.find((item) => 'id' in item.facts && item.facts.id === id)?.facts.kind
+
+  it('follows a mail written to many until Claude reads whom it asks, and tells Claude who the PM is', async () => {
+    const { today, requests } = withRecap('everyone')
+    const before = await today.view(project)
+    expect(kindOf(before, 'budget')).toBe('mail_reply')
+    expect(kindOf(before, 'recap')).toBe('mail_follow')
+    // A mail nobody read yet is worth a run, though it asks no answer for now.
+    expect(before.evaluationDue).toBe(true)
+
+    const after = await today.evaluate(project)
+    expect(requests[0]?.pm).toEqual({ name: 'Paola Verdi', addresses: ['pm@example.test'] })
+    expect(requests[0]?.mails.find((mail) => mail.id === 'recap')).toEqual({
+      id: 'recap',
+      path: RECAP_PATH,
+      subject: 'Aurora: recap UAT',
+      to: 'Paola Verdi <pm@example.test>, Mario Rossi <m.rossi@fornitore.example>',
+      mails: 1,
+    })
+    const followed = after.items.find((item) => item.facts.kind === 'mail_follow')
+    expect(followed).toMatchObject({
+      key: 'mail:c:aurora: recap uat',
+      band: 'watch',
+      facts: { why: 'everyone', judgement: { addressee: 'everyone', addresseeName: null } },
+    })
+    expect(after.evaluationDue).toBe(false)
+  })
+
+  it('asks an answer of a mail to many that Claude reads as the PM’s', async () => {
+    const { today } = withRecap('me')
+    const view = await today.evaluate(project)
+    expect(
+      view.items.find((item) => 'id' in item.facts && item.facts.id === 'recap'),
+    ).toMatchObject({
+      band: 'waiting',
+      facts: { kind: 'mail_reply', why: 'judged' },
+    })
+  })
+
+  it('judges again what was judged before Claude was asked whom a mail is for', async () => {
+    const { today, requests, store } = withRecap(undefined)
+    await today.evaluate(project)
+    expect(store.evaluation.mails.recap?.addressee).toBeUndefined()
+    // Not said whom it is for: it is still to be read, the next time Claude is asked.
+    await today.evaluate(project)
+    expect(requests).toHaveLength(2)
+  })
+
+  it('keeps the PM’s word on whose turn a conversation is, and takes it back', async () => {
+    const { today, store } = withRecap('everyone')
+    await today.evaluate(project)
+    const mine = await today.mailTurn(project, 'mail:c:aurora: recap uat', 'mine')
+    expect(kindOf(mine, 'recap')).toBe('mail_reply')
+    expect(store.settings.mailTurns).toEqual([
+      { conversation: 'aurora: recap uat', turn: 'mine', at: '2026-11-16' },
+    ])
+    // A mail to the PM alone can be said not theirs: the conversation is then only followed.
+    const notMine = await today.mailTurn(project, 'mail:budget', 'not_mine')
+    expect(kindOf(notMine, 'budget')).toBe('mail_follow')
+    const back = await today.mailTurn(project, 'mail:c:aurora: recap uat', null)
+    expect(kindOf(back, 'recap')).toBe('mail_follow')
+    // Only a signal of the mail that is on the page has a turn.
+    await expect(today.mailTurn(project, 'mail:non-c-e', 'mine')).rejects.toThrow(
+      'today_decision_invalid',
+    )
+    const meeting = back.items.find((item) => item.facts.kind === 'meeting')
+    await expect(today.mailTurn(project, meeting?.key ?? '', 'mine')).rejects.toThrow(
+      'today_decision_invalid',
+    )
   })
 })

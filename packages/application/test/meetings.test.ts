@@ -285,7 +285,7 @@ describe('the recorded meetings on the page of the day', () => {
       risks: { register: notSet('risk_invalid'), propose: notSet('risk_invalid') },
       files: { under: async () => [], readText: async () => null },
       store: {
-        load: async () => ({ decisions: [], mutedKinds: [], ownAddresses: [] }),
+        load: async () => ({ decisions: [], mutedKinds: [], ownAddresses: [], mailTurns: [] }),
         save: async () => {},
         loadEvaluation: async () => ({ at: null, model: null, mails: {} }),
         saveEvaluation: async () => {},

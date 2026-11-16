@@ -1,7 +1,9 @@
 import {
+  assignedToOwnPeople,
   cleanDashboardSettings,
   DomainError,
   type Project,
+  type ProjectTeam,
   parseTrackerExport,
   TRACKER_HISTORY_PATH,
   TRACKER_SNAPSHOT_PATH,
@@ -23,6 +25,8 @@ export type TrackerSnapshotsDeps = {
   secrets: SecretVault
   tracker: TrackerSnapshotReader
   writer: MemoryWriter
+  /** The people of the project: who the supplier's own are, when only their items count. */
+  team?: (project: Project) => Promise<ProjectTeam>
 }
 
 /** What a reading of the tracker brought. */
@@ -79,7 +83,12 @@ export function createTrackerSnapshots(deps: TrackerSnapshotsDeps): TrackerSnaps
       await deps.writer.write(
         project.folder,
         TRACKER_SUMMARY_PATH,
-        trackerSummary(parsed, settings),
+        trackerSummary(
+          settings.ownPeopleOnly && deps.team
+            ? { ...parsed, items: assignedToOwnPeople(parsed.items, await deps.team(project)) }
+            : parsed,
+          settings,
+        ),
       )
     }
     return {

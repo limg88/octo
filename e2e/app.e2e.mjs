@@ -67,6 +67,19 @@ const launch = (dataFolder = `${work}/dati`) =>
 let app = await launch()
 try {
   let page = await app.firstWindow()
+  /**
+   * «Chiedi» opens on a new conversation: this opens, among those already had, the one that
+   * shows the text given.
+   */
+  const openChatWith = async (text) => {
+    const chats = page.getByRole('navigation', { name: 'Conversazioni' }).locator('.ask-chat')
+    await chats.first().waitFor({ timeout: TIMEOUT_MS })
+    for (let at = 0; at < (await chats.count()); at += 1) {
+      await chats.nth(at).click()
+      if ((await page.getByText(text).count()) > 0) return
+    }
+    assert.fail(`no conversation shows «${text}»`)
+  }
   const ask = async (question) => {
     await page.getByPlaceholder('Chiedi qualcosa su questo progetto…').fill(question)
     await page.getByRole('button', { name: 'Chiedi', exact: true }).click()
@@ -148,7 +161,7 @@ try {
   await mail.getByLabel('Mittenti da escludere').fill('avvisi@monitor.example')
   await mail.getByRole('button', { name: 'Salva', exact: true }).click()
   await mail.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
-  await guide.getByText(/^1 su 5 collegati/).waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^1 su 6 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await mail.getByRole('button', { name: 'Leggi ora' }).click()
   // The periodic reading may have run just before the click: either way two mails are there.
   await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
@@ -238,7 +251,7 @@ try {
   await assertEventually(() => workItems().length === 4)
 
   // Demo 05: one button reads everything that is linked.
-  await guide.getByText(/^2 su 5 collegati/).waitFor({ timeout: TIMEOUT_MS })
+  await guide.getByText(/^2 su 6 collegati/).waitFor({ timeout: TIMEOUT_MS })
   await guide.getByRole('button', { name: 'Riempi la memoria ora' }).click()
   await guide.getByText('Fatto. Ora puoi fare domande').waitFor({ timeout: TIMEOUT_MS })
   for (const source of ['Posta', 'Azure DevOps', 'Documenti']) {
@@ -461,7 +474,11 @@ try {
   // The costs come from the rows of the timesheets: nobody typed them.
   await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('27.200,00').waitFor()
-  await forecastRow('PRJ000303').getByText('nessuna attività nel mese').waitFor()
+  // How a row was computed is said under it, across the table.
+  await page
+    .locator('table.data tbody tr:has-text("PRJ000303") + tr.row-details')
+    .getByText('nessuna attività nel mese')
+    .waitFor()
   await page.getByText(/manca la tariffa al giorno di Costa Elena \(120 ore/).waitFor()
   await page.getByText(/^16 ore del mese non ancora approvate/).waitFor()
   await page.getByText(/codici che il modello non elenca: PRJ000999/).waitFor()
@@ -561,9 +578,10 @@ try {
   await page.getByRole('tab', { name: 'Deliverable' }).click()
   const work11 = page.getByRole('region', { name: 'Deliverable' })
   await work11.getByRole('button', { name: 'Nuovo deliverable' }).click()
-  await work11
-    .getByText('Impostato: lo stato di avanzamento approvato esce anche come presentazione.')
-    .waitFor({ timeout: TIMEOUT_MS })
+  // The deck of the project is not shown among the kinds: a template belongs to a kind, and
+  // the one chosen for the whole project before still serves the kinds that are shown.
+  await work11.getByRole('button', { name: 'Crea un tipo tuo' }).waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(await work11.getByText('Modello delle presentazioni').count(), 0)
   await work11.getByRole('button', { name: /Stato di avanzamento/ }).click()
   await work11.getByLabel(/^Periodo/).fill('Sprint 28')
   await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
@@ -720,7 +738,7 @@ try {
   app = await launch()
   page = await app.firstWindow()
   await page.getByRole('tab', { name: 'Chiedi' }).click()
-  await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
+  await openChatWith('1 punto da controllare')
 
   // Demo 17: the model that answers is chosen for the project and written beside the answer.
   await page.getByText('modello claude-fake-default').first().waitFor({ timeout: TIMEOUT_MS })
@@ -805,7 +823,7 @@ try {
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
   // The questions came with the folder, the readings with the backup.
   await page.getByRole('tab', { name: 'Chiedi' }).click()
-  await page.getByText('1 punto da controllare').waitFor({ timeout: TIMEOUT_MS })
+  await openChatWith('1 punto da controllare')
   const readings = (dataFolder) =>
     JSON.parse(readFileSync(`${work}/${dataFolder}/feeds/demo-aurora/ado.json`, 'utf8'))
   assert.deepEqual(readings('dati-nuovo'), readings('dati'))

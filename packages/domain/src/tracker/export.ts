@@ -141,6 +141,7 @@ export function cleanDashboardSettings(settings: DashboardSettings): DashboardSe
     exportPath: settings.exportPath.trim(),
     historyPath: settings.historyPath.trim(),
     tags: cleanList(settings.tags),
+    ownPeopleOnly: settings.ownPeopleOnly === true,
     bugTypes: orDefault(cleanList(settings.bugTypes), DEFAULT_DASHBOARD_SETTINGS.bugTypes),
     storyTypes: orDefault(cleanList(settings.storyTypes), DEFAULT_DASHBOARD_SETTINGS.storyTypes),
     stuckDays,

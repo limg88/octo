@@ -15,8 +15,8 @@ type PeriodKey = 'name' | 'from' | 'to'
 const SIDES: TeamPerson['side'][] = ['supplier', 'client']
 
 const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
-  { key: 'name', label: text.columns.name },
-  { key: 'role', label: text.columns.role },
+  { key: 'name', label: text.columns.name, width: 'minmax(150px, 1.2fr)' },
+  { key: 'role', label: text.columns.role, width: 'minmax(200px, 1.8fr)' },
   {
     key: 'side',
     label: text.columns.side,
@@ -27,10 +27,10 @@ const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
   { key: 'allocation', label: text.columns.allocation, kind: 'amount', width: '110px' },
   { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
   { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
-  { key: 'note', label: text.columns.note },
+  { key: 'note', label: text.columns.note, width: 'minmax(130px, 1fr)' },
 ]
 const PERIOD_COLUMNS: RowsColumn<PeriodKey>[] = [
-  { key: 'name', label: text.columns.period },
+  { key: 'name', label: text.columns.period, width: 'minmax(200px, 1fr)' },
   { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
   { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
 ]

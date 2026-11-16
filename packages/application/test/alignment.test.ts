@@ -5,6 +5,7 @@ import {
   type JiraFeedConfig,
   NO_SOURCES,
   type Project,
+  type ProjectTeam,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import {
@@ -62,6 +63,22 @@ type Setup = {
   exported?: unknown
   records?: FeedRecord[]
   jira?: boolean
+  team?: ProjectTeam
+}
+
+const person = (name: string, side: 'supplier' | 'client') => ({
+  name,
+  role: '',
+  side,
+  from: '',
+  to: '',
+  allocation: null,
+  note: '',
+})
+/** The people of the project: one of the supplier, one of the client. */
+const TEAM: ProjectTeam = {
+  people: [person('Mario Rossi', 'supplier'), person('Carla Bianchi', 'client')],
+  periods: [],
 }
 
 function setup(options: Setup = {}) {
@@ -103,6 +120,7 @@ function setup(options: Setup = {}) {
       },
     },
     writer,
+    ...(options.team ? { team: async () => options.team as ProjectTeam } : {}),
   })
   return { alignments, asked, read, written: writer.files }
 }
@@ -125,6 +143,23 @@ describe('the alignment of two trackers', () => {
       assignee: 'Mario Rossi',
     })
     expect(view.alignment.missing.map((entry) => entry.id)).toEqual(['102'])
+  })
+
+  it('compares only the items of the supplier’s own people, when the PM asks so', async () => {
+    const exported = {
+      ...EXPORT,
+      items: [
+        { ...item(101, 'Esportazione ordini', 'Aurora\\Sprint 28'), assigned_to: 'Rossi Mario' },
+        { ...item(102, 'Filtro per data', 'Aurora\\Sprint 28'), assigned_to: 'Bianchi Carla' },
+      ],
+    }
+    const own = setup({ settings: { ownPeopleOnly: true }, exported, team: TEAM })
+    const view = await own.alignments.view(project)
+    expect(view.alignment.total).toBe(1)
+    expect(view.alignment.missing).toEqual([])
+
+    const all = setup({ exported, team: TEAM })
+    expect((await all.alignments.view(project)).alignment.total).toBe(2)
   })
 
   it('offers the sprints, periods and tags of the export before anything is compared', async () => {

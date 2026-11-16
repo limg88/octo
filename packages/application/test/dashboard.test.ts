@@ -2,6 +2,7 @@ import {
   type DashboardSettings,
   DEFAULT_DASHBOARD_SETTINGS,
   type Project,
+  type ProjectTeam,
   TRACKER_SUMMARY_PATH,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
@@ -71,10 +72,26 @@ const HISTORY = {
   },
 }
 
+const person = (name: string, side: 'supplier' | 'client') => ({
+  name,
+  role: '',
+  side,
+  from: '',
+  to: '',
+  allocation: null,
+  note: '',
+})
+/** The people of the project: one of the supplier, one of the client. */
+const TEAM: ProjectTeam = {
+  people: [person('Mario Rossi', 'supplier'), person('Carla Bianchi', 'client')],
+  periods: [],
+}
+
 function setup(
   initial: Partial<DashboardSettings> = {},
   files: Record<string, unknown> = {},
   writer?: ReturnType<typeof memoryWriter>,
+  team?: ProjectTeam,
 ) {
   let saved: DashboardSettings = { ...DEFAULT_DASHBOARD_SETTINGS, ...initial }
   const settings: DashboardSettingsStore = {
@@ -96,6 +113,7 @@ function setup(
     exports,
     clock: { now: () => NOW },
     ...(writer ? { writer } : {}),
+    ...(team ? { team: async () => team } : {}),
   })
 }
 
@@ -139,6 +157,39 @@ describe('dashboard', () => {
       { state: '04 - In Progress', phase: 'work', mappedByHand: false, count: 1 },
       { state: '12b - Closed', phase: 'closed', mappedByHand: false, count: 1 },
     ])
+  })
+
+  it('counts only the items of the supplier’s own people, when the PM asks so', async () => {
+    const assigned = {
+      ...EXPORT,
+      items: EXPORT.items.map((item, at) => ({
+        ...item,
+        // Bug 1 and story 4 are ours; bug 2 is the client's, the others nobody's.
+        assigned_to:
+          ['Rossi Mario', 'Bianchi Carla', null, 'MARIO ROSSI', 'Verdi Luca'][at] ?? null,
+      })),
+    }
+    const files = { 'export.json': assigned }
+    const writer = memoryWriter()
+    const own = setup(
+      { exportPath: 'export.json', tags: ['Team'], ownPeopleOnly: true },
+      files,
+      writer,
+      TEAM,
+    )
+    const view = await own.view(project, RANGE)
+    expect(view.bugs.total).toBe(1)
+    expect(view.bugs.open.map((bug) => bug.id)).toEqual(['1'])
+    expect(view.requirements.map((row) => row.id)).toEqual(['4'])
+    // The text of the numbers says what it counted.
+    await own.saveSettings(project, await own.settings(project))
+    expect(writer.files.get(TRACKER_SUMMARY_PATH)).toContain(
+      '- Perimetro: elementi con tag Team, assegnati alle persone del fornitore',
+    )
+
+    // Not asked: everybody's items count, as before.
+    const all = setup({ exportPath: 'export.json', tags: ['Team'] }, files, undefined, TEAM)
+    expect((await all.view(project, RANGE)).bugs.total).toBe(2)
   })
 
   it('uses the history when the project has one and goes on without when it is not readable', async () => {

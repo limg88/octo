@@ -18,15 +18,18 @@ import {
   isDomainError,
   type LiveSource,
   type MailJudgement,
+  type MailThreads,
+  type MailTurn,
   type ModelSettings,
   mailItems,
-  mailKey,
   mailThreads,
+  mailTurnsOf,
   meetingItems,
   meetingsOn,
   monthDueItems,
   monthOf,
   monthPeriod,
+  ownPeopleKeys,
   type Project,
   parseMailDocument,
   previousMonth,
@@ -45,6 +48,7 @@ import {
   trackerAgeItems,
   unassignedMeetingItems,
   withDecision,
+  withMailTurn,
   withoutDecision,
 } from '@octo/domain'
 import type { Alignments } from './alignment.ts'
@@ -139,6 +143,11 @@ export type Today = {
   view(project: Project): Promise<TodayView>
   decide(project: Project, input: DecideInput): Promise<TodayView>
   muteKind(project: Project, kind: TodayKind, muted: boolean): Promise<TodayView>
+  /**
+   * Keeps the PM's word on whose turn the conversation of a mail signal is: theirs to answer, or
+   * not theirs. Null takes the word back: the code and Claude decide again.
+   */
+  mailTurn(project: Project, key: string, turn: MailTurn | null): Promise<TodayView>
   saveAddresses(project: Project, addresses: readonly string[]): Promise<TodayView>
   /** Asks Claude to weigh the mail that waits; once a week also for the risks. */
   evaluate(project: Project, input?: EvaluateInput): Promise<TodayView>
@@ -230,7 +239,7 @@ export function createToday(deps: TodayDeps): Today {
     }
     const team = await deps.team.get(project).catch(() => ({ people: [], periods: [] }))
     const mails = await attempt(() => recentMail(project, today))
-    const threads = mailThreads(mails, own, now)
+    const threads = mailThreads(mails, own, now, ownPeopleKeys(team))
 
     const groups = await Promise.all([
       Promise.resolve(sourceItems(sources, now)),
@@ -262,7 +271,7 @@ export function createToday(deps: TodayDeps): Today {
       }),
       attempt(async () => draftItems(await deps.deliverables.list(project), now)),
       Promise.resolve(calendarItems(team, today)),
-      Promise.resolve(mailItems(threads, evaluation.mails, now, tomorrow)),
+      Promise.resolve(mailItems(threads, evaluation.mails, now, tomorrow, mailTurnsOf(settings))),
       Promise.resolve(meetingItems(meetingsOn(mails, today, romeDateString))),
       attempt(async () => riskItems(await deps.risks.register(project))),
       attempt(async () =>
@@ -270,14 +279,23 @@ export function createToday(deps: TodayDeps): Today {
       ),
     ])
     const page = applyDecisions(groups.flat(), settings, today)
-    const unjudged = threads.awaitingMe.filter((mail) => evaluation.mails[mail.id] === undefined)
+    // A judgement given before Claude was asked whom a mail is for says only how much it matters.
+    const unjudged = threads.awaitingMe.filter(
+      (mail) => evaluation.mails[mail.id]?.addressee === undefined,
+    )
     const judgedToday = evaluation.at !== null && romeDateString(new Date(evaluation.at)) === today
     return { today, settings, evaluation, threads, unjudged, judgedToday, page, freshness, own }
   }
 
   async function view(project: Project): Promise<TodayView> {
     const computed = await compute(project)
-    const visible = new Set(computed.page.items.map((item) => item.key))
+    const visible = new Set(
+      computed.page.items.flatMap((item) =>
+        item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow'
+          ? [item.facts.id]
+          : [],
+      ),
+    )
     return {
       day: computed.today,
       items: computed.page.items,
@@ -288,7 +306,7 @@ export function createToday(deps: TodayDeps): Today {
       evaluation: { at: computed.evaluation.at, model: computed.evaluation.model },
       // A mail the PM put away is not worth a run of Claude.
       evaluationDue:
-        !computed.judgedToday && computed.unjudged.some((mail) => visible.has(mailKey(mail.id))),
+        !computed.judgedToday && computed.unjudged.some((mail) => visible.has(mail.id)),
       ownAddresses: computed.own,
       addedAddresses: computed.settings.ownAddresses,
     }
@@ -305,11 +323,20 @@ export function createToday(deps: TodayDeps): Today {
     mails: readonly StoredMail[],
     evaluation: TodayEvaluation,
     input: EvaluateInput,
+    asked: { threads: MailThreads; own: readonly string[] },
   ): Promise<TodayEvaluation> {
     let model: string | null = evaluation.model
     const proposed = await deps.judge.mails({
       projectFolder: project.folder,
-      mails: mails.map((mail) => ({ id: mail.id, path: mail.path, subject: mail.subject })),
+      mails: mails.map((mail) => ({
+        id: mail.id,
+        path: mail.path,
+        subject: mail.subject,
+        to: mail.to,
+        mails: asked.threads.waiting[mail.id]?.mails ?? 1,
+      })),
+      // Whom a mail asks something of is told for this person: their name and their addresses.
+      pm: { name: deps.identity()?.name ?? null, addresses: asked.own },
       model: (await deps.models?.(project))?.ask ?? null,
       liveSources: (await deps.liveSources?.(project)) ?? [],
       onModel: (used) => {
@@ -333,6 +360,12 @@ export function createToday(deps: TodayDeps): Today {
         quoteVerified: found.status === 'verified',
         deadline:
           judgement.deadline !== null && DAY.test(judgement.deadline) ? judgement.deadline : null,
+        ...(judgement.addressee
+          ? {
+              addressee: judgement.addressee,
+              addresseeName: judgement.addresseeName?.trim() || null,
+            }
+          : {}),
       }
     }
     return { at: deps.clock.now().toISOString(), model, mails: judged }
@@ -366,6 +399,18 @@ export function createToday(deps: TodayDeps): Today {
       return view(project)
     },
 
+    async mailTurn(project, key, turn) {
+      const { page, settings, today } = await compute(project)
+      const item = page.items.find((candidate) => candidate.key === key)
+      const conversation =
+        item && (item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow')
+          ? item.facts.conversation
+          : undefined
+      if (conversation === undefined) throw new DomainError('today_decision_invalid', key)
+      await deps.store.save(project.folder, withMailTurn(settings, conversation, turn, today))
+      return view(project)
+    },
+
     async muteKind(project, kind, muted) {
       const settings = await deps.store.load(project.folder)
       const others = settings.mutedKinds.filter((kept) => kept !== kind)
@@ -389,12 +434,12 @@ export function createToday(deps: TodayDeps): Today {
       if (evaluating.has(project.id)) throw new DomainError('source_busy', 'today')
       evaluating.add(project.id)
       try {
-        const { threads, unjudged, evaluation } = await compute(project)
+        const { threads, unjudged, evaluation, own } = await compute(project)
         const mails = input.all ? threads.awaitingMe : unjudged
         // With nothing to weigh the run is skipped, but the day is marked as judged.
         const next =
           mails.length > 0
-            ? await judgeMails(project, mails, evaluation, input)
+            ? await judgeMails(project, mails, evaluation, input, { threads, own })
             : { ...evaluation, at: deps.clock.now().toISOString() }
         // Judgements of mail that no longer waits are dropped: the file does not grow for ever.
         const waiting = new Set(threads.awaitingMe.map((mail) => mail.id))

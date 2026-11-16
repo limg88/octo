@@ -34,9 +34,14 @@ const SNAPSHOT: TrackerSnapshot = {
   history: { '1': { created: '2026-10-01T08:00:00Z', states: [], tags: [] } },
 }
 
-function setup(ado: AdoFeedConfig | null = config, reader?: TrackerSnapshotReader) {
+function setup(
+  ado: AdoFeedConfig | null = config,
+  reader?: TrackerSnapshotReader,
+  ownPeople?: string[],
+) {
   let saved: DashboardSettings = {
     ...DEFAULT_DASHBOARD_SETTINGS,
+    ownPeopleOnly: ownPeople !== undefined,
     exportPath: 'raw/vecchio.json',
     tags: ['Squadra'],
     bugTypes: ['Bug', 'Defect'],
@@ -62,11 +67,53 @@ function setup(ado: AdoFeedConfig | null = config, reader?: TrackerSnapshotReade
     secrets,
     tracker,
     writer,
+    ...(ownPeople
+      ? {
+          team: async () => ({
+            people: ownPeople.map((name) => ({
+              name,
+              role: '',
+              side: 'supplier' as const,
+              from: '',
+              to: '',
+              allocation: null,
+              note: '',
+            })),
+            periods: [],
+          }),
+        }
+      : {}),
   })
   return { snapshots, writer, secrets, asked, settings: () => saved }
 }
 
 describe('reading the tracker for the dashboard', () => {
+  it('keeps the whole reading, and counts in its numbers only the supplier’s own people', async () => {
+    const bug = (id: number, assigned_to: string) => ({
+      id,
+      type: 'Bug',
+      title: `Bug ${id}`,
+      state: 'Active',
+      tags: 'Squadra',
+      assigned_to,
+      created_date: '2026-10-01T08:00:00Z',
+    })
+    const reader: TrackerSnapshotReader = {
+      read: async () => ({
+        ...SNAPSHOT,
+        items: [bug(1, 'Rossi Mario'), bug(2, 'Bianchi Carla'), bug(3, 'Mario Rossi')],
+      }),
+    }
+    const { snapshots, writer, secrets } = setup(config, reader, ['Mario Rossi'])
+    secrets.all.set('p-1/ado', 'pat')
+    expect((await snapshots.read(project)).items).toBe(3)
+    // The file «Chiedi» reads holds every item; the numbers are of ours alone.
+    expect(JSON.parse(writer.files.get(TRACKER_SNAPSHOT_PATH) ?? '').items).toHaveLength(3)
+    const summary = writer.files.get(TRACKER_SUMMARY_PATH) ?? ''
+    expect(summary).toContain('assegnati alle persone del fornitore')
+    expect(summary).toContain('- Bug aperti: 2')
+  })
+
   it('writes the tracker as the export the dashboard reads and points the dashboard at it', async () => {
     const { snapshots, writer, secrets, asked, settings } = setup()
     secrets.all.set('p-1/ado', 'pat')

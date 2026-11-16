@@ -22,6 +22,7 @@ export type TodayGroup = (typeof TODAY_GROUPS)[number]
 
 export const GROUP_OF: Readonly<Record<TodayKind, TodayGroup>> = {
   mail_reply: 'mail',
+  mail_follow: 'mail',
   mail_waiting: 'mail',
   tracker_old: 'tracker',
   bugs_stuck: 'tracker',

@@ -1,5 +1,5 @@
 import type { JudgeRequest, TodayJudge } from '@octo/application'
-import { IMPORTANCES, MIN_QUOTE_LENGTH, UNCITABLE_FOLDERS } from '@octo/domain'
+import { IMPORTANCES, MAIL_ADDRESSEES, MIN_QUOTE_LENGTH, UNCITABLE_FOLDERS } from '@octo/domain'
 import { z } from 'zod'
 import { liveSourcesPrompt } from './ask-prompt.ts'
 import { type ClaudeCliConfig, projectRules, runStructured } from './structured-run.ts'
@@ -17,6 +17,8 @@ const judgementsSchema = z.object({
       reason: z.string(),
       quote: z.string(),
       deadline: z.string().nullable(),
+      addressee: z.enum(MAIL_ADDRESSEES),
+      addresseeName: z.string().nullable(),
     }),
   ),
 })
@@ -47,21 +49,38 @@ ${RULES_CLOSE}`
   return `${prompt}${live}${bound}`
 }
 
-export const MAIL_JUDGE_PROMPT = `You rate the mail that waits for an answer from a Project Manager.
-The project is the current folder. Each mail of the list you are given is a file of the project:
-read it, and read what else in the project you need to tell how much it matters (deadlines,
-commitments, open points, who the sender is for the project).
+export const MAIL_JUDGE_PROMPT = `You read the mail a Project Manager is written to, and say of each one how much
+it matters and whom it asks something of. The project is the current folder. Each mail of the list
+you are given is a file of the project: read it, and read what else in the project you need to
+tell how much it matters (deadlines, commitments, open points, who the sender is for the project).
 ${NOT_SOURCES}
 
-The list was made by the code: these mails wait for an answer. You do not decide whether a mail
-waits; you say how much each one matters. For every mail of the list give:
+The list was made by the code: in each of these mails the Project Manager is among the people it is
+written to, and has not answered. That does not mean the mail asks an answer of the Project
+Manager: many are written to several people, or to somebody else by name. "pm" says who the
+Project Manager is: the name and the addresses. For every mail "to" says whom it is written to and
+"mails" how many mails of the same conversation wait (you are given the last one).
+
+For every mail of the list give:
 - "id": the id of the mail, exactly as given.
+- "addressee": whom the mail asks to do or to answer something.
+  "me" when it asks the Project Manager: by name, with a mention, as the only person written to,
+  or because what is asked is plainly the Project Manager's to give (a plan, a decision, a budget,
+  a confirmation on the project they run).
+  "someone_else" when it asks another person by name; "everyone" when it asks the whole group
+  without naming anybody; "nobody" when it asks nothing: a recap, a notice, a thank you, minutes.
+  When in doubt between "me" and another, say "me": a mail left unanswered costs more than one
+  read twice.
+- "addresseeName": the name of the person asked, as the mail writes it, when "addressee" is
+  "someone_else"; otherwise null.
 - "importance": "alta" when not answering blocks something or someone, or a decision, a
   commitment or money is at stake; "media" when it needs an answer but nothing stops meanwhile;
-  "bassa" when it is for information or a courtesy.
-- "reason": one short sentence, in Italian, in the words a Project Manager uses, that says why.
-- "quote": the words of that mail that back the reason, copied word for word from its file, at
-  least ${MIN_QUOTE_LENGTH} characters long. Never rephrase a quote.
+  "bassa" when it is for information or a courtesy. Say how much it matters for the project,
+  whoever has to answer.
+- "reason": one short sentence, in Italian, in the words a Project Manager uses, that says why it
+  matters and, when it is not for the Project Manager, whom it is for.
+- "quote": the words of that mail that show whom it asks and what, copied word for word from its
+  file, at least ${MIN_QUOTE_LENGTH} characters long. Never rephrase a quote.
 - "deadline": the day the mail asks an answer by, as YYYY-MM-DD, only when the mail names it;
   otherwise null. Never work out a day the mail does not state.
 
@@ -97,7 +116,7 @@ export function createClaudeTodayJudge(config: ClaudeCliConfig): TodayJudge {
       const rules = await projectRules(request.projectFolder)
       const result = await runStructured(config, {
         projectFolder: request.projectFolder,
-        input: JSON.stringify({ mails }, null, 1),
+        input: JSON.stringify({ pm: request.pm ?? { name: null, addresses: [] }, mails }, null, 1),
         systemPrompt: withContext(MAIL_JUDGE_PROMPT, request, rules),
         schema: judgementsSchema,
         model: request.model,

@@ -6,7 +6,8 @@ import {
   type ForecastSettings,
   NO_ROW_INPUTS,
 } from '@octo/domain'
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { messages } from './messages.ts'
@@ -32,8 +33,11 @@ const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
   { key: 'hours', label: text.columns.hours, kind: 'amount', width: '140px' },
 ]
 
-/** The columns of the table of the month, for what spans the whole row. */
-const COLUMNS = 9
+/** How many columns Octo fills and how many the PM does: the two groups of the heading. */
+const COMPUTED_COLUMNS = 7
+const OWN_COLUMNS = 3
+const FIGURE_WIDTH = '92px'
+const INPUT_WIDTH = '112px'
 
 const AMOUNT_FIELDS = ['toInvoice', 'revenue', 'budgetCosts', 'totalCosts'] as const
 type AmountField = (typeof AMOUNT_FIELDS)[number]
@@ -133,6 +137,100 @@ export function ForecastMonth({
     )
   }
 
+  const amountCell = (row: ForecastRow, name: AmountField, label: string) => (
+    <>
+      <input
+        type="text"
+        inputMode="decimal"
+        className="amount"
+        aria-label={text.forCode(label, row.code)}
+        value={draftFor(row.code)[name]}
+        onChange={(event) => change(row.code, { [name]: event.target.value })}
+      />
+      <FieldProblems
+        lines={problems[row.code]?.amounts.includes(name) ? [messages.amountWrong] : []}
+      />
+    </>
+  )
+  const figure = <Value extends number | null>(
+    key: string,
+    label: string,
+    of: (row: ForecastRow) => Value,
+    show: (value: Value) => string,
+  ): DataColumn<ForecastRow> => ({
+    key,
+    label,
+    kind: 'number',
+    width: FIGURE_WIDTH,
+    cell: (row) => show(of(row)),
+    sort: (row) => of(row),
+  })
+  const columns: DataColumn<ForecastRow>[] = [
+    {
+      key: 'code',
+      label: text.columnCode,
+      width: '128px',
+      cell: (row) => (
+        <>
+          <span title={row.description}>{row.code}</span>
+          <button
+            type="button"
+            className="quiet cell-button"
+            aria-expanded={open === row.code}
+            aria-label={text.forCode(text.moreData, row.code)}
+            onClick={() => setOpen(open === row.code ? null : row.code)}
+          >
+            {text.moreData}
+          </button>
+        </>
+      ),
+      sort: (row) => row.code,
+      text: (row) => `${row.code} ${row.description}`,
+    },
+    figure('internal', text.columnInternal, (row) => row.values.internalCosts, text.money),
+    figure('external', text.columnExternal, (row) => row.values.externalCosts, text.money),
+    figure('revenue', text.columnRevenue, (row) => row.values.revenue, text.money),
+    {
+      key: 'quantity',
+      label: text.columnQuantity,
+      kind: 'number',
+      width: FIGURE_WIDTH,
+      cell: ({ values }) =>
+        values.quantityIsShare
+          ? text.share(values.quantity)
+          : text.daysWithUnit(text.days(values.quantity)),
+      sort: (row) => row.values.quantity,
+    },
+    figure('marginMonth', text.columnMarginMonth, (row) => row.values.marginMonth, text.share),
+    figure('marginEnd', text.columnMarginEnd, (row) => row.values.marginEnd, text.share),
+    {
+      key: 'ownRevenue',
+      label: text.columnOwnRevenue,
+      kind: 'number',
+      width: INPUT_WIDTH,
+      cell: (row) => amountCell(row, 'revenue', text.revenue),
+    },
+    {
+      key: 'toInvoice',
+      label: text.columnToInvoice,
+      kind: 'number',
+      width: INPUT_WIDTH,
+      cell: (row) => amountCell(row, 'toInvoice', text.toInvoice),
+    },
+    {
+      key: 'ownNote',
+      label: text.columnOwnNote,
+      cell: (row) => (
+        <input
+          type="text"
+          aria-label={text.forCode(text.note, row.code)}
+          value={draftFor(row.code).note}
+          onChange={(event) => change(row.code, { note: event.target.value })}
+        />
+      ),
+    },
+  ]
+
   const gaps = (
     <Gaps
       view={view}
@@ -160,50 +258,39 @@ export function ForecastMonth({
           save()
         }}
       >
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{text.columnCode}</th>
-              <th className="number">{text.columnInternal}</th>
-              <th className="number">{text.columnExternal}</th>
-              <th className="number">{text.columnRevenue}</th>
-              <th className="number">{text.columnQuantity}</th>
-              <th className="number">{text.columnMarginMonth}</th>
-              <th className="number">{text.columnMarginEnd}</th>
-              <th className="number">{text.columnToInvoice}</th>
-              <th>{text.columnNote}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <Fragment key={row.code}>
-                <CodeRow
-                  row={row}
-                  draft={draftFor(row.code)}
-                  problems={problems[row.code]}
-                  open={open === row.code}
-                  onChange={(part) => change(row.code, part)}
-                  onToggle={() => setOpen(open === row.code ? null : row.code)}
-                />
-                {open === row.code && (
-                  <tr className="row-details">
-                    <td colSpan={COLUMNS}>
-                      <CodeDetails
-                        code={row.code}
-                        draft={draftFor(row.code)}
-                        problems={problems[row.code]}
-                        externalNames={settings.externals
-                          .filter((external) => external.code === row.code)
-                          .map((external) => external.name)}
-                        onChange={(part) => change(row.code, part)}
-                      />
-                    </td>
-                  </tr>
+        <p className="hint">{text.inputsHint}</p>
+        <div className="table-wide">
+          <DataTable
+            label={text.monthData}
+            groups={[
+              { label: text.groupComputed, span: COMPUTED_COLUMNS },
+              { label: text.groupOwn, span: OWN_COLUMNS },
+            ]}
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.code}
+            detail={(row) => (
+              <>
+                {row.note !== '' && (
+                  <p className="hint row-note">
+                    {text.howComputed} {row.note}
+                  </p>
                 )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                {open === row.code && (
+                  <CodeDetails
+                    code={row.code}
+                    draft={draftFor(row.code)}
+                    problems={problems[row.code]}
+                    externalNames={settings.externals
+                      .filter((external) => external.code === row.code)
+                      .map((external) => external.name)}
+                    onChange={(part) => change(row.code, part)}
+                  />
+                )}
+              </>
+            )}
+          />
+        </div>
         <div className="actions">
           <button type="submit" className="quiet-submit">
             {text.saveInputs}
@@ -213,79 +300,6 @@ export function ForecastMonth({
       </form>
       {gaps}
     </>
-  )
-}
-
-/** One code: what is computed, and in the same row what the PM decides for the month. */
-function CodeRow({
-  row,
-  draft,
-  problems,
-  open,
-  onChange,
-  onToggle,
-}: {
-  row: ForecastRow
-  draft: Draft
-  problems: Problems | undefined
-  open: boolean
-  onChange: (part: Partial<Draft>) => void
-  onToggle: () => void
-}) {
-  const { code, description, values, note } = row
-  const amountCell = (name: AmountField, label: string, placeholder = '') => (
-    <>
-      <input
-        type="text"
-        inputMode="decimal"
-        className="amount"
-        aria-label={text.forCode(label, code)}
-        placeholder={placeholder}
-        value={draft[name]}
-        onChange={(event) => onChange({ [name]: event.target.value })}
-      />
-      <FieldProblems lines={problems?.amounts.includes(name) ? [messages.amountWrong] : []} />
-    </>
-  )
-  return (
-    <tr>
-      <td title={description}>
-        {code}
-        <button
-          type="button"
-          className="quiet"
-          aria-expanded={open}
-          aria-label={text.forCode(text.moreData, code)}
-          onClick={onToggle}
-        >
-          {text.moreData}
-        </button>
-      </td>
-      <td className="number">{text.money(values.internalCosts)}</td>
-      <td className="number">{text.money(values.externalCosts)}</td>
-      <td className="number">
-        {text.money(values.revenue)}
-        {amountCell('revenue', text.revenue, text.revenueComputed)}
-      </td>
-      <td className="number">
-        {values.quantityIsShare
-          ? text.share(values.quantity)
-          : text.daysWithUnit(text.days(values.quantity))}
-      </td>
-      <td className="number">{text.share(values.marginMonth)}</td>
-      <td className="number">{text.share(values.marginEnd)}</td>
-      <td className="number">{amountCell('toInvoice', text.toInvoice)}</td>
-      <td>
-        <span className="cell-text">{note}</span>
-        <input
-          type="text"
-          aria-label={text.forCode(text.note, code)}
-          placeholder={text.note}
-          value={draft.note}
-          onChange={(event) => onChange({ note: event.target.value })}
-        />
-      </td>
-    </tr>
   )
 }
 

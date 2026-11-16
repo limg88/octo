@@ -20,13 +20,14 @@ import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
-import { ProjectSettings } from './ProjectSettings.tsx'
+import { ProjectSettings, type SettingsPart } from './ProjectSettings.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
 import { SignIn } from './SignIn.tsx'
 import { SECTION_LABELS, type Section } from './sections.ts'
 import { ThemeToggle } from './ThemeToggle.tsx'
 import { TodayView } from './TodayView.tsx'
+import { UpdateNotice } from './UpdateNotice.tsx'
 import { useTheme } from './use-theme.ts'
 
 type Props = {
@@ -56,6 +57,8 @@ export function App({ api }: Props) {
   const [handoff, setHandoff] = useState<Handoff | null>(null)
   const [todayFocus, setTodayFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
   const [dashboardFocus, setDashboardFocus] = useState<DashboardFocus>(NO_DASHBOARD_FOCUS)
+  /** The part of the settings a page sent the PM to; null: the settings open as usual. */
+  const [settingsPart, setSettingsPart] = useState<SettingsPart | null>(null)
 
   // Nothing of a project follows the PM into another one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the project is what is watched.
@@ -74,12 +77,18 @@ export function App({ api }: Props) {
   }, [api])
 
   const signedIn = session?.identity != null
-  // Nothing is asked of Octo before somebody is signed in: it would be refused.
-  useEffect(() => {
-    if (!signedIn) return
+
+  /** Asks again whether Claude Code answers: after the PM installed it, without reopening Octo. */
+  function checkAgent() {
     void api.agentStatus().then((result) => {
       if (result.ok) setAgent(result.value)
     })
+  }
+  // Nothing is asked of Octo before somebody is signed in: it would be refused.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked once for each sign-in.
+  useEffect(() => {
+    if (!signedIn) return
+    checkAgent()
     void api.listProjects().then((result) => {
       if (!result.ok) return setError(result.code)
       setProjects(result.value)
@@ -211,6 +220,12 @@ export function App({ api }: Props) {
     setSelectedId(result.value.id)
   }
 
+  /** A section chosen from the menu opens as usual, not on what another page asked of it. */
+  function openSection(section: Section) {
+    setSettingsPart(null)
+    setTab(section)
+  }
+
   const selected = projects.find((project) => project.id === selectedId) ?? null
 
   /** Opens «Chiedi» with a question about something of the project, for the PM to send. */
@@ -250,7 +265,7 @@ export function App({ api }: Props) {
           onManage={() => openDialog('manage')}
           onOverview={() => setOverview(true)}
         />
-        {selected && !overview && <SectionNav current={tab} onSelect={setTab} />}
+        {selected && !overview && <SectionNav current={tab} onSelect={openSection} />}
         <div className="sidebar-foot">
           {session?.identity && (
             <p className="agent">
@@ -264,6 +279,7 @@ export function App({ api }: Props) {
         </div>
       </nav>
       <main>
+        <UpdateNotice api={api} />
         {error && dialog === null && (
           <div className="notice-bar notice-bar-warning">
             <p role="alert">{errorText(error)}</p>
@@ -290,9 +306,13 @@ export function App({ api }: Props) {
           </div>
         )}
         {agent?.available === false && (
-          <div className="notice" role="alert">
-            <h2>{messages.agentMissingTitle}</h2>
-            <p>{messages.agentMissingBody}</p>
+          <div className="notice-bar notice-bar-warning">
+            <p role="alert">
+              <strong>{messages.agentMissingTitle}</strong>. {messages.agentMissingBody}
+            </p>
+            <button type="button" onClick={checkAgent}>
+              {messages.agentRetry}
+            </button>
           </div>
         )}
         {overview ? (
@@ -333,6 +353,10 @@ export function App({ api }: Props) {
                 onAsk={askAbout}
                 focus={todayFocus}
                 onFocus={setTodayFocus}
+                onOpenSettings={() => {
+                  setSettingsPart('today')
+                  setTab('sources')
+                }}
               />
             ) : tab === 'ask' ? (
               <AskView
@@ -370,7 +394,7 @@ export function App({ api }: Props) {
             ) : tab === 'alignment' ? (
               <AlignmentView api={api} project={selected} onOpenSection={setTab} />
             ) : (
-              <ProjectSettings api={api} project={selected} />
+              <ProjectSettings api={api} project={selected} part={settingsPart} />
             )}
           </>
         ) : (

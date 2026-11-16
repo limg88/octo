@@ -193,6 +193,7 @@ describe('what the page of the day keeps in the project', () => {
       ],
       mutedKinds: ['meeting' as const],
       ownAddresses: ['pm@example.test'],
+      mailTurns: [{ conversation: 'aurora: budget', turn: 'not_mine' as const, at: '2026-11-16' }],
     }
     await store.save(folder, settings)
     expect(await store.load(folder)).toEqual(settings)
@@ -252,6 +253,14 @@ describe('Claude as the one who judges', () => {
       'Il comitato ha approvato il budget.',
     ].join('\n'),
   )
+  const PM = 'pm@example.test'
+  const mailFile = (name: string, firstLine: string) =>
+    writeFileSync(
+      join(folder, name),
+      ['---', 'tipo: "email"', 'id: "x"', '---', '', '# Aurora', '', firstLine].join('\n'),
+    )
+  mailFile('a-tutti.md', 'Ciao a tutti, di seguito il recap della sessione.')
+  mailFile('a-carla.md', 'Carla, ci confermi la data del collaudo entro venerdì?')
   const judge = createClaudeTodayJudge({
     command: process.execPath,
     prefixArgs: [join(here, 'fake-claude.mjs')],
@@ -263,9 +272,30 @@ describe('Claude as the one who judges', () => {
     const judged = await judge.mails({
       projectFolder: folder,
       mails: [
-        { id: 'a', path: 'mail.md', subject: 'Aurora: budget' },
-        { id: 'b', path: 'non-c-e.md', subject: 'Aurora: saluti' },
+        { id: 'a', path: 'mail.md', subject: 'Aurora: budget', to: PM, mails: 1 },
+        {
+          id: 'b',
+          path: 'non-c-e.md',
+          subject: 'Aurora: saluti',
+          to: `${PM}, altri@x.test`,
+          mails: 2,
+        },
+        {
+          id: 'c',
+          path: 'a-tutti.md',
+          subject: 'Aurora: recap',
+          to: `${PM}, altri@x.test`,
+          mails: 1,
+        },
+        {
+          id: 'd',
+          path: 'a-carla.md',
+          subject: 'Aurora: data',
+          to: `${PM}, carla@x.test`,
+          mails: 1,
+        },
       ],
+      pm: { name: 'Paola Verdi', addresses: [PM] },
       onModel: (model) => models.push(model),
     })
     expect(judged).toEqual([
@@ -275,8 +305,21 @@ describe('Claude as the one who judges', () => {
         reason: expect.any(String),
         quote: 'Il comitato ha approvato il budget.',
         deadline: null,
+        addressee: 'me',
+        addresseeName: null,
       },
-      { id: 'b', importance: 'media', reason: expect.any(String), quote: '', deadline: null },
+      {
+        id: 'b',
+        importance: 'media',
+        reason: expect.any(String),
+        quote: '',
+        deadline: null,
+        addressee: 'me',
+        addresseeName: null,
+      },
+      // Whom a mail asks is read in its words: the whole group, or another person by name.
+      expect.objectContaining({ id: 'c', addressee: 'everyone', addresseeName: null }),
+      expect.objectContaining({ id: 'd', addressee: 'someone_else', addresseeName: 'Carla' }),
     ])
     expect(models).toEqual(['claude-fake-default'])
     // Nothing to weigh: Claude is not run at all.

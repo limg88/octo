@@ -77,6 +77,8 @@ export type DashboardSettings = {
   historyPath: string
   /** Items with at least one of these tags are in scope; none: all of them. */
   tags: string[]
+  /** Only the items assigned to the supplier's people of the project are in scope. */
+  ownPeopleOnly: boolean
   bugTypes: string[]
   storyTypes: string[]
   /** Days in the same state after which an open bug is shown as stuck. */
@@ -97,6 +99,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   exportPath: '',
   historyPath: '',
   tags: [],
+  ownPeopleOnly: false,
   bugTypes: ['Bug'],
   storyTypes: ['User Story', 'Story'],
   stuckDays: 30,

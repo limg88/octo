@@ -11,6 +11,8 @@ import {
   calendarItems,
   candidateId,
   cleanTodaySettings,
+  conversationKey,
+  conversationOfMail,
   type Deliverable,
   daysBetweenDays,
   dismissCandidate,
@@ -22,8 +24,11 @@ import {
   identityOf,
   isMonthClosing,
   isToDo,
+  MAX_MAIL_TURNS,
+  type MailJudgement,
   mailItems,
   mailThreads,
+  mailTurnsOf,
   meetingItems,
   meetingsOn,
   monthDueItems,
@@ -35,6 +40,7 @@ import {
   orderToday,
   parseInvite,
   parseMailDocument,
+  personKey,
   previousMonth,
   type Reconciliation,
   requirementItems,
@@ -42,13 +48,16 @@ import {
   risksMarkdown,
   romeDateString,
   type StoredMail,
+  senderName,
   sourceItems,
   type TodayItem,
   threadSubject,
   trackerAgeItems,
   updateRisk,
+  type WaitingMail,
   withCandidates,
   withDecision,
+  withMailTurn,
   withoutDecision,
   workdaysBetween,
 } from '../src/index.ts'
@@ -540,7 +549,11 @@ describe('the mail of the project read back', () => {
       references: ['domanda'],
     })
     expect(mailThreads([asked, answer], own, NOW).awaitingThem).toEqual([])
-    expect(mailThreads([waiting], [], NOW)).toEqual({ awaitingMe: [], awaitingThem: [] })
+    expect(mailThreads([waiting], [], NOW)).toEqual({
+      awaitingMe: [],
+      waiting: {},
+      awaitingThem: [],
+    })
     expect(threadSubject(' R: RE: Fw:  Aurora:  Collaudo ')).toBe('aurora: collaudo')
   })
 
@@ -565,6 +578,7 @@ describe('the mail of the project read back', () => {
     expect(items[1]?.facts).toMatchObject({ kind: 'mail_reply', days: 1, judgement })
     const waiting = {
       awaitingMe: [],
+      waiting: {},
       awaitingThem: [stored({ id: 'q', date: '2026-11-10T09:00:00Z' })],
     }
     expect(mailItems(waiting, {}, NOW, '2026-11-17')[0]).toMatchObject({
@@ -811,5 +825,250 @@ describe('who uses Octo', () => {
     expect(assignmentOf(['PRJ000101'], [])).toBe('not_assigned')
     expect(assignmentOf([], ['PRJ000202'])).toBe('unknown')
     expect(assignmentOf(['PRJ000101'], null)).toBe('unknown')
+  })
+})
+
+describe('whose turn a mail is', () => {
+  const OWN = ['pm@example.test']
+  const MANY =
+    'Paola Verdi <pm@example.test>, Luca Neri <luca@cliente.example>, altri@cliente.example'
+  const toMany = (overrides: Partial<StoredMail> & Pick<StoredMail, 'id'>) =>
+    stored({ to: MANY, subject: 'Aurora: recap UAT', ...overrides })
+  const judged = (
+    addressee: 'me' | 'someone_else' | 'everyone' | 'nobody' | undefined,
+    part: Partial<MailJudgement> = {},
+  ): MailJudgement => ({
+    importance: 'media',
+    reason: 'Motivo.',
+    quote: 'Ciao a tutti, di seguito il recap',
+    quoteVerified: true,
+    deadline: null,
+    ...(addressee ? { addressee, addresseeName: null } : {}),
+    ...part,
+  })
+
+  it('shows one mail for each conversation, the last, and says how many wait', () => {
+    const threads = mailThreads(
+      [
+        toMany({ id: 'primo', date: '2026-11-12T09:00:00Z' }),
+        toMany({ id: 'secondo', subject: 'R: Aurora: recap UAT', date: '2026-11-13T09:00:00Z' }),
+        toMany({ id: 'terzo', subject: 'RE: R: Aurora: recap UAT', date: '2026-11-14T09:00:00Z' }),
+        stored({ id: 'diretta', subject: '', date: '2026-11-15T09:00:00Z' }),
+        stored({ id: 'altra', subject: '', date: '2026-11-15T10:00:00Z' }),
+      ],
+      OWN,
+      NOW,
+    )
+    // Mail without a subject are each a conversation of their own.
+    expect(threads.awaitingMe.map((mail) => mail.id)).toEqual(['altra', 'diretta', 'terzo'])
+    expect(threads.waiting.terzo).toEqual({
+      addressing: 'among_many',
+      conversation: 'aurora: recap uat',
+      mails: 3,
+      recipients: 3,
+      answeredBy: null,
+    })
+    expect(threads.waiting.diretta).toMatchObject({
+      addressing: 'only_me',
+      conversation: 'diretta',
+    })
+    expect(conversationOfMail(stored({ id: 'x', subject: 'I: Aurora: Budget ' }))).toBe(
+      'aurora: budget',
+    )
+  })
+
+  it('knows a conversation the PM or one of their own people has taken up', () => {
+    const first = toMany({ id: 'primo', date: '2026-11-12T09:00:00Z' })
+    const ownPeople = new Set([personKey('Mario Rossi')])
+    const taken = mailThreads(
+      [
+        first,
+        // One of the supplier's own answers, written as a tracker or a mail program writes it.
+        toMany({
+          id: 'nostra',
+          from: '"Rossi, Mario" <m.rossi@fornitore.example>',
+          date: '2026-11-13T09:00:00Z',
+        }),
+      ],
+      OWN,
+      NOW,
+      ownPeople,
+    )
+    // The answer of the colleague is itself a mail the PM is written to: the last of the two.
+    expect(taken.awaitingMe.map((mail) => mail.id)).toEqual(['nostra'])
+    expect(taken.waiting.nostra).toMatchObject({ addressing: 'among_many', mails: 2 })
+    const followed = mailThreads(
+      [
+        first,
+        stored({
+          id: 'nostra',
+          subject: 'R: Aurora: recap UAT',
+          from: 'Mario Rossi <m.rossi@fornitore.example>',
+          to: 'Luca Neri <luca@cliente.example>',
+          date: '2026-11-13T09:00:00Z',
+        }),
+      ],
+      OWN,
+      NOW,
+      ownPeople,
+    )
+    expect(followed.waiting.primo).toMatchObject({
+      addressing: 'answered_by_own',
+      answeredBy: 'Mario Rossi',
+    })
+    expect(senderName('"Rossi, Mario" <m.rossi@fornitore.example>')).toBe('Rossi, Mario')
+
+    // The PM wrote later in the conversation, without citing the mail: nothing waits there.
+    const mine = stored({
+      id: 'mia',
+      subject: 'R: Aurora: recap UAT',
+      from: 'pm@example.test',
+      to: 'luca@cliente.example',
+      date: '2026-11-13T09:00:00Z',
+      references: ['un-altra'],
+    })
+    expect(mailThreads([first, mine], OWN, NOW).awaitingMe).toEqual([])
+  })
+
+  it('takes a system that writes under its own name for what it is', () => {
+    const notice = stored({ id: 'ado', from: 'Azure DevOps <azuredevops@microsoft.com>' })
+    const jira = stored({
+      id: 'jira',
+      subject: 'AUR-1',
+      from: '"Jira" <jira@cliente.atlassian.net>',
+    })
+    const signed = stored({
+      id: 'firmata',
+      subject: '[JIRA] (AUR-2)',
+      from: 'Mario Rossi (Jira) <jira@cliente.atlassian.net>',
+    })
+    expect(mailThreads([notice, jira, signed], OWN, NOW).awaitingMe).toEqual([])
+  })
+
+  it('asks an answer only of a mail that is the PM’s: alone, or as Claude read it', () => {
+    const mails = [
+      stored({ id: 'sola', subject: 'Aurora: firma' }),
+      toMany({ id: 'a-me', subject: 'Aurora: piano' }),
+      toMany({ id: 'a-tutti' }),
+      toMany({ id: 'a-luca', subject: 'Aurora: data' }),
+      toMany({ id: 'nessuno', subject: 'Aurora: verbale' }),
+      toMany({ id: 'non-letta', subject: 'Aurora: ambiente' }),
+      toMany({ id: 'vecchio-giudizio', subject: 'Aurora: listino' }),
+    ]
+    const judgements = {
+      'a-me': judged('me', { deadline: '2026-11-17' }),
+      'a-tutti': judged('everyone', { importance: 'alta' }),
+      'a-luca': judged('someone_else', { addresseeName: ' Luca Neri ', deadline: '2026-11-17' }),
+      nessuno: judged('nobody'),
+      // Judged before Claude was asked whom a mail is for: how much it matters, and no more.
+      'vecchio-giudizio': judged(undefined),
+    }
+    const items = mailItems(mailThreads(mails, OWN, NOW), judgements, NOW, '2026-11-17')
+    const of = (id: string) => items.find((item) => 'id' in item.facts && item.facts.id === id)
+    expect(of('sola')).toMatchObject({
+      key: 'mail:sola',
+      band: 'waiting',
+      facts: { kind: 'mail_reply', why: 'only_me' },
+    })
+    expect(of('sola')?.formerKeys).toBeUndefined()
+    expect(of('a-me')).toMatchObject({
+      key: 'mail:c:aurora: piano',
+      formerKeys: ['mail:a-me'],
+      band: 'due',
+      dueBecause: 'deadline',
+      facts: { kind: 'mail_reply', why: 'judged' },
+    })
+    expect(of('a-tutti')).toMatchObject({
+      band: 'watch',
+      facts: { kind: 'mail_follow', why: 'everyone', who: null, recipients: 3, mails: 1 },
+    })
+    // A day asked of somebody else is not a day of the PM.
+    expect(of('a-luca')).toMatchObject({
+      band: 'watch',
+      facts: { kind: 'mail_follow', why: 'someone_else', who: 'Luca Neri' },
+    })
+    expect(of('a-luca')?.dueBecause).toBeUndefined()
+    expect(of('nessuno')?.facts).toMatchObject({ kind: 'mail_follow', why: 'nobody' })
+    expect(of('non-letta')?.facts).toMatchObject({ kind: 'mail_follow', why: 'unjudged' })
+    expect(of('vecchio-giudizio')?.facts).toMatchObject({ kind: 'mail_follow', why: 'unjudged' })
+    expect(conversationKey('aurora: piano')).toBe('mail:c:aurora: piano')
+
+    // What only is followed and matters much comes first among what is watched.
+    const watched = orderToday(items).filter((item) => item.band === 'watch')
+    expect(watched[0]?.facts).toMatchObject({ id: 'a-tutti' })
+  })
+
+  it('puts the PM’s own word before the headers and before Claude', () => {
+    const mails = [stored({ id: 'sola', subject: 'Aurora: firma' }), toMany({ id: 'a-tutti' })]
+    const threads = mailThreads(mails, OWN, NOW)
+    const judgements = { 'a-tutti': judged('everyone') }
+    const items = mailItems(threads, judgements, NOW, '2026-11-17', {
+      'aurora: firma': 'not_mine',
+      'aurora: recap uat': 'mine',
+    })
+    expect(items.map((item) => item.facts)).toMatchObject([
+      { id: 'sola', kind: 'mail_follow', why: 'chosen' },
+      { id: 'a-tutti', kind: 'mail_reply', why: 'chosen' },
+    ])
+    // A conversation one of the own people took up is followed whatever Claude read in it.
+    const taken = {
+      ...threads,
+      waiting: {
+        ...threads.waiting,
+        'a-tutti': {
+          ...(threads.waiting['a-tutti'] as WaitingMail),
+          addressing: 'answered_by_own' as const,
+          answeredBy: 'Mario Rossi',
+        },
+      },
+    }
+    expect(
+      mailItems(taken, { 'a-tutti': judged('me') }, NOW, '2026-11-17')[1]?.facts,
+    ).toMatchObject({ kind: 'mail_follow', why: 'answered_by_own', who: 'Mario Rossi' })
+    // A mail the code knows nothing of is taken as one among many.
+    expect(mailItems({ ...threads, waiting: {} }, {}, NOW, '2026-11-17')[0]?.facts).toMatchObject({
+      kind: 'mail_follow',
+      why: 'unjudged',
+      recipients: 1,
+      mails: 1,
+    })
+  })
+
+  it('keeps the PM’s word on a conversation, and a decision taken under the key of before', () => {
+    const settings = withMailTurn(NO_TODAY_SETTINGS, 'aurora: piano', 'not_mine', '2026-11-16')
+    expect(mailTurnsOf(settings)).toEqual({ 'aurora: piano': 'not_mine' })
+    const changed = withMailTurn(settings, 'aurora: piano', 'mine', '2026-11-17')
+    expect(changed.mailTurns).toEqual([
+      { conversation: 'aurora: piano', turn: 'mine', at: '2026-11-17' },
+    ])
+    expect(withMailTurn(changed, 'aurora: piano', null, '2026-11-18').mailTurns).toEqual([])
+    const many = Array.from({ length: MAX_MAIL_TURNS + 5 }, (_unused, at) => ({
+      conversation: `c-${at}`,
+      turn: 'mine' as const,
+      at: '2026-11-16',
+    }))
+    expect(cleanTodaySettings({ ...NO_TODAY_SETTINGS, mailTurns: many }).mailTurns).toHaveLength(
+      MAX_MAIL_TURNS,
+    )
+
+    // «Non serve risposta» said of a mail before conversations had a key still hides it.
+    const [item] = mailItems(mailThreads([toMany({ id: 'a-me' })], OWN, NOW), {}, NOW, '2026-11-17')
+    const before = {
+      ...NO_TODAY_SETTINGS,
+      decisions: [
+        {
+          key: 'mail:a-me',
+          kind: 'mail_reply' as const,
+          state: 'muted' as const,
+          at: '2026-11-15',
+          until: null,
+          weight: 1,
+        },
+      ],
+    }
+    expect(applyDecisions(item ? [item] : [], before, '2026-11-16')).toMatchObject({
+      items: [],
+      hidden: 1,
+    })
   })
 })

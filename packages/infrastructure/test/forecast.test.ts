@@ -270,6 +270,50 @@ describe('the settings of the forecast on disk', () => {
     ])
   })
 
+  it('read back the rows of one view of a system of record, from every file of it', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    const netsuite = join(folder, 'fonti', 'NetSuite')
+    await mkdir(join(netsuite, 'v-invoice-all'), { recursive: true })
+    const rowsFile = (view: string, perimeter: string, rows: unknown[]) =>
+      [
+        '---',
+        'octobrief: 1',
+        'system: "dwsi"',
+        'type: "rows"',
+        `view: ${JSON.stringify(view)}`,
+        `perimeter: ${JSON.stringify(perimeter)}`,
+        'extractedAt: "2026-11-15T20:17:11.687Z"',
+        'sourceSyncedAt: "2026-11-15T14:07:20.993Z"',
+        `rows: ${JSON.stringify(rows)}`,
+        '---',
+        `# ${view}`,
+        '',
+      ].join('\n')
+    const invoice = (invoiceid: string, amount: number) => ({
+      key: `${invoiceid}|1`,
+      values: { invoiceid, amount, salesorder: 'SO-1' },
+    })
+    await writeFile(
+      join(netsuite, 'v-invoice-all', 'prj-a.md'),
+      rowsFile('v_invoice_all', 'prj:A', [invoice('2026/1', 100)]),
+    )
+    await writeFile(
+      join(netsuite, 'v-invoice-all', 'prj-b.md'),
+      rowsFile('v_invoice_all', 'prj:B', [invoice('2026/2', 50)]),
+    )
+    await writeFile(
+      join(netsuite, 'ordini.md'),
+      rowsFile('v_sales_order_all', 'prj:A', [{ key: 'SO-1|1', values: { amount: 150 } }]),
+    )
+    await writeFile(join(netsuite, 'nota.md'), '# Una nota\n')
+    const rows = await createFeedRecords(createFsProjectFiles()).rows(
+      folder,
+      'fonti/NetSuite',
+      'v_invoice_all',
+    )
+    expect(rows.map((row) => row.invoiceid).sort()).toEqual(['2026/1', '2026/2'])
+  })
+
   it('keep the people and the calendar', async () => {
     const store = createFsTeamStore()
     expect(await store.load(folder)).toEqual(NO_TEAM)

@@ -59,6 +59,7 @@ const systemNow = (): Date => new Date()
 
 export function SourcesView({ api, project, now = systemNow, open = true, onToggle }: Props) {
   const [view, setView] = useState<MailSourceView | null>(null)
+  const openDiskAccess = () => void api.openDiskAccessSettings()
   const [form, setForm] = useState<MailForm | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -124,7 +125,11 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
   }
 
   if (!view || !form) {
-    return <section className="sources">{error && <Alert code={error} />}</section>
+    return (
+      <section className="sources">
+        {error && <Alert code={error} onOpenDiskAccess={openDiskAccess} />}
+      </section>
+    )
   }
   const set = (change: Partial<MailForm>) => setForm({ ...form, ...change })
 
@@ -136,7 +141,13 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
         open={open}
         onToggle={onToggle}
         status={
-          <Freshness state={view.state} configured={view.config !== null} busy={busy} now={now()} />
+          <Freshness
+            state={view.state}
+            configured={view.config !== null}
+            busy={busy}
+            now={now()}
+            onOpenDiskAccess={openDiskAccess}
+          />
         }
       >
         {view.config !== null && (
@@ -145,7 +156,7 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
           </button>
         )}
       </SourceHeader>
-      {error && <Alert code={error} />}
+      {error && <Alert code={error} onOpenDiskAccess={openDiskAccess} />}
       {open && <p className="hint">{messages.mailIntro}</p>}
       <form className="source-form" hidden={!open} onSubmit={(event) => void save(event)}>
         <ListField
@@ -227,11 +238,28 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
   )
 }
 
-function Alert({ code }: { code: ErrorCode }) {
+/** The error that is put right in the settings of the system, not in Octo. */
+const DISK_ACCESS_ERROR: ErrorCode = 'mail_archive_unreadable'
+
+/** The way to where the system lets Octo read the mail, beside the error that asks for it. */
+function DiskAccess({ code, onOpen }: { code: ErrorCode; onOpen: () => void }) {
+  if (code !== DISK_ACCESS_ERROR) return null
   return (
-    <p className="warning" role="alert">
-      {errorText(code)}
-    </p>
+    <div className="actions">
+      <button type="button" onClick={onOpen}>
+        {messages.diskAccess.open}
+      </button>
+      <span className="hint">{messages.diskAccess.hint}</span>
+    </div>
+  )
+}
+
+function Alert({ code, onOpenDiskAccess }: { code: ErrorCode; onOpenDiskAccess: () => void }) {
+  return (
+    <div className="warning" role="alert">
+      <p>{errorText(code)}</p>
+      <DiskAccess code={code} onOpen={onOpenDiskAccess} />
+    </div>
   )
 }
 
@@ -240,11 +268,13 @@ function Freshness({
   configured,
   busy,
   now,
+  onOpenDiskAccess,
 }: {
   state: SourceState
   configured: boolean
   busy: boolean
   now: Date
+  onOpenDiskAccess: () => void
 }) {
   if (busy) {
     return (
@@ -262,6 +292,7 @@ function Freshness({
       <div className="warning" role="alert">
         <p>{messages.mailLastFailed(at)}</p>
         <p>{errorText(run.error)}</p>
+        <DiskAccess code={run.error} onOpen={onOpenDiskAccess} />
       </div>
     )
   }

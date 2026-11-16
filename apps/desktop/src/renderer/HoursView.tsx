@@ -2,6 +2,7 @@ import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { KnownList } from './KnownList.tsx'
@@ -375,58 +376,86 @@ function Comparison({
       {rows.length === 0 ? (
         <p className="hint">{text.noRows}</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{text.columnPerson}</th>
-              <th className="number">{text.columnTimesheet}</th>
-              <th className="number">{text.columnWorklog}</th>
-              <th className="number">{text.columnDelta}</th>
-              <th>{text.columnStatus}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.person}>
-                <td>{row.person}</td>
-                <td className="number">{text.amount(row.timesheetHours)}</td>
-                <td className="number">{text.amount(row.worklogHours)}</td>
-                <td className="number">{text.pct(row.deltaPct)}</td>
-                <td>
-                  <span
-                    className={
-                      row.status === 'ok' || row.status === 'expected'
-                        ? 'status status-ok'
-                        : 'status status-warning'
-                    }
-                  >
-                    {text.status[row.status]}
-                  </span>
-                  {(row.status === 'no_worklog' || row.status === 'no_timesheet') && (
-                    <button
-                      type="button"
-                      className="quiet"
-                      title={text.markExpectedHint}
-                      aria-label={`${text.markExpected}: ${row.person}`}
-                      onClick={() => onExpect(row)}
+        <DataTable
+          label={text.columnPerson}
+          columns={
+            [
+              {
+                key: 'person',
+                label: text.columnPerson,
+                cell: (row) => row.person,
+                sort: (row) => row.person,
+                text: (row) => row.person,
+              },
+              {
+                key: 'timesheet',
+                label: text.columnTimesheet,
+                kind: 'number',
+                width: '130px',
+                cell: (row) => text.amount(row.timesheetHours),
+                sort: (row) => row.timesheetHours,
+              },
+              {
+                key: 'worklog',
+                label: text.columnWorklog,
+                kind: 'number',
+                width: '130px',
+                cell: (row) => text.amount(row.worklogHours),
+                sort: (row) => row.worklogHours,
+              },
+              {
+                key: 'delta',
+                label: text.columnDelta,
+                kind: 'number',
+                width: '110px',
+                cell: (row) => text.pct(row.deltaPct),
+                sort: (row) => row.deltaPct,
+              },
+              {
+                key: 'status',
+                label: text.columnStatus,
+                width: '300px',
+                cell: (row) => (
+                  <>
+                    <span
+                      className={
+                        row.status === 'ok' || row.status === 'expected'
+                          ? 'status status-ok'
+                          : 'status status-warning'
+                      }
                     >
-                      {text.markExpected}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
+                      {text.status[row.status]}
+                    </span>
+                    {(row.status === 'no_worklog' || row.status === 'no_timesheet') && (
+                      <button
+                        type="button"
+                        className="quiet"
+                        title={text.markExpectedHint}
+                        aria-label={`${text.markExpected}: ${row.person}`}
+                        onClick={() => onExpect(row)}
+                      >
+                        {text.markExpected}
+                      </button>
+                    )}
+                  </>
+                ),
+                sort: (row) => text.status[row.status],
+                text: (row) => text.status[row.status],
+              },
+            ] satisfies DataColumn<HoursRow>[]
+          }
+          rows={rows}
+          rowKey={(row) => row.person}
+          footer={
             <tr>
-              <th>{text.total}</th>
-              <th className="number">{text.amount(totals.timesheetHours)}</th>
-              <th className="number">{text.amount(totals.worklogHours)}</th>
-              <th className="number">{text.pct(totals.deltaPct)}</th>
-              <th />
+              <td>{text.total}</td>
+              <td className="number">{text.amount(totals.timesheetHours)}</td>
+              <td className="number">{text.amount(totals.worklogHours)}</td>
+              <td className="number">{text.pct(totals.deltaPct)}</td>
+              <td />
             </tr>
-          </tfoot>
-        </table>
+          }
+        />
       )}
       <section aria-label={text.excludedTitle}>
         <h3>{text.excludedTitle}</h3>

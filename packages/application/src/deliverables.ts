@@ -20,6 +20,8 @@ import {
   isOwnKind,
   JOBS_FOLDER,
   jobPath,
+  KIND_TEMPLATES_FOLDER,
+  kindTemplatePath,
   LETTERHEAD_PATH,
   type LiveSource,
   MEETING_META_FILE,
@@ -37,6 +39,9 @@ import {
   registerMarkdown,
   reviewTimeSince,
   romeDateString,
+  TEMPLATE_FORMATS,
+  type TemplateFormat,
+  templateFormatOf,
   withEstimate,
   withoutMarkers,
 } from '@octo/domain'
@@ -96,6 +101,18 @@ export type Deliverables = {
   /** What the PM added, for this project, to how a kind is written. Empty when nothing. */
   instructions(project: Project, kindId: string): Promise<string>
   saveInstructions(project: Project, kindId: string, text: string): Promise<void>
+  /** The formats each kind has a template in, for the kinds that have one. */
+  templates(project: Project): Promise<Record<string, TemplateFormat[]>>
+  /**
+   * Keeps a file as the template of a kind in its format; null takes it away. A Word template
+   * gives the kind its sections and its paper, a presentation the slides to fill.
+   */
+  setKindTemplate(
+    project: Project,
+    kindId: string,
+    format: TemplateFormat,
+    bytes: Uint8Array | null,
+  ): Promise<void>
   /** Whether the project has a letterhead its Word files are written on. */
   hasLetterhead(project: Project): Promise<boolean>
   /** Keeps a Word document as the letterhead of the project; null goes back to plain files. */
@@ -206,14 +223,20 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       const chosen = await deps.models?.(project)
       const models: NonNullable<Deliverable['models']> = { write: null, review: null }
       // With a model deck the draft is its slides for the period: the outline is the structure.
-      const outline =
-        kind.deck && (await hasDeckModel(project))
-          ? await deps.renderer.deckOutline(await deps.files.read(project.folder, DECK_MODEL_PATH))
-          : null
+      const deckModel = await deckModelOf(project, kind)
+      const outline = deckModel
+        ? await deps.renderer.deckOutline(await deps.files.read(project.folder, deckModel))
+        : null
+      // A Word template of the kind gives the draft its sections, when it is not written as slides.
+      const wordTemplate = outline ? null : await templateOf(project, kind.id, 'docx')
+      const sections = wordTemplate
+        ? await deps.renderer.wordOutline(await deps.files.read(project.folder, wordTemplate))
+        : []
       const given = await deps.writer.draft({
         projectFolder: project.folder,
         kind,
         ...(outline ? { deckOutline: outline } : {}),
+        ...(sections.length > 0 ? { sectionOutline: sections } : {}),
         model: chosen?.write ?? null,
         liveSources: (await deps.liveSources?.(project)) ?? [],
         onModel: (used) => {
@@ -346,18 +369,22 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     const markdown = `${APPROVED_FOLDER}/${approvedFileName(approved, MARKDOWN)}`
     const word = `${APPROVED_FOLDER}/${approvedFileName(approved, WORD)}`
     await deps.memory.write(project.folder, markdown, `${text.trimEnd()}\n`)
-    const letterhead = (await hasLetterhead(project))
-      ? await deps.files.read(project.folder, LETTERHEAD_PATH)
-      : undefined
+    const kind = await kindOf(project, approved.kindId)
+    // The paper of the kind comes before the paper of the project.
+    const paper =
+      (await templateOf(project, kind.id, 'docx')) ??
+      ((await hasLetterhead(project)) ? LETTERHEAD_PATH : null)
+    const letterhead = paper ? await deps.files.read(project.folder, paper) : undefined
     await deps.memory.writeBytes(
       project.folder,
       word,
       await deps.renderer.word(approved.title, text, letterhead),
     )
     const files = [markdown, word]
-    if ((await kindOf(project, approved.kindId)).deck && (await hasDeckModel(project))) {
+    const deckModel = await deckModelOf(project, kind)
+    if (deckModel) {
       const deck = `${APPROVED_FOLDER}/${approvedFileName(approved, DECK)}`
-      const model = await deps.files.read(project.folder, DECK_MODEL_PATH)
+      const model = await deps.files.read(project.folder, deckModel)
       const slides = current.written?.deck
       await deps.memory.writeBytes(
         project.folder,
@@ -386,6 +413,52 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   const hasLetterhead = (project: Project) => hasModel(project, LETTERHEAD_PATH)
   const hasDeckModel = (project: Project) => hasModel(project, DECK_MODEL_PATH)
 
+  /** The template of a kind in a format, as a path of the project; null when it has none. */
+  async function templateOf(
+    project: Project,
+    kindId: string,
+    format: TemplateFormat,
+  ): Promise<string | null> {
+    const path = kindTemplatePath(kindId, format)
+    return (await hasModel(project, path)) ? path : null
+  }
+
+  /**
+   * The presentation a kind is written on: its own, else the one of the project when the kind is
+   * one that is shown to an audience. Null: the kind is not written as slides.
+   */
+  async function deckModelOf(project: Project, kind: DeliverableKind): Promise<string | null> {
+    const own = await templateOf(project, kind.id, 'pptx')
+    if (own) return own
+    return kind.deck && (await hasDeckModel(project)) ? DECK_MODEL_PATH : null
+  }
+
+  async function templates(project: Project): Promise<Record<string, TemplateFormat[]>> {
+    const found: Record<string, TemplateFormat[]> = {}
+    for (const path of await deps.files.under(project.folder, KIND_TEMPLATES_FOLDER)) {
+      const name = path.slice(path.lastIndexOf('/') + 1)
+      const format = templateFormatOf(name)
+      if (format === null) continue
+      const kindId = name.slice(0, -(format.length + 1))
+      found[kindId] = [...(found[kindId] ?? []), format].sort()
+    }
+    return found
+  }
+
+  async function setKindTemplate(
+    project: Project,
+    kindId: string,
+    format: TemplateFormat,
+    bytes: Uint8Array | null,
+  ): Promise<void> {
+    const path = kindTemplatePath((await kindOf(project, kindId)).id, format)
+    if (bytes === null) return deps.files.remove(project.folder, path)
+    if (format === 'docx') await deps.renderer.checkLetterhead(bytes)
+    else await deps.renderer.checkDeckModel(bytes)
+    await deps.memory.claim(project.folder)
+    await deps.memory.writeBytes(project.folder, path, bytes)
+  }
+
   async function setDeckModel(project: Project, bytes: Uint8Array | null): Promise<void> {
     if (bytes === null) return deps.files.remove(project.folder, DECK_MODEL_PATH)
     await deps.renderer.checkDeckModel(bytes)
@@ -410,6 +483,12 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     },
     removeKind: async (project, kindId) => {
       if (!isOwnKind(kindId)) throw new DomainError('deliverable_kind_unknown', kindId)
+      // The templates of a kind go with it: another kind of the same name starts without.
+      for (const format of TEMPLATE_FORMATS) {
+        if (await templateOf(project, kindId, format)) {
+          await deps.files.remove(project.folder, kindTemplatePath(kindId, format))
+        }
+      }
       await deps.files.remove(project.folder, ownKindPath(kindId))
     },
     list,
@@ -418,6 +497,8 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     revise,
     approve,
     instructions,
+    templates,
+    setKindTemplate,
     hasLetterhead,
     setLetterhead,
     hasDeckModel,

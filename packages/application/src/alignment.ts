@@ -4,11 +4,13 @@ import {
   type AlignmentSettings,
   type AlignTicket,
   alignTrackers,
+  assignedToOwnPeople,
   cleanAlignmentSettings,
   DomainError,
   missingTicketsCsv,
   OCTO_FOLDER,
   type Project,
+  type ProjectTeam,
   parseTrackerExport,
 } from '@octo/domain'
 import type {
@@ -30,6 +32,8 @@ export type AlignmentDeps = {
   sources: SourceSettings
   records: FeedRecords
   writer: MemoryWriter
+  /** The people of the project: who the supplier's own are, when only their items count. */
+  team?: (project: Project) => Promise<ProjectTeam>
 }
 
 /** Where Octo writes the import files of the missing tickets. */
@@ -123,7 +127,10 @@ export function createAlignments(deps: AlignmentDeps): Alignments {
       },
     )
     if (tickets.length === 0) throw new DomainError('alignment_tickets_missing', folder)
-    const items: AlignItem[] = parsed.items
+    const items: AlignItem[] =
+      settings.ownPeopleOnly && deps.team
+        ? assignedToOwnPeople(parsed.items, await deps.team(project))
+        : parsed.items
     return { settings, parsed, items, tickets }
   }
 

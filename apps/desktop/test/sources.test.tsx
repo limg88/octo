@@ -32,7 +32,10 @@ const configured: MailSourceView = {
   state: { cursor: run.at, lastRun: run },
 }
 
-type SourcesApi = Pick<OctoApi, 'mailSource' | 'saveMailSource' | 'syncMail' | 'onSourcesChanged'>
+type SourcesApi = Pick<
+  OctoApi,
+  'mailSource' | 'saveMailSource' | 'syncMail' | 'onSourcesChanged' | 'openDiskAccessSettings'
+>
 
 function fakeApi(overrides: Partial<SourcesApi> = {}) {
   let changed: (projectId: string) => void = () => {}
@@ -40,6 +43,7 @@ function fakeApi(overrides: Partial<SourcesApi> = {}) {
     mailSource: vi.fn(async () => ok(configured)),
     saveMailSource: vi.fn(async () => ok(configured)),
     syncMail: vi.fn(async () => ok(run)),
+    openDiskAccessSettings: vi.fn(async () => ok(null)),
     onSourcesChanged: (listener) => {
       changed = listener
       return () => {}
@@ -133,7 +137,10 @@ describe('SourcesView', () => {
       mailSource: async () => ok({ ...configured, state: { cursor: null, lastRun: failed } }),
     })
     render(<SourcesView api={broken.api} project={project} now={now} />)
-    expect(await screen.findByText(/Accesso completo al disco/)).toBeTruthy()
+    expect(await screen.findByText(/abilita Octo e riaprilo/)).toBeTruthy()
+    // What is put right in the settings of the system is one click away.
+    fireEvent.click(screen.getByRole('button', { name: messages.diskAccess.open }))
+    expect(broken.api.openDiskAccessSettings).toHaveBeenCalledTimes(1)
   })
 
   it('refreshes after a periodic reading of this project only', async () => {

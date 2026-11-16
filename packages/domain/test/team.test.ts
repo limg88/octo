@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assignedToOwnPeople,
   cleanTeam,
   NO_TEAM,
+  ownPeopleKeys,
   type ProjectTeam,
   peopleAway,
   periodsOn,
@@ -138,5 +140,49 @@ describe('a new project', () => {
     ])
     expect(files[0]?.content).toMatch(/^# Boreale\n\nCartella del progetto, creata da Octo\./)
     expect(files[0]?.content).toContain('`Riunioni/`')
+  })
+})
+
+describe('the items of the supplier’s own people', () => {
+  const person = (name: string, side: 'supplier' | 'client') => ({
+    name,
+    role: '',
+    side,
+    from: '',
+    to: '',
+    allocation: null,
+    note: '',
+  })
+  const team = {
+    people: [
+      person('Mario Rossi', 'supplier'),
+      person('Giovanna Troiano Scognamiglio', 'supplier'),
+      person('Cristian Lena', 'client'),
+    ],
+    periods: [],
+  }
+  const item = (id: string, assignee: string | null) => ({ id, assignee })
+  const items = [
+    item('1', 'Rossi Mario'),
+    item('2', 'MARIO ROSSI'),
+    item('3', 'Troiano Scognamiglio Giovanna'),
+    item('4', 'Lena Cristian'),
+    item('5', 'Scudiero Emilia'),
+    item('6', null),
+    item('7', ''),
+  ]
+
+  it('are told by the name, in any order: the client’s, strangers’ and nobody’s are left out', () => {
+    expect(assignedToOwnPeople(items, team).map((kept) => kept.id)).toEqual(['1', '2', '3'])
+    expect([...ownPeopleKeys(team)].sort()).toEqual([
+      'giovanna scognamiglio troiano',
+      'mario rossi',
+    ])
+  })
+
+  it('are all the items while the team lists nobody of the supplier', () => {
+    const onlyClient = { people: [person('Cristian Lena', 'client')], periods: [] }
+    expect(assignedToOwnPeople(items, onlyClient)).toHaveLength(items.length)
+    expect(assignedToOwnPeople(items, { people: [], periods: [] })).toHaveLength(items.length)
   })
 })

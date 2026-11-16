@@ -97,8 +97,11 @@ export function trackerSummary(
     phases.set(phase, (phases.get(phase) ?? 0) + 1)
   }
   const open = bugs.length - (phases.get('closed') ?? 0)
-  const perimeter =
+  const tagged =
     settings.tags.length > 0 ? `elementi con tag ${settings.tags.join(', ')}` : 'tutti gli elementi'
+  const perimeter = settings.ownPeopleOnly
+    ? `${tagged}, assegnati alle persone del fornitore`
+    : tagged
   return [
     '# Tracker del cliente: riepilogo in numeri',
     '',
