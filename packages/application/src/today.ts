@@ -70,6 +70,7 @@ import type {
   AgentProgress,
   Clock,
   EvidenceReader,
+  NowSentence,
   ProjectFiles,
   TodayEvaluation,
   TodayJudge,
@@ -110,6 +111,11 @@ export type TodayView = {
   items: TodayItem[]
   /** Those of them that come first now, each with the rule that says why. */
   now: NowItem[]
+  /**
+   * Why they matter today, as Claude wrote it when it was asked today: only the sentences whose
+   * quote the code found, and only on signals that still come first.
+   */
+  nowSummary: NowSentence[]
   /** Signals the PM put away and that stay away today. */
   hidden: number
   /** Those of them a decision keeps away, each with its decision: read, and taken back. */
@@ -123,7 +129,10 @@ export type TodayView = {
   freshness: TodayFreshness[]
   /** When Claude last judged and with which model; the judgements sit on the mail signals. */
   evaluation: { at: string | null; model: string | null }
-  /** True when a mail waits that Claude has not judged and no judgement was given today. */
+  /**
+   * True when nothing was judged today and there is something to ask Claude: a mail that waits
+   * and it has not read, or signals that come first and it has not said why.
+   */
   evaluationDue: boolean
   /** The addresses Octo takes as the PM's: those of the sign-in and those added by hand. */
   ownAddresses: string[]
@@ -348,10 +357,12 @@ export function createToday(deps: TodayDeps): Today {
     if (JSON.stringify(settings) !== JSON.stringify(saved)) {
       await deps.store.save(project.folder, settings)
     }
-    // A judgement given before Claude was asked whom a mail is for says only how much it matters.
-    const unjudged = threads.awaitingMe.filter(
-      (mail) => evaluation.mails[mail.id]?.addressee === undefined,
-    )
+    // A judgement given before Claude was asked whom a mail is for, or whether it asks
+    // something at all, does not say it: the mail is read again.
+    const unjudged = threads.awaitingMe.filter((mail) => {
+      const judgement = evaluation.mails[mail.id]
+      return judgement?.addressee === undefined || judgement.asksAction === undefined
+    })
     const judgedToday = evaluation.at !== null && romeDateString(new Date(evaluation.at)) === today
     return {
       now,
@@ -386,10 +397,18 @@ export function createToday(deps: TodayDeps): Today {
           : [],
       ),
     )
+    const first = nowItems(computed.page.items, computed.now)
+    const firstKeys = new Set(first.map((entry) => entry.item.key))
     return {
       day: computed.today,
       items: computed.page.items,
-      now: nowItems(computed.page.items, computed.now),
+      now: first,
+      // What Claude wrote on another day is about another day.
+      nowSummary: computed.judgedToday
+        ? computed.evaluation.summary.filter(
+            (sentence) => sentence.verified && firstKeys.has(sentence.key),
+          )
+        : [],
       hidden: computed.page.hidden,
       hiddenItems: computed.page.hiddenItems,
       resolvedToday: computed.settings.resolved
@@ -402,7 +421,8 @@ export function createToday(deps: TodayDeps): Today {
       evaluation: { at: computed.evaluation.at, model: computed.evaluation.model },
       // A mail the PM put away is not worth a run of Claude.
       evaluationDue:
-        !computed.judgedToday && computed.unjudged.some((mail) => visible.has(mail.id)),
+        !computed.judgedToday &&
+        (first.length > 0 || computed.unjudged.some((mail) => visible.has(mail.id))),
       ownAddresses: computed.own,
       addedAddresses: computed.settings.ownAddresses,
     }
@@ -474,9 +494,52 @@ export function createToday(deps: TodayDeps): Today {
               addresseeName: judgement.addresseeName?.trim() || null,
             }
           : {}),
+        ...(judgement.asksAction === undefined ? {} : { asksAction: judgement.asksAction }),
+        judgedAt: deps.clock.now().toISOString(),
       }
     }
-    return { at: deps.clock.now().toISOString(), model, mails: judged }
+    return { ...evaluation, at: deps.clock.now().toISOString(), model, mails: judged }
+  }
+
+  /**
+   * Asks Claude why what the code put first matters today. The code keeps a sentence only on a
+   * signal it chose, one for a signal, and looks for the quote in the file it names.
+   */
+  async function explainNow(
+    project: Project,
+    computed: Computed,
+    input: EvaluateInput,
+  ): Promise<NowSentence[]> {
+    const first = nowItems(computed.page.items, computed.now)
+    if (first.length === 0) return []
+    const proposed = await deps.judge.summary({
+      projectFolder: project.folder,
+      day: computed.today,
+      items: first.map((entry) => ({
+        key: entry.item.key,
+        rule: entry.rule,
+        facts: entry.item.facts,
+      })),
+      model: (await deps.models?.(project))?.ask ?? null,
+      liveSources: (await deps.liveSources?.(project)) ?? [],
+      ...(input.onProgress ? { onProgress: input.onProgress } : {}),
+      ...(input.signal ? { signal: input.signal } : {}),
+    })
+    const sentences: NowSentence[] = []
+    for (const entry of first) {
+      const sentence = proposed.find((candidate) => candidate.key === entry.item.key)
+      if (!sentence || sentence.text.trim() === '') continue
+      const citation = { n: 1, path: sentence.path, quote: sentence.quote }
+      const found = checkCitation(citation, await deps.evidence.read(project.folder, sentence.path))
+      sentences.push({
+        key: sentence.key,
+        text: sentence.text.trim(),
+        path: sentence.path,
+        quote: sentence.quote,
+        verified: found.status === 'verified',
+      })
+    }
+    return sentences
   }
 
   return {
@@ -514,7 +577,10 @@ export function createToday(deps: TodayDeps): Today {
     async mailTurn(project, key, turn) {
       const computed = await compute(project)
       const { page, settings, today } = computed
-      const item = page.items.find((candidate) => candidate.key === key)
+      // A mail Claude keeps away is taken back by saying it is the PM's.
+      const item =
+        page.items.find((candidate) => candidate.key === key) ??
+        page.hiddenItems.find((hidden) => hidden.item.key === key)?.item
       const conversation =
         item && (item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow')
           ? item.facts.conversation
@@ -557,7 +623,19 @@ export function createToday(deps: TodayDeps): Today {
         const kept = Object.fromEntries(
           Object.entries(next.mails).filter(([id]) => waiting.has(id)),
         )
-        await deps.store.saveEvaluation(project.folder, { ...next, mails: kept })
+        const judged = { ...next, mails: kept, summary: [] }
+        await deps.store.saveEvaluation(project.folder, judged)
+        // Why what comes first matters is a second question, asked on the mail just judged:
+        // when it fails, the mail judged stays judged and the page says nothing more.
+        const summary = await explainNow(project, await compute(project), input).catch(
+          (error: unknown) => {
+            if (!isDomainError(error)) throw error
+            return []
+          },
+        )
+        if (summary.length > 0) {
+          await deps.store.saveEvaluation(project.folder, { ...judged, summary })
+        }
         if (await risksDue(project, deps.clock.now())) {
           // The risks are a second question: when it fails, the mail judged stays judged.
           await deps.risks.propose(project, input).catch((error: unknown) => {

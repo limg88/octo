@@ -84,6 +84,7 @@ export function withMailTurn(
   }
 }
 
+const DAY_LENGTH = 'YYYY-MM-DD'.length
 /** Working days after which a signal marked done, and still there, is shown again. */
 export const DONE_GRACE_WORKDAYS = 3
 /** Times a kind is put away for good before Octo offers to stop showing it. */
@@ -116,10 +117,20 @@ function comesBack(
     : 'hidden'
 }
 
+/** The day Claude judged the mail of a signal, when the signal is a mail and it was kept. */
+function judgedDay(item: TodayItem): string | null {
+  const judged =
+    item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow'
+      ? item.facts.judgement?.judgedAt
+      : undefined
+  return judged === undefined ? null : judged.slice(0, DAY_LENGTH)
+}
+
 /** A signal that stays away today, with the decision that keeps it there. */
 export type HiddenItem = {
   item: TodayItem
-  state: DecisionState
+  /** What the PM decided, or `claude` when Claude read that the signal asks nothing. */
+  state: DecisionState | 'claude'
   /** The day the decision was taken. */
   at: string
   /** For `later`: the day it comes back. */
@@ -153,6 +164,10 @@ export function applyDecisions(
   for (const item of items) {
     if (muted.has(item.facts.kind)) {
       ofMutedKind += 1
+      continue
+    }
+    if (item.setAsideBy === 'claude') {
+      hiddenItems.push({ item, state: 'claude', at: judgedDay(item) ?? today, until: null })
       continue
     }
     // A decision taken when the signal had another key is the decision on this signal.

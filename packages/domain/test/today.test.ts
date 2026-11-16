@@ -1175,6 +1175,71 @@ describe('whose turn a mail is', () => {
   })
 })
 
+describe('the mail Claude reads as asking nothing', () => {
+  const threads = (addressing: WaitingMail['addressing']) => ({
+    awaitingMe: [stored({ id: 'm' })],
+    awaitingThem: [],
+    waiting: {
+      m: { addressing, conversation: 'c', mails: 1, recipients: 2, answeredBy: null },
+    },
+  })
+  const judgement = (overrides: Partial<MailJudgement>): MailJudgement => ({
+    importance: 'bassa',
+    reason: 'Ringrazia soltanto.',
+    quote: 'grazie a tutti',
+    quoteVerified: true,
+    deadline: null,
+    addressee: 'me',
+    asksAction: false,
+    judgedAt: '2026-11-14T09:00:00.000Z',
+    ...overrides,
+  })
+  const tomorrow = '2026-11-17'
+  const signal = (
+    addressing: WaitingMail['addressing'],
+    overrides: Partial<MailJudgement> = {},
+    turns: Parameters<typeof mailItems>[4] = {},
+  ) => mailItems(threads(addressing), { m: judgement(overrides) }, NOW, tomorrow, turns)[0]
+
+  it('is kept away, to answer or to follow, only on words the code found', () => {
+    expect(signal('only_me')).toMatchObject({ facts: { kind: 'mail_reply' }, setAsideBy: 'claude' })
+    expect(signal('among_many', { addressee: 'everyone' })).toMatchObject({
+      facts: { kind: 'mail_follow' },
+      setAsideBy: 'claude',
+    })
+    expect(signal('only_me', { quoteVerified: false })?.setAsideBy).toBeUndefined()
+    expect(signal('only_me', { asksAction: true })?.setAsideBy).toBeUndefined()
+    // Judged before this was asked: the mail is taken as one that asks.
+    expect(signal('only_me', { asksAction: undefined })?.setAsideBy).toBeUndefined()
+  })
+
+  it('comes back when the PM says it is theirs, and not when they say it is not', () => {
+    expect(signal('only_me', {}, { c: 'mine' })?.setAsideBy).toBeUndefined()
+    expect(signal('only_me', {}, { c: 'not_mine' })?.setAsideBy).toBe('claude')
+  })
+
+  it('is listed among what stays away, with the day Claude said so', () => {
+    const aside = signal('only_me') as TodayItem
+    const page = applyDecisions([aside], NO_TODAY_SETTINGS, MID_MONTH)
+    expect(page.items).toEqual([])
+    expect(page.hiddenItems).toEqual([
+      { item: aside, state: 'claude', at: '2026-11-14', until: null },
+    ])
+    // What was judged before the day was kept is said of today.
+    const undated = signal('only_me', { judgedAt: undefined }) as TodayItem
+    expect(applyDecisions([undated], NO_TODAY_SETTINGS, MID_MONTH).hiddenItems[0]?.at).toBe(
+      MID_MONTH,
+    )
+    // A kind the PM does not want at all is not listed, whoever keeps it away.
+    const muted = { ...NO_TODAY_SETTINGS, mutedKinds: ['mail_reply' as const] }
+    expect(applyDecisions([aside], muted, MID_MONTH)).toMatchObject({ hidden: 1, hiddenItems: [] })
+    expect(
+      applyDecisions([item({ key: 'x', setAsideBy: 'claude' })], NO_TODAY_SETTINGS, MID_MONTH)
+        .hiddenItems[0]?.at,
+    ).toBe(MID_MONTH)
+  })
+})
+
 describe('what comes first now', () => {
   const meeting = (start: string): TodayItem =>
     item({

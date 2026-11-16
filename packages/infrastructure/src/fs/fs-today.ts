@@ -67,9 +67,22 @@ const evaluationSchema = z.object({
         deadline: z.string().nullable().default(null),
         addressee: z.enum(MAIL_ADDRESSEES).optional(),
         addresseeName: z.string().nullable().optional(),
+        asksAction: z.boolean().optional(),
+        judgedAt: z.string().optional(),
       }),
     )
     .default({}),
+  summary: z
+    .array(
+      z.object({
+        key: z.string(),
+        text: z.string(),
+        path: z.string(),
+        quote: z.string(),
+        verified: z.boolean(),
+      }),
+    )
+    .default([]),
 })
 
 const sourceSchema = z.object({ path: z.string(), quote: z.string(), verified: z.boolean() })

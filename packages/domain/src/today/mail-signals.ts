@@ -48,6 +48,14 @@ function placingOf(
 }
 
 /**
+ * Whether Claude's word keeps a mail away: it read that the mail asks nothing of the PM, the
+ * code found the words it quoted in the mail, and the PM did not say the mail is theirs. On
+ * words the code did not find nothing is taken off the page.
+ */
+const askingNothing = (judgement: MailJudgement | null, turn: MailTurn | undefined): boolean =>
+  judgement?.asksAction === false && judgement.quoteVerified && turn !== 'mine'
+
+/**
  * The mail that waits for the PM, the mail the PM is only written to with others, and the mail
  * the PM waits on. That a mail waits and whom its headers name is computed; how much it matters
  * and whom its words ask is the judgement given, when there is one. A mail that is the PM's and
@@ -71,7 +79,9 @@ export function mailItems(
       recipients: 1,
       answeredBy: null,
     }
-    const placing = placingOf(waiting, judgement, turns[waiting.conversation])
+    const turn = turns[waiting.conversation]
+    const placing = placingOf(waiting, judgement, turn)
+    const aside = askingNothing(judgement, turn) ? { setAsideBy: 'claude' as const } : {}
     const days = wholeDays(mail.date, now)
     const shared = {
       id: mail.id,
@@ -103,6 +113,7 @@ export function mailItems(
         weight: days + (judgement ? FOLLOW_WEIGHT[judgement.importance] : 0),
         target: 'mail',
         asOf: mail.date,
+        ...aside,
       }
     }
     const due = judgement?.deadline != null && judgement.deadline <= tomorrow
@@ -114,6 +125,7 @@ export function mailItems(
       target: 'mail',
       asOf: mail.date,
       ...(due ? { dueBecause: 'deadline' as const } : {}),
+      ...aside,
     }
   })
   const waiting = threads.awaitingThem.map((mail): TodayItem => {

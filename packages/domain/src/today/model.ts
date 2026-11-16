@@ -43,6 +43,13 @@ export type MailJudgement = {
   addressee?: MailAddressee | undefined
   /** Who that is, when it is somebody else. */
   addresseeName?: string | null | undefined
+  /**
+   * Whether the PM has something to do about the mail; absent in what was judged before this
+   * was asked, and then the mail is taken as one that asks.
+   */
+  asksAction?: boolean | undefined
+  /** When Claude said so; absent in what was judged before this was kept. */
+  judgedAt?: string | undefined
 }
 
 /** Why a mail is the PM's to answer. */
@@ -176,6 +183,11 @@ export type TodayItem = {
   /** Why it is in the band of what is due, when a date moved it there. */
   dueBecause?: 'month_end' | 'sprint_end' | 'deadline'
   returned?: TodayReturn
+  /**
+   * Who keeps the signal away without the PM having said so: Claude, for a mail it read as
+   * asking nothing, with words the code found in the mail.
+   */
+  setAsideBy?: 'claude'
 }
 
 /** How fresh each source of the page is. */

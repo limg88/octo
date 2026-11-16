@@ -114,6 +114,8 @@ export const messages = {
     nowHint:
       'Ciò che viene prima, scelto da una regola: una riunione vicina, una scadenza, ciò che avevi rimandato a oggi, una mail importante, ciò che è peggiorato.',
     nowList: 'Cose che vengono prima',
+    nowSummary: 'Perché contano oggi, secondo Claude',
+    nowSource: 'Apri la fonte',
     nowWhy: {
       meetingSoon: (minutes: number) =>
         minutes === 1
@@ -142,7 +144,10 @@ export const messages = {
     nothingToDo: 'Niente da fare oggi.',
     more: (count: number) => (count === 1 ? 'Mostra l’altra' : `Mostra le altre ${count}`),
     fewer: 'Mostra solo le prime',
-    hiddenButton: (count: number) => `Messe da parte: ${count}`,
+    hiddenButton: (count: number, byClaude = 0) =>
+      byClaude === 0
+        ? `Messe da parte: ${count}`
+        : `Messe da parte: ${count} · da Claude: ${byClaude}`,
     hiddenTitle: 'Segnalazioni messe da parte',
     hiddenNone: 'Nessuna segnalazione messa da parte.',
     hiddenWhat: 'Che cosa',
@@ -153,7 +158,10 @@ export const messages = {
       done: 'Fatto',
       later: (day: string | null) => (day ? `Rimandato al ${day}` : 'Rimandato'),
       muted: 'Messo da parte',
+      claude: 'Claude: non chiede un’azione',
     },
+    hiddenWhy: (reason: string, quote: string) => `${reason} «${quote}»`,
+    restoreMailHint: 'La mail torna fra quelle a cui rispondere, e Claude non la toglie più.',
     restore: 'Ripristina',
     resolvedToday: (count: number, kinds: string) => `Risolti da soli oggi: ${count} (${kinds}).`,
     done: 'Fatto',
@@ -212,6 +220,8 @@ export const messages = {
       verified: 'fonte controllata',
       unverified: 'frase non trovata nella mail',
       deadline: (day: string) => `chiede una risposta entro il ${day}`,
+      filterToo:
+        'Una mail che secondo Claude non chiede nulla, con la frase trovata nella mail, sta fra le messe da parte con il motivo: «Ripristina» la riporta fra quelle a cui rispondere. Sotto «Adesso» Claude scrive perché quelle voci contano oggi: le sceglie Octo con una regola, Claude le spiega, e una frase senza fonte controllata non viene mostrata.',
       risksToo:
         'Con la valutazione delle mail, una volta a settimana, Claude propone anche i rischi del progetto: li trovi nel registro dei rischi.',
       explain:

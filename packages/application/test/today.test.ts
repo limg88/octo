@@ -22,8 +22,10 @@ import {
   createToday,
   type IdentityProvider,
   NO_EVALUATION,
+  type NowToExplain,
   type ProposedJudgement,
   type ProposedRisk,
+  type ProposedSentence,
   settingsOwnedBy,
   type TodayDeps,
   type TodayEvaluation,
@@ -114,15 +116,23 @@ function memoryTodayStore(): TodayStore & { settings: TodaySettings; evaluation:
 type JudgeScript = {
   mails?: (ids: string[]) => ProposedJudgement[]
   risks?: ProposedRisk[]
+  summary?: (keys: string[]) => ProposedSentence[]
+  summaryFails?: Error
   fails?: Error
 }
 
 function scriptedJudge(
   script: JudgeScript = {},
-): TodayJudge & { asked: string[][]; riskRuns: number } {
+): TodayJudge & { asked: string[][]; riskRuns: number; explained: NowToExplain[][] } {
   const judge = {
     asked: [] as string[][],
     riskRuns: 0,
+    explained: [] as NowToExplain[][],
+    summary: async (request: Parameters<TodayJudge['summary']>[0]) => {
+      judge.explained.push([...request.items])
+      if (script.summaryFails) throw script.summaryFails
+      return script.summary?.(request.items.map((item) => item.key)) ?? []
+    },
     mails: async (request: Parameters<TodayJudge['mails']>[0]) => {
       judge.asked.push(request.mails.map((mail) => mail.id))
       if (script.fails) throw script.fails
@@ -137,6 +147,7 @@ function scriptedJudge(
           deadline: null,
           addressee: 'me' as const,
           addresseeName: null,
+          asksAction: true,
         }))
       )
     },
@@ -480,6 +491,87 @@ describe('the page of the day', () => {
     expect((await today.view(project)).resolvedToday).toEqual(['draft'])
     at('2026-11-18T09:00:00.000Z')
     expect((await today.view(project)).resolvedToday).toEqual([])
+  })
+
+  it('lets Claude say why what comes first matters, and shows only what the code found', async () => {
+    const sentence = (key: string, quote: string, text = 'Il cliente aspetta la conferma.') => ({
+      key,
+      text,
+      path: BUDGET_PATH,
+      quote,
+    })
+    const found = 'ha approvato un budget aggiuntivo di 8.000 euro'
+    const { today, judge, store, at } = setup(
+      {},
+      {
+        summary: () => [
+          sentence('mail:budget', found, ' Il cliente aspetta la conferma. '),
+          // Twice on the same signal, on a signal the code did not choose, and with no words.
+          sentence('mail:budget', found, 'Una seconda frase.'),
+          sentence('mail:altra', found),
+          sentence('meeting:uid-1:2026-11-16T14:00:00.000Z', found, '  '),
+        ],
+      },
+    )
+    at('2026-11-16T12:30:00.000Z')
+    // The meeting comes first and Claude has not said why: that is worth a run.
+    expect((await today.view(project)).evaluationDue).toBe(true)
+    const view = await today.evaluate(project)
+    // Claude is told what the code chose, in its order, after the mail was judged.
+    expect(judge.explained[0]?.map((item) => [item.key, item.rule])).toEqual([
+      ['meeting:uid-1:2026-11-16T14:00:00.000Z', 'meeting_soon'],
+      ['mail:budget', 'important_mail'],
+    ])
+    expect(view.nowSummary).toEqual([
+      {
+        key: 'mail:budget',
+        text: 'Il cliente aspetta la conferma.',
+        path: BUDGET_PATH,
+        quote: found,
+        verified: true,
+      },
+    ])
+    expect(view.evaluationDue).toBe(false)
+    // The mail is put away: what was said of it is no longer shown.
+    const away = await today.decide(project, { key: 'mail:budget', state: 'muted' })
+    expect(away.nowSummary).toEqual([])
+    await today.decide(project, { key: 'mail:budget', state: 'open' })
+    // The day after, what Claude wrote is about another day.
+    at('2026-11-17T09:00:00.000Z')
+    expect((await today.view(project)).nowSummary).toEqual([])
+    expect(store.evaluation.summary).toHaveLength(1)
+  })
+
+  it('keeps a sentence whose words are not in the file, and never shows it', async () => {
+    const { today, store } = setup(
+      {},
+      {
+        summary: (keys) =>
+          keys.map((key) => ({
+            key,
+            text: 'Frase.',
+            path: BUDGET_PATH,
+            quote: 'parole inventate qui',
+          })),
+      },
+    )
+    const view = await today.evaluate(project)
+    expect(store.evaluation.summary).toMatchObject([{ key: 'mail:budget', verified: false }])
+    expect(view.nowSummary).toEqual([])
+  })
+
+  it('judges the mail also when Claude cannot say why, and lets other failures through', async () => {
+    const quiet = setup({}, { summaryFails: new DomainError('agent_failed') })
+    const view = await quiet.today.evaluate(project)
+    expect(view.now.map((entry) => entry.rule)).toEqual(['important_mail'])
+    expect(view.nowSummary).toEqual([])
+    expect(quiet.store.evaluation.mails.budget?.importance).toBe('alta')
+    const loud = setup({}, { summaryFails: new Error('disk on fire') })
+    await expect(loud.today.evaluate(project)).rejects.toThrow('disk on fire')
+    // Nothing comes first: Claude is not asked why.
+    const none = setup({}, { mails: () => [] })
+    await none.today.evaluate(project)
+    expect(none.judge.explained).toEqual([])
   })
 
   it('says what comes first now, by rule: a meeting about to start, what was put off', async () => {
@@ -903,7 +995,7 @@ describe('whose turn a mail is, on the page of the day', () => {
   )
   const files: Record<string, string> = { ...FILES, [RECAP_PATH]: recap }
   /** A project with one mail to the PM alone and one written to the PM and to another. */
-  function withRecap(addressee: 'me' | 'everyone' | undefined) {
+  function withRecap(addressee: 'me' | 'everyone' | undefined, asksAction = true) {
     const requests: Array<Parameters<TodayJudge['mails']>[0]> = []
     const judge: TodayJudge = {
       mails: async (request) => {
@@ -914,10 +1006,11 @@ describe('whose turn a mail is, on the page of the day', () => {
           reason: 'Recap della sessione.',
           quote: 'ha approvato un budget aggiuntivo di 8.000 euro',
           deadline: null,
-          ...(addressee ? { addressee, addresseeName: ' ' } : {}),
+          ...(addressee ? { addressee, addresseeName: ' ', asksAction } : {}),
         }))
       },
       risks: async () => [],
+      summary: async () => [],
     }
     const made = setup({
       judge,
@@ -988,6 +1081,75 @@ describe('whose turn a mail is, on the page of the day', () => {
     const back = await today.decide(project, { key: 'mail:c:aurora: recap uat', state: 'open' })
     expect(back.hiddenItems).toEqual([])
     expect(store.settings.decisions).toEqual([])
+  })
+
+  it('keeps away a mail Claude reads as asking nothing, with the words found in it', async () => {
+    const { today, store } = withRecap('me', false)
+    const view = await today.evaluate(project)
+    // Neither among what is to answer nor among what is followed: away, and said by whom.
+    expect(view.items.filter((item) => item.target === 'mail' && 'id' in item.facts)).toEqual([])
+    expect(view.hiddenItems.map((hidden) => [hidden.item.key, hidden.state, hidden.at])).toEqual([
+      ['mail:budget', 'claude', '2026-11-16'],
+      ['mail:c:aurora: recap uat', 'claude', '2026-11-16'],
+    ])
+    expect(store.evaluation.mails.recap).toMatchObject({
+      asksAction: false,
+      judgedAt: '2026-11-16T09:00:00.000Z',
+    })
+    // The PM's word comes before Claude's: the mail is theirs, and stays so when judged again.
+    const back = await today.mailTurn(project, 'mail:c:aurora: recap uat', 'mine')
+    expect(back.hiddenItems.map((hidden) => hidden.item.key)).toEqual(['mail:budget'])
+    expect(
+      back.items.find((item) => 'id' in item.facts && item.facts.id === 'recap'),
+    ).toMatchObject({ facts: { kind: 'mail_reply', why: 'chosen' } })
+    const again = await today.evaluate(project, { all: true })
+    expect(again.hiddenItems.map((hidden) => hidden.item.key)).toEqual(['mail:budget'])
+  })
+
+  it('takes nothing off the page on words the code did not find in the mail', async () => {
+    const { today } = setup(
+      {},
+      {
+        mails: (ids) =>
+          ids.map((id) => ({
+            id,
+            importance: 'bassa' as const,
+            reason: 'Ringrazia soltanto.',
+            quote: 'parole che nella mail non ci sono',
+            deadline: null,
+            addressee: 'me' as const,
+            addresseeName: null,
+            asksAction: false,
+          })),
+      },
+    )
+    const view = await today.evaluate(project)
+    expect(view.hiddenItems).toEqual([])
+    expect(view.items.map((item) => item.key)).toContain('mail:budget')
+  })
+
+  it('reads again a mail judged before Claude was asked whether it asks something', async () => {
+    const { today, judge, store } = setup()
+    store.evaluation = {
+      ...NO_EVALUATION,
+      at: '2026-11-15T09:00:00.000Z',
+      mails: {
+        budget: {
+          importance: 'alta',
+          reason: 'r',
+          quote: 'q',
+          quoteVerified: false,
+          deadline: null,
+          addressee: 'me',
+        },
+      },
+    }
+    // Nothing goes away until Claude has read it again.
+    const before = await today.view(project)
+    expect(before.items.map((item) => item.key)).toContain('mail:budget')
+    expect(before.evaluationDue).toBe(true)
+    await today.evaluate(project)
+    expect(judge.asked).toEqual([['budget']])
   })
 
   it('asks an answer of a mail to many that Claude reads as the PM’s', async () => {

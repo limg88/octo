@@ -388,6 +388,7 @@ export function TodayView({
     group,
     count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
   })).filter((entry) => entry.count > 0)
+  const byClaude = view.hiddenItems.filter((hidden) => hidden.state === 'claude').length
   const selected = inView.find((item) => item.key === selectedKey) ?? null
   const select = (key: string) => {
     setLater(null)
@@ -471,6 +472,25 @@ export function TodayView({
               </li>
             ))}
           </ul>
+          {view.nowSummary.length > 0 && (
+            <section className="today-now-summary" aria-label={text.nowSummary}>
+              <span className="eyebrow">{text.nowSummary}</span>
+              {view.nowSummary.map((sentence) => (
+                <p key={sentence.key}>
+                  {sentence.text}{' '}
+                  <button
+                    type="button"
+                    className="quiet"
+                    title={`«${sentence.quote}»`}
+                    aria-label={`${text.nowSource}: ${sentence.path}`}
+                    onClick={() => void openFile(sentence.key, sentence.path)}
+                  >
+                    {text.nowSource}
+                  </button>
+                </p>
+              ))}
+            </section>
+          )}
         </section>
       )}
 
@@ -597,7 +617,7 @@ export function TodayView({
               aria-expanded={showHidden}
               onClick={() => setShowHidden(!showHidden)}
             >
-              {text.hiddenButton(view.hiddenItems.length)}
+              {text.hiddenButton(view.hiddenItems.length - byClaude, byClaude)}
             </button>
           </div>
           {showHidden && (
@@ -607,6 +627,7 @@ export function TodayView({
               onRestore={(item) =>
                 void decide({ key: item.key, title: signalText(item).title }, 'open')
               }
+              onMine={(item) => void mailTurn(item.key, 'mine')}
               onUnmute={(kind) => void mute(kind, false)}
             />
           )}
@@ -695,8 +716,19 @@ function HiddenList(props: {
   items: HiddenItem[]
   mutedKinds: TodayKind[]
   onRestore: (item: TodayItem) => void
+  /** Takes back a mail Claude keeps away: the PM says it is theirs. */
+  onMine: (item: TodayItem) => void
   onUnmute: (kind: TodayKind) => void
 }) {
+  /** Why Claude keeps a mail away, in its words and those of the mail. */
+  const whyOf = (hidden: HiddenItem): string | null => {
+    const facts = hidden.item.facts
+    const judged =
+      hidden.state === 'claude' && (facts.kind === 'mail_reply' || facts.kind === 'mail_follow')
+        ? facts.judgement
+        : null
+    return judged ? text.hiddenWhy(judged.reason, judged.quote) : null
+  }
   const stateText = (hidden: HiddenItem): string =>
     hidden.state === 'later'
       ? text.hiddenStates.later(hidden.until ? shortDayText(hidden.until) : null)
@@ -705,7 +737,15 @@ function HiddenList(props: {
     {
       key: 'what',
       label: text.hiddenWhat,
-      cell: (hidden) => <strong>{signalText(hidden.item).title}</strong>,
+      cell: (hidden) => {
+        const why = whyOf(hidden)
+        return (
+          <>
+            <strong>{signalText(hidden.item).title}</strong>
+            {why !== null && <span className="hint"> {why}</span>}
+          </>
+        )
+      },
       sort: (hidden) => signalText(hidden.item).title,
       text: (hidden) => signalText(hidden.item).title,
     },
@@ -736,7 +776,10 @@ function HiddenList(props: {
           type="button"
           className="quiet"
           aria-label={`${text.restore}: ${signalText(hidden.item).title}`}
-          onClick={() => props.onRestore(hidden.item)}
+          title={hidden.state === 'claude' ? text.restoreMailHint : undefined}
+          onClick={() =>
+            hidden.state === 'claude' ? props.onMine(hidden.item) : props.onRestore(hidden.item)
+          }
         >
           {text.restore}
         </button>
@@ -979,6 +1022,7 @@ function Judgement({ view, canJudge, judging, step, hasMail, ...actions }: Judge
         <strong>{at ? text.judgement.when(dateTimeText(at), model) : text.judgement.never}</strong>
       </p>
       <p className="hint">{text.judgement.explain}</p>
+      <p className="hint">{text.judgement.filterToo}</p>
       <p className="hint">{text.judgement.risksToo}</p>
       {judging ? (
         <>

@@ -2175,6 +2175,18 @@ details.advanced[open] > summary {
   margin: 0;
 }
 
+.today-now-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
+.today-now-summary p {
+  margin: 0;
+}
+
 .today-hidden {
   display: flex;
   flex-direction: column;

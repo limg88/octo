@@ -10,7 +10,13 @@ import {
   type SourcesConfig,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
-import { createMeetings, createToday, MEETINGS_SOURCE, type TodayDeps } from '../src/index.ts'
+import {
+  createMeetings,
+  createToday,
+  MEETINGS_SOURCE,
+  NO_EVALUATION,
+  type TodayDeps,
+} from '../src/index.ts'
 import { memorySourceStates } from './fakes.ts'
 
 const NOW = new Date('2026-11-16T09:00:00.000Z')
@@ -288,10 +294,10 @@ describe('the recorded meetings on the page of the day', () => {
       store: {
         load: async () => NO_TODAY_SETTINGS,
         save: async () => {},
-        loadEvaluation: async () => ({ at: null, model: null, mails: {} }),
+        loadEvaluation: async () => NO_EVALUATION,
         saveEvaluation: async () => {},
       },
-      judge: { mails: async () => [], risks: async () => [] },
+      judge: { mails: async () => [], risks: async () => [], summary: async () => [] },
       evidence: { read: async () => ({ kind: 'missing' }) },
       clock: { now: () => NOW },
       identity: () => null,

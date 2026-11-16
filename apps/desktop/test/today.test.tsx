@@ -102,6 +102,7 @@ const view = (overrides: Partial<View> = {}): View => ({
   day: '2026-11-16',
   items: [source, hours, mail, bugs, risk],
   now: [],
+  nowSummary: [],
   hidden: 1,
   hiddenItems: [],
   resolvedToday: [],
@@ -324,6 +325,53 @@ describe('the page of the day', () => {
     await waitFor(() =>
       expect(api.decideToday).toHaveBeenCalledWith('p-1', 'hours:2026-10', 'later', '2026-12-03'),
     )
+  })
+
+  it('shows why what comes first matters as Claude wrote it, with the way to its source', async () => {
+    const { api } = todayApi(
+      view({
+        now: [{ item: mail, rule: 'important_mail' }],
+        nowSummary: [
+          {
+            key: mail.key,
+            text: 'Il cliente aspetta la conferma del budget.',
+            path: 'Posta/2026-11/budget.md',
+            quote: 'ha approvato un budget aggiuntivo',
+            verified: true,
+          },
+        ],
+      }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const summary = await screen.findByRole('region', { name: text.nowSummary })
+    expect(summary.textContent).toContain('Il cliente aspetta la conferma del budget.')
+    fireEvent.click(
+      within(summary).getByRole('button', { name: `${text.nowSource}: Posta/2026-11/budget.md` }),
+    )
+    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'Posta/2026-11/budget.md')
+  })
+
+  it('says which mail Claude keeps away and why, apart, and takes it back as the PM’s', async () => {
+    const { api } = todayApi(
+      view({
+        items: [bugs],
+        hiddenItems: [
+          { item: mail, state: 'claude', at: '2026-11-16', until: null },
+          { item: hours, state: 'done', at: '2026-11-13', until: null },
+        ],
+      }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    // What Claude took off the page is counted apart from what the PM put away.
+    fireEvent.click(await screen.findByRole('button', { name: text.hiddenButton(1, 1) }))
+    const hidden = screen.getByRole('region', { name: text.hiddenTitle })
+    expect(hidden.textContent).toContain(text.hiddenStates.claude)
+    expect(hidden.textContent).toContain('«ha approvato un budget aggiuntivo»')
+    fireEvent.click(
+      within(hidden).getByRole('button', { name: /Ripristina: Rispondi a Carla Bianchi/ }),
+    )
+    await waitFor(() => expect(api.setMailTurn).toHaveBeenCalledWith('p-1', mail.key, 'mine'))
+    expect(api.decideToday).not.toHaveBeenCalled()
   })
 
   it('remembers done, later and not interested, each with one gesture', async () => {

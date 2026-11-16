@@ -28,6 +28,7 @@ import type {
   MailMessage,
   MeetingReading,
   ModelSettings,
+  NowRule,
   Preferences,
   ProgressSettings,
   Project,
@@ -43,6 +44,7 @@ import type {
   SourceState,
   SourcesConfig,
   StarterFile,
+  TodayFacts,
   TodaySettings,
   TrackerHours,
   UpdateProgress,
@@ -477,9 +479,22 @@ export type TodayEvaluation = {
   model: string | null
   /** By the id of the mail. A mail judged once is not judged again. */
   mails: Record<string, MailJudgement>
+  /** Why what came first mattered when Claude was last asked, a sentence for a signal. */
+  summary: NowSentence[]
 }
 
-export const NO_EVALUATION: TodayEvaluation = { at: null, model: null, mails: {} }
+/** A sentence of Claude on a signal that comes first, with the words of a file that back it. */
+export type NowSentence = {
+  /** The key of the signal it is about. */
+  key: string
+  text: string
+  path: string
+  quote: string
+  /** Whether the code found the quote in the file. */
+  verified: boolean
+}
+
+export const NO_EVALUATION: TodayEvaluation = { at: null, model: null, mails: {}, summary: [] }
 
 /** What the PM decided on the page of the day and what Claude judged, kept in the project. */
 export interface TodayStore {
@@ -519,7 +534,19 @@ export type ProposedJudgement = {
   /** Whom the mail asks something of; absent when the judge does not say. */
   addressee?: MailJudgement['addressee']
   addresseeName?: string | null
+  /** Whether the PM has something to do about the mail; absent when the judge does not say. */
+  asksAction?: boolean
 }
+
+/** A signal that comes first, as Claude is told it: the rule that chose it and its facts. */
+export type NowToExplain = {
+  key: string
+  rule: NowRule
+  facts: TodayFacts
+}
+
+/** What Claude gives back on a signal that comes first: the quote is checked by the code. */
+export type ProposedSentence = { key: string; text: string; path: string; quote: string }
 
 export type ProposedRisk = { title: string; why: string; path: string; quote: string }
 
@@ -542,6 +569,13 @@ export interface TodayJudge {
     request: JudgeRequest & { mails: readonly MailToJudge[]; pm?: JudgedFor },
   ): Promise<ProposedJudgement[]>
   risks(request: JudgeRequest & { known: readonly string[] }): Promise<ProposedRisk[]>
+  /**
+   * Why the signals the code put first matter today, a sentence for each at most. Claude never
+   * chooses them, and never changes their order.
+   */
+  summary(
+    request: JudgeRequest & { day: string; items: readonly NowToExplain[] },
+  ): Promise<ProposedSentence[]>
 }
 
 /** What a sign-in gives: who the person is and what renews the sign-in without asking again. */

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NO_EVALUATION } from '@octo/application'
@@ -209,8 +209,19 @@ describe('what the page of the day keeps in the project', () => {
           quote: 'q',
           quoteVerified: true,
           deadline: null,
+          asksAction: false,
+          judgedAt: '2026-11-16T09:00:00.000Z',
         },
       },
+      summary: [
+        {
+          key: 'mail:x',
+          text: 'Il budget va confermato al cliente.',
+          path: 'Posta/2026-11/x.md',
+          quote: 'budget aggiuntivo',
+          verified: true,
+        },
+      ],
     }
     await store.saveEvaluation(folder, evaluation)
     expect(await store.loadEvaluation(folder)).toEqual(evaluation)
@@ -309,6 +320,7 @@ describe('Claude as the one who judges', () => {
         deadline: null,
         addressee: 'me',
         addresseeName: null,
+        asksAction: true,
       },
       {
         id: 'b',
@@ -318,6 +330,7 @@ describe('Claude as the one who judges', () => {
         deadline: null,
         addressee: 'me',
         addresseeName: null,
+        asksAction: true,
       },
       // Whom a mail asks is read in its words: the whole group, or another person by name.
       expect.objectContaining({ id: 'c', addressee: 'everyone', addresseeName: null }),
@@ -339,6 +352,64 @@ describe('Claude as the one who judges', () => {
       },
     ])
     expect(await judge.risks({ projectFolder: folder, known: [risks[0]?.title ?? ''] })).toEqual([])
+  })
+
+  it('says of a mail that only thanks that it asks nothing, with the words that show it', async () => {
+    mailFile('grazie.md', 'Grazie a te per il lavoro di ieri, tutto a posto.')
+    const [judged] = await judge.mails({
+      projectFolder: folder,
+      mails: [{ id: 'g', path: 'grazie.md', subject: 'Aurora: grazie', to: PM, mails: 1 }],
+    })
+    expect(judged).toMatchObject({
+      id: 'g',
+      importance: 'bassa',
+      asksAction: false,
+      quote: 'Grazie a te per il lavoro di ieri, tutto a posto.',
+    })
+  })
+
+  it('says why what comes first matters, a sentence for a signal, and nothing for nothing', async () => {
+    mkdirSync(join(folder, 'wiki'), { recursive: true })
+    writeFileSync(join(folder, 'wiki', 'stato.md'), 'La consegna è fissata al 12 dicembre 2026.')
+    expect(await judge.summary({ projectFolder: folder, day: '2026-11-16', items: [] })).toEqual([])
+    const sentences = await judge.summary({
+      projectFolder: folder,
+      day: '2026-11-16',
+      items: [
+        {
+          key: 'mail:a',
+          rule: 'important_mail',
+          facts: {
+            kind: 'mail_reply',
+            id: 'a',
+            path: 'mail.md',
+            from: 'Carla',
+            subject: 'Aurora: budget',
+            days: 0,
+            judgement: null,
+          },
+        },
+        {
+          key: 'hours:2026-10',
+          rule: 'due',
+          facts: { kind: 'month_due', month: '2026-10', what: 'forecast' },
+        },
+      ],
+    })
+    expect(sentences).toEqual([
+      {
+        key: 'mail:a',
+        text: expect.any(String),
+        path: 'mail.md',
+        quote: 'Il comitato ha approvato il budget.',
+      },
+      {
+        key: 'hours:2026-10',
+        text: expect.any(String),
+        path: 'wiki/stato.md',
+        quote: 'fissata al 12 dicembre 2026',
+      },
+    ])
   })
 })
 

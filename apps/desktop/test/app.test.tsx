@@ -129,6 +129,7 @@ const emptyToday: TodayView = {
   day: '2026-11-16',
   items: [],
   now: [],
+  nowSummary: [],
   hidden: 0,
   hiddenItems: [],
   resolvedToday: [],

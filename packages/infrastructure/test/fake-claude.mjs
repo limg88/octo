@@ -58,6 +58,9 @@ function addresseeOf(line, pmName) {
   return { addressee: 'me', addresseeName: null }
 }
 
+/** A mail that only thanks, confirms or informs asks nothing of who reads it. */
+const ASKS_NOTHING = /\b(grazie|per conoscenza|vi informo|confermo che|ricevuto)\b/i
+
 // A run of the judge of the mail: every mail given is weighed, with words copied from its file.
 if (args.join(' ').includes('You read the mail a Project Manager is written to')) {
   const { mails, pm } = JSON.parse(question)
@@ -68,15 +71,49 @@ if (args.join(' ').includes('You read the mail a Project Manager is written to')
       mails: mails.map((mail) => {
         const money = /budget|ordine|fattur/i.test(mail.subject)
         const quote = firstLineOf(mail.path)
+        const asksAction = !ASKS_NOTHING.test(quote)
         return {
           id: mail.id,
-          importance: money ? 'alta' : 'media',
-          reason: money
-            ? 'Riguarda il budget del progetto: va confermato al cliente.'
-            : 'Chiede una risposta, ma nulla si ferma nel frattempo.',
+          importance: !asksAction ? 'bassa' : money ? 'alta' : 'media',
+          reason: !asksAction
+            ? 'Ringrazia o informa: non chiede nulla.'
+            : money
+              ? 'Riguarda il budget del progetto: va confermato al cliente.'
+              : 'Chiede una risposta, ma nulla si ferma nel frattempo.',
           quote,
           deadline: null,
           ...addresseeOf(quote, pm?.name ?? null),
+          asksAction,
+        }
+      }),
+    },
+  })
+  process.exit(0)
+}
+
+// A run of the judge of what comes first: a sentence for each signal, with words of a file. A
+// mail is backed by its own first line, anything else by the state of the project when there.
+if (args.join(' ').includes('A Project Manager opens the page of the day of one project')) {
+  const { items } = JSON.parse(question)
+  const WHY = {
+    meeting_soon:
+      'Alla riunione si decide la data del collaudo: conviene arrivarci con lo stato aggiornato.',
+    due: 'La consegna è vicina: chiudere oggi evita di portarsi dietro numeri non allineati.',
+    later: 'L’avevi rimandata a oggi e la consegna si avvicina.',
+    important_mail: 'Il cliente aspetta una conferma sul budget del progetto.',
+    worse: 'È peggiorata e la consegna si avvicina.',
+  }
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      sentences: items.map((item) => {
+        const mail = item.facts.kind === 'mail_reply' ? item.facts.path : null
+        return {
+          key: item.key,
+          text: WHY[item.rule],
+          path: mail ?? 'wiki/stato.md',
+          quote: mail ? firstLineOf(mail) : 'fissata al 12 dicembre 2026',
         }
       }),
     },
