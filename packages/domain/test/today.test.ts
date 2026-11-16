@@ -463,6 +463,36 @@ describe('what the PM decided on a signal', () => {
     ).toEqual({ why: 'still', since: '2026-11-13' })
   })
 
+  it('does not take the days a mail has waited for the mail getting worse', () => {
+    const waiting = (days: number) =>
+      item({
+        key: 'mail:1',
+        band: 'waiting',
+        weight: days,
+        target: 'mail',
+        facts: {
+          kind: 'mail_reply',
+          id: '1',
+          path: '1.md',
+          from: 'Carla',
+          subject: 'Budget',
+          days,
+          judgement: null,
+        },
+      })
+    const settings = {
+      ...NO_TODAY_SETTINGS,
+      decisions: [decision({ key: 'mail:1', kind: 'mail_reply', at: '2026-11-16', weight: 0 })],
+    }
+    // The day after it has waited one day more: it is not worse, it stays away.
+    expect(applyDecisions([waiting(1)], settings, '2026-11-17').items).toEqual([])
+    // Still unanswered after the days of grace: told again, as still open.
+    expect(applyDecisions([waiting(3)], settings, '2026-11-19').items[0]?.returned).toEqual({
+      why: 'still',
+      since: '2026-11-16',
+    })
+  })
+
   it('tells what went away by itself, and forgets what was marked done about it', () => {
     const before = {
       ...NO_TODAY_SETTINGS,

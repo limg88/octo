@@ -161,6 +161,19 @@ export type TodayFacts =
 
 export type TodayKind = TodayFacts['kind']
 
+/**
+ * The kinds whose weight counts what is wrong: more of it is worse. The weight of the others is
+ * the days they have waited, which grows by itself and tells nothing new.
+ */
+export const COUNTED_KINDS: readonly TodayKind[] = [
+  'hours',
+  'forecast',
+  'bugs_stuck',
+  'requirements',
+  'alignment',
+  'risk_candidates',
+]
+
 /** Why a signal the PM had put away is shown again. */
 export type TodayReturn =
   | { why: 'later' }

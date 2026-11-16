@@ -1,4 +1,5 @@
 import {
+  COUNTED_KINDS,
   type MailTurn,
   orderToday,
   type TodayItem,
@@ -118,9 +119,14 @@ function comesBack(
   if (decision.state === 'later') {
     return decision.until !== null && today < decision.until ? 'hidden' : { why: 'later' }
   }
-  if (item.weight > decision.weight) return { why: 'worse', was: decision.weight, now: item.weight }
-  // What is getting better is being done: it stays away for as long as it does not get worse.
-  if (item.weight < decision.weight) return 'hidden'
+  // Only a weight that counts what is wrong tells better from worse: days that pass do not.
+  if (COUNTED_KINDS.includes(item.facts.kind)) {
+    if (item.weight > decision.weight) {
+      return { why: 'worse', was: decision.weight, now: item.weight }
+    }
+    // What is getting better is being done: it stays away for as long as it does not get worse.
+    if (item.weight < decision.weight) return 'hidden'
+  }
   return workdaysBetween(decision.at, today) >= DONE_GRACE_WORKDAYS
     ? { why: 'still', since: decision.at }
     : 'hidden'

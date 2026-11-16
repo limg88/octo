@@ -1,22 +1,9 @@
 import type { PresentSignal, TodaySettings } from './decisions.ts'
-import { isToDo, type TodayItem, type TodayKind } from './model.ts'
+import { COUNTED_KINDS, isToDo, type TodayItem } from './model.ts'
 import type { NowItem } from './now.ts'
 
 /** What changed in a signal since the PM last looked at the page. */
 export type TodayMark = 'new' | 'worse'
-
-/**
- * The kinds whose weight counts what is wrong: more of it is worse. The weight of the others is
- * the days they have waited, which grows by itself and tells nothing new.
- */
-export const COUNTED_KINDS: readonly TodayKind[] = [
-  'hours',
-  'forecast',
-  'bugs_stuck',
-  'requirements',
-  'alignment',
-  'risk_candidates',
-]
 
 /**
  * The signals that are new or got worse since the PM last looked at the page, by their key.
