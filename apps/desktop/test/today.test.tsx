@@ -451,6 +451,23 @@ describe('the page of the day', () => {
     expect(api.markTodaySeen).toHaveBeenCalledTimes(1)
   })
 
+  it('says of many sources only the one read longest ago, and keeps each a pointer away', async () => {
+    const { api } = todayApi(
+      view({
+        items: [bugs],
+        freshness: [
+          { source: 'Posta', readAt: '2026-11-16T15:57:00.000Z' },
+          { source: 'Jira', readAt: '2026-11-16T14:40:00.000Z' },
+          { source: 'Confluence', readAt: null },
+        ],
+      }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const line = await screen.findByText(text.freshnessOldest(3, 'Confluence', text.freshnessNever))
+    expect(line.getAttribute('title')?.split('\n')).toHaveLength(3)
+    expect(line.getAttribute('title')).toContain('Jira: ')
+  })
+
   it('says when the sources are read next, in minutes', async () => {
     const soon = new Date(Date.now() + 12 * 60 * 1000 - 5000).toISOString()
     const { api } = todayApi(view(), { nextReading: vi.fn(async () => ok<string | null>(soon)) })

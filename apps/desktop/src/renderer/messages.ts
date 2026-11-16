@@ -108,6 +108,8 @@ export const messages = {
       shown === all ? `${all} in elenco` : `${shown} di ${all} in elenco`,
     title: (day: string) => `Oggi · ${day}`,
     freshnessNever: 'mai letta',
+    freshnessOldest: (count: number, source: string, when: string) =>
+      `${count} fonti lette · la meno recente è ${source}: ${when}`,
     readNow: 'Leggi ora',
     reading: 'Leggo le fonti…',
     now: 'Adesso',
