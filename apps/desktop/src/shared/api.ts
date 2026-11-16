@@ -44,6 +44,7 @@ import type {
   MailTurn,
   MeetingsSourceConfig,
   ModelSettings,
+  OpenPointChange,
   OwnKindInput,
   Preferences,
   ProgressSettings,
@@ -51,8 +52,8 @@ import type {
   ProjectTeam,
   QuestionRecord,
   RestoreOutcome,
+  RiskChange,
   RiskRegister,
-  RiskState,
   SourceRun,
   SourceState,
   StoredMeeting,
@@ -173,6 +174,7 @@ export const CHANNELS = {
   todayMailTurn: 'today:mail-turn',
   todayAddresses: 'today:addresses',
   todayEvaluate: 'today:evaluate',
+  todayClose: 'today:close',
   todayCancel: 'today:cancel',
   todayProgress: 'today:progress',
   todayOverview: 'today:overview',
@@ -181,6 +183,9 @@ export const CHANNELS = {
   todayEntered: 'today:entered',
   nextReading: 'sources:next-reading',
   windowFocus: 'window:focus',
+  pointsAdd: 'points:add',
+  pointsUpdate: 'points:update',
+  pointsConfirm: 'points:confirm',
   risksGet: 'risks:get',
   risksPropose: 'risks:propose',
   risksAccept: 'risks:accept',
@@ -463,6 +468,8 @@ export type OctoApi = {
   saveOwnAddresses(projectId: string, addresses: string[]): Promise<Result<TodayView>>
   /** Asks Claude to weigh the mail that waits; `all` weighs again what was already weighed. */
   evaluateToday(projectId: string, all: boolean): Promise<Result<TodayView>>
+  /** Asks Claude what the recorded meetings not yet read did to the open points. */
+  closeToday(projectId: string): Promise<Result<TodayView>>
   cancelEvaluateToday(projectId: string): Promise<Result<null>>
   onTodayProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Every project in brief; Claude is never asked. */
@@ -480,16 +487,25 @@ export type OctoApi = {
   nextReading(): Promise<Result<string | null>>
   /** Brings the window of Octo in front of the others. */
   focusWindow(): Promise<Result<null>>
+  /** Opens a point, by hand or from a signal of the page; the page comes back with it. */
+  addOpenPoint(projectId: string, point: OpenPointDraft): Promise<Result<TodayView>>
+  updateOpenPoint(
+    projectId: string,
+    pointId: string,
+    change: OpenPointChange,
+  ): Promise<Result<TodayView>>
+  /** The PM's answer to what a point waits for: closed, or still in the queue. */
+  confirmOpenPoint(
+    projectId: string,
+    pointId: string,
+    resolved: boolean,
+  ): Promise<Result<TodayView>>
   risks(projectId: string): Promise<Result<RiskRegister>>
   proposeRisks(projectId: string): Promise<Result<RiskRegister>>
   acceptRisk(projectId: string, candidateId: string, title: string): Promise<Result<RiskRegister>>
   dismissRisk(projectId: string, candidateId: string): Promise<Result<RiskRegister>>
   addRisk(projectId: string, title: string): Promise<Result<RiskRegister>>
-  updateRisk(
-    projectId: string,
-    riskId: string,
-    change: { state?: RiskState; note?: string },
-  ): Promise<Result<RiskRegister>>
+  updateRisk(projectId: string, riskId: string, change: RiskChange): Promise<Result<RiskRegister>>
   /** Whether the project is of who is signed in, by its project codes in the company system. */
   assignment(projectId: string): Promise<Result<Assignment>>
   /** What the person set for the app on this computer; answered also before the sign-in. */
@@ -501,4 +517,19 @@ export type OctoApi = {
 export type TodayDecisionChoice = 'done' | 'later' | 'muted' | 'open'
 
 /** A signal that comes first now and did not at the reading before, with its project. */
-export type TodayEntered = { projectId: string; projectName: string; item: TodayItem }
+export type TodayEntered = {
+  projectId: string
+  projectName: string
+  item: TodayItem
+  /** For a meeting about to start: the minutes before it, and how much there is to bring. */
+  meeting?: { minutes: number; toBring: number }
+}
+
+/** What the interface sends to open a point. */
+export type OpenPointDraft = {
+  title: string
+  owner?: string
+  due?: string | null
+  /** The signal of the page the point is opened from. */
+  signal?: { key: string; kind: TodayKind }
+}

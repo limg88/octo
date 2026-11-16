@@ -5,6 +5,7 @@ import {
   calendarItems,
   checkCitation,
   cleanTodaySettings,
+  type DayMeeting,
   DECISION_STATES,
   type DecisionState,
   DomainError,
@@ -20,32 +21,47 @@ import {
   isMonthClosing,
   isSprintEnding,
   type LiveSource,
+  lastRecordingOf,
+  MAX_MEETINGS_PER_PREP,
+  MAX_PREP_NOTES,
   type MailJudgement,
   type MailThreads,
   type MailTurn,
+  type MeetingPrep,
   type ModelSettings,
   mailItems,
   mailThreads,
   mailTurnsOf,
   marksOf,
   meetingItems,
+  meetingKey,
+  meetingPrep,
   meetingsOn,
   monthDueItems,
   monthOf,
   monthPeriod,
+  NO_OPEN_POINTS,
   type NowItem,
+  nextWorkday,
   nowItems,
   ownPeopleKeys,
+  type PointBrief,
+  type PrepNote,
   type Project,
   parseMailDocument,
+  pointBrief,
+  pointsCount,
   previousMonth,
+  previousWorkday,
   RISK_PROPOSAL_DAYS,
+  type Risk,
   reconcileSignals,
   requirementItems,
   riskItems,
   romeDateString,
   type SourceReading,
   type StoredMail,
+  type StoredMeeting,
   sourceItems,
   sprintEnd,
   TODAY_BANDS,
@@ -58,6 +74,8 @@ import {
   todayCount,
   trackerAgeItems,
   unassignedMeetingItems,
+  type WeekView,
+  weekItems,
   withDecision,
   withMailTurn,
   withoutDecision,
@@ -65,15 +83,18 @@ import {
 } from '@octo/domain'
 import type { Alignments } from './alignment.ts'
 import type { Dashboard } from './dashboard.ts'
+import { type DayClosing, MEETING_FILES_TO_READ } from './day-closing.ts'
 import type { Deliverables } from './deliverables.ts'
 import type { Feeds } from './feeds.ts'
 import { FORECAST_FOLDER, type Forecasts } from './forecast.ts'
 import type { Hours } from './hours.ts'
 import type { Meetings } from './meetings.ts'
+import type { OpenPoints } from './open-points.ts'
 import type {
   AgentProgress,
   Clock,
   EvidenceReader,
+  MeetingReader,
   NowSentence,
   ProjectFiles,
   TodayEvaluation,
@@ -93,9 +114,15 @@ export type TodayDeps = {
   sources: Pick<Sources, 'mail'>
   feeds: Pick<Feeds, 'view'>
   /** With the meetings, those recorded that no project could be told for wait on the page. */
-  meetings?: Pick<Meetings, 'view' | 'unassigned'>
+  meetings?: Pick<Meetings, 'view' | 'unassigned' | 'imported'>
+  /** With who reads the meetings, Claude adds to each card of the day what to bring. */
+  reader?: Pick<MeetingReader, 'prep'>
   team: Pick<Team, 'get'>
   risks: Pick<Risks, 'register' | 'propose'>
+  /** With the open points, the page opens on what was left open the day before. */
+  points?: Pick<OpenPoints, 'settle'>
+  /** With the closing of the day, the recorded meetings close points and open new ones. */
+  closing?: DayClosing
   files: Pick<ProjectFiles, 'under' | 'readText'>
   store: TodayStore
   judge: TodayJudge
@@ -113,6 +140,16 @@ export type TodayView = {
   day: string
   /** The signals after the PM's decisions, in the order of the page. */
   items: TodayItem[]
+  /** The meetings of the day and of the next working day, as the invitations tell them. */
+  agenda: TodayAgenda
+  /** The open points: what is in the queue, what was closed since the working day before. */
+  points: PointBrief
+  /** What to take to each meeting of today, in the order of the agenda. */
+  prep: MeetingPrep[]
+  /** The closing of the day: whether recorded meetings wait to be read, and when Claude last did. */
+  closing: TodayClosing
+  /** The critical things of the week: what is to put right, and what is coming. */
+  week: WeekView
   /** Those of them that come first now, each with the rule that says why. */
   now: NowItem[]
   /**
@@ -148,6 +185,23 @@ export type TodayView = {
   ownAddresses: string[]
   /** The addresses added by hand, as they are kept. */
   addedAddresses: string[]
+}
+
+/** The meetings the PM prepares: those of today, and those of the next working day. */
+export type TodayAgenda = {
+  today: DayMeeting[]
+  next: { day: string; meetings: DayMeeting[] }
+}
+
+/** What the page says of the closing of the day. */
+export type TodayClosing = {
+  /** How many recorded meetings Claude has not read yet. */
+  unread: number
+  /** What tells this wait from another: the page asks Claude once for each. */
+  key: string
+  /** When Claude last read the meetings, and with which model; null when never. */
+  at: string | null
+  model: string | null
 }
 
 export type DecideInput = {
@@ -190,6 +244,8 @@ export type Today = {
   setNotify(project: Project, notify: boolean): Promise<TodayView>
   /** Asks Claude to weigh the mail that waits; once a week also for the risks. */
   evaluate(project: Project, input?: EvaluateInput): Promise<TodayView>
+  /** Asks Claude what the recorded meetings not yet read did to the open points. */
+  closeDay(project: Project, input?: Omit<EvaluateInput, 'all'>): Promise<TodayView>
   /** Every project in brief, from what the code computes: Claude is never asked. */
   overview(projects: readonly Project[]): Promise<ProjectOverview[]>
 }
@@ -202,11 +258,18 @@ const TREND_WEEKS = 8
 export const OVERVIEW_ITEMS = 3
 /** The meetings as the page of the day names their source. */
 export const MEETINGS_SOURCE = 'Riunioni (Verbale)'
+/** The last recording of the series of a meeting, with its files that are there. */
+type LastFiles = (StoredMeeting & { files: string[] }) | null
+const NOTHING = (): void => {}
+
+/** How far back an invitation is looked for: a series called longer ago is called again. */
+export const INVITE_MONTHS = 12
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const dayOf = (instant: Date): string => instant.toISOString().slice(0, 10)
 
 /** The kinds of signal each section of the page tells: unread, none of them is told gone. */
 const MAIL_KINDS: readonly TodayKind[] = ['mail_reply', 'mail_follow', 'mail_waiting', 'meeting']
+const MEETING_KINDS: readonly TodayKind[] = ['meeting']
 const TRACKER_KINDS: readonly TodayKind[] = ['tracker_old', 'bugs_stuck', 'requirements']
 const HOURS_KINDS: readonly TodayKind[] = ['hours']
 const FORECAST_KINDS: readonly TodayKind[] = ['forecast', 'month_due']
@@ -275,6 +338,36 @@ export function createToday(deps: TodayDeps): Today {
     return mails
   }
 
+  /**
+   * The invitations older than the mail that can still wait for somebody: a meeting that repeats
+   * is invited once, months before the day it is held.
+   */
+  async function olderInvites(project: Project, today: string): Promise<StoredMail[]> {
+    const folder = (await deps.sources.mail(project)).config?.targetFolder
+    if (!folder) return []
+    const invites: StoredMail[] = []
+    let month = previousMonth(today)
+    for (let back = 2; back <= INVITE_MONTHS; back += 1) {
+      month = previousMonth(`${month}-01`)
+      for (const path of await deps.files.under(project.folder, `${folder}/${month}`)) {
+        const content = await deps.files.readText(project.folder, path)
+        const mail = content === null ? null : parseMailDocument(path, content)
+        if (mail?.meeting) invites.push(mail)
+      }
+    }
+    return invites
+  }
+
+  /** The files of a recorded meeting that are there, the shortest first. */
+  async function textsOf(project: Project, folder: string): Promise<string[]> {
+    const files: string[] = []
+    for (const name of MEETING_FILES_TO_READ) {
+      const path = `${folder}/${name}`
+      if ((await deps.files.readText(project.folder, path)) !== null) files.push(path)
+    }
+    return files
+  }
+
   async function tracker(project: Project, now: Date) {
     const settings = await deps.dashboard.settings(project)
     const view = await deps.dashboard.view(project, {
@@ -308,6 +401,15 @@ export function createToday(deps: TodayDeps): Today {
     }
     const mails = await attempt(() => recentMail(project, today), unread(MAIL_KINDS))
     const threads = mailThreads(mails, own, now, ownPeopleKeys(team))
+    const invites = [
+      ...(await attempt(() => olderInvites(project, today), unread(MEETING_KINDS))),
+      ...mails,
+    ]
+    const nextDay = nextWorkday(today)
+    const agenda: TodayAgenda = {
+      today: meetingsOn(invites, today),
+      next: { day: nextDay, meetings: meetingsOn(invites, nextDay) },
+    }
     const sprint = await deps.alignments
       .settings(project)
       .then((alignment) => alignment.sprint)
@@ -320,6 +422,7 @@ export function createToday(deps: TodayDeps): Today {
     if (!isMonthClosing(today)) unread(MONTH_CLOSING_KINDS)()
     const lastDay = sprintEnd(sprint, team)
 
+    const openRisks: Risk[] = []
     const groups = await Promise.all([
       Promise.resolve(sourceItems(sources, now)),
       attempt(async () => {
@@ -352,8 +455,12 @@ export function createToday(deps: TodayDeps): Today {
         unread(DRAFT_KINDS),
       ),
       Promise.resolve(calendarItems(team, today)),
-      Promise.resolve(meetingItems(meetingsOn(mails, today, romeDateString))),
-      attempt(async () => riskItems(await deps.risks.register(project)), unread(RISK_KINDS)),
+      Promise.resolve(meetingItems(agenda.today)),
+      attempt(async () => {
+        const risks = await deps.risks.register(project)
+        openRisks.push(...risks.risks)
+        return riskItems(risks)
+      }, unread(RISK_KINDS)),
       attempt(
         async () => unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
         unread(UNASSIGNED_KINDS),
@@ -370,6 +477,33 @@ export function createToday(deps: TodayDeps): Today {
     const settings = reconcileSignals(saved, signalsFor(saved), unsettled, today)
     if (JSON.stringify(settings) !== JSON.stringify(saved)) {
       await deps.store.save(project.folder, settings)
+    }
+    // A point opened from a signal that went away is closed with it.
+    const settled =
+      (await deps.points?.settle(project, signalsFor(saved), unsettled)) ?? NO_OPEN_POINTS
+    // The meetings of the days being closed: those of the working day before, and today's.
+    const since = previousWorkday(today)
+    const held = [...meetingsOn(invites, since), ...agenda.today]
+    const closing = await deps.closing?.look(project, held)
+    const register = closing?.register ?? settled
+    const points = pointBrief(register, today, since, agenda.today, now)
+    // The last time each meeting of today was recorded: what was left open there is brought.
+    const recorded = await attempt(
+      async () => (await deps.meetings?.imported(project)) ?? [],
+      NOTHING,
+    )
+    const heldByDay = new Map<string, DayMeeting[]>()
+    const heldOn = (day: string): DayMeeting[] => {
+      const known = heldByDay.get(day) ?? meetingsOn(invites, day)
+      heldByDay.set(day, known)
+      return known
+    }
+    const lasts: LastFiles[] = []
+    for (const meeting of agenda.today) {
+      const recording = lastRecordingOf(meeting, recorded, heldOn, romeDateString)
+      lasts.push(
+        recording ? { ...recording, files: await textsOf(project, recording.folder) } : null,
+      )
     }
     // A judgement given before Claude was asked whom a mail is for, or whether it asks
     // something at all, does not say it: the mail is read again.
@@ -388,6 +522,18 @@ export function createToday(deps: TodayDeps): Today {
       judgedToday,
       page: pageFor(settings),
       pageFor,
+      agenda,
+      points,
+      register,
+      lasts,
+      held,
+      closing: {
+        unread: closing?.unread.length ?? 0,
+        key: (closing?.unread ?? []).join(' '),
+        at: register.closedAt,
+        model: register.closedBy,
+      },
+      openRisks,
       sprintEnd: lastDay !== null && lastDay > today ? lastDay : null,
       freshness,
       own,
@@ -403,6 +549,26 @@ export function createToday(deps: TodayDeps): Today {
     page: computed.pageFor(settings),
   })
 
+  /** The card of each meeting of today, from what was computed and what Claude said today. */
+  function prepOf(computed: Computed): MeetingPrep[] {
+    return computed.agenda.today.map((meeting, index) => {
+      const last = computed.lasts[index] ?? null
+      return meetingPrep(meeting, {
+        points: computed.points.queued,
+        allPoints: computed.register.points,
+        last: last && { ...last, file: last.files[0] ?? null },
+        items: computed.page.items,
+        own: computed.own,
+        // What Claude wrote on another day is about other meetings.
+        notes: computed.judgedToday ? computed.evaluation.prep : [],
+      })
+    })
+  }
+
+  /** The meetings of today that have not started: those worth preparing. */
+  const upcoming = (computed: Computed): DayMeeting[] =>
+    computed.agenda.today.filter((meeting) => Date.parse(meeting.start) > computed.now.getTime())
+
   function viewOf(computed: Computed): TodayView {
     const visible = new Set(
       computed.page.items.flatMap((item) =>
@@ -416,6 +582,17 @@ export function createToday(deps: TodayDeps): Today {
     return {
       day: computed.today,
       items: computed.page.items,
+      agenda: computed.agenda,
+      points: computed.points,
+      prep: prepOf(computed),
+      closing: computed.closing,
+      week: weekItems({
+        items: computed.page.items,
+        points: computed.points.queued,
+        risks: computed.openRisks,
+        today: computed.today,
+        sprintEnd: computed.sprintEnd,
+      }),
       now: first,
       // What Claude wrote on another day is about another day.
       nowSummary: computed.judgedToday
@@ -424,7 +601,7 @@ export function createToday(deps: TodayDeps): Today {
           )
         : [],
       marks: marksOf(computed.page.items, computed.settings),
-      count: todayCount(computed.page.items, first),
+      count: todayCount(computed.page.items, first) + pointsCount(computed.points),
       notify: computed.settings.notify,
       hidden: computed.page.hidden,
       hiddenItems: computed.page.hiddenItems,
@@ -439,7 +616,10 @@ export function createToday(deps: TodayDeps): Today {
       // A mail the PM put away is not worth a run of Claude.
       evaluationDue:
         !computed.judgedToday &&
-        (first.length > 0 || computed.unjudged.some((mail) => visible.has(mail.id))),
+        (first.length > 0 ||
+          computed.closing.unread > 0 ||
+          (deps.reader !== undefined && upcoming(computed).length > 0) ||
+          computed.unjudged.some((mail) => visible.has(mail.id))),
       ownAddresses: computed.own,
       addedAddresses: computed.settings.ownAddresses,
     }
@@ -559,6 +739,65 @@ export function createToday(deps: TodayDeps): Today {
     return sentences
   }
 
+  /**
+   * Asks Claude what to bring to the meetings of today still to come. It is told the card the
+   * code made for each; the code keeps a note only on a meeting it asked about, and looks for
+   * the quote in the file it names.
+   */
+  async function prepare(
+    project: Project,
+    computed: Computed,
+    input: EvaluateInput,
+  ): Promise<PrepNote[]> {
+    const ahead = new Set(upcoming(computed).map(meetingKey))
+    const cards = prepOf(computed)
+    const meetings = computed.agenda.today.flatMap((meeting, index) => {
+      const card = cards[index]
+      if (!card || !ahead.has(card.key)) return []
+      return [
+        {
+          key: card.key,
+          subject: meeting.subject,
+          start: meeting.start,
+          attendees: meeting.attendees,
+          points: card.points.map(({ point }) => ({
+            id: point.id,
+            title: point.title,
+            owner: point.owner,
+            due: point.due,
+          })),
+          lastFiles: computed.lasts[index]?.files ?? [],
+          mails: card.mails.flatMap((item) => ('path' in item.facts ? [item.facts.path] : [])),
+        },
+      ]
+    })
+    if (!deps.reader || meetings.length === 0) return []
+    const proposed = await deps.reader.prep({
+      projectFolder: project.folder,
+      day: computed.today,
+      meetings: meetings.slice(0, MAX_MEETINGS_PER_PREP),
+      model: (await deps.models?.(project))?.ask ?? null,
+      liveSources: (await deps.liveSources?.(project)) ?? [],
+      ...(input.onProgress ? { onProgress: input.onProgress } : {}),
+      ...(input.signal ? { signal: input.signal } : {}),
+    })
+    const notes: PrepNote[] = []
+    for (const note of proposed) {
+      const said = notes.filter((kept) => kept.key === note.key).length
+      if (!ahead.has(note.key) || note.text.trim() === '' || said >= MAX_PREP_NOTES) continue
+      const citation = { n: 1, path: note.path, quote: note.quote }
+      const found = checkCitation(citation, await deps.evidence.read(project.folder, note.path))
+      notes.push({
+        key: note.key,
+        text: note.text.trim(),
+        path: note.path,
+        quote: note.quote,
+        verified: found.status === 'verified',
+      })
+    }
+    return notes
+  }
+
   return {
     view,
 
@@ -653,7 +892,7 @@ export function createToday(deps: TodayDeps): Today {
         const kept = Object.fromEntries(
           Object.entries(next.mails).filter(([id]) => waiting.has(id)),
         )
-        const judged = { ...next, mails: kept, summary: [] }
+        const judged = { ...next, mails: kept, summary: [], prep: [] }
         await deps.store.saveEvaluation(project.folder, judged)
         // Why what comes first matters is a second question, asked on the mail just judged:
         // when it fails, the mail judged stays judged and the page says nothing more.
@@ -666,12 +905,43 @@ export function createToday(deps: TodayDeps): Today {
         if (summary.length > 0) {
           await deps.store.saveEvaluation(project.folder, { ...judged, summary })
         }
+        // The meetings recorded since are a third question, with the same care.
+        const { closing, held } = await compute(project)
+        if (closing.unread > 0) {
+          await deps.closing?.close(project, { held, ...input }).catch((error: unknown) => {
+            if (!isDomainError(error)) throw error
+          })
+        }
+        // What to bring to the meetings still to come is the last question, on all the rest.
+        const prep = await prepare(project, await compute(project), input).catch(
+          (error: unknown) => {
+            if (!isDomainError(error)) throw error
+            return []
+          },
+        )
+        if (prep.length > 0) {
+          const current = await deps.store.loadEvaluation(project.folder)
+          await deps.store.saveEvaluation(project.folder, { ...current, prep })
+        }
         if (await risksDue(project, deps.clock.now())) {
           // The risks are a second question: when it fails, the mail judged stays judged.
           await deps.risks.propose(project, input).catch((error: unknown) => {
             if (!isDomainError(error)) throw error
           })
         }
+        return await view(project)
+      } finally {
+        evaluating.delete(project.id)
+      }
+    },
+
+    async closeDay(project, input = {}) {
+      if (!deps.closing) return view(project)
+      if (evaluating.has(project.id)) throw new DomainError('source_busy', 'today')
+      evaluating.add(project.id)
+      try {
+        const { held } = await compute(project)
+        await deps.closing.close(project, { held, ...input })
         return await view(project)
       } finally {
         evaluating.delete(project.id)

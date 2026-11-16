@@ -131,8 +131,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const content = await deps.files.readText(project.folder, path)
       const stored = content === null ? null : parseMailDocument(path, content)
       if (stored?.meeting && stored.invite !== CALENDAR_CANCEL) {
-        const { uid, start, end } = stored.meeting
-        invites.push({ uid, start, end })
+        const { uid, start, end, recurrence, excluded } = stored.meeting
+        invites.push({ uid, start, end, recurrence, excluded })
       }
     }
     return {

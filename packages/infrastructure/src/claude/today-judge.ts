@@ -42,13 +42,14 @@ const risksSchema = z.object({
   ),
 })
 
-const NOT_SOURCES = `${UNCITABLE_FOLDERS.map((folder) => `\`${folder}/\``).join(', ')} hold earlier answers, settings and
+export const NOT_SOURCES = `${UNCITABLE_FOLDERS.map((folder) => `\`${folder}/\``).join(', ')} hold earlier answers, settings and
 internal costs: they are not sources. Never read, search or cite them.`
 
 const RULES_OPEN = '<project_rules>'
 const RULES_CLOSE = '</project_rules>'
 
-function withContext(prompt: string, request: JudgeRequest, rules: string | null): string {
+/** A prompt with what Octo reads live and the rules the PM wrote for the project. */
+export function withContext(prompt: string, request: JudgeRequest, rules: string | null): string {
   const live = liveSourcesPrompt(request.liveSources)
   const bound = rules
     ? `

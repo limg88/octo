@@ -6,12 +6,18 @@ import type {
   TodayView as View,
 } from '@octo/application'
 import {
+  type BriefPoint,
+  type DayMeeting,
   type MailFollowWhy,
   type MailReplyWhy,
+  type MeetingPrep,
   NO_RISKS,
+  type OpenPoint,
+  type PointBrief,
   type Project,
   type RiskRegister as Register,
   type TodayItem,
+  type WeekEntry,
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -19,6 +25,7 @@ import { AllProjectsView } from '../src/renderer/AllProjectsView.tsx'
 import { App } from '../src/renderer/App.tsx'
 import { errorText, messages } from '../src/renderer/messages.ts'
 import { systemNotify } from '../src/renderer/notify.ts'
+import { prepText } from '../src/renderer/prep-text.ts'
 import { RiskRegister } from '../src/renderer/RiskRegister.tsx'
 import { SignIn } from '../src/renderer/SignIn.tsx'
 import { TodayView } from '../src/renderer/TodayView.tsx'
@@ -102,6 +109,11 @@ const risk = item(
 const view = (overrides: Partial<View> = {}): View => ({
   day: '2026-11-16',
   items: [source, hours, mail, bugs, risk],
+  agenda: { today: [], next: { day: '2026-11-17', meetings: [] } },
+  points: { since: '2026-11-13', queued: [], closed: [], toConfirm: [] },
+  prep: [],
+  closing: { unread: 0, key: '', at: null, model: null },
+  week: { until: '2026-11-22', ongoing: [], coming: [] },
   now: [],
   nowSummary: [],
   marks: {},
@@ -134,6 +146,7 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
     setMailTurn: vi.fn(async () => ok(view({ items: [bugs] }))),
     saveOwnAddresses: vi.fn(async () => ok(view({ addedAddresses: ['altro@example.test'] }))),
     evaluateToday: vi.fn(async () => ok(first)),
+    closeToday: vi.fn(async () => ok(first)),
     cancelEvaluateToday: vi.fn(async () => ok(null)),
     onTodayProgress: (listener: typeof tell) => {
       tell = listener
@@ -148,6 +161,9 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
     fill: vi.fn(async () => ok([])),
     openEvidence: vi.fn(async () => ok(null)),
     assignMeeting: vi.fn(async () => ok(first)),
+    addOpenPoint: vi.fn(async () => ok(first)),
+    updateOpenPoint: vi.fn(async () => ok(first)),
+    confirmOpenPoint: vi.fn(async () => ok(first)),
     risks: vi.fn(async () => ok<Register>(NO_RISKS)),
     proposeRisks: vi.fn(async () => ok<Register>(NO_RISKS)),
     acceptRisk: vi.fn(async () => ok<Register>(NO_RISKS)),
@@ -189,6 +205,667 @@ describe('the notice of the system', () => {
     made[0]?.onclick?.()
     expect(clicked).toHaveBeenCalled()
     vi.unstubAllGlobals()
+  })
+})
+
+describe('the brief of the open points', () => {
+  const point = (id: string, more: Partial<OpenPoint> = {}): OpenPoint => ({
+    id,
+    title: `Punto ${id}`,
+    owner: '',
+    openedOn: '2026-11-10',
+    due: null,
+    state: 'open',
+    origin: 'pm',
+    source: null,
+    signalKey: null,
+    signalKind: null,
+    meeting: null,
+    closedOn: null,
+    closedBy: null,
+    closing: null,
+    history: [],
+    check: null,
+    ...more,
+  })
+  const queued = (id: string, more: Partial<BriefPoint> = {}, of: Partial<OpenPoint> = {}) => ({
+    point: point(id, of),
+    fresh: false,
+    overdueDays: 0,
+    openWorkdays: 4,
+    raiseAt: null,
+    ...more,
+  })
+  const source = { path: 'riunioni/sal/report.md', quote: 'ambiente entro venerdì', verified: true }
+  const brief = (more: Partial<PointBrief> = {}): PointBrief => ({
+    since: '2026-11-13',
+    queued: [
+      queued(
+        'a',
+        {
+          overdueDays: 2,
+          raiseAt: { uid: 'sal', subject: 'SAL', start: '2026-11-16T09:00:00.000Z' },
+        },
+        {
+          title: 'Ambiente di prova',
+          owner: 'Rossi',
+          due: '2026-11-14',
+          origin: 'claude',
+          source,
+          history: [{ day: '2026-11-13', text: 'Luca lo consegna lunedì', source: null }],
+        },
+      ),
+      queued('b', { fresh: true, openWorkdays: 0 }, { due: '2026-11-20' }),
+      queued('c', { openWorkdays: 1 }),
+    ],
+    closed: [
+      point('z', {
+        title: 'Stima della migrazione',
+        state: 'resolved',
+        closedOn: '2026-11-13',
+        closedBy: 'claude',
+        closing: {
+          path: 'riunioni/sal/report.md',
+          quote: 'confermata a 12 giorni',
+          verified: true,
+        },
+      }),
+    ],
+    toConfirm: [],
+    ...more,
+  })
+  const show = async (points: PointBrief, items: TodayItem[] = []) => {
+    const { api } = todayApi(view({ points, items }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const region = await screen.findByRole('region', { name: text.points.title })
+    return { api, region }
+  }
+
+  it('says what is in the queue, whose it is, since when, and where to close it today', async () => {
+    const { api, region } = await show(brief())
+    expect(region.textContent).toContain(
+      '3 in coda · 1 nuovo dal 13/11/2026 · 1 chiuso dal 13/11/2026',
+    )
+    const [first, second, third] = within(
+      screen.getByRole('list', { name: text.points.list }),
+    ).getAllByRole('listitem') as [HTMLElement, HTMLElement, HTMLElement]
+    expect(first.textContent).toContain(text.points.late)
+    expect(first.textContent).toContain('Ambiente di prova')
+    expect(first.textContent).toContain(text.points.byClaude)
+    expect(first.textContent).toContain(
+      'di Rossi · aperto da 4 giorni lavorativi · era entro il 14/11/2026: scaduto da 2 giorni',
+    )
+    expect(first.textContent).toContain('↳ se ne parla oggi alle 10:00: SAL')
+    expect(first.textContent).toContain('13/11/2026: Luca lo consegna lunedì')
+    expect(second.textContent).toContain(text.points.fresh)
+    expect(second.textContent).toContain('tuo · aperto oggi · entro il 20/11/2026')
+    expect(third.textContent).toContain('aperto da 1 giorno lavorativo')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: `${text.points.source}: Ambiente di prova` }),
+    )
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', source.path))
+    fireEvent.click(screen.getByRole('button', { name: `${text.points.resolve}: Punto b` }))
+    await waitFor(() =>
+      expect(api.updateOpenPoint).toHaveBeenCalledWith('p-1', 'b', { state: 'resolved' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: `${text.points.drop}: Punto c` }))
+    await waitFor(() =>
+      expect(api.updateOpenPoint).toHaveBeenCalledWith('p-1', 'c', { state: 'dropped' }),
+    )
+  })
+
+  it('changes a point, adds one by hand, and shows what was closed with the way back', async () => {
+    const { api, region } = await show(brief())
+    fireEvent.click(screen.getByRole('button', { name: `${text.points.edit}: Punto c` }))
+    const form = screen.getByRole('form', { name: text.points.editTitle('Punto c') })
+    fireEvent.change(within(form).getByLabelText(text.points.ownerLabel), {
+      target: { value: 'Bianchi' },
+    })
+    fireEvent.change(within(form).getByLabelText(text.points.dueLabel), {
+      target: { value: '2026-11-19' },
+    })
+    fireEvent.click(within(form).getByRole('button', { name: text.points.save }))
+    await waitFor(() =>
+      expect(api.updateOpenPoint).toHaveBeenCalledWith('p-1', 'c', {
+        title: 'Punto c',
+        owner: 'Bianchi',
+        due: '2026-11-19',
+      }),
+    )
+    // Changing one's mind leaves the point as it was.
+    fireEvent.click(screen.getByRole('button', { name: `${text.points.edit}: Punto b` }))
+    fireEvent.click(screen.getByRole('button', { name: text.points.cancel }))
+    expect(screen.queryByRole('form', { name: text.points.editTitle('Punto b') })).toBeNull()
+
+    const add = screen.getByRole('form', { name: text.points.addTitle })
+    const button = within(add).getByRole('button', { name: text.points.add }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.change(within(add).getByLabelText(text.points.titleLabel), {
+      target: { value: 'Verbale del collaudo' },
+    })
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(api.addOpenPoint).toHaveBeenCalledWith('p-1', {
+        title: 'Verbale del collaudo',
+        owner: '',
+        due: null,
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: text.points.closedButton(1, '13/11/2026') }))
+    const closed = screen.getByRole('list', { name: text.points.closedList })
+    expect(closed.textContent).toContain(
+      'chiuso il 13/11/2026 · da quanto detto in riunione · «confermata a 12 giorni»',
+    )
+    fireEvent.click(within(closed).getByRole('button', { name: /^Fonte/ }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledTimes(1))
+    fireEvent.click(
+      screen.getByRole('button', { name: `${text.points.reopen}: Stima della migrazione` }),
+    )
+    await waitFor(() =>
+      expect(api.updateOpenPoint).toHaveBeenCalledWith('p-1', 'z', { state: 'open' }),
+    )
+    // The brief folds to its first line.
+    fireEvent.click(within(region).getByRole('button', { name: text.points.fold }))
+    expect(screen.queryByRole('list', { name: text.points.list })).toBeNull()
+    expect(within(region).getByRole('button', { name: text.points.unfold })).toBeTruthy()
+  })
+
+  it('asks the PM about what waits for a word, shows the first points only, and says a failure', async () => {
+    const many = Array.from({ length: 9 }, (_, index) => queued(`p${index}`))
+    const waiting = point('w', {
+      check: {
+        day: '2026-11-16',
+        why: 'not_recorded',
+        text: 'SAL non registrato: risolto?',
+        meeting: 'SAL',
+      },
+    })
+    const updateOpenPoint = vi.fn(async () => ({
+      ok: false as const,
+      code: 'open_point_invalid' as const,
+    }))
+    const { api } = todayApi(
+      view({ points: brief({ queued: many, closed: [], toConfirm: [waiting] }) }),
+      {
+        updateOpenPoint,
+      },
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const checks = await screen.findByRole('list', { name: text.points.toConfirm })
+    expect(checks.textContent).toContain('«SAL» del 16/11/2026 non è stata registrata')
+    fireEvent.click(within(checks).getByRole('button', { name: `${text.points.resolve}: Punto w` }))
+    await waitFor(() => expect(api.confirmOpenPoint).toHaveBeenCalledWith('p-1', 'w', true))
+    fireEvent.click(within(checks).getByRole('button', { name: `${text.points.stays}: Punto w` }))
+    await waitFor(() => expect(api.confirmOpenPoint).toHaveBeenCalledWith('p-1', 'w', false))
+
+    const list = screen.getByRole('list', { name: text.points.list })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(7)
+    fireEvent.click(screen.getByRole('button', { name: text.points.more(2) }))
+    expect(within(list).getAllByRole('listitem')).toHaveLength(9)
+    fireEvent.click(screen.getByRole('button', { name: text.points.fewer }))
+    fireEvent.click(screen.getByRole('button', { name: `${text.points.resolve}: Punto p0` }))
+    expect(await screen.findByText(errorText('open_point_invalid'))).toBeTruthy()
+  })
+
+  it('says which meetings wait to be read, reads them by itself once, and when the PM asks', async () => {
+    const waiting = {
+      unread: 2,
+      key: 'm-1 m-2',
+      at: '2026-11-13T17:00:00.000Z',
+      model: 'claude-fake',
+    }
+    const { api, changed } = todayApi(view({ points: brief(), closing: waiting }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const region = await screen.findByRole('region', { name: text.points.title })
+    expect(region.textContent).toContain('2 riunioni registrate da leggere · Riunioni lette il ')
+    expect(region.textContent).toContain('(claude-fake)')
+    // Nothing else is to ask Claude: the meetings are read alone, once for the same wait.
+    await waitFor(() => expect(api.closeToday).toHaveBeenCalledTimes(1))
+    expect(api.evaluateToday).not.toHaveBeenCalled()
+    act(() => changed())
+    await waitFor(() => expect(api.todayView).toHaveBeenCalledTimes(2))
+    expect(api.closeToday).toHaveBeenCalledTimes(1)
+    fireEvent.click(await screen.findByRole('button', { name: text.points.closeDay }))
+    await waitFor(() => expect(api.closeToday).toHaveBeenCalledTimes(2))
+  })
+
+  it('reads the meetings with the evaluation of the day, not a second time', async () => {
+    const waiting = { unread: 1, key: 'm-1', at: null, model: null }
+    const { api } = todayApi(view({ points: brief(), closing: waiting, evaluationDue: true }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const region = await screen.findByRole('region', { name: text.points.title })
+    expect(region.textContent).toContain(
+      `1 riunione registrata da leggere · ${text.points.neverClosed}`,
+    )
+    await waitFor(() => expect(api.evaluateToday).toHaveBeenCalledTimes(1))
+    expect(api.closeToday).not.toHaveBeenCalled()
+  })
+
+  it('reads no meeting without Claude, and says what a point waits for in words', async () => {
+    const doubt = point('d', {
+      check: { day: '2026-11-16', why: 'unverified', text: 'Sembra fatto.', meeting: 'SAL' },
+    })
+    const bare = point('e', {
+      check: { day: '2026-11-16', why: 'unverified', text: 'Sembra fatto.', meeting: null },
+    })
+    const missed = point('m', {
+      check: { day: '2026-11-16', why: 'not_recorded', text: '', meeting: 'Stand-up' },
+    })
+    const waiting = { unread: 1, key: 'm-1', at: '2026-11-13T17:00:00.000Z', model: null }
+    const { api } = todayApi(
+      view({ points: brief({ toConfirm: [doubt, bare, missed] }), closing: waiting }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge={false} onOpenSection={() => {}} />)
+    const checks = await screen.findByRole('list', { name: text.points.toConfirm })
+    expect(checks.textContent).toContain(
+      'Claude lo legge chiuso in «SAL», ma la frase non è nel file: Sembra fatto.',
+    )
+    expect(checks.textContent).toContain('Claude lo legge chiuso, ma la frase non è nel file')
+    expect(checks.textContent).toContain(
+      '«Stand-up» del 16/11/2026 non è stata registrata: lì è stato risolto, o resta in coda?',
+    )
+    expect(screen.queryByRole('button', { name: text.points.closeDay })).toBeNull()
+    expect(api.closeToday).not.toHaveBeenCalled()
+  })
+
+  it('opens a point from a signal of the page, once', async () => {
+    const { api, region } = await show(brief({ queued: [], closed: [] }), [mail])
+    expect(region.textContent).toContain(text.points.none)
+    fireEvent.click(await screen.findByRole('button', { name: text.points.fromSignal }))
+    await waitFor(() =>
+      expect(api.addOpenPoint).toHaveBeenCalledWith('p-1', {
+        title: signalText(mail).title,
+        signal: { key: mail.key, kind: 'mail_reply' },
+      }),
+    )
+    cleanup()
+    await show(brief({ queued: [queued('s', {}, { signalKey: mail.key })], closed: [] }), [mail])
+    await screen.findByRole('region', { name: text.detailTitle })
+    expect(screen.queryByRole('button', { name: text.points.fromSignal })).toBeNull()
+  })
+})
+
+describe('the critical things of the week', () => {
+  const entry = (
+    key: string,
+    side: WeekEntry['side'],
+    what: WeekEntry['what'],
+    more = {},
+  ): WeekEntry => ({
+    key,
+    side,
+    what,
+    day: null,
+    overdueDays: 0,
+    ...more,
+  })
+  const openRisk = {
+    id: 'r1',
+    title: 'Ambiente non pronto',
+    since: '2026-11-10',
+    state: 'open' as const,
+    source: null,
+    note: 'Lo segue Luca',
+    due: null,
+    severity: 'alta' as const,
+  }
+  const pointOf = (title: string, owner: string, due: string | null) => ({
+    point: { id: title, title, owner, due, history: [], check: null } as unknown as OpenPoint,
+    fresh: false,
+    overdueDays: 0,
+    openWorkdays: 7,
+    raiseAt: null,
+  })
+
+  it('tells apart what is to put right now and what the week brings, by day', async () => {
+    const riskSignal = item('risk:r1', 'watch', {
+      kind: 'risk',
+      id: 'r1',
+      title: 'x',
+      since: '2026-11-10',
+    })
+    const week = {
+      until: '2026-11-22',
+      ongoing: [
+        entry(
+          'point:a',
+          'ongoing',
+          { kind: 'point', entry: pointOf('Verbale', 'Rossi', '2026-11-13') },
+          {
+            day: '2026-11-13',
+            overdueDays: 3,
+          },
+        ),
+        entry('point:b', 'ongoing', { kind: 'point', entry: pointOf('Vecchio', '', null) }),
+        entry('risk:r1', 'ongoing', { kind: 'risk', risk: openRisk }),
+        entry('signal:bugs-stuck', 'ongoing', { kind: 'signal', item: bugs }),
+      ],
+      coming: [
+        entry(
+          'risk:r2',
+          'coming',
+          { kind: 'risk', risk: { ...openRisk, id: 'r2', severity: null, note: '' } },
+          {
+            day: '2026-11-18',
+          },
+        ),
+        entry('sprint-end', 'coming', { kind: 'sprint_end' }, { day: '2026-11-19' }),
+        entry('signal:hours', 'coming', { kind: 'signal', item: hours }),
+      ],
+    }
+    const opened: string[] = []
+    const { api } = todayApi(view({ week, items: [bugs, riskSignal, risk] }))
+    render(
+      <TodayView
+        api={api}
+        project={aurora}
+        canJudge
+        onOpenSection={(section) => opened.push(section)}
+        onOpenBugs={(filter) => opened.push(`bugs:${filter}`)}
+      />,
+    )
+    const region = await screen.findByRole('region', { name: text.week.title })
+    expect(region.textContent).toContain('fino al 22/11/2026')
+    const [late, old, critical, stuck] = within(
+      within(region).getByRole('list', { name: text.week.ongoing }),
+    ).getAllByRole('listitem') as HTMLElement[]
+    expect(late?.textContent).toContain('scaduto da 3 giorni')
+    expect(late?.textContent).toContain('Open point Verbale')
+    expect(late?.textContent).toContain('di Rossi')
+    expect(old?.textContent).toContain('adesso')
+    expect(old?.textContent).toContain('tuo · aperto da 7 giorni lavorativi')
+    expect(critical?.textContent).toContain('Rischio · gravità alta')
+    expect(critical?.textContent).toContain('Lo segue Luca')
+    expect(stuck?.textContent).toContain(signalText(bugs).title)
+    const [dated, sprint, month] = within(
+      within(region).getByRole('list', { name: text.week.coming }),
+    ).getAllByRole('listitem') as HTMLElement[]
+    expect(dated?.textContent).toContain('mer 18/11')
+    expect(dated?.textContent).toContain('Rischio Ambiente non pronto')
+    expect(sprint?.textContent).toContain('gio 19/11')
+    expect(sprint?.textContent).toContain(text.week.sprintEnd)
+    expect(month?.textContent).toContain(text.week.thisWeek)
+    // What the week tells is not told again among what is only watched: the candidates stay.
+    const watched = screen.getByRole('table', { name: text.watch })
+    expect(watched.textContent).not.toContain(signalText(bugs).title)
+    expect(watched.textContent).toContain(signalText(risk).title)
+
+    fireEvent.click(within(stuck as HTMLElement).getByRole('button'))
+    fireEvent.click(within(month as HTMLElement).getByRole('button'))
+    expect(opened).toEqual(['bugs:stuck', 'hours'])
+    fireEvent.click(within(critical as HTMLElement).getByRole('button'))
+    expect(await screen.findByText(messages.risks.intro)).toBeTruthy()
+  })
+
+  it('says a side with nothing, and is not shown with nothing at all', async () => {
+    const week = {
+      until: '2026-11-22',
+      ongoing: [],
+      coming: [entry('sprint-end', 'coming', { kind: 'sprint_end' }, { day: '2026-11-19' })],
+    }
+    const { api } = todayApi(view({ week }))
+    const { unmount } = render(
+      <TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />,
+    )
+    const region = await screen.findByRole('region', { name: text.week.title })
+    expect(region.textContent).toContain(text.week.noneOngoing)
+    unmount()
+    const coming = {
+      ...week,
+      ongoing: week.coming.map((kept) => ({ ...kept, side: 'ongoing' as const })),
+      coming: [],
+    }
+    render(
+      <TodayView
+        api={todayApi(view({ week: coming })).api}
+        project={aurora}
+        canJudge
+        onOpenSection={() => {}}
+      />,
+    )
+    expect((await screen.findByRole('region', { name: text.week.title })).textContent).toContain(
+      text.week.noneComing,
+    )
+    cleanup()
+    render(<TodayView api={todayApi().api} project={aurora} canJudge onOpenSection={() => {}} />)
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('region', { name: text.week.title })).toBeNull()
+  })
+})
+
+describe('the meetings of the day', () => {
+  const held = (uid: string, start: string, more: Partial<DayMeeting> = {}): DayMeeting => ({
+    uid,
+    subject: uid,
+    start,
+    end: null,
+    location: '',
+    attendees: [],
+    repeats: false,
+    path: `Posta/${uid}.md`,
+    sentAt: '2026-11-10T09:00:00.000Z',
+    ...more,
+  })
+  const sal = held('SAL', '2026-11-16T09:00:00.000Z', {
+    end: '2026-11-16T10:00:00.000Z',
+    location: 'Teams',
+    repeats: true,
+    attendees: [
+      'Carla Bianchi <carla@cliente.example>',
+      'a@x.example',
+      'b@x.example',
+      'c@x.example',
+      'd@x.example',
+    ],
+  })
+  const review = held('Collaudo', '2099-11-16T14:00:00.000Z', { attendees: ['a', 'b', 'c', 'd'] })
+
+  it('lists them in the order they are held, apart from what is to do, with who is there', async () => {
+    const meeting = item('meeting:Collaudo', 'due', {
+      kind: 'meeting',
+      subject: 'Collaudo',
+      start: review.start,
+      location: '',
+      path: review.path,
+    })
+    const agenda = {
+      today: [sal, review],
+      next: { day: '2026-11-17', meetings: [held('Riesame', '2026-11-17T08:30:00.000Z')] },
+    }
+    const { api } = todayApi(view({ agenda, items: [meeting, mail] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+
+    const list = await screen.findByRole('list', { name: text.agenda.list })
+    const [first, second] = within(list).getAllByRole('listitem') as [HTMLElement, HTMLElement]
+    expect(first.textContent).toContain('10:00–11:00')
+    expect(first.textContent).toContain(text.agenda.repeats)
+    // Held hours ago: said so. Who is there by name, the others counted.
+    expect(first.textContent).toContain(text.agenda.over)
+    expect(first.textContent).toContain(
+      'Teams · Carla Bianchi, a@x.example, b@x.example e altre 2 persone',
+    )
+    expect(second.textContent).toContain('a, b, c e un’altra persona')
+    expect(second.textContent).not.toContain(text.agenda.over)
+    expect(screen.getByText(/Prossimo giorno \(17\/11\/2026\): 09:30 Riesame/)).toBeTruthy()
+    // A meeting is told in the agenda, not again among what is to do.
+    expect(
+      within(screen.getByRole('list', { name: text.list })).getAllByRole('button'),
+    ).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: `${text.agenda.openInvite}: SAL` }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'Posta/SAL.md'))
+  })
+
+  const KEY = 'meeting:Collaudo:2099-11-16T14:00:00.000Z'
+  const folder = '_octo/riunioni/2026-11-09_collaudo'
+  const pointOf = (title: string, more: object = {}) =>
+    ({ id: title, title, owner: '', due: null, ...more }) as unknown as OpenPoint
+  const card = (more: Partial<MeetingPrep> = {}): MeetingPrep => ({
+    key: KEY,
+    points: [
+      {
+        point: pointOf('Data del collaudo', { owner: 'Rossi', due: '2026-11-20' }),
+        fresh: false,
+        overdueDays: 2,
+        openWorkdays: 4,
+        raiseAt: null,
+      },
+    ],
+    last: {
+      title: 'Collaudo di Aurora',
+      started: '2026-11-09T14:00:00.000Z',
+      folder,
+      file: `${folder}/report.md`,
+      opened: [pointOf('Ambiente di prova')],
+      closed: [pointOf('Stima')],
+    },
+    mails: [mail],
+    numbers: [bugs],
+    bring: [
+      {
+        key: KEY,
+        text: 'Chiedi la data dell’ambiente.',
+        path: `${folder}/report.md`,
+        quote: 'Ambiente di prova entro venerdì',
+        verified: true,
+      },
+    ],
+    ...more,
+  })
+  const withCard = (prep: MeetingPrep[], today: DayMeeting[] = [sal, review]) =>
+    view({ agenda: { today, next: { day: '2026-11-17', meetings: [] } }, prep, items: [mail] })
+
+  it('opens the card of the next meeting: what to bring, the last time, the mail, the numbers', async () => {
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    const { api } = todayApi(withCard([card()]))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    // The meeting still to come is prepared without a click; the one over is a click away.
+    const region = await screen.findByRole('region', { name: text.prep.title('Collaudo') })
+    expect(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }).textContent).toBe(
+      '4 cose da portare',
+    )
+    expect(screen.getByRole('button', { name: `${text.agenda.card}: SAL` }).textContent).toBe(
+      text.agenda.card,
+    )
+    const toBring = within(region).getByRole('list', { name: `${text.prep.points}: Collaudo` })
+    expect(toBring.textContent).toContain(text.points.late)
+    expect(toBring.textContent).toContain(
+      'Data del collaudo di Rossi · aperto da 4 giorni lavorativi · entro il 20/11/2026',
+    )
+    expect(region.textContent).toContain('Collaudo di Aurora, registrata il 09/11/2026')
+    const left = within(region).getByRole('list', { name: `${text.prep.last}: Collaudo` })
+    expect(left.textContent).toContain('Nato lì e ancora aperto: Ambiente di prova')
+    expect(left.textContent).toContain('Chiuso lì: Stima')
+    expect(
+      within(region).getByRole('list', { name: `${text.prep.mails}: Collaudo` }).textContent,
+    ).toContain(signalText(mail).title)
+    expect(
+      within(region).getByRole('list', { name: `${text.prep.numbers}: Collaudo` }).textContent,
+    ).toContain(signalText(bugs).title)
+    const notes = within(region).getByRole('list', { name: `${text.prep.bring}: Collaudo` })
+    expect(notes.textContent).toContain('Chiedi la data dell’ambiente.')
+
+    fireEvent.click(within(region).getByRole('button', { name: `${text.prep.openLast}: Collaudo` }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', `${folder}/report.md`))
+    fireEvent.click(within(notes).getByRole('button'))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledTimes(2))
+    fireEvent.click(within(region).getByRole('button', { name: /^Apri la mail/ }))
+    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledTimes(3))
+
+    fireEvent.click(within(region).getByRole('button', { name: text.prep.copy }))
+    expect(await within(region).findByRole('button', { name: text.prep.copied })).toBeTruthy()
+    expect(writeText).toHaveBeenCalledWith(prepText(review, card()))
+    expect(prepText(review, card())).toBe(
+      [
+        '15:00 · Collaudo',
+        'a, b, c, d',
+        '',
+        `${text.prep.points}:`,
+        '- Data del collaudo (Rossi)',
+        '',
+        `${text.prep.last}:`,
+        '- Collaudo di Aurora, registrata il 09/11/2026',
+        '- Nato lì e ancora aperto: Ambiente di prova',
+        '- Chiuso lì: Stima',
+        '',
+        `${text.prep.mails}:`,
+        `- ${signalText(mail).title}`,
+        '',
+        `${text.prep.numbers}:`,
+        `- ${signalText(bugs).title}`,
+        '',
+        `${text.prep.bring}:`,
+        '- Chiedi la data dell’ambiente.',
+      ].join('\n'),
+    )
+    // The card closes, and another opens in its place.
+    fireEvent.click(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }))
+    expect(screen.queryByRole('region', { name: text.prep.title('Collaudo') })).toBeNull()
+    vi.unstubAllGlobals()
+  })
+
+  it('says a meeting with nothing to bring, one whose points are the PM’s, and when Claude works', async () => {
+    const bare = card({ points: [], last: null, mails: [], numbers: [], bring: [] })
+    const mine = card({
+      key: 'meeting:SAL:2026-11-16T09:00:00.000Z',
+      points: [
+        { point: pointOf('Verbale'), fresh: false, overdueDays: 0, openWorkdays: 1, raiseAt: null },
+      ],
+      last: {
+        ...(card().last as NonNullable<MeetingPrep['last']>),
+        file: null,
+        opened: [],
+        closed: [],
+      },
+      mails: [],
+      numbers: [],
+      bring: [],
+    })
+    let release: (value: Result<View>) => void = () => {}
+    const page = { ...withCard([mine, bare]), evaluationDue: true }
+    const { api } = todayApi(page, {
+      evaluateToday: vi.fn(
+        () =>
+          new Promise<Result<View>>((resolve) => {
+            release = resolve
+          }),
+      ),
+    })
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const empty = await screen.findByRole('region', { name: text.prep.title('Collaudo') })
+    expect(empty.textContent).toContain(text.prep.empty)
+    expect(within(empty).queryByRole('button', { name: text.prep.copy })).toBeNull()
+    expect(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }).textContent).toBe(
+      text.prep.nothing,
+    )
+    // While Claude works the card says what may still come.
+    expect(await within(empty).findByText(text.prep.preparing)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: `${text.agenda.card}: SAL` }))
+    const own = screen.getByRole('region', { name: text.prep.title('SAL') })
+    expect(own.textContent).toContain('Verbale tuo · aperto da 1 giorno lavorativo')
+    expect(within(own).queryByRole('button', { name: `${text.prep.openLast}: SAL` })).toBeNull()
+    expect(prepText(sal, mine)).not.toContain(text.prep.mails)
+    expect(prepText({ ...sal, attendees: [] }, bare)).toBe('10:00 · SAL')
+    await act(async () => release(ok(page)))
+  })
+
+  it('says a day without meetings when only the next has some, and nothing with none', async () => {
+    const next = { day: '2026-11-17', meetings: [held('Riesame', '2026-11-17T08:30:00.000Z')] }
+    const { api } = todayApi(view({ agenda: { today: [], next } }))
+    const { unmount } = render(
+      <TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />,
+    )
+    expect((await screen.findByRole('region', { name: text.agenda.title })).textContent).toContain(
+      'nessuna',
+    )
+    expect(screen.queryByRole('list', { name: text.agenda.list })).toBeNull()
+    unmount()
+    render(<TodayView api={todayApi().api} project={aurora} canJudge onOpenSection={() => {}} />)
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('region', { name: text.agenda.title })).toBeNull()
   })
 })
 
@@ -818,6 +1495,8 @@ describe('the register of the risks', () => {
         state: 'open',
         source: { path: 'wiki/stato.md', quote: 'ambiente non ancora pronto', verified: false },
         note: '',
+        due: null,
+        severity: null,
       },
       {
         id: 'r2',
@@ -826,6 +1505,8 @@ describe('the register of the risks', () => {
         state: 'closed',
         source: null,
         note: '',
+        due: null,
+        severity: null,
       },
     ],
     candidates: [
@@ -892,6 +1573,27 @@ describe('the register of the risks', () => {
     fireEvent.click(screen.getByRole('button', { name: words.close }))
     await waitFor(() =>
       expect(api.updateRisk).toHaveBeenCalledWith('p-1', 'r1', { state: 'closed' }),
+    )
+    fireEvent.change(
+      screen.getByLabelText(`${messages.risks.severity}: Ambiente di prova non disponibile`),
+      { target: { value: 'alta' } },
+    )
+    await waitFor(() =>
+      expect(api.updateRisk).toHaveBeenCalledWith('p-1', 'r1', { severity: 'alta' }),
+    )
+    fireEvent.change(
+      screen.getByLabelText(`${messages.risks.severity}: Ambiente di prova non disponibile`),
+      { target: { value: '' } },
+    )
+    await waitFor(() =>
+      expect(api.updateRisk).toHaveBeenCalledWith('p-1', 'r1', { severity: null }),
+    )
+    const dueField = screen.getByLabelText(
+      `${messages.risks.due}: Ambiente di prova non disponibile`,
+    )
+    fireEvent.change(dueField, { target: { value: '2026-11-20' } })
+    await waitFor(() =>
+      expect(api.updateRisk).toHaveBeenCalledWith('p-1', 'r1', { due: '2026-11-20' }),
     )
     fireEvent.click(screen.getByRole('button', { name: words.reopen }))
     await waitFor(() => expect(api.updateRisk).toHaveBeenCalledWith('p-1', 'r2', { state: 'open' }))

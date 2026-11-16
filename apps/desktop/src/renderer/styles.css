@@ -2191,6 +2191,181 @@ details.advanced[open] > summary {
   margin: 0;
 }
 
+.today-points {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--text);
+}
+
+.today-points .today-title {
+  margin: 0;
+}
+
+.today-points-toggle {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.today-point-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-point-list > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.today-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.today-point-what {
+  flex: 1;
+  min-width: 0;
+}
+
+.today-point-facts {
+  display: block;
+}
+
+.today-point-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.today-point-form input:first-child {
+  flex: 1 1 260px;
+}
+
+.today-closing {
+  justify-content: space-between;
+}
+
+.pill.pill-late {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.today-week-when.today-week-late {
+  color: var(--danger);
+}
+
+.today-week {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.today-week .today-title {
+  margin: 0;
+}
+
+.today-week-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 6px 20px;
+}
+
+.today-week-side {
+  min-width: 0;
+}
+
+.today-week-when {
+  flex: 0 0 120px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.today-agenda {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.today-agenda .today-title {
+  margin: 0;
+}
+
+.today-meetings {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-meeting + .today-meeting {
+  border-top: 1px solid var(--line);
+}
+
+.today-meeting-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.today-meeting-hours {
+  flex: 0 0 96px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.today-meeting-what {
+  flex: 1;
+  min-width: 0;
+}
+
+.today-meeting-who {
+  display: block;
+}
+
+.today-meeting-over .today-meeting-hours,
+.today-meeting-over .today-meeting-what strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.today-prep {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px 106px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--accent);
+  background: var(--hover);
+}
+
+.today-prep ul,
+.today-prep p {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+
+.today-prep p {
+  padding-left: 0;
+}
+
+.today-agenda-next {
+  margin: 0;
+}
+
 .pill-new {
   background: var(--accent);
   color: var(--panel);

@@ -112,6 +112,139 @@ export const messages = {
       `${count} fonti lette · la meno recente è ${source}: ${when}`,
     readNow: 'Leggi ora',
     reading: 'Leggo le fonti…',
+    points: {
+      title: 'Il punto',
+      list: 'Open point in coda',
+      queued: (count: number) =>
+        count === 0 ? 'nessun open point' : count === 1 ? '1 in coda' : `${count} in coda`,
+      freshCount: (count: number, since: string) =>
+        count === 1 ? `1 nuovo dal ${since}` : `${count} nuovi dal ${since}`,
+      closedCount: (count: number, since: string) =>
+        count === 1 ? `1 chiuso dal ${since}` : `${count} chiusi dal ${since}`,
+      toConfirmCount: (count: number) => `${count} da confermare`,
+      fold: 'Riduci',
+      unfold: 'Espandi',
+      none: 'Nessun open point in coda.',
+      mine: 'tuo',
+      of: (owner: string) => `di ${owner}`,
+      openFor: (workdays: number) =>
+        workdays === 0
+          ? 'aperto oggi'
+          : workdays === 1
+            ? 'aperto da 1 giorno lavorativo'
+            : `aperto da ${workdays} giorni lavorativi`,
+      dueBy: (day: string) => `entro il ${day}`,
+      overdue: (day: string, days: number) =>
+        days === 1
+          ? `era entro il ${day}: scaduto da 1 giorno`
+          : `era entro il ${day}: scaduto da ${days} giorni`,
+      late: 'Scaduto',
+      fresh: 'Nuovo',
+      byClaude: 'da Claude',
+      raiseAt: (hour: string, meeting: string) => `↳ se ne parla oggi alle ${hour}: ${meeting}`,
+      lastSaid: (day: string, said: string) => `${day}: ${said}`,
+      resolve: 'Risolto',
+      edit: 'Modifica',
+      source: 'Fonte',
+      drop: 'Non è un open point',
+      dropHint: 'Non è un open point: lo tolgo e non lo ripropongo.',
+      reopen: 'Riapri',
+      stays: 'Resta in coda',
+      toConfirm: 'Open point da confermare',
+      toConfirmPill: 'Da confermare',
+      closedButton: (count: number, since: string) =>
+        count === 1 ? `Chiuso dal ${since}: 1` : `Chiusi dal ${since}: ${count}`,
+      closedList: 'Open point chiusi',
+      closedOn: (day: string) => `chiuso il ${day}`,
+      closedBy: {
+        pm: 'da te',
+        claude: 'da quanto detto in riunione',
+        signal: 'da solo: il dato è cambiato',
+      },
+      more: (count: number) => (count === 1 ? 'Mostra l’altro' : `Mostra gli altri ${count}`),
+      fewer: 'Mostra meno',
+      addTitle: 'Nuovo open point',
+      addHint: 'Nuovo open point: che cosa va chiuso',
+      titleLabel: 'Che cosa va chiuso',
+      ownerLabel: 'Di chi',
+      ownerHint: 'di chi (vuoto: tuo)',
+      dueLabel: 'Entro il',
+      add: 'Aggiungi',
+      save: 'Salva',
+      cancel: 'Annulla',
+      editTitle: (title: string) => `Modifica: ${title}`,
+      notRecorded: (meeting: string, day: string) =>
+        `«${meeting}» del ${day} non è stata registrata: lì è stato risolto, o resta in coda?`,
+      unverified: (said: string, meeting: string | null) =>
+        meeting
+          ? `Claude lo legge chiuso in «${meeting}», ma la frase non è nel file: ${said}`
+          : `Claude lo legge chiuso, ma la frase non è nel file: ${said}`,
+      unread: (count: number) =>
+        count === 1
+          ? '1 riunione registrata da leggere'
+          : `${count} riunioni registrate da leggere`,
+      neverClosed: 'Claude non ha ancora letto le riunioni di questo progetto',
+      closedAt: (when: string, model: string | null) =>
+        model ? `Riunioni lette il ${when} (${model})` : `Riunioni lette il ${when}`,
+      closeDay: 'Chiudi la giornata',
+      closing: 'Leggo le riunioni…',
+      fromSignal: 'Segna come open point',
+      fromSignalHint:
+        'Resta in coda finché non è chiuso; si chiude da solo quando questa segnalazione sparisce.',
+    },
+    week: {
+      title: 'Criticità della settimana',
+      hint: 'Calcolate da Octo: ciò che è da risolvere adesso e ciò che arriva entro la settimana. Dal venerdì comprende la settimana dopo.',
+      until: (day: string) => `fino al ${day}`,
+      ongoing: 'In corso',
+      coming: 'In arrivo',
+      noneOngoing: 'Niente da risolvere.',
+      noneComing: 'Niente in arrivo.',
+      now: 'adesso',
+      thisWeek: 'in settimana',
+      overdue: (days: number) => (days === 1 ? 'scaduto da 1 giorno' : `scaduto da ${days} giorni`),
+      kinds: { point: 'Open point', risk: 'Rischio', sprint: 'Sprint' },
+      risk: (severity: string) => `Rischio · gravità ${severity}`,
+      sprintEnd: 'Fine dello sprint',
+      openRisks: 'Apri il registro',
+    },
+    prep: {
+      title: (meeting: string) => `Scheda di preparazione: ${meeting}`,
+      nothing: 'niente da portare',
+      count: (count: number) => (count === 1 ? '1 cosa da portare' : `${count} cose da portare`),
+      empty: 'Niente da portare a questa riunione: nessun open point, nessuna mail che aspetta.',
+      points: 'Open point da portare',
+      last: 'L’ultima volta',
+      lastWhen: (title: string, day: string) => `${title}, registrata il ${day}`,
+      openLast: 'Apri il riepilogo',
+      stillOpen: (title: string) => `Nato lì e ancora aperto: ${title}`,
+      closedThere: (title: string) => `Chiuso lì: ${title}`,
+      mails: 'Posta di chi partecipa',
+      numbers: 'Numeri del tracker',
+      bring: 'Da portare, secondo Claude',
+      preparing: 'Claude sta preparando che cosa portare…',
+      copy: 'Copia la scheda',
+      copied: 'Copiata',
+      notifyBody: (project: string, minutes: number, count: number) =>
+        count === 0
+          ? `${project} · fra ${minutes} minuti`
+          : count === 1
+            ? `${project} · fra ${minutes} minuti · 1 cosa da portare`
+            : `${project} · fra ${minutes} minuti · ${count} cose da portare`,
+    },
+    agenda: {
+      title: 'Riunioni di oggi',
+      list: 'Riunioni di oggi, in ordine d’orario',
+      count: (count: number) =>
+        count === 0 ? 'nessuna' : count === 1 ? '1 riunione' : `${count} riunioni`,
+      repeats: 'ricorrente',
+      over: 'finita',
+      openInvite: 'Apri l’invito',
+      card: 'Scheda',
+      andOthers: (named: string, others: number) =>
+        others === 1 ? `${named} e un’altra persona` : `${named} e altre ${others} persone`,
+      next: (day: string, meetings: string) => `Prossimo giorno (${day}): ${meetings}`,
+    },
     now: 'Adesso',
     nowHint:
       'Ciò che viene prima, scelto da una regola: una riunione vicina, una scadenza, ciò che avevi rimandato a oggi, una mail importante, ciò che è peggiorato.',
@@ -288,6 +421,9 @@ export const messages = {
     reopen: 'Riapri',
     note: 'Nota',
     saveNote: 'Salva la nota',
+    due: 'Entro il',
+    severity: 'Gravità',
+    noSeverity: 'non detta',
     add: 'Aggiungi un rischio',
     addLabel: 'Un rischio che vuoi tenere d’occhio',
     candidates: 'Proposti da Claude',
@@ -1626,6 +1762,7 @@ const errors: Record<ErrorCode, string> = {
   sign_in_cancelled: 'Accesso interrotto. Riprova quando vuoi.',
   today_decision_invalid: 'Non ho capito che cosa fare di questa segnalazione.',
   risk_invalid: 'Questo rischio non c’è più nel registro.',
+  open_point_invalid: 'Questo open point non c’è più, o gli manca il titolo.',
   deliverable_input_missing: 'Manca un campo obbligatorio.',
   deliverable_kind_unknown: 'Questo tipo di deliverable non esiste più.',
   deliverable_kind_invalid: 'Servono un titolo e le istruzioni; le domande sono al massimo otto.',

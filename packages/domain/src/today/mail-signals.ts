@@ -1,5 +1,10 @@
 import type { StoredMail } from '../mail/document.ts'
-import { conversationOfMail, type MailThreads, type WaitingMail } from '../mail/thread.ts'
+import {
+  conversationOfMail,
+  type DayMeeting,
+  type MailThreads,
+  type WaitingMail,
+} from '../mail/thread.ts'
 import type {
   Importance,
   MailFollowWhy,
@@ -149,27 +154,26 @@ export function mailItems(
   return [...reply, ...waiting]
 }
 
+export const meetingKey = (meeting: Pick<DayMeeting, 'uid' | 'start'>): string =>
+  `meeting:${meeting.uid}:${meeting.start}`
+
 /** The meetings of the day, from the invitations in the mail. */
-export function meetingItems(meetings: readonly StoredMail[]): TodayItem[] {
-  return meetings.flatMap((mail): TodayItem[] =>
-    mail.meeting === null
-      ? []
-      : [
-          {
-            key: `meeting:${mail.meeting.uid}:${mail.meeting.start}`,
-            band: 'due',
-            facts: {
-              kind: 'meeting',
-              subject: mail.meeting.summary || mail.subject,
-              start: mail.meeting.start,
-              location: mail.meeting.location,
-              path: mail.path,
-            },
-            // Above whatever else is due, the earlier in the day the higher.
-            weight: MEETING_WEIGHT - (Date.parse(mail.meeting.start) % DAY_MS) / DAY_MS,
-            target: 'mail',
-            asOf: mail.date,
-          },
-        ],
+export function meetingItems(meetings: readonly DayMeeting[]): TodayItem[] {
+  return meetings.map(
+    (meeting): TodayItem => ({
+      key: meetingKey(meeting),
+      band: 'due',
+      facts: {
+        kind: 'meeting',
+        subject: meeting.subject,
+        start: meeting.start,
+        location: meeting.location,
+        path: meeting.path,
+      },
+      // Above whatever else is due, the earlier in the day the higher.
+      weight: MEETING_WEIGHT - (Date.parse(meeting.start) % DAY_MS) / DAY_MS,
+      target: 'mail',
+      asOf: meeting.sentAt,
+    }),
   )
 }

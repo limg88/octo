@@ -62,6 +62,8 @@ const invitation = [
   `DTSTART;TZID=Europe/Rome:${meetingStart}`,
   `DTEND;TZID=Europe/Rome:${meetingEnd}`,
   'LOCATION:Sala riunioni del cliente',
+  'ORGANIZER;CN=Carla Bianchi:mailto:carla@cliente.example',
+  'ATTENDEE;ROLE=REQ-PARTICIPANT;CN=Paola Verdi:mailto:pm@example.test',
   'END:VEVENT',
   'END:VCALENDAR',
 ].join('\n')

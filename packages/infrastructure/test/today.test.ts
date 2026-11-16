@@ -3,11 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NO_EVALUATION } from '@octo/application'
-import { type DomainError, NO_RISKS, NO_TODAY_SETTINGS, type SignInConfig } from '@octo/domain'
+import {
+  addOpenPoint,
+  type DomainError,
+  NO_OPEN_POINTS,
+  NO_RISKS,
+  NO_TODAY_SETTINGS,
+  type SignInConfig,
+} from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   createClaudeTodayJudge,
   createFixedIdentityProvider,
+  createFsOpenPointStore,
   createFsRiskRegisterStore,
   createFsTodayStore,
   createOidcIdentityProvider,
@@ -226,6 +234,15 @@ describe('what the page of the day keeps in the project', () => {
           verified: true,
         },
       ],
+      prep: [
+        {
+          key: 'meeting:sal:2026-11-16T09:00:00.000Z',
+          text: 'Chiedi la data dell’ambiente di prova.',
+          path: '_octo/riunioni/sal/report.md',
+          quote: 'ambiente entro venerdì',
+          verified: true,
+        },
+      ],
     }
     await store.saveEvaluation(folder, evaluation)
     expect(await store.loadEvaluation(folder)).toEqual(evaluation)
@@ -246,6 +263,8 @@ describe('what the page of the day keeps in the project', () => {
           state: 'open' as const,
           source: null,
           note: '',
+          due: '2026-11-20',
+          severity: 'alta' as const,
         },
       ],
     }
@@ -253,6 +272,22 @@ describe('what the page of the day keeps in the project', () => {
     expect(await risks.load(folder)).toEqual(register)
     writeFileSync(join(folder, '_octo', '.impostazioni', 'rischi.json'), '{"risks": 1}')
     expect(await risks.load(folder)).toEqual(NO_RISKS)
+
+    const points = createFsOpenPointStore()
+    expect(await points.load(folder)).toEqual(NO_OPEN_POINTS)
+    const kept = addOpenPoint(
+      NO_OPEN_POINTS,
+      {
+        title: 'Ambiente di prova',
+        origin: 'signal',
+        signal: { key: 'mail:1', kind: 'mail_reply' },
+      },
+      '2026-11-16',
+    )
+    await points.save(folder, kept)
+    expect(await points.load(folder)).toEqual(kept)
+    writeFileSync(join(folder, '_octo', '.impostazioni', 'open-point.json'), '{"points": 1}')
+    expect(await points.load(folder)).toEqual(NO_OPEN_POINTS)
   })
 })
 
@@ -475,6 +510,10 @@ describe('a mail that answers another, or invites to a meeting', () => {
       start: '2026-11-16T14:00:00.000Z',
       end: '2026-11-16T15:00:00.000Z',
       location: '',
+      recurrence: null,
+      excluded: [],
+      occurrence: null,
+      attendees: [],
     })
   })
 })

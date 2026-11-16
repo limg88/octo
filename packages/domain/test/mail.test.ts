@@ -14,6 +14,7 @@ import {
   type MailRules,
   mailDocument,
   mailWanted,
+  parseMailDocument,
   shortHash,
   slugOf,
   sourcePathOf,
@@ -85,6 +86,28 @@ describe('which mail is of the project', () => {
 })
 
 describe('a mail as a file of the memory', () => {
+  it('keeps how a meeting repeats and who is invited, and reads them back', () => {
+    const meeting = {
+      uid: 'sal',
+      summary: 'SAL',
+      start: '2026-11-02T09:00:00.000Z',
+      end: null,
+      location: '',
+      recurrence: 'FREQ=WEEKLY;BYDAY=MO',
+      excluded: ['2026-11-23T09:00:00.000Z'],
+      occurrence: '2026-11-16T09:00:00.000Z',
+      attendees: ['Carla Bianchi <carla@cliente.example>', 'luca@octo.example'],
+    }
+    const invite = message({ calendarMethod: 'REQUEST', meeting })
+    const { content } = mailDocument(archived, invite, { keepQuoted: false })
+    expect(parseMailDocument('a.md', content)?.meeting).toEqual(meeting)
+    // A meeting held once is written as it always was.
+    const once = { uid: 'u', summary: '', start: meeting.start, end: null, location: '' }
+    const plain = mailDocument(archived, message({ meeting: once }), { keepQuoted: false })
+    expect(plain.content).not.toContain('riunione-ripete')
+    expect(plain.content).not.toContain('riunione-partecipanti')
+  })
+
   it('goes in the folder of its month, named by day, subject and a stable mark', () => {
     const document = mailDocument(archived, message(), { keepQuoted: false })
 

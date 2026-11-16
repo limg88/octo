@@ -162,6 +162,27 @@ export type TodayFacts =
 
 export type TodayKind = TodayFacts['kind']
 
+/** Every kind of signal, for who has to tell one from any other word. */
+export const TODAY_KINDS = [
+  'source',
+  'tracker_old',
+  'mail_reply',
+  'mail_follow',
+  'mail_waiting',
+  'hours',
+  'forecast',
+  'month_due',
+  'bugs_stuck',
+  'requirements',
+  'alignment',
+  'draft',
+  'calendar',
+  'meeting',
+  'meeting_unassigned',
+  'risk',
+  'risk_candidates',
+] as const satisfies readonly TodayKind[]
+
 /**
  * The kinds whose weight counts what is wrong: more of it is worse. The weight of the others is
  * the days they have waited, which grows by itself and tells nothing new.

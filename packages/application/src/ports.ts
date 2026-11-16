@@ -29,7 +29,9 @@ import type {
   MeetingReading,
   ModelSettings,
   NowRule,
+  OpenPointRegister,
   Preferences,
+  PrepNote,
   ProgressSettings,
   Project,
   ProjectTeam,
@@ -481,6 +483,8 @@ export type TodayEvaluation = {
   mails: Record<string, MailJudgement>
   /** Why what came first mattered when Claude was last asked, a sentence for a signal. */
   summary: NowSentence[]
+  /** What Claude said to bring to the meetings of the day it was last asked on. */
+  prep: PrepNote[]
 }
 
 /** A sentence of Claude on a signal that comes first, with the words of a file that back it. */
@@ -494,7 +498,13 @@ export type NowSentence = {
   verified: boolean
 }
 
-export const NO_EVALUATION: TodayEvaluation = { at: null, model: null, mails: {}, summary: [] }
+export const NO_EVALUATION: TodayEvaluation = {
+  at: null,
+  model: null,
+  mails: {},
+  summary: [],
+  prep: [],
+}
 
 /** What the PM decided on the page of the day and what Claude judged, kept in the project. */
 export interface TodayStore {
@@ -502,6 +512,12 @@ export interface TodayStore {
   save(projectFolder: string, settings: TodaySettings): Promise<void>
   loadEvaluation(projectFolder: string): Promise<TodayEvaluation>
   saveEvaluation(projectFolder: string, evaluation: TodayEvaluation): Promise<void>
+}
+
+/** The register of the open points of a project, kept with Octo's settings of the project. */
+export interface OpenPointStore {
+  load(projectFolder: string): Promise<OpenPointRegister>
+  save(projectFolder: string, register: OpenPointRegister): Promise<void>
 }
 
 /** The register of the risks of a project, kept with Octo's settings of the project. */
@@ -576,6 +592,71 @@ export interface TodayJudge {
   summary(
     request: JudgeRequest & { day: string; items: readonly NowToExplain[] },
   ): Promise<ProposedSentence[]>
+}
+
+/** An open point as Claude is told it, to look for it in the meetings of a day. */
+export type PointToCheck = { id: string; title: string; owner: string; due: string | null }
+
+/** A recorded meeting as Claude is told it: what it is called, when, and its files. */
+export type MeetingToRead = { title: string; started: string; files: readonly string[] }
+
+/** What Claude read of an open point in a meeting; the quote is checked by the code. */
+export type ProposedVerdict = {
+  id: string
+  outcome: 'resolved' | 'open'
+  said: string
+  path: string
+  quote: string
+}
+
+/** A point Claude read being opened in a meeting; the quote is checked by the code. */
+export type ProposedOpenPoint = {
+  title: string
+  owner: string
+  due: string | null
+  path: string
+  quote: string
+}
+
+export type ProposedClosing = { verdicts: ProposedVerdict[]; points: ProposedOpenPoint[] }
+
+/** A meeting of the day as Claude is told it, with what the code already put in its card. */
+export type MeetingToPrepare = {
+  key: string
+  subject: string
+  start: string
+  attendees: readonly string[]
+  /** The open points the code says to bring. */
+  points: readonly PointToCheck[]
+  /** The files of the last recording of the series, the report first. */
+  lastFiles: readonly string[]
+  /** The mail of who is invited that waits, by its file. */
+  mails: readonly string[]
+}
+
+/** What Claude says to bring to a meeting; the quote is checked by the code. */
+export type ProposedBring = { key: string; text: string; path: string; quote: string }
+
+/**
+ * Claude as the one who reads the meetings of a day, read-only on the project folder: which open
+ * points were closed there, which were talked about, which were opened. It never drops a point.
+ * Failures are DomainErrors with an `agent_*` code.
+ */
+export interface MeetingReader {
+  closing(
+    request: JudgeRequest & {
+      day: string
+      points: readonly PointToCheck[]
+      meetings: readonly MeetingToRead[]
+    },
+  ): Promise<ProposedClosing>
+  /**
+   * What to bring to each meeting of the day: what to ask, what will be asked, what to decide.
+   * Claude adds to the card the code made; it never takes anything off it.
+   */
+  prep(
+    request: JudgeRequest & { day: string; meetings: readonly MeetingToPrepare[] },
+  ): Promise<ProposedBring[]>
 }
 
 /** A sentence Claude proposes on the numbers of the tracker; the code checks ids and numbers. */

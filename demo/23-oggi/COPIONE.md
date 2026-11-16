@@ -25,7 +25,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
 
 3. **Guarda «Adesso» e «Da fare oggi».**
    Atteso, dall'alto (le prime, quelle con una regola che le mette davanti, stanno nel riquadro «Adesso»: vedi la demo 30):
-   - «Alle 15:00: Aurora: prova generale del collaudo», dall'invito arrivato per posta;
+   - «Alle 15:00: Aurora: prova generale del collaudo», dall'invito arrivato per posta: dal 16/11/2026 sta nel riquadro «Riunioni di oggi» (demo 36), e in «Adesso» quando comincia entro due ore;
    - «Sprint 28: i due tracker non sono allineati», con «Perché oggi: lo sprint sta finendo.»;
    - «Rispondi a Carla Bianchi · «Aurora: budget aggiuntivo approvato»»;
    - «…: le ore di 3 persone non tornano» (Bianchi Anna, Neri Sara, Ugo Gialli);

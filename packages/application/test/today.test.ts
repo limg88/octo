@@ -7,9 +7,11 @@ import {
   type Identity,
   type MailSourceConfig,
   NEVER_READ,
+  NO_OPEN_POINTS,
   NO_RISKS,
   NO_TEAM,
   NO_TODAY_SETTINGS,
+  type OpenPointRegister,
   type Project,
   type Reconciliation,
   type RiskRegister,
@@ -17,10 +19,13 @@ import {
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import {
+  createOpenPoints,
   createRisks,
   createSession,
   createToday,
+  type DayClosing,
   type IdentityProvider,
+  type MeetingToPrepare,
   NO_EVALUATION,
   type NowToExplain,
   type ProposedJudgement,
@@ -247,6 +252,306 @@ function setup(overrides: Partial<TodayDeps> = {}, judgeScript: JudgeScript = {}
 }
 
 describe('the page of the day', () => {
+  it('opens on the points left open, and closes with its signal a point opened from one', async () => {
+    let register: OpenPointRegister = NO_OPEN_POINTS
+    const points = createOpenPoints({
+      store: {
+        load: async () => register,
+        save: async (_folder, next) => {
+          register = next
+        },
+      },
+      writer: memoryWriter(),
+      clock: { now: () => new Date('2026-11-13T09:00:00.000Z') },
+    })
+    await points.add(project, { title: 'Verbale', due: '2026-11-13' })
+    await points.add(project, {
+      title: 'Budget',
+      signal: { key: 'mail:budget', kind: 'mail_reply' },
+    })
+    await points.add(project, {
+      title: 'Sparita',
+      signal: { key: 'mail:altra', kind: 'mail_reply' },
+    })
+    const { today } = setup({ points })
+    const view = await today.view(project)
+    expect(view.points.since).toBe('2026-11-13')
+    expect(view.points.queued.map((entry) => [entry.point.title, entry.overdueDays])).toEqual([
+      ['Verbale', 3],
+      ['Budget', 0],
+    ])
+    // The mail of the third point is no longer there: closed by itself.
+    expect(view.points.closed.map((point) => [point.title, point.closedBy])).toEqual([
+      ['Sparita', 'signal'],
+    ])
+    // The meeting, the mail, and the point past its day.
+    expect(view.count).toBe(3)
+    // The point past its day is a critical thing of the week.
+    expect(view.week.ongoing.map((entry) => entry.key)).toEqual([
+      `point:${view.points.queued[0]?.point.id}`,
+    ])
+    // Without the register the page still works.
+    expect((await setup().today.view(project)).points.queued).toEqual([])
+  })
+
+  it('reads the recorded meetings with the evaluation of the day, and when the PM asks', async () => {
+    const checked = {
+      ...NO_OPEN_POINTS,
+      closedAt: '2026-11-13T17:00:00.000Z',
+      closedBy: 'claude-fake',
+    }
+    let unread = ['m-1', 'm-2']
+    const looks: string[][] = []
+    const closes: string[][] = []
+    let fails: Error | null = null
+    const closing: DayClosing = {
+      look: async (_project, held) => {
+        looks.push(held.map((meeting) => meeting.start))
+        return { register: checked, unread }
+      },
+      close: async (_project, input) => {
+        closes.push(input.held.map((meeting) => meeting.uid))
+        if (fails) throw fails
+        unread = []
+        return checked
+      },
+    }
+    const { today, judge } = setup({ closing })
+    const view = await today.view(project)
+    // The meetings of the working day before and of today are those the recordings are told by.
+    expect(looks[0]).toEqual(['2026-11-16T14:00:00.000Z'])
+    expect(view.closing).toEqual({
+      unread: 2,
+      key: 'm-1 m-2',
+      at: '2026-11-13T17:00:00.000Z',
+      model: 'claude-fake',
+    })
+    expect(view.evaluationDue).toBe(true)
+    // A reading that fails leaves the mail judged, and the meetings to read.
+    fails = new DomainError('agent_failed')
+    expect((await today.evaluate(project)).closing.unread).toBe(2)
+    expect(judge.asked).toHaveLength(1)
+    fails = null
+    const closed = await today.closeDay(project)
+    expect(closes).toEqual([['uid-1'], ['uid-1']])
+    expect(closed.closing.unread).toBe(0)
+    // With nothing to read the evaluation of the day does not read.
+    await today.evaluate(project, { all: true })
+    expect(closes).toHaveLength(2)
+    // Something else fails: it is not hidden.
+    fails = new Error('boom')
+    unread = ['m-3']
+    await expect(today.evaluate(project)).rejects.toThrow('boom')
+    await expect(today.closeDay(project)).rejects.toThrow('boom')
+    // Without the closing the page still works, and there is nothing to close.
+    const plain = setup()
+    expect((await plain.today.closeDay(project)).closing).toEqual({
+      unread: 0,
+      key: '',
+      at: null,
+      model: null,
+    })
+  })
+
+  it('prepares the meetings still to come: the card of the code, and what Claude adds', async () => {
+    const folder = '_octo/riunioni/2026-11-09_collaudo'
+    const files: Record<string, string> = {
+      ...FILES,
+      [`${folder}/report.md`]: 'Ambiente di prova entro venerdì.',
+      [`${folder}/transcript.md`]: 'Luca: lo consegno venerdì.',
+    }
+    const recorded = {
+      id: 'm-9',
+      title: 'Collaudo di Aurora',
+      started: '2026-11-09T14:00:00.000Z',
+      minutes: 45,
+      participants: [],
+      folder,
+    }
+    let register: OpenPointRegister = NO_OPEN_POINTS
+    const points = createOpenPoints({
+      store: {
+        load: async () => register,
+        save: async (_folder, next) => {
+          register = next
+        },
+      },
+      writer: memoryWriter(),
+      clock: { now: () => new Date('2026-11-12T09:00:00.000Z') },
+    })
+    await points.add(project, { title: 'Data del collaudo', meeting: 'uid-1' })
+    const asked: MeetingToPrepare[][] = []
+    let fails: Error | null = null
+    const KEY = 'meeting:uid-1:2026-11-16T14:00:00.000Z'
+    const { today, at, store } = setup({
+      points,
+      meetings: {
+        view: async () => ({ config: null }) as never,
+        unassigned: async () => [],
+        imported: async () => [recorded],
+      },
+      reader: {
+        prep: async (request) => {
+          asked.push([...request.meetings])
+          if (fails) throw fails
+          return [
+            {
+              key: KEY,
+              text: ' Chiedi la data. ',
+              path: `${folder}/report.md`,
+              quote: 'Ambiente di prova entro venerdì',
+            },
+            {
+              key: KEY,
+              text: 'Inventata.',
+              path: `${folder}/report.md`,
+              quote: 'parole che non ci sono',
+            },
+            { key: KEY, text: '  ', path: `${folder}/report.md`, quote: 'Ambiente di prova' },
+            {
+              key: 'meeting:altra',
+              text: 'Di un’altra.',
+              path: `${folder}/report.md`,
+              quote: 'Ambiente di prova',
+            },
+          ]
+        },
+      },
+      files: {
+        under: async (_folder, under) =>
+          Object.keys(files).filter((path) => path.startsWith(`${under}/`)),
+        readText: async (_folder, path) => files[path] ?? null,
+      },
+      evidence: evidenceFrom(
+        Object.fromEntries(
+          Object.entries(files).map(([path, text]) => [
+            path,
+            { kind: 'found', text, modifiedAt: '' },
+          ]),
+        ),
+      ),
+    })
+    // Before Claude: the card of the code. The last recording is told by its name.
+    const before = await today.view(project)
+    expect(before.prep).toHaveLength(1)
+    expect(before.prep[0]).toMatchObject({
+      key: KEY,
+      last: { title: 'Collaudo di Aurora', file: `${folder}/report.md` },
+      bring: [],
+    })
+    expect(before.prep[0]?.points.map((entry) => entry.point.title)).toEqual(['Data del collaudo'])
+    expect(before.evaluationDue).toBe(true)
+
+    const view = await today.evaluate(project)
+    expect(asked[0]).toEqual([
+      {
+        key: KEY,
+        subject: 'Collaudo di Aurora',
+        start: '2026-11-16T14:00:00.000Z',
+        attendees: [],
+        points: [{ id: expect.any(String), title: 'Data del collaudo', owner: '', due: null }],
+        lastFiles: [`${folder}/report.md`, `${folder}/transcript.md`],
+        mails: [],
+      },
+    ])
+    // Only what the code found, on the meeting it asked about.
+    expect(view.prep[0]?.bring).toEqual([
+      {
+        key: KEY,
+        text: 'Chiedi la data.',
+        path: `${folder}/report.md`,
+        quote: 'Ambiente di prova entro venerdì',
+        verified: true,
+      },
+    ])
+    expect(store.evaluation.prep).toHaveLength(2)
+    // A run that fails keeps the page; one after the meeting began asks nothing more.
+    fails = new DomainError('agent_failed')
+    expect((await today.evaluate(project)).prep[0]?.bring).toEqual([])
+    fails = null
+    at('2026-11-16T14:30:00.000Z')
+    await today.evaluate(project)
+    expect(asked).toHaveLength(2)
+    // The day after, what Claude wrote is of another day.
+    at('2026-11-17T08:00:00.000Z')
+    expect((await today.view(project)).prep).toEqual([])
+  })
+
+  it('reads the meetings one project at a time', async () => {
+    let release: () => void = () => {}
+    const closing: DayClosing = {
+      look: async () => ({ register: NO_OPEN_POINTS, unread: [] }),
+      close: () =>
+        new Promise((resolve) => {
+          release = () => resolve(NO_OPEN_POINTS)
+        }),
+    }
+    const { today } = setup({ closing })
+    const running = today.closeDay(project)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await expect(today.closeDay(project)).rejects.toMatchObject({ code: 'source_busy' })
+    release()
+    await running
+  })
+
+  it('tells the open risks of the register among the critical things of the week', async () => {
+    const { today, risks } = setup()
+    const register = await risks.add(project, 'Ambiente non pronto')
+    const id = register.risks[0]?.id ?? ''
+    expect((await today.view(project)).week.ongoing.map((entry) => entry.key)).toEqual([
+      `risk:${id}`,
+    ])
+    await risks.update(project, id, { due: '2026-11-18', severity: 'alta' })
+    const week = (await today.view(project)).week
+    expect(week.until).toBe('2026-11-22')
+    expect(week.coming.map((entry) => [entry.key, entry.day])).toEqual([
+      [`risk:${id}`, '2026-11-18'],
+    ])
+  })
+
+  it('holds the meetings of today and of the next working day, also from an old series', async () => {
+    const weekly = mailFile('sal', 'SAL', 'Carla <carla@cliente.example>', '2026-03-02T08:00:00Z', [
+      'invito: "REQUEST"',
+      'riunione: "SAL settimanale"',
+      'riunione-id: "sal"',
+      'riunione-inizio: "2026-03-02T09:00:00.000Z"',
+      'riunione-fine: "2026-03-02T10:00:00.000Z"',
+      'riunione-luogo: "Teams"',
+      'riunione-ripete: "FREQ=WEEKLY;BYDAY=MO,TU"',
+      'riunione-partecipanti: "Carla <carla@cliente.example>"',
+    ])
+    const old: Record<string, string> = {
+      ...FILES,
+      'Posta/2026-03/sal.md': weekly,
+      'Posta/2026-03/altro.md': mailFile(
+        'x',
+        'Saluti',
+        'Carla <c@c.example>',
+        '2026-03-03T08:00:00Z',
+      ),
+      // Called more than a year ago: not looked for.
+      'Posta/2025-10/vecchio.md': weekly.replaceAll('sal', 'vecchio'),
+    }
+    const { today } = setup({
+      files: {
+        under: async (_folder, folder) =>
+          Object.keys(old).filter((path) => path.startsWith(`${folder}/`)),
+        readText: async (_folder, path) => old[path] ?? null,
+      },
+    })
+    const view = await today.view(project)
+    expect(view.agenda.today.map((held) => [held.subject, held.start, held.repeats])).toEqual([
+      ['SAL settimanale', '2026-11-16T09:00:00.000Z', true],
+      ['Collaudo di Aurora', '2026-11-16T14:00:00.000Z', false],
+    ])
+    expect(view.agenda.today[0]?.attendees).toEqual(['Carla <carla@cliente.example>'])
+    expect(view.agenda.next).toMatchObject({
+      day: '2026-11-17',
+      meetings: [{ subject: 'SAL settimanale', start: '2026-11-17T09:00:00.000Z' }],
+    })
+    expect(view.items.filter((item) => item.facts.kind === 'meeting')).toHaveLength(2)
+  })
+
   it('shows the mail that waits and the meeting of the day when no section is set up', async () => {
     const { today } = setup()
     const view = await today.view(project)

@@ -165,6 +165,118 @@ if (args.join(' ').includes('wants to chase an answer on one item of the tracker
   process.exit(0)
 }
 
+// A run of who prepares the meetings of the day: for each meeting a question from the last
+// recording (its first line that is not a title), and one from the first mail that waits.
+if (args.join(' ').includes('A Project Manager prepares the meetings of the day')) {
+  const { meetings } = JSON.parse(question)
+  const firstWords = (path) => {
+    try {
+      const lines = readFileSync(join(process.cwd(), path), 'utf8').split('\n')
+      const body = lines[0] === '---' ? lines.slice(lines.indexOf('---', 1) + 1) : lines
+      const line = body.find((candidate) => candidate.trim() !== '' && !candidate.startsWith('#'))
+      return (line ?? '').trim()
+    } catch {
+      return ''
+    }
+  }
+  const notes = []
+  for (const meeting of meetings) {
+    const last = meeting.lastFiles[0]
+    if (last && firstWords(last) !== '') {
+      notes.push({
+        key: meeting.key,
+        text: 'Chiedi a che punto è ciò che era rimasto aperto l’ultima volta.',
+        path: last,
+        quote: firstWords(last),
+      })
+    }
+    const mail = meeting.mails[0]
+    if (mail && firstWords(mail) !== '') {
+      notes.push({
+        key: meeting.key,
+        text: 'Preparati a rispondere alla mail che aspetta: te lo chiederanno.',
+        path: mail,
+        quote: firstWords(mail),
+      })
+    }
+    if (meeting.subject.includes('senza fonte')) {
+      notes.push({
+        key: meeting.key,
+        text: 'Porta una cosa che nessun file dice.',
+        path: last ?? 'nessun-file.md',
+        quote: 'queste parole non stanno in nessun file',
+      })
+    }
+  }
+  emit({ type: 'result', is_error: false, structured_output: { notes } })
+  process.exit(0)
+}
+
+// A run of the reader of the meetings of a day. A line of a file that names an open point closes
+// it when it says so («fatto», «chiuso», «risolto», «consegnato»), otherwise it is what was said
+// of it; a line that starts with «Azione:» opens a point, with who takes it in brackets and the
+// day after «entro». A point whose title holds «senza fonte» is closed on words no file has.
+if (args.join(' ').includes('A Project Manager closes the day of one project')) {
+  const { points, meetings } = JSON.parse(question)
+  const CLOSES = /\b(fatto|fatta|chiuso|chiusa|risolto|risolta|consegnato|consegnata)\b/i
+  const ACTION = /^[-*\s]*Azione:\s*(.+)$/i
+  const verdicts = []
+  const opened = []
+  for (const meeting of meetings) {
+    for (const path of meeting.files) {
+      let lines = []
+      try {
+        lines = readFileSync(join(process.cwd(), path), 'utf8').split('\n')
+      } catch {
+        continue
+      }
+      for (const raw of lines) {
+        const line = raw.trim()
+        const action = ACTION.exec(line)
+        if (action) {
+          const words = action[1]
+          opened.push({
+            title: words
+              .replace(/\s*\([^)]*\)/, '')
+              .replace(/\s*entro \d{4}-\d{2}-\d{2}/, '')
+              .replace(/\.$/, '')
+              .trim(),
+            owner: /\(([^)]*)\)/.exec(words)?.[1] ?? '',
+            due: /entro (\d{4}-\d{2}-\d{2})/.exec(words)?.[1] ?? null,
+            path,
+            quote: line,
+          })
+          continue
+        }
+        for (const point of points) {
+          if (verdicts.some((verdict) => verdict.id === point.id)) continue
+          if (!line.toLowerCase().includes(point.title.toLowerCase())) continue
+          verdicts.push({
+            id: point.id,
+            outcome: CLOSES.test(line) ? 'resolved' : 'open',
+            said: line.replace(/^[-*\s]+/, ''),
+            path,
+            quote: line,
+          })
+        }
+      }
+    }
+  }
+  const first = meetings[0]?.files[0] ?? 'nessun-file.md'
+  for (const point of points) {
+    if (!point.title.includes('senza fonte')) continue
+    verdicts.push({
+      id: point.id,
+      outcome: 'resolved',
+      said: 'Se n’è parlato come di cosa fatta.',
+      path: first,
+      quote: 'queste parole non stanno in nessun file',
+    })
+  }
+  emit({ type: 'result', is_error: false, structured_output: { verdicts, points: opened } })
+  process.exit(0)
+}
+
 // A run of the judge of the risks: one risk, with its source in the project.
 if (args.join(' ').includes('You look for the risks of one project')) {
   const { alreadyInTheRegister } = JSON.parse(question)

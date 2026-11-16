@@ -8,8 +8,8 @@ import {
   type ModelSettings,
   type Project,
   RISKS_FILE,
+  type RiskChange,
   type RiskRegister,
-  type RiskState,
   risksMarkdown,
   romeDateString,
   updateRisk,
@@ -46,11 +46,7 @@ export type Risks = {
   accept(project: Project, candidateId: string, title: string): Promise<RiskRegister>
   dismiss(project: Project, candidateId: string): Promise<RiskRegister>
   add(project: Project, title: string): Promise<RiskRegister>
-  update(
-    project: Project,
-    riskId: string,
-    change: { state?: RiskState; note?: string },
-  ): Promise<RiskRegister>
+  update(project: Project, riskId: string, change: RiskChange): Promise<RiskRegister>
 }
 
 /**

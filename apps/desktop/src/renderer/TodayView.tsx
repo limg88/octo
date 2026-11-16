@@ -3,6 +3,7 @@ import {
   type HiddenItem,
   isToDo,
   type MailTurn,
+  meetingKey,
   type Project,
   TODAY_LIMIT,
   type TodayItem,
@@ -25,6 +26,10 @@ import { dateTimeText, messages, progressText } from './messages.ts'
 import { RiskRegister } from './RiskRegister.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
+import { TodayAgenda } from './TodayAgenda.tsx'
+import { TodayPoints } from './TodayPoints.tsx'
+import { prepSummary, TodayPrep } from './TodayPrep.tsx'
+import { TodayWeek } from './TodayWeek.tsx'
 import {
   ageText,
   asOfText,
@@ -43,6 +48,7 @@ type TodayApi = Pick<
   | 'muteTodayKind'
   | 'setMailTurn'
   | 'evaluateToday'
+  | 'closeToday'
   | 'cancelEvaluateToday'
   | 'onTodayProgress'
   | 'onSourcesChanged'
@@ -57,6 +63,9 @@ type TodayApi = Pick<
   | 'addRisk'
   | 'updateRisk'
   | 'assignMeeting'
+  | 'addOpenPoint'
+  | 'updateOpenPoint'
+  | 'confirmOpenPoint'
 >
 
 type Props = {
@@ -144,6 +153,10 @@ export function TodayView({
   const [opening, setOpening] = useState<string | null>(null)
   /** The day and project Claude was already asked for by this page: never twice by itself. */
   const asked = useRef<string | null>(null)
+  /** The recorded meetings Claude was already asked to read by this page: never twice by itself. */
+  const askedClosing = useRef<string | null>(null)
+  /** True while Claude works for this page: it is asked one thing at a time. */
+  const busy = useRef(false)
   /** The project on the page now: an answer that comes back for another one is dropped. */
   const live = useRef<string | null>(project.id)
   live.current = project.id
@@ -200,25 +213,37 @@ export function TodayView({
     return () => clearTimeout(timer)
   }, [api, project.id, view, visitAfterMs])
 
-  const evaluate = useCallback(
-    async (everything: boolean) => {
+  /** Asks Claude something about the page, one thing at a time, and shows the page it gives back. */
+  const askClaude = useCallback(
+    async (ask: (projectId: string) => ReturnType<TodayApi['evaluateToday']>) => {
       const projectId = project.id
+      busy.current = true
       setJudging(true)
       setStep(null)
       setError(null)
-      const result = await api.evaluateToday(projectId, everything)
+      const result = await ask(projectId)
+      busy.current = false
       if (live.current !== projectId) return
       setJudging(false)
       if (result.ok) show(result.value)
       // Stopped by the PM: nothing to explain.
       else if (result.code !== 'agent_cancelled') setError(result.code)
     },
-    [api, project.id, show],
+    [project.id, show],
+  )
+  const evaluate = useCallback(
+    (everything: boolean) => askClaude((projectId) => api.evaluateToday(projectId, everything)),
+    [api, askClaude],
+  )
+  const closeDay = useCallback(
+    () => askClaude((projectId) => api.closeToday(projectId)),
+    [api, askClaude],
   )
 
   /**
    * Reads the page again. Claude is asked by the page itself once a day for a project, the first
    * time a mail it has not weighed waits there: at the opening, or after a reading brought it.
+   * Later in the day it is asked again only when a recorded meeting it has not read came in.
    */
   const load = useCallback(async () => {
     const projectId = project.id
@@ -227,11 +252,19 @@ export function TodayView({
     if (!result.ok) return setError(result.code)
     show(result.value)
     void askNextReading()
+    if (!canJudge || busy.current) return
     const mark = `${projectId}:${result.value.day}`
-    if (!result.value.evaluationDue || !canJudge || asked.current === mark) return
-    asked.current = mark
-    void evaluate(false)
-  }, [api, project.id, show, canJudge, evaluate, askNextReading])
+    if (result.value.evaluationDue && asked.current !== mark) {
+      asked.current = mark
+      // The evaluation of the day reads the recorded meetings too.
+      askedClosing.current = `${projectId}:${result.value.closing.key}`
+      return void evaluate(false)
+    }
+    const closingMark = `${projectId}:${result.value.closing.key}`
+    if (result.value.closing.unread === 0 || askedClosing.current === closingMark) return
+    askedClosing.current = closingMark
+    void closeDay()
+  }, [api, project.id, show, canJudge, evaluate, closeDay, askNextReading])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new project starts from its own page.
   useEffect(() => {
@@ -313,6 +346,16 @@ export function TodayView({
     await load()
   }
 
+  /** Changes the register of the open points; the page comes back with it. */
+  async function changePoints(change: () => ReturnType<TodayApi['addOpenPoint']>) {
+    const projectId = project.id
+    setError(null)
+    const result = await change()
+    if (live.current !== projectId) return
+    if (result.ok) show(result.value)
+    else setError(result.code)
+  }
+
   /** Hands a file of the project to the system; the row says so while the system takes it. */
   async function openFile(key: string, path: string) {
     const projectId = project.id
@@ -349,7 +392,10 @@ export function TodayView({
   const first = view?.now ?? []
   // What comes first is told once, above: the lists below go on without it.
   const firstKeys = new Set(first.map((entry) => entry.item.key))
-  const toDo = allItems.filter((item) => isToDo(item) && !firstKeys.has(item.key))
+  // The meetings of the day have their own place: the agenda, in the order they are held.
+  const toDo = allItems.filter(
+    (item) => isToDo(item) && !firstKeys.has(item.key) && item.facts.kind !== 'meeting',
+  )
   const inGroup =
     focus.group === 'all' ? toDo : toDo.filter((item) => GROUP_OF[item.facts.kind] === focus.group)
   const shown = all ? inGroup : inGroup.slice(0, TODAY_LIMIT)
@@ -443,6 +489,7 @@ export function TodayView({
     },
   ]
 
+  const prepByKey = new Map(view.prep.map((prep) => [prep.key, prep]))
   const alerts = view.items.filter((item) => item.band === 'alert')
   // A source that is a warning already says how old it is: it is not said twice.
   const warned = new Set(
@@ -473,7 +520,19 @@ export function TodayView({
               oldest.readAt ? dateTimeText(oldest.readAt) : text.freshnessNever,
             ),
           ]
-  const watch = view.items.filter((item) => item.band === 'watch' && !firstKeys.has(item.key))
+  // What the week already tells as critical is not told again as only watched.
+  const inWeek = new Set(
+    [...view.week.ongoing, ...view.week.coming].flatMap((entry) =>
+      entry.what.kind === 'signal' ? [entry.what.item.key] : [],
+    ),
+  )
+  const watch = view.items.filter(
+    (item) =>
+      item.band === 'watch' &&
+      !firstKeys.has(item.key) &&
+      !inWeek.has(item.key) &&
+      item.facts.kind !== 'risk',
+  )
   const groups = TODAY_GROUPS.map((group) => ({
     group,
     count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
@@ -546,6 +605,47 @@ export function TodayView({
         </div>
       )}
 
+      <TodayPoints
+        brief={view.points}
+        day={view.day}
+        closing={view.closing}
+        canJudge={canJudge}
+        judging={judging}
+        onClose={() => void closeDay()}
+        onAdd={(point) => void changePoints(() => api.addOpenPoint(project.id, point))}
+        onUpdate={(pointId, change) =>
+          void changePoints(() => api.updateOpenPoint(project.id, pointId, change))
+        }
+        onConfirm={(pointId, resolved) =>
+          void changePoints(() => api.confirmOpenPoint(project.id, pointId, resolved))
+        }
+        onOpenFile={(key, path) => void openFile(key, path)}
+      />
+
+      <TodayAgenda
+        agenda={view.agenda}
+        now={minute}
+        opening={opening}
+        onOpen={(key, path) => void openFile(key, path)}
+        summary={(meeting) => {
+          const prep = prepByKey.get(meetingKey(meeting))
+          return prep ? prepSummary(prep) : null
+        }}
+      >
+        {(meeting) => {
+          const prep = prepByKey.get(meetingKey(meeting))
+          return prep ? (
+            <TodayPrep
+              meeting={meeting}
+              prep={prep}
+              judging={judging}
+              onOpenFile={(key, path) => void openFile(key, path)}
+              onOpen={open}
+            />
+          ) : null
+        }}
+      </TodayAgenda>
+
       {first.length > 0 && (
         <section className="panel today-now" aria-label={text.now}>
           <h4 className="today-title" title={text.nowHint}>
@@ -586,6 +686,8 @@ export function TodayView({
           )}
         </section>
       )}
+
+      <TodayWeek week={view.week} onOpen={open} onOpenRisks={() => setShowRisks(true)} />
 
       <h4 className="today-title">
         {text.toDo}
@@ -665,6 +767,17 @@ export function TodayView({
                     )
                   }
                   onAskLater={() => setLater(later === selected.key ? null : selected.key)}
+                  onPoint={
+                    view.points.queued.some((entry) => entry.point.signalKey === selected.key)
+                      ? undefined
+                      : () =>
+                          void changePoints(() =>
+                            api.addOpenPoint(project.id, {
+                              title: signalText(selected).title,
+                              signal: { key: selected.key, kind: selected.facts.kind },
+                            }),
+                          )
+                  }
                 />
               ) : (
                 <p className="hint panel-body">{messages.detail.none}</p>
@@ -950,6 +1063,8 @@ type DetailProps = {
   onNotMine: () => void
   onDecide: (state: TodayDecisionChoice, until?: string | null) => void
   onAskLater: () => void
+  /** Opens a point from the signal; absent when one is already open on it. */
+  onPoint: (() => void) | undefined
 }
 
 /** The signal in view: why it is here, what it stands on, and what the PM can do about it. */
@@ -1062,6 +1177,16 @@ function SignalDetail(props: DetailProps) {
               onClick={props.onNotMine}
             >
               {text.notMine}
+            </button>
+          )}
+          {props.onPoint && (
+            <button
+              type="button"
+              className="quiet"
+              title={text.points.fromSignalHint}
+              onClick={props.onPoint}
+            >
+              {text.points.fromSignal}
             </button>
           )}
           <button type="button" className="quiet" onClick={() => props.onDecide('muted')}>

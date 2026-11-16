@@ -59,6 +59,11 @@ function threadLines(message: MailMessage): string[] {
   ]
 }
 
+/** What parts the people of a meeting in its header: no name and no address holds it. */
+const ATTENDEE_SEPARATOR = '; '
+const listOf = (value: string | undefined, separator: string): string[] =>
+  (value ?? '').split(separator).filter((entry) => entry !== '')
+
 /** The meeting of an invitation, and whether the invitation calls it or calls it off. */
 function meetingLines(message: MailMessage): string[] {
   const meeting = message.meeting
@@ -70,6 +75,15 @@ function meetingLines(message: MailMessage): string[] {
     `riunione-inizio: ${headerValue(meeting.start)}`,
     `riunione-fine: ${headerValue(meeting.end ?? '')}`,
     `riunione-luogo: ${headerValue(meeting.location)}`,
+    // Written only when the invitation says so: the file of a meeting held once stays as it was.
+    ...(meeting.recurrence ? [`riunione-ripete: ${headerValue(meeting.recurrence)}`] : []),
+    ...(meeting.excluded?.length
+      ? [`riunione-escluse: ${headerValue(meeting.excluded.join(' '))}`]
+      : []),
+    ...(meeting.occurrence ? [`riunione-occorrenza: ${headerValue(meeting.occurrence)}`] : []),
+    ...(meeting.attendees?.length
+      ? [`riunione-partecipanti: ${headerValue(meeting.attendees.join(ATTENDEE_SEPARATOR))}`]
+      : []),
   ]
 }
 
@@ -93,6 +107,12 @@ export type StoredMail = {
     start: string
     end: string | null
     location: string
+    /** How it repeats; null: once, or read before this was kept. */
+    recurrence: string | null
+    excluded: string[]
+    /** The time of the series this invitation changes; null: the series itself. */
+    occurrence: string | null
+    attendees: string[]
   } | null
   /** Whether what its author wrote holds a question. */
   asks: boolean
@@ -153,6 +173,10 @@ export function parseMailDocument(path: string, content: string): StoredMail | n
             start,
             end: header.get('riunione-fine') || null,
             location: header.get('riunione-luogo') ?? '',
+            recurrence: header.get('riunione-ripete') || null,
+            excluded: listOf(header.get('riunione-escluse'), ' '),
+            occurrence: header.get('riunione-occorrenza') || null,
+            attendees: listOf(header.get('riunione-partecipanti'), ATTENDEE_SEPARATOR),
           }
         : null,
     asks: lines

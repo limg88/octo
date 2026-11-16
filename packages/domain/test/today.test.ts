@@ -39,7 +39,9 @@ import {
   NO_RISKS,
   NO_TEAM,
   NO_TODAY_SETTINGS,
+  nextWorkday,
   nowItems,
+  occurrenceOn,
   opensAsDocument,
   orderToday,
   parseInvite,
@@ -603,6 +605,10 @@ describe('the mail of the project read back', () => {
       'riunione-inizio: "2026-11-16T14:00:00.000Z"',
       'riunione-fine: ""',
       'riunione-luogo: "Sala grande"',
+      'riunione-ripete: "FREQ=WEEKLY"',
+      'riunione-escluse: "2026-11-23T14:00:00.000Z 2026-11-30T14:00:00.000Z"',
+      'riunione-occorrenza: "2026-11-16T09:00:00.000Z"',
+      'riunione-partecipanti: "Carla Bianchi <carla@cliente.example>; luca@octo.example"',
       '---',
       '',
       '# R: Aurora: "budget"',
@@ -626,6 +632,10 @@ describe('the mail of the project read back', () => {
         start: '2026-11-16T14:00:00.000Z',
         end: null,
         location: 'Sala grande',
+        recurrence: 'FREQ=WEEKLY',
+        excluded: ['2026-11-23T14:00:00.000Z', '2026-11-30T14:00:00.000Z'],
+        occurrence: '2026-11-16T09:00:00.000Z',
+        attendees: ['Carla Bianchi <carla@cliente.example>', 'luca@octo.example'],
       },
       asks: true,
     })
@@ -725,6 +735,8 @@ describe('the mail of the project read back', () => {
   })
 })
 
+const ONCE = { recurrence: null, excluded: [], occurrence: null, attendees: [] }
+
 describe('the meetings of an invitation', () => {
   const calendar = (lines: string[]) =>
     [
@@ -753,6 +765,10 @@ describe('the meetings of an invitation', () => {
       start: '2026-11-16T14:00:00.000Z',
       end: '2026-11-16T15:00:00.000Z',
       location: 'Sala grande Piano 2',
+      recurrence: null,
+      excluded: [],
+      occurrence: null,
+      attendees: [],
     })
     // Universal time, and a whole day.
     expect(parseInvite(calendar(['UID:u', 'DTSTART:20260716T130000Z']))?.start).toBe(
@@ -779,6 +795,7 @@ describe('the meetings of an invitation', () => {
       start,
       end: null,
       location: '',
+      ...ONCE,
     })
     const mails = [
       stored({
@@ -809,14 +826,180 @@ describe('the meetings of an invitation', () => {
       stored({ id: '5', invite: 'REQUEST', meeting: meeting('domani', '2026-11-17T08:00:00Z') }),
       stored({ id: '6' }),
     ]
-    const today = meetingsOn(mails, '2026-11-16', romeDateString)
-    expect(today.map((mail) => mail.id)).toEqual(['2'])
+    const today = meetingsOn(mails, '2026-11-16')
+    expect(today.map((held) => held.path)).toEqual([mails[1]?.path])
     expect(meetingItems(today)[0]).toMatchObject({
       key: 'meeting:collaudo:2026-11-16T09:00:00Z',
       band: 'due',
       facts: { kind: 'meeting', subject: 'collaudo' },
     })
-    expect(meetingItems([stored({ id: '6' })])).toEqual([])
+    expect(meetingsOn([stored({ id: '6' })], '2026-11-16')).toEqual([])
+  })
+
+  it('reads how a meeting repeats, the times left out and who is invited', () => {
+    const meeting = parseInvite(
+      calendar([
+        'UID:sal',
+        'DTSTART;TZID=Europe/Rome:20261102T100000',
+        'RRULE:FREQ=WEEKLY;BYDAY=MO',
+        'EXDATE;TZID=Europe/Rome:20261109T100000,20261123T100000',
+        'RECURRENCE-ID;TZID=Europe/Rome:20261116T100000',
+        'ORGANIZER;CN="Rossi; Mario":mailto:Mario.Rossi@cliente.example',
+        'ATTENDEE;ROLE=REQ-PARTICIPANT;CN=Anna Bianchi:mailto:anna@octo.example',
+        'ATTENDEE;CN=anna@octo.example:mailto:anna@octo.example',
+        'ATTENDEE:mailto:luca@octo.example',
+        'ATTENDEE;CN=Sala riunioni:invalid',
+      ]),
+    )
+    expect(meeting).toMatchObject({
+      recurrence: 'FREQ=WEEKLY;BYDAY=MO',
+      excluded: ['2026-11-09T09:00:00.000Z', '2026-11-23T09:00:00.000Z'],
+      occurrence: '2026-11-16T09:00:00.000Z',
+      attendees: [
+        'Rossi, Mario <mario.rossi@cliente.example>',
+        'Anna Bianchi <anna@octo.example>',
+        'luca@octo.example',
+        'Sala riunioni',
+      ],
+    })
+  })
+
+  const series = (recurrence: string | null, start = '2026-11-02T09:00:00.000Z') => ({
+    start,
+    end: new Date(Date.parse(start) + 30 * 60 * 1000).toISOString(),
+    recurrence,
+    excluded: ['2026-11-23T09:00:00.000Z'],
+  })
+  const fallsOn = (recurrence: string | null, day: string, start?: string): boolean =>
+    occurrenceOn(series(recurrence, start), day) !== null
+
+  it('tells the days a meeting that repeats falls on, at the same hour of Italy', () => {
+    const weekly = series('FREQ=WEEKLY;BYDAY=MO,WE')
+    expect(occurrenceOn(weekly, '2026-11-16')).toEqual({
+      start: '2026-11-16T09:00:00.000Z',
+      end: '2026-11-16T09:30:00.000Z',
+    })
+    // In summer the same hour of Italy is another instant.
+    expect(occurrenceOn(weekly, '2027-06-07')?.start).toBe('2027-06-07T08:00:00.000Z')
+    expect(fallsOn('FREQ=WEEKLY;BYDAY=MO,WE', '2026-11-18')).toBe(true)
+    expect(fallsOn('FREQ=WEEKLY;BYDAY=MO,WE', '2026-11-17')).toBe(false)
+    // The time left out, a day before the first, the first itself.
+    expect(fallsOn('FREQ=WEEKLY;BYDAY=MO', '2026-11-23')).toBe(false)
+    expect(fallsOn('FREQ=WEEKLY;BYDAY=MO', '2026-10-26')).toBe(false)
+    expect(occurrenceOn(series(null), '2026-11-02')?.start).toBe('2026-11-02T09:00:00.000Z')
+    expect(fallsOn(null, '2026-11-09')).toBe(false)
+    // Without a weekday the rule keeps the one of the first time; every second week.
+    expect(fallsOn('FREQ=WEEKLY', '2026-11-09')).toBe(true)
+    expect(fallsOn('FREQ=WEEKLY;INTERVAL=2', '2026-11-09')).toBe(false)
+    expect(fallsOn('FREQ=WEEKLY;INTERVAL=2', '2026-11-16')).toBe(true)
+  })
+
+  it('follows daily, monthly and yearly rules, and where a series ends', () => {
+    expect(fallsOn('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', '2026-11-06')).toBe(true)
+    expect(fallsOn('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', '2026-11-07')).toBe(false)
+    expect(fallsOn('FREQ=DAILY;INTERVAL=3', '2026-11-05')).toBe(true)
+    expect(fallsOn('FREQ=DAILY;INTERVAL=3', '2026-11-04')).toBe(false)
+    // The count: the first and two more.
+    expect(fallsOn('FREQ=DAILY;COUNT=3', '2026-11-04')).toBe(true)
+    expect(fallsOn('FREQ=DAILY;COUNT=3', '2026-11-05')).toBe(false)
+    expect(fallsOn('FREQ=DAILY;COUNT=9999', '2040-01-01')).toBe(false)
+    // The last day, as a day and as an instant of universal time.
+    expect(fallsOn('FREQ=DAILY;UNTIL=20261110', '2026-11-10')).toBe(true)
+    expect(fallsOn('FREQ=DAILY;UNTIL=20261110', '2026-11-11')).toBe(false)
+    expect(fallsOn('FREQ=DAILY;UNTIL=20261110T225959Z', '2026-11-11')).toBe(false)
+    // The same day of the month, a day named, the last day, a weekday by its place.
+    expect(fallsOn('FREQ=MONTHLY', '2026-12-02')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY', '2026-12-03')).toBe(false)
+    expect(fallsOn('FREQ=MONTHLY;BYMONTHDAY=15', '2026-11-15')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-11-30')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY;BYDAY=1MO', '2026-12-07')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY;BYDAY=1MO', '2026-12-14')).toBe(false)
+    expect(fallsOn('FREQ=MONTHLY;BYDAY=-1FR', '2026-11-27')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY;BYDAY=MO;BYSETPOS=2', '2026-11-09')).toBe(true)
+    expect(fallsOn('FREQ=MONTHLY;INTERVAL=2;BYDAY=1MO', '2026-12-07')).toBe(false)
+    expect(fallsOn('FREQ=YEARLY', '2027-11-02')).toBe(true)
+    expect(fallsOn('FREQ=YEARLY', '2027-11-03')).toBe(false)
+    expect(fallsOn('FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=2', '2027-03-02')).toBe(true)
+    expect(fallsOn('FREQ=YEARLY;INTERVAL=2', '2027-11-02')).toBe(false)
+  })
+
+  it('holds a rule it cannot follow for its first time only', () => {
+    for (const rule of [
+      'FREQ=HOURLY',
+      'FREQ=WEEKLY;BYDAY=XX',
+      'FREQ=WEEKLY;INTERVAL=0',
+      'FREQ=WEEKLY;COUNT=0',
+      'FREQ=MONTHLY;BYDAY=MO,TU;BYSETPOS=1',
+      'FREQ=DAILY;UNTIL=ieri;;X',
+    ]) {
+      expect(fallsOn(rule, '2026-11-02')).toBe(true)
+    }
+    expect(fallsOn('FREQ=HOURLY', '2026-11-03')).toBe(false)
+    expect(fallsOn('FREQ=WEEKLY;BYDAY=XX', '2026-11-09')).toBe(false)
+    // An end that cannot be read is no end.
+    expect(fallsOn('FREQ=DAILY;UNTIL=ieri', '2026-11-03')).toBe(true)
+    expect(occurrenceOn({ start: '2026-11-02T09:00:00.000Z', end: null }, '2026-11-02')).toEqual({
+      start: '2026-11-02T09:00:00.000Z',
+      end: null,
+    })
+    expect(
+      occurrenceOn(
+        { start: '2026-11-02T09:00:00.000Z', end: null, recurrence: 'FREQ=DAILY' },
+        '2026-11-03',
+      ),
+    ).toEqual({ start: '2026-11-03T09:00:00.000Z', end: null })
+  })
+
+  it('holds a series on each of its days, and one time moved or called off alone', () => {
+    const weekly = {
+      uid: 'sal',
+      summary: 'SAL',
+      start: '2026-11-02T09:00:00.000Z',
+      end: '2026-11-02T10:00:00.000Z',
+      location: 'Teams',
+      ...ONCE,
+      recurrence: 'FREQ=WEEKLY;BYDAY=MO',
+      attendees: ['Mario Rossi <mario@cliente.example>'],
+    }
+    const moved = {
+      ...weekly,
+      recurrence: null,
+      start: '2026-11-17T14:00:00.000Z',
+      end: '2026-11-17T15:00:00.000Z',
+      occurrence: '2026-11-16T09:00:00.000Z',
+    }
+    const mails = [
+      stored({ id: 's', invite: 'REQUEST', meeting: weekly, date: '2026-10-20T09:00:00Z' }),
+      stored({ id: 'r', invite: 'REPLY', meeting: weekly, date: '2026-10-21T09:00:00Z' }),
+      stored({ id: 'm', invite: 'REQUEST', meeting: moved, date: '2026-11-10T09:00:00Z' }),
+      stored({
+        id: 'c',
+        invite: 'CANCEL',
+        meeting: { ...moved, start: weekly.start, occurrence: '2026-11-30T09:00:00.000Z' },
+        date: '2026-11-11T09:00:00Z',
+      }),
+    ]
+    expect(meetingsOn(mails, '2026-11-09')).toEqual([
+      {
+        uid: 'sal',
+        subject: 'SAL',
+        start: '2026-11-09T09:00:00.000Z',
+        end: '2026-11-09T10:00:00.000Z',
+        location: 'Teams',
+        attendees: ['Mario Rossi <mario@cliente.example>'],
+        repeats: true,
+        path: mails[0]?.path,
+        sentAt: '2026-10-20T09:00:00Z',
+      },
+    ])
+    // Moved from Monday to Tuesday afternoon; called off on the 30th.
+    expect(meetingsOn(mails, '2026-11-16')).toEqual([])
+    expect(meetingsOn(mails, '2026-11-17').map((held) => held.start)).toEqual([
+      '2026-11-17T14:00:00.000Z',
+    ])
+    expect(meetingsOn(mails, '2026-11-30')).toEqual([])
+    expect(nextWorkday('2026-11-13')).toBe('2026-11-16')
+    expect(nextWorkday('2026-11-16')).toBe('2026-11-17')
   })
 })
 

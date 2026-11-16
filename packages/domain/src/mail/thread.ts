@@ -1,5 +1,7 @@
 import { personKey } from '../hours/model.ts'
+import { romeDateString } from '../rome-time.ts'
 import type { StoredMail } from './document.ts'
+import { type MeetingTime, occurrenceOn } from './recurrence.ts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -164,23 +166,62 @@ export function mailThreads(
   }
 }
 
-/** The meetings the invitations of the project call on a day, each once, without those called off. */
-export function meetingsOn(
-  mails: readonly StoredMail[],
-  day: string,
-  dayOf: (instant: Date) => string,
-): StoredMail[] {
-  const lastByUid = new Map<string, StoredMail>()
+/** A meeting held on a day, as the invitations of the project tell it. */
+export type DayMeeting = {
+  uid: string
+  subject: string
+  start: string
+  end: string | null
+  location: string
+  attendees: string[]
+  /** Whether it is one time of a series. */
+  repeats: boolean
+  /** The file of the invitation that tells it. */
+  path: string
+  /** When that invitation was sent. */
+  sentAt: string
+}
+
+const dayMeeting = (mail: StoredMail, time: MeetingTime, repeats: boolean): DayMeeting => ({
+  uid: mail.meeting?.uid ?? '',
+  subject: mail.meeting?.summary || mail.subject,
+  start: time.start,
+  end: time.end,
+  location: mail.meeting?.location ?? '',
+  attendees: mail.meeting?.attendees ?? [],
+  repeats,
+  path: mail.path,
+  sentAt: mail.date,
+})
+
+/**
+ * The meetings the invitations of the project call on a day of Italy, each once, the earliest
+ * first. A later invitation with the same id replaces the one before; a series is held on every
+ * day its rule falls on; an invitation for one time of a series moves or calls off that time
+ * only.
+ */
+export function meetingsOn(mails: readonly StoredMail[], day: string): DayMeeting[] {
+  const series = new Map<string, StoredMail>()
+  /** By the id of the series and the day of the time changed. */
+  const changed = new Map<string, StoredMail>()
   const oldestFirst = [...mails].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
   for (const mail of oldestFirst) {
-    if (mail.meeting && mail.invite !== 'REPLY') lastByUid.set(mail.meeting.uid, mail)
+    if (!mail.meeting || mail.invite === 'REPLY') continue
+    const { uid, occurrence } = mail.meeting
+    if (occurrence) changed.set(`${uid}\n${romeDateString(new Date(occurrence))}`, mail)
+    else series.set(uid, mail)
   }
-  return [...lastByUid.values()]
-    .filter(
-      (mail) =>
-        mail.invite !== 'CANCEL' &&
-        mail.meeting !== null &&
-        dayOf(new Date(mail.meeting.start)) === day,
-    )
-    .sort((a, b) => Date.parse(a.meeting?.start ?? '') - Date.parse(b.meeting?.start ?? ''))
+  const held: DayMeeting[] = []
+  for (const mail of series.values()) {
+    if (mail.invite === 'CANCEL' || !mail.meeting) continue
+    if (changed.has(`${mail.meeting.uid}\n${day}`)) continue
+    const time = occurrenceOn(mail.meeting, day)
+    if (time) held.push(dayMeeting(mail, time, Boolean(mail.meeting.recurrence)))
+  }
+  for (const mail of changed.values()) {
+    if (mail.invite === 'CANCEL' || !mail.meeting) continue
+    if (romeDateString(new Date(mail.meeting.start)) !== day) continue
+    held.push(dayMeeting(mail, { start: mail.meeting.start, end: mail.meeting.end }, true))
+  }
+  return held.sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
 }

@@ -17,5 +17,19 @@ export function workdaysBetween(from: string, to: string): number {
   return count
 }
 
+/** The first working day after a day. */
+export function nextWorkday(day: string): string {
+  let at = utcDay(day).getTime() + DAY_MS
+  while (!isWorkday(new Date(at))) at += DAY_MS
+  return new Date(at).toISOString().slice(0, 10)
+}
+
+/** The last working day before a day. */
+export function previousWorkday(day: string): string {
+  let at = utcDay(day).getTime() - DAY_MS
+  while (!isWorkday(new Date(at))) at -= DAY_MS
+  return new Date(at).toISOString().slice(0, 10)
+}
+
 /** Days before the end of a sprint in which what is not ready for it is due. */
 export const SPRINT_ENDING_WORKDAYS = 2

@@ -170,6 +170,7 @@ const api: OctoApi = {
   saveOwnAddresses: (projectId, addresses) =>
     ipcRenderer.invoke(CHANNELS.todayAddresses, { projectId, addresses }),
   evaluateToday: (projectId, all) => ipcRenderer.invoke(CHANNELS.todayEvaluate, { projectId, all }),
+  closeToday: (projectId) => ipcRenderer.invoke(CHANNELS.todayClose, { projectId }),
   cancelEvaluateToday: (projectId) => ipcRenderer.invoke(CHANNELS.todayCancel, { projectId }),
   onTodayProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
@@ -188,6 +189,11 @@ const api: OctoApi = {
   },
   nextReading: () => ipcRenderer.invoke(CHANNELS.nextReading),
   focusWindow: () => ipcRenderer.invoke(CHANNELS.windowFocus),
+  addOpenPoint: (projectId, point) => ipcRenderer.invoke(CHANNELS.pointsAdd, { projectId, point }),
+  updateOpenPoint: (projectId, pointId, change) =>
+    ipcRenderer.invoke(CHANNELS.pointsUpdate, { projectId, pointId, change }),
+  confirmOpenPoint: (projectId, pointId, resolved) =>
+    ipcRenderer.invoke(CHANNELS.pointsConfirm, { projectId, pointId, resolved }),
   risks: (projectId) => ipcRenderer.invoke(CHANNELS.risksGet, { projectId }),
   proposeRisks: (projectId) => ipcRenderer.invoke(CHANNELS.risksPropose, { projectId }),
   acceptRisk: (projectId, candidateId, title) =>

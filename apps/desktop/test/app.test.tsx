@@ -128,6 +128,11 @@ const signedIn: SessionView = {
 const emptyToday: TodayView = {
   day: '2026-11-16',
   items: [],
+  agenda: { today: [], next: { day: '2026-11-17', meetings: [] } },
+  points: { since: '2026-11-13', queued: [], closed: [], toConfirm: [] },
+  prep: [],
+  closing: { unread: 0, key: '', at: null, model: null },
+  week: { until: '2026-11-22', ongoing: [], coming: [] },
   now: [],
   nowSummary: [],
   marks: {},
@@ -309,9 +314,13 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     setMailTurn: vi.fn(async () => ok(emptyToday)),
     saveOwnAddresses: vi.fn(async () => ok(emptyToday)),
     evaluateToday: vi.fn(async () => ok(emptyToday)),
+    closeToday: vi.fn(async () => ok(emptyToday)),
     cancelEvaluateToday: vi.fn(async () => ok(null)),
     onTodayProgress: () => () => {},
     todayOverview: vi.fn(async () => ok([])),
+    addOpenPoint: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    updateOpenPoint: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    confirmOpenPoint: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
     risks: vi.fn(async () => ok(NO_RISKS)),
     proposeRisks: vi.fn(async () => ok(NO_RISKS)),
     acceptRisk: vi.fn(async () => ok(NO_RISKS)),
@@ -410,6 +419,15 @@ describe('App', () => {
       tell({ ...entered, projectId: aurora.id, projectName: aurora.name } as never),
     )
     expect(notices).toHaveLength(1)
+    // A meeting about to start is told with how long is left and how much there is to bring.
+    for (const toBring of [0, 1, 3]) {
+      await act(async () => tell({ ...entered, meeting: { minutes: 15, toBring } } as never))
+    }
+    expect(notices.slice(1).map(({ body }) => body)).toEqual([
+      `${boreale.name} · fra 15 minuti`,
+      `${boreale.name} · fra 15 minuti · 1 cosa da portare`,
+      `${boreale.name} · fra 15 minuti · 3 cose da portare`,
+    ])
     // A click on the notice brings Octo in front, on the page of the day of that project.
     await openAsk()
     await act(async () => notices[0]?.click())

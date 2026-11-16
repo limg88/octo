@@ -254,6 +254,22 @@ describe('whose a recorded meeting is', () => {
     expect(meetingOwner({ ...kickoff, title: 'Sync' }, '', open)).toBe('borea')
   })
 
+  it('is of the project whose meeting that repeats falls at that time', () => {
+    // Called a month before, every Tuesday at the hour of the recording.
+    const weekly = {
+      uid: 'w',
+      start: '2026-10-13T08:30:00.000Z',
+      end: '2026-10-13T09:30:00.000Z',
+      recurrence: 'FREQ=WEEKLY;BYDAY=TU',
+    }
+    const sync = { ...kickoff, title: 'Sync' }
+    expect(meetingOwner(sync, '', [candidate('aurora', []), candidate('borea', [weekly])])).toBe(
+      'borea',
+    )
+    const skipped = { ...weekly, excluded: [kickoff.started.replace(/T.*/, 'T09:30:00.000Z')] }
+    expect(meetingOwner(sync, '', [candidate('borea', [skipped])])).toBeNull()
+  })
+
   it('is of the only project invited to the very event Verbale names, whatever its day', () => {
     // A meeting that repeats is invited once, with the day of its first time.
     const series = { uid: 'serie-1', start: '2026-10-06T09:00:00.000Z', end: null }

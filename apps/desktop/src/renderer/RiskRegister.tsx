@@ -1,5 +1,12 @@
 import type { AgentProgress } from '@octo/application'
-import type { Project, RiskRegister as Register, Risk, RiskCandidate } from '@octo/domain'
+import {
+  IMPORTANCES,
+  type Project,
+  type RiskRegister as Register,
+  type Risk,
+  type RiskCandidate,
+  type RiskChange,
+} from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
@@ -106,6 +113,7 @@ export function RiskRegister({ api, project, canJudge, onBack }: Props) {
             onOpenSource={(path) => void api.openEvidence(project.id, path)}
             onState={() => void apply(api.updateRisk(project.id, risk.id, { state: 'closed' }))}
             onNote={(note) => void apply(api.updateRisk(project.id, risk.id, { note }))}
+            onChange={(change) => void apply(api.updateRisk(project.id, risk.id, change))}
           />
         ))}
       </ul>
@@ -219,15 +227,47 @@ type RiskRowProps = {
   onOpenSource: (path: string) => void
   onState: () => void
   onNote: (note: string) => void
+  /** The day the risk is to be dealt with by, or how much it matters. */
+  onChange: (change: Pick<RiskChange, 'due' | 'severity'>) => void
 }
 
-function RiskRow({ risk, onOpenSource, onState, onNote }: RiskRowProps) {
+function RiskRow({ risk, onOpenSource, onState, onNote, onChange }: RiskRowProps) {
   const [note, setNote] = useState(risk.note)
   return (
     <li className="today-item">
       <p className="today-item-title">{risk.title}</p>
       <p className="hint">{text.since(italianDay(risk.since))}</p>
       {risk.source && <Source source={risk.source} onOpen={onOpenSource} />}
+      <div className="actions today-item-actions">
+        <label>
+          {text.severity}{' '}
+          <select
+            aria-label={`${text.severity}: ${risk.title}`}
+            value={risk.severity ?? ''}
+            onChange={(event) =>
+              onChange({
+                severity: IMPORTANCES.find((known) => known === event.target.value) ?? null,
+              })
+            }
+          >
+            <option value="">{text.noSeverity}</option>
+            {IMPORTANCES.map((severity) => (
+              <option key={severity} value={severity}>
+                {severity}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {text.due}{' '}
+          <input
+            type="date"
+            aria-label={`${text.due}: ${risk.title}`}
+            value={risk.due ?? ''}
+            onChange={(event) => onChange({ due: event.target.value || null })}
+          />
+        </label>
+      </div>
       <div className="actions today-item-actions">
         <input
           type="text"

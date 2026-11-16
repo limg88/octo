@@ -135,7 +135,13 @@ export function App({ api, notify = systemNotify }: Props) {
         if (watching) return
         notify(
           signalText(entered.item).title,
-          messages.today.notifyBody(entered.projectName),
+          entered.meeting
+            ? messages.today.prep.notifyBody(
+                entered.projectName,
+                entered.meeting.minutes,
+                entered.meeting.toBring,
+              )
+            : messages.today.notifyBody(entered.projectName),
           () => {
             void api.focusWindow()
             setOverview(false)

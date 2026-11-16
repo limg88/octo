@@ -43,10 +43,50 @@ function instantOf(value: string): string | null {
   return new Date(start + time).toISOString()
 }
 
+/** People of an invitation kept at most: a meeting of a whole company is not prepared by name. */
+export const MAX_INVITE_ATTENDEES = 50
+const PERSON_FIELDS: readonly string[] = ['ORGANIZER', 'ATTENDEE']
+const COMMON_NAME = /;CN=(?:"([^"]*)"|([^;:]*))/i
+const MAIL_ADDRESS = /mailto:([^\s;>]+)/i
+
+/** Who a line of the people of an event names: `Name <address>`, the address, or the name. */
+function personOf(line: string): string | null {
+  const name = COMMON_NAME.exec(line)
+  // A name never holds what parts the people of a meeting in the file of the mail.
+  const shown = unescaped(name?.[1] ?? name?.[2] ?? '').replaceAll(';', ',')
+  const address = (MAIL_ADDRESS.exec(line)?.[1] ?? '').toLowerCase()
+  if (address === '') return shown === '' ? null : shown
+  return shown === '' || shown.toLowerCase() === address ? address : `${shown} <${address}>`
+}
+
+const addressOf = (person: string): string =>
+  (/<([^>]+)>$/.exec(person)?.[1] ?? person).toLowerCase()
+
+/** The people of an event, each once, the one who calls it first. */
+function peopleOf(lines: readonly string[]): string[] {
+  const people = new Map<string, string>()
+  for (const field of PERSON_FIELDS) {
+    for (const line of lines) {
+      const name = (line.split(/[;:]/)[0] ?? '').toUpperCase()
+      const person = name === field ? personOf(line) : null
+      if (person !== null && !people.has(addressOf(person))) people.set(addressOf(person), person)
+    }
+  }
+  return [...people.values()].slice(0, MAX_INVITE_ATTENDEES)
+}
+
+/** The times a series leaves out: every `EXDATE` line, each with one or more moments. */
+function excludedOf(lines: readonly string[]): string[] {
+  return lines
+    .filter((line) => (line.split(/[;:]/)[0] ?? '').toUpperCase() === 'EXDATE')
+    .flatMap((line) => line.slice(line.indexOf(':') + 1).split(','))
+    .flatMap((moment) => instantOf(moment) ?? [])
+}
+
 /**
  * The meeting a calendar part invites to: the first event it holds. Null when it has none, or
- * when the event has no id or no start that can be read. A meeting that repeats is given as its
- * first time only.
+ * when the event has no id or no start that can be read. A meeting that repeats carries its
+ * rule: which days it falls on is told by `occurrenceOn`.
  */
 export function parseInvite(calendar: string): MailMeeting | null {
   const lines = unfolded(calendar)
@@ -54,7 +94,8 @@ export function parseInvite(calendar: string): MailMeeting | null {
   const close = lines.indexOf(EVENT_CLOSE, open + 1)
   if (open < 0 || close < 0) return null
   const fields = new Map<string, string>()
-  for (const line of lines.slice(open + 1, close)) {
+  const event = lines.slice(open + 1, close)
+  for (const line of event) {
     const colon = line.indexOf(':')
     if (colon < 0) continue
     // `DTSTART;TZID=Europe/Rome:…`: the name of the field ends at the first parameter.
@@ -70,5 +111,9 @@ export function parseInvite(calendar: string): MailMeeting | null {
     start,
     end: instantOf(fields.get('DTEND') ?? ''),
     location: unescaped(fields.get('LOCATION') ?? ''),
+    recurrence: (fields.get('RRULE') ?? '').trim() || null,
+    excluded: excludedOf(event),
+    occurrence: instantOf(fields.get('RECURRENCE-ID') ?? ''),
+    attendees: peopleOf(event),
   }
 }

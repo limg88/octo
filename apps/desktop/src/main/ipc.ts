@@ -17,6 +17,7 @@ import type {
   Hours,
   Meetings,
   Models,
+  OpenPoints,
   Progress,
   Projects,
   QuestionLog,
@@ -34,9 +35,11 @@ import {
   EXPORT_WARNING_HOURS,
   FEED_NAMES,
   FULL_ALLOCATION,
+  IMPORTANCES,
   isDomainError,
   MAIL_TURNS,
   MODEL_CHOICES,
+  OPEN_POINT_STATES,
   opensAsDocument,
   PHASES,
   pathInProject,
@@ -44,6 +47,7 @@ import {
   TEAM_SIDES,
   TEMPLATE_FORMATS,
   THEME_CHOICES,
+  TODAY_KINDS,
   type TodayKind,
   templateFormatOf,
   WAREHOUSE_TLS_MODES,
@@ -89,6 +93,7 @@ export type IpcDeps = {
   session: Session
   today: Today
   risks: Risks
+  points: OpenPoints
   /** When the sources of every project are read next by themselves; null when not known. */
   nextReading: () => string | null
 }
@@ -385,6 +390,27 @@ const todayMailTurnInput = byProject.extend({
 })
 const todayAddressesInput = byProject.extend({ addresses: z.array(rule).max(MAX_ADDRESSES) })
 const todayEvaluateInput = byProject.extend({ all: z.boolean() })
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const pointAddInput = byProject.extend({
+  point: z.object({
+    title: rule,
+    owner: rule.optional(),
+    due: day.nullable().optional(),
+    signal: z
+      .object({ key: z.string().max(MAX_QUESTION_LENGTH), kind: z.enum(TODAY_KINDS) })
+      .optional(),
+  }),
+})
+const pointUpdateInput = byProject.extend({
+  pointId: id,
+  change: z.object({
+    title: rule.optional(),
+    owner: rule.optional(),
+    due: day.nullable().optional(),
+    state: z.enum(OPEN_POINT_STATES).optional(),
+  }),
+})
+const pointConfirmInput = byProject.extend({ pointId: id, resolved: z.boolean() })
 const riskCandidateInput = byProject.extend({ candidateId: id })
 const riskAcceptInput = riskCandidateInput.extend({ title: rule })
 const riskAddInput = byProject.extend({ title: rule })
@@ -393,6 +419,8 @@ const riskUpdateInput = byProject.extend({
   change: z.object({
     state: z.enum(RISK_STATES).optional(),
     note: z.string().max(MAX_INPUT_LENGTH).optional(),
+    due: day.nullable().optional(),
+    severity: z.enum(IMPORTANCES).nullable().optional(),
   }),
 })
 
@@ -457,6 +485,12 @@ export function registerIpc(deps: IpcDeps): void {
       deps.today.evaluate(project, { all, signal, onProgress: tellProgress(projectId) }),
     )
   })
+  handle(CHANNELS.todayClose, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    return judging(projectId, (signal) =>
+      deps.today.closeDay(project, { signal, onProgress: tellProgress(projectId) }),
+    )
+  })
   handle(CHANNELS.todayCancel, byProject, async ({ projectId }) => {
     running.get(`today:${projectId}`)?.abort()
     return null
@@ -477,6 +511,31 @@ export function registerIpc(deps: IpcDeps): void {
     return null
   })
 
+  handle(CHANNELS.pointsAdd, pointAddInput, async ({ projectId, point }) => {
+    const project = await deps.projects.get(projectId)
+    await deps.points.add(project, {
+      title: point.title,
+      ...(point.owner === undefined ? {} : { owner: point.owner }),
+      ...(point.due === undefined ? {} : { due: point.due }),
+      ...(point.signal ? { signal: point.signal } : {}),
+    })
+    return deps.today.view(project)
+  })
+  handle(CHANNELS.pointsUpdate, pointUpdateInput, async ({ projectId, pointId, change }) => {
+    const project = await deps.projects.get(projectId)
+    await deps.points.update(project, pointId, {
+      ...(change.title === undefined ? {} : { title: change.title }),
+      ...(change.owner === undefined ? {} : { owner: change.owner }),
+      ...(change.due === undefined ? {} : { due: change.due }),
+      ...(change.state ? { state: change.state } : {}),
+    })
+    return deps.today.view(project)
+  })
+  handle(CHANNELS.pointsConfirm, pointConfirmInput, async ({ projectId, pointId, resolved }) => {
+    const project = await deps.projects.get(projectId)
+    await deps.points.confirm(project, pointId, resolved)
+    return deps.today.view(project)
+  })
   handle(CHANNELS.risksGet, byProject, async ({ projectId }) =>
     deps.risks.register(await deps.projects.get(projectId)),
   )
@@ -499,6 +558,8 @@ export function registerIpc(deps: IpcDeps): void {
     deps.risks.update(await deps.projects.get(projectId), riskId, {
       ...(change.state ? { state: change.state } : {}),
       ...(change.note !== undefined ? { note: change.note } : {}),
+      ...(change.due !== undefined ? { due: change.due } : {}),
+      ...(change.severity !== undefined ? { severity: change.severity } : {}),
     }),
   )
   handle(CHANNELS.assignmentGet, byProject, async ({ projectId }) =>

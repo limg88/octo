@@ -1,6 +1,6 @@
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { shortHash } from '../mail/document.ts'
-import type { TodayItem } from './model.ts'
+import { IMPORTANCES, type Importance, type TodayItem } from './model.ts'
 
 /** Where a risk comes from: a file of the project and the words in it. */
 export type RiskSource = { path: string; quote: string; verified: boolean }
@@ -18,6 +18,10 @@ export type Risk = {
   source: RiskSource | null
   /** What the PM adds: who follows it, what is being done. */
   note: string
+  /** The day it has to be dealt with by; null when it has none. */
+  due: string | null
+  /** How much it matters, as the PM says; null when not said. */
+  severity: Importance | null
 }
 
 /** A risk Claude proposes, with its source: it enters the register only when the PM takes it. */
@@ -98,6 +102,8 @@ export function acceptCandidate(
     state: 'open',
     source: candidate.source,
     note: '',
+    due: null,
+    severity: null,
   }
   return {
     ...register,
@@ -124,16 +130,31 @@ export function addRisk(register: RiskRegister, title: string, today: string): R
     ...register,
     risks: [
       ...register.risks,
-      { id, title: clean, since: today, state: 'open', source: null, note: '' },
+      {
+        id,
+        title: clean,
+        since: today,
+        state: 'open',
+        source: null,
+        note: '',
+        due: null,
+        severity: null,
+      },
     ],
   }
 }
 
-export function updateRisk(
-  register: RiskRegister,
-  id: string,
-  change: { state?: RiskState; note?: string },
-): RiskRegister {
+/** What the PM changes of a risk; a day or a weight given as null is taken away. */
+export type RiskChange = {
+  state?: RiskState
+  note?: string
+  due?: string | null
+  severity?: Importance | null
+}
+
+const RISK_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+export function updateRisk(register: RiskRegister, id: string, change: RiskChange): RiskRegister {
   return {
     ...register,
     risks: register.risks.map((risk) =>
@@ -143,6 +164,17 @@ export function updateRisk(
             ...(change.state ? { state: change.state } : {}),
             ...(change.note !== undefined
               ? { note: change.note.trim().slice(0, MAX_RISK_NOTE) }
+              : {}),
+            ...(change.due !== undefined
+              ? { due: change.due !== null && RISK_DAY.test(change.due) ? change.due : null }
+              : {}),
+            ...(change.severity !== undefined
+              ? {
+                  severity:
+                    change.severity !== null && IMPORTANCES.includes(change.severity)
+                      ? change.severity
+                      : null,
+                }
               : {}),
           }
         : risk,
@@ -173,6 +205,8 @@ export function risksMarkdown(register: RiskRegister): string {
     for (const risk of risks) {
       lines.push(`- **${risk.title}** — nel registro dal ${italianDay(risk.since)}`)
       if (risk.source) lines.push(`  - Fonte: \`${risk.source.path}\`: «${risk.source.quote}»`)
+      if (risk.severity) lines.push(`  - Gravità: ${risk.severity}`)
+      if (risk.due) lines.push(`  - Entro il ${italianDay(risk.due)}`)
       if (risk.note !== '') lines.push(`  - Nota del PM: ${risk.note}`)
     }
     lines.push('')

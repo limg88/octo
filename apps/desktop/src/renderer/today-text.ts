@@ -25,6 +25,11 @@ const HOUR = new Intl.DateTimeFormat('it-IT', {
   timeZone: 'Europe/Rome',
 })
 
+const WEEKDAY = new Intl.DateTimeFormat('it-IT', { weekday: 'short', timeZone: 'UTC' })
+/** The weekday of a day in short: `gio`. */
+export const weekdayText = (day: string): string => WEEKDAY.format(new Date(`${day}T00:00:00Z`))
+/** The hour of an instant in Italy: `10:00`. */
+export const hourText = (instant: string): string => HOUR.format(new Date(instant))
 const hours = (value: number): string => NUMBER.format(value)
 export const monthText = (month: string): string => MONTH.format(new Date(`${month}-01T00:00:00Z`))
 export const dayText = (day: string): string => DAY.format(new Date(`${day}T00:00:00Z`))

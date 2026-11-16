@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import {
   NO_EVALUATION,
+  type OpenPointStore,
   type RiskRegisterStore,
   type TodayEvaluation,
   type TodayStore,
@@ -11,9 +12,15 @@ import {
   IMPORTANCES,
   MAIL_ADDRESSEES,
   MAIL_TURNS,
+  NO_OPEN_POINTS,
   NO_RISKS,
   NO_TODAY_SETTINGS,
   OCTO_FOLDER,
+  OPEN_POINT_CLOSERS,
+  OPEN_POINT_ORIGINS,
+  OPEN_POINT_STATES,
+  type OpenPointRegister,
+  POINT_CHECK_REASONS,
   RISK_STATES,
   type RiskRegister,
   type TodayKind,
@@ -25,6 +32,7 @@ import { PROJECT_SETTINGS_FOLDER } from './project-files.ts'
 
 const TODAY_FILE = 'oggi.json'
 const RISKS_SETTINGS_FILE = 'rischi.json'
+const OPEN_POINTS_SETTINGS_FILE = 'open-point.json'
 /**
  * What Claude judged is kept in a hidden folder of its own: it is neither a setting of the PM
  * nor a source, and the agent's search skips hidden folders.
@@ -86,6 +94,17 @@ const evaluationSchema = z.object({
       }),
     )
     .default([]),
+  prep: z
+    .array(
+      z.object({
+        key: z.string(),
+        text: z.string(),
+        path: z.string(),
+        quote: z.string(),
+        verified: z.boolean(),
+      }),
+    )
+    .default([]),
 })
 
 const sourceSchema = z.object({ path: z.string(), quote: z.string(), verified: z.boolean() })
@@ -99,6 +118,8 @@ const registerSchema = z.object({
         state: z.enum(RISK_STATES).default('open'),
         source: sourceSchema.nullable().default(null),
         note: z.string().default(''),
+        due: z.string().nullable().default(null),
+        severity: z.enum(IMPORTANCES).nullable().default(null),
       }),
     )
     .default([]),
@@ -108,6 +129,51 @@ const registerSchema = z.object({
   dismissed: z.array(z.string()).default([]),
   proposedAt: z.string().nullable().default(null),
   proposedBy: z.string().nullable().default(null),
+})
+
+const pointsSchema = z.object({
+  points: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        owner: z.string().default(''),
+        openedOn: z.string(),
+        due: z.string().nullable().default(null),
+        state: z.enum(OPEN_POINT_STATES).default('open'),
+        origin: z.enum(OPEN_POINT_ORIGINS).default('pm'),
+        source: sourceSchema.nullable().default(null),
+        signalKey: z.string().nullable().default(null),
+        signalKind: z.string().nullable().default(null),
+        meeting: z.string().nullable().default(null),
+        closedOn: z.string().nullable().default(null),
+        closedBy: z.enum(OPEN_POINT_CLOSERS).nullable().default(null),
+        closing: sourceSchema.nullable().default(null),
+        history: z
+          .array(
+            z.object({
+              day: z.string(),
+              text: z.string(),
+              source: sourceSchema.nullable().default(null),
+            }),
+          )
+          .default([]),
+        check: z
+          .object({
+            day: z.string(),
+            why: z.enum(POINT_CHECK_REASONS),
+            text: z.string(),
+            meeting: z.string().nullable().default(null),
+          })
+          .nullable()
+          .default(null),
+      }),
+    )
+    .default([]),
+  readMeetings: z.array(z.string()).default([]),
+  closedDay: z.string().nullable().default(null),
+  closedAt: z.string().nullable().default(null),
+  closedBy: z.string().nullable().default(null),
 })
 
 /** What the PM decided on the page of the day and what Claude judged, in the project folder. */
@@ -156,6 +222,26 @@ export function createFsRiskRegisterStore(): RiskRegisterStore {
     async load(projectFolder): Promise<RiskRegister> {
       const parsed = registerSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
       return parsed.success ? parsed.data : NO_RISKS
+    },
+    save: (projectFolder, register) => writeJson(fileOf(projectFolder), register),
+  }
+}
+
+/** The register of the open points, kept with Octo's settings of the project. */
+export function createFsOpenPointStore(): OpenPointStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, OPEN_POINTS_SETTINGS_FILE)
+  return {
+    async load(projectFolder): Promise<OpenPointRegister> {
+      const parsed = pointsSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) return NO_OPEN_POINTS
+      return {
+        ...parsed.data,
+        points: parsed.data.points.map((point) => ({
+          ...point,
+          signalKind: point.signalKind as TodayKind | null,
+        })),
+      }
     },
     save: (projectFolder, register) => writeJson(fileOf(projectFolder), register),
   }

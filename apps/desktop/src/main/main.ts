@@ -10,6 +10,7 @@ import {
   createBackups,
   createDashboard,
   createDashboardAdvice,
+  createDayClosing,
   createDeliverables,
   createDocuments,
   createFeeding,
@@ -18,6 +19,7 @@ import {
   createHours,
   createMeetings,
   createModels,
+  createOpenPoints,
   createPreferences,
   createProgress,
   createProjects,
@@ -35,16 +37,26 @@ import {
   type Session,
   settingsOwnedBy,
   type Today,
+  type TodayView,
   TRACKER_REFRESH_MS,
   type TrackerSnapshots,
   type Updates,
 } from '@octo/application'
-import { backupFileName, DomainError, firstEntered, type Project } from '@octo/domain'
+import {
+  backupFileName,
+  DomainError,
+  firstEntered,
+  meetingKey,
+  meetingNotices,
+  type Project,
+  prepCount,
+} from '@octo/domain'
 import {
   createAdoTrackerReader,
   createAppleMailArchive,
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
+  createClaudeMeetingReader,
   createClaudeTodayJudge,
   createClaudeTrackerAdvisor,
   createConnectorFeedReader,
@@ -61,6 +73,7 @@ import {
   createFsMeetingExports,
   createFsMemoryWriter,
   createFsModelSettings,
+  createFsOpenPointStore,
   createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
@@ -131,6 +144,7 @@ const MAC = 'darwin'
 /** How often the sources of every project are read while the app is open. */
 const SYNC_INTERVAL_MS = 15 * 60 * 1000
 const FIRST_SYNC_DELAY_MS = 10 * 1000
+const MINUTE_MS = 60 * 1000
 /**
  * Demos and tests only: the seconds between two readings, so that a demo does not wait a quarter
  * of an hour to show what a reading brings.
@@ -211,12 +225,43 @@ async function tellEntered(
     project.id,
     view.now.map((entry) => entry.item.key),
   )
+  if (view.notify) announceMeetings(view, project, window)
   if (entered === null || window.isDestroyed()) return
   window.webContents.send(CHANNELS.todayEntered, {
     projectId: project.id,
     projectName: project.name,
     item: entered.item,
   })
+}
+
+/** The meetings the window was already told about before they start, by project and key. */
+const announced = new Set<string>()
+
+/**
+ * Tells the window, a quarter of an hour before, about each meeting of the day that starts
+ * before the next reading: once for a meeting, with how much there is to bring to it.
+ */
+function announceMeetings(view: TodayView, project: Project, window: BrowserWindow): void {
+  for (const { meeting, inMs } of meetingNotices(view.agenda.today, new Date(), syncIntervalMs)) {
+    const key = meetingKey(meeting)
+    const item = view.items.find((candidate) => candidate.key === key)
+    const mark = `${project.id}\n${key}`
+    if (!item || announced.has(mark)) continue
+    announced.add(mark)
+    const prep = view.prep.find((card) => card.key === key)
+    setTimeout(() => {
+      if (window.isDestroyed()) return
+      window.webContents.send(CHANNELS.todayEntered, {
+        projectId: project.id,
+        projectName: project.name,
+        item,
+        meeting: {
+          minutes: Math.max(1, Math.ceil((Date.parse(meeting.start) - Date.now()) / MINUTE_MS)),
+          toBring: prep ? prepCount(prep) : 0,
+        },
+      })
+    }, inMs)
+  }
 }
 
 /**
@@ -536,7 +581,22 @@ function start(seatEnv: Record<string, string | undefined>): void {
     models: chosenModels,
     liveSources,
   })
+  const points = createOpenPoints({ store: createFsOpenPointStore(), writer, clock })
+  const reader = createClaudeMeetingReader(claude)
+  const closing = createDayClosing({
+    points,
+    meetings,
+    files,
+    reader,
+    evidence,
+    clock,
+    models: chosenModels,
+    liveSources,
+  })
   const today = createToday({
+    points,
+    closing,
+    reader,
     hours,
     forecasts,
     dashboard,
@@ -562,6 +622,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     session,
     today,
     risks,
+    points,
     sources,
     feeds,
     meetings,

@@ -1,8 +1,17 @@
 import { phraseIn } from '../mail/match.ts'
+import { occurrenceOn } from '../mail/recurrence.ts'
+import { romeDateString } from '../rome-time.ts'
 import type { RecordedMeeting } from './model.ts'
 
 /** When a meeting of the calendar is: an invitation the mail of a project holds. */
-export type MeetingInvite = { uid: string; start: string; end: string | null }
+export type MeetingInvite = {
+  uid: string
+  start: string
+  end: string | null
+  /** How it repeats, when it does: it is then at that hour on every day of its rule. */
+  recurrence?: string | null
+  excluded?: readonly string[]
+}
 
 /** What a project offers to recognise a meeting as its own. */
 export type MeetingCandidate = {
@@ -36,9 +45,12 @@ export function meetingOwner(
 ): string | null {
   const from = Date.parse(meeting.started)
   const to = from + Math.max(meeting.durationSeconds, 1) * SECOND_MS
+  const day = romeDateString(new Date(meeting.started))
   const overlaps = (invite: MeetingInvite): boolean => {
-    const start = Date.parse(invite.start)
-    const end = invite.end === null ? start + DEFAULT_INVITE_MS : Date.parse(invite.end)
+    // A meeting that repeats is looked for on the day of the recording.
+    const time = occurrenceOn(invite, day) ?? invite
+    const start = Date.parse(time.start)
+    const end = time.end === null ? start + DEFAULT_INVITE_MS : Date.parse(time.end)
     return start < to && from < end
   }
   const called = candidates.filter((candidate) =>

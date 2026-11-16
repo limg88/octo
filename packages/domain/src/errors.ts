@@ -89,6 +89,7 @@ export const DOMAIN_ERROR_CODES = [
   'sign_in_cancelled',
   'today_decision_invalid',
   'risk_invalid',
+  'open_point_invalid',
 ] as const
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]

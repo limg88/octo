@@ -36,6 +36,14 @@ export interface MailMeeting {
   readonly start: string
   readonly end: string | null
   readonly location: string
+  /** How it repeats, as the invitation writes it (`FREQ=WEEKLY;BYDAY=MO`); absent or null: once. */
+  readonly recurrence?: string | null
+  /** The times of the series that are not held, as instants. */
+  readonly excluded?: readonly string[]
+  /** The time of the series this invitation changes, as an instant; absent or null: the series. */
+  readonly occurrence?: string | null
+  /** Who is invited, the one who calls it first: `Name <address>`, or the address alone. */
+  readonly attendees?: readonly string[]
 }
 
 /** A mail as the archive of the mail program lists it: where it is filed and when it arrived. */
