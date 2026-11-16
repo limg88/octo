@@ -477,19 +477,12 @@ try {
   await hoursRow('Costa Elena').getByText('Torna').waitFor()
   assert.ok(!jira.server.received.some((request) => request.method !== 'GET'))
 
-  // Demo 09: the monthly forecast filled on the spreadsheet of the administration.
+  // Demo 09 and 41: the monthly forecast of the project codes of the project, computed with no
+  // spreadsheet; the one of the administration is filled only on their rows.
   execFileSync('node', [`${root}demo/lib/fake-forecast.ts`, `${work}/Aurora`])
   const modelFile = `${work}/Aurora/Amministrazione/Previsionale avanzamenti.xlsx`
   const modelBefore = readFileSync(modelFile)
   await page.getByRole('tab', { name: 'Previsionale' }).click()
-  const setup09 = page.getByRole('region', { name: 'Il modello dell’amministrazione' })
-  await setup09.waitFor({ timeout: TIMEOUT_MS })
-  await page.waitForFunction(
-    () =>
-      document.querySelector('.settings-form input')?.value ===
-      'Amministrazione/Previsionale avanzamenti.xlsx',
-  )
-  await setup09.getByRole('button', { name: 'Salva' }).click()
   const forecastRow = (code) => page.locator('table.data tbody tr', { hasText: code })
   // The costs come from the rows of the timesheets: nobody typed them.
   await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
@@ -497,11 +490,14 @@ try {
   // How a row was computed is said under it, across the table.
   await page
     .locator('table.data tbody tr:has-text("PRJ000303") + tr.row-details')
-    .getByText('nessuna attività nel mese')
+    .getByText('canone: ordinato in 12 rate mensili')
     .waitFor()
+  // A fee is the order in equal monthly parts; a code of another PM is not shown.
+  await forecastRow('PRJ000303').getByText('1.250,00').waitFor()
+  assert.equal(await forecastRow('PRJ000404').count(), 0)
   await page.getByText(/manca la tariffa al giorno di Costa Elena \(120 ore/).waitFor()
   await page.getByText(/^16 ore del mese non ancora approvate/).waitFor()
-  await page.getByText(/codici che il modello non elenca: PRJ000999/).waitFor()
+  await page.getByText(/codici che non sono di questo progetto: PRJ000999/).waitFor()
   // The rate that is missing is typed where it is said to be missing.
   const elena = 'Costa Elena su PRJ000101'
   await page.getByLabel(`Tariffa al giorno, ${elena}`, { exact: true }).fill('400')

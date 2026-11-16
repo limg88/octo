@@ -1,5 +1,6 @@
 import type {
   FeedReader,
+  ProjectOrdersReader,
   TimesheetReader,
   TrackerHoursReader,
   TrackerSnapshotReader,
@@ -573,6 +574,29 @@ export function createWarehouseTimesheetReader(
           period,
         )
         return rows.map((row) => ({ ...row }))
+      } catch (error) {
+        throw failure(error)
+      }
+    },
+  }
+}
+
+/**
+ * The name and the ordered amount of the project codes of a NetSuite source, through the same
+ * read-only connector the feed uses and with the same credential.
+ */
+export function createWarehouseOrdersReader(
+  options: ConnectorFeedOptions = {},
+): ProjectOrdersReader {
+  return {
+    async read(config, secret) {
+      try {
+        const orders = await dwsiConnector.orders(warehouseContext(config, secret, options))
+        return orders.map((order) => ({
+          code: order.projectid,
+          description: order.name,
+          ordered: order.ordered,
+        }))
       } catch (error) {
         throw failure(error)
       }

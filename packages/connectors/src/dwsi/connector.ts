@@ -320,7 +320,24 @@ export type DwsiConnector = Connector<DwsiConfig, DwsiCursor> & {
    * what that person chooses from, whatever codes the source declares. None without an address.
    */
   assigned(ctx: ConnectorContext<DwsiConfig>): Promise<PerimeterOption[]>
+  /**
+   * The name and the ordered amount of the chosen projects bound to the PM who owns the source.
+   * Read only when the PM asks for them.
+   */
+  orders(ctx: ConnectorContext<DwsiConfig>): Promise<DwsiProjectOrder[]>
 }
+
+/** A project as its orders tell it: every line of its sales orders counts, closed or not. */
+export interface DwsiProjectOrder {
+  projectid: string
+  name: string
+  /** The sum of the amounts of the lines; null with no line that carries one. */
+  ordered: number | null
+}
+
+const viewNamed = (name: string): DwsiView => DWSI_VIEWS.find((v) => v.name === name) as DwsiView
+const PROJECT_VIEW = viewNamed('v_project')
+const ORDERS_VIEW = viewNamed('v_sales_order_all')
 
 export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiConnector {
   const open = options.open ?? openDwsiSession
@@ -414,6 +431,30 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
             if (row.projectid !== code) continue
             all.push(valuesOf(TIMESHEET_HOURS_VIEW, row) as unknown as DwsiTimesheetRow)
           }
+        }
+        return all
+      })
+    },
+
+    async orders(ctx) {
+      const chosen = codesOf(ctx)
+      return withSession(ctx, async (session) => {
+        const bound = await boundCodes(session, ctx, chosen)
+        if (bound.size === 0) throw new ConnectorError('source_not_authorized')
+        const all: DwsiProjectOrder[] = []
+        for (const code of chosen.filter((candidate) => bound.has(candidate))) {
+          ctx.signal.throwIfAborted()
+          const [project] = await readView(session, PROJECT_VIEW, code)
+          const amounts = (await readView(session, ORDERS_VIEW, code))
+            .map((line) => line.amount)
+            .filter((amount): amount is number | string => amount !== null && amount !== '')
+            .map(Number)
+            .filter(Number.isFinite)
+          all.push({
+            projectid: code,
+            name: typeof project?.name === 'string' ? project.name.trim() : '',
+            ordered: amounts.length === 0 ? null : amounts.reduce((sum, amount) => sum + amount, 0),
+          })
         }
         return all
       })

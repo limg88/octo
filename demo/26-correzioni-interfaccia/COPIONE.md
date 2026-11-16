@@ -31,7 +31,7 @@ Durata: 5 minuti. Otto difetti segnalati sull'app installata, uno per passo.
    Dimostra: le colonne tengono il loro posto; ogni tabella si ordina e si filtra allo stesso modo.
 
 5. **Previsionale: ciò che calcola Octo e ciò che scrivi tu.** Apri «Previsionale».
-   Atteso: l'intestazione ha due gruppi, «Calcolato da Octo» e «Da te, per questo mese». Nel primo i numeri, e sotto ogni riga «Come è calcolato»; nel secondo tre campi: «Ricavi corretti», «Da fatturare», «Tua nota». Sopra, una riga spiega che cosa fa ogni campo. «Altri dati» apre sotto la riga le ore degli esterni e i costi totali.
+   Atteso: l'intestazione ha due gruppi, «Calcolato da Octo» e «Da te, per questo mese». Nel primo i numeri, e sotto ogni riga «Come è calcolato»; nel secondo «Ricavi corretti», «Da fatturare» e «+ Aggiungi una nota», che apre una finestra per scriverla. Sopra, una riga spiega che cosa fa ogni campo. «Altri dati» apre sotto la riga le ore degli esterni e i costi totali.
    Dimostra: un campo non sta più sotto un numero senza dire che cos'è.
 
 6. **Tag in un elenco che si cerca.** Apri «Allineamento», poi «Che cosa confronto».

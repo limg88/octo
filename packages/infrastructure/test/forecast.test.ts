@@ -200,6 +200,29 @@ describe('the settings of the forecast on disk', () => {
     expect(loaded.months['2026-07']?.P1?.externals).toEqual([{ name: 'Studio Blu', hours: 8 }])
   })
 
+  it('keep how each code is sold, and read a code with costs at budget as a fixed price', async () => {
+    const store = createFsForecastSettings()
+    const projects = {
+      P1: { kind: 'fee' as const, description: 'Canone', ordered: 22500, feeMonths: 12 },
+    }
+    await store.save(folder, { ...DEFAULT_FORECAST_SETTINGS, projects })
+    expect((await store.load(folder)).projects).toEqual(projects)
+    const file = join(folder, '_octo', '.impostazioni', 'forecast.json')
+    const { writeFile } = await import('node:fs/promises')
+    // As kept before the way of selling was written: costs at budget meant a fixed price.
+    await writeFile(
+      file,
+      JSON.stringify({
+        projects: { P2: { ordered: 5000 } },
+        months: { '2026-06': { P1: { budgetCosts: 8000 }, P2: { budgetCosts: 100 } } },
+      }),
+    )
+    expect((await store.load(folder)).projects).toEqual({
+      P1: { kind: 'fixed_price', description: '', ordered: null, feeMonths: null },
+      P2: { kind: 'time_material', description: '', ordered: 5000, feeMonths: null },
+    })
+  })
+
   it('keep the order, the requests and the map of the form', async () => {
     const store = createFsProgressSettings()
     expect(await store.load(folder)).toEqual(DEFAULT_PROGRESS_SETTINGS)

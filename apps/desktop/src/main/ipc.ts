@@ -34,6 +34,7 @@ import {
   DomainError,
   EXPORT_WARNING_HOURS,
   FEED_NAMES,
+  FORECAST_KINDS,
   FULL_ALLOCATION,
   IMPORTANCES,
   isDomainError,
@@ -265,6 +266,17 @@ const money = z.number().nullable()
 const forecastSettingsInput = byProject.extend({
   settings: z.object({
     modelPath: rule,
+    projects: z
+      .record(
+        rule,
+        z.object({
+          kind: z.enum(FORECAST_KINDS),
+          description: z.string().max(MAX_INPUT_LENGTH),
+          ordered: money,
+          feeMonths: z.number().nullable(),
+        }),
+      )
+      .refine((projects) => Object.keys(projects).length <= MAX_RULES),
     hoursPerDay: z.number(),
     rates: z
       .array(z.object({ person: rule, code: rule.nullable(), ratePerDay: z.number() }))
@@ -1030,6 +1042,10 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.forecastCompile, forecastMonthInput, async (input) =>
     deps.forecasts.compile(await deps.projects.get(input.projectId), input.month),
+  )
+
+  handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>
+    deps.forecasts.readOrders(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.progressSettingsGet, byProject, async ({ projectId }) =>

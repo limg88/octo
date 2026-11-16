@@ -378,6 +378,22 @@ export interface TimesheetReader {
   ): Promise<Array<Record<string, unknown>>>
 }
 
+/** What the company's system knows of a project code: its name and what the client ordered. */
+export type ProjectOrder = {
+  code: string
+  description: string
+  /** The sum of the lines of its sales orders; null when it has none. */
+  ordered: number | null
+}
+
+/**
+ * The orders of the project codes of a NetSuite source, read through its read-only connector.
+ * Failures are DomainErrors with a `feed_*` code.
+ */
+export interface ProjectOrdersReader {
+  read(config: WarehouseFeedConfig, secret: string, signal: AbortSignal): Promise<ProjectOrder[]>
+}
+
 /** The model chosen for each task in a project, kept with Octo's settings of the project. */
 export interface ModelSettingsStore {
   load(projectFolder: string): Promise<ModelSettings>

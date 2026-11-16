@@ -105,6 +105,7 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.forecastView, { projectId, month }),
   compileForecast: (projectId, month) =>
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
+  readForecastOrders: (projectId) => ipcRenderer.invoke(CHANNELS.forecastOrdersRead, { projectId }),
   progressSettings: (projectId) => ipcRenderer.invoke(CHANNELS.progressSettingsGet, { projectId }),
   saveProgressSettings: (projectId, settings) =>
     ipcRenderer.invoke(CHANNELS.progressSettingsSave, { projectId, settings }),

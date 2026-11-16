@@ -5,10 +5,13 @@ import {
   DEFAULT_FORECAST_SETTINGS,
   type ForecastExternalRate,
   type ForecastModel,
+  type ForecastProject,
   type ForecastRate,
   type ForecastRowInputs,
   type ForecastSettings,
+  forecastFormulaAt,
   type HoursEntry,
+  NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
   readForecastModel,
   type SheetGrid,
@@ -65,13 +68,25 @@ const entry = (
   cost: number | null = hours * COST_PER_HOUR,
 ): HoursEntry => ({ person, day, hours, project, approved, id: null, cost })
 
+const CODES = ['P1', 'P2', 'P3']
+const project = (part: Partial<ForecastProject>): ForecastProject => ({
+  ...NO_FORECAST_PROJECT,
+  ...part,
+})
+const PROJECTS: Record<string, ForecastProject> = {
+  P1: project({ ordered: 100000, description: 'Sviluppo' }),
+  P2: project({ ordered: 50000 }),
+}
+
 const settingsWith = (
   rows: Record<string, Partial<ForecastRowInputs>> = {},
   rates: ForecastRate[] = [{ person: 'Rossi Mario', code: null, ratePerDay: 400 }],
   externals: ForecastExternalRate[] = [],
+  projects: Record<string, ForecastProject> = PROJECTS,
 ): ForecastSettings => ({
   ...DEFAULT_FORECAST_SETTINGS,
   modelPath: 'modello.xlsx',
+  projects,
   rates,
   externals,
   months: {
@@ -97,9 +112,9 @@ describe('the model of the forecast', () => {
       note: 'L',
     })
     expect(model.rows).toEqual([
-      { number: 2, code: 'P1', description: 'Sviluppo', ordered: 100000 },
-      { number: 3, code: 'P2', description: 'Sviluppo', ordered: 50000 },
-      { number: 4, code: 'P3', description: 'Sviluppo', ordered: null },
+      { number: 2, code: 'P1' },
+      { number: 3, code: 'P2' },
+      { number: 4, code: 'P3' },
     ])
   })
 
@@ -112,7 +127,7 @@ describe('the model of the forecast', () => {
         line(5, 'P9', ''),
       ],
     })
-    expect(model.rows).toEqual([{ number: 5, code: 'P9', description: 'Sviluppo', ordered: null }])
+    expect(model.rows).toEqual([{ number: 5, code: 'P9' }])
   })
 
   it('names the headings a sheet lacks', () => {
@@ -124,6 +139,14 @@ describe('the model of the forecast', () => {
     const none = readForecastModel({ rows: [{ number: 1, cells: [{ ref: 'A1', text: 'x' }] }] })
     expect(none.ok).toBe(false)
     expect(!none.ok && none.missing).toHaveLength(10)
+  })
+
+  it('puts the cells a formula names at a row of the sheet', () => {
+    const { columns } = modelOf()
+    expect(forecastFormulaAt('IFERROR(({revenue}-{internalCosts})/{revenue},"")', columns, 7)).toBe(
+      'IFERROR((G7-E7)/G7,"")',
+    )
+    expect(forecastFormulaAt('{ordered}/12+{unknown}', columns, 2)).toBe('D2/12+{unknown}')
   })
 })
 
@@ -141,8 +164,14 @@ describe('compiling the forecast', () => {
   ]
 
   it('prices the approved hours of the month as formulas that carry their value', () => {
-    const forecast = compileForecast(modelOf(), timesheet, settingsWith(), '2026-06')
+    const forecast = compileForecast(CODES, timesheet, settingsWith(), '2026-06')
     const [row] = forecast.rows
+    expect(row).toMatchObject({
+      code: 'P1',
+      description: 'Sviluppo',
+      revenueKind: 'time_material',
+      ordered: 100000,
+    })
     expect(row?.hours).toBe(36)
     expect(row?.cells.internalCosts).toEqual({
       kind: 'formula',
@@ -154,7 +183,7 @@ describe('compiling the forecast', () => {
     expect(row?.cells.quantity).toEqual({ kind: 'number', value: 4.5 })
     expect(row?.cells.marginMonth).toEqual({
       kind: 'formula',
-      formula: 'IFERROR((G2-E2-F2)/G2,"")',
+      formula: 'IFERROR(({revenue}-{internalCosts}-{externalCosts})/{revenue},"")',
       value: (600 - 700) / 600,
     })
     expect(row?.cells.marginEnd).toEqual({ kind: 'empty' })
@@ -172,7 +201,7 @@ describe('compiling the forecast', () => {
   })
 
   it('writes zeros and says so for a code with no activity', () => {
-    const forecast = compileForecast(modelOf(), timesheet, settingsWith(), '2026-06')
+    const forecast = compileForecast(CODES, timesheet, settingsWith(), '2026-06')
     const idle = forecast.rows[1]
     expect(idle?.note).toBe('nessuna attività nel mese')
     expect(idle?.values).toMatchObject({ internalCosts: 0, revenue: 0, marginMonth: null })
@@ -195,7 +224,7 @@ describe('compiling the forecast', () => {
         { name: 'Studio Blu', code: 'P2', costPerDay: 1, ratePerDay: 1 },
       ],
     )
-    const [row] = compileForecast(modelOf(), timesheet, settings, '2026-06').rows
+    const [row] = compileForecast(CODES, timesheet, settings, '2026-06').rows
     expect(row?.cells.externalCosts).toEqual({ kind: 'formula', formula: '2.5*300', value: 750 })
     expect(row?.cells.revenue).toEqual({
       kind: 'formula',
@@ -206,7 +235,7 @@ describe('compiling the forecast', () => {
     expect(row?.cells.toInvoice).toEqual({ kind: 'number', value: 12000 })
     expect(row?.cells.marginEnd).toEqual({
       kind: 'formula',
-      formula: 'IFERROR((D2-60000)/D2,"")',
+      formula: 'IFERROR(({ordered}-60000)/{ordered},"")',
       value: 0.4,
     })
     expect(row?.note).toMatch(/Blu Studio: 2,5 gg dichiarati · SAL di giugno$/)
@@ -214,24 +243,24 @@ describe('compiling the forecast', () => {
 
   it('adds the costs of the month when the total stops at the month before', () => {
     const settings = settingsWith({ P1: { totalCosts: 50000, totalCostsBeforeMonth: true } })
-    const [row] = compileForecast(modelOf(), timesheet, settings, '2026-06').rows
+    const [row] = compileForecast(CODES, timesheet, settings, '2026-06').rows
     expect(row?.cells.marginEnd).toEqual({
       kind: 'formula',
-      formula: 'IFERROR((D2-(50000+E2+F2))/D2,"")',
+      formula: 'IFERROR(({ordered}-(50000+{internalCosts}+{externalCosts}))/{ordered},"")',
       value: (100000 - 50700) / 100000,
     })
   })
 
   it('takes the revenue the PM decided instead of the computed one', () => {
     const settings = settingsWith({ P1: { revenue: 5000 }, P2: { revenue: 100 } })
-    const forecast = compileForecast(modelOf(), timesheet, settings, '2026-06')
+    const forecast = compileForecast(CODES, timesheet, settings, '2026-06')
     expect(forecast.rows[0]?.cells.revenue).toEqual({ kind: 'number', value: 5000 })
     expect(forecast.rows[0]?.note).toContain('ricavi indicati dal PM')
     expect(forecast.gaps.some((gap) => gap.kind === 'no_rate')).toBe(false)
     expect(forecast.rows[1]?.note).toBe('ricavi indicati dal PM')
   })
 
-  it('computes a fixed price as costs over the budget, on the ordered amount', () => {
+  it('computes a fixed price as the costs so far over the budget, on the ordered amount', () => {
     const settings = settingsWith(
       {
         P1: { budgetCosts: 8000, externals: [{ name: 'Blu', hours: 8 }] },
@@ -242,20 +271,98 @@ describe('compiling the forecast', () => {
         { name: 'Blu', code: 'P1', costPerDay: 100, ratePerDay: 9 },
         { name: 'Blu', code: 'P3', costPerDay: 100, ratePerDay: 0 },
       ],
+      {
+        P1: project({ kind: 'fixed_price', ordered: 100000 }),
+        P2: project({ kind: 'fixed_price', ordered: 50000 }),
+        P3: project({ kind: 'fixed_price' }),
+      },
     )
-    const forecast = compileForecast(modelOf(), timesheet, settings, '2026-06')
-    const [row, , unordered] = forecast.rows
+    const forecast = compileForecast(CODES, timesheet, settings, '2026-06')
+    const [row, unbudgeted, unordered] = forecast.rows
     expect(row?.cells.quantity).toEqual({
       kind: 'formula',
-      formula: '(E2+F2)/8000',
+      formula: 'MIN(1,(0+{internalCosts}+{externalCosts})/8000)',
       value: 0.1,
       percent: true,
     })
-    expect(row?.cells.revenue).toEqual({ kind: 'formula', formula: 'D2*H2', value: 10000 })
+    expect(row?.cells.revenue).toEqual({
+      kind: 'formula',
+      formula: '{ordered}*({quantity}-0)',
+      value: 10000,
+    })
     expect(row?.values.quantityIsShare).toBe(true)
-    expect(row?.note).toContain('avanzamento 10% = costi del mese / costi a budget 8.000')
+    expect(row?.note).toContain(
+      'avanzamento 10% (mese prima 0%) = costi fino al mese / costi a budget 8.000',
+    )
+    // Fixed price: nobody is asked a rate.
+    expect(forecast.gaps.some((gap) => gap.kind === 'no_rate')).toBe(false)
+    expect(unbudgeted?.values).toMatchObject({ revenue: 0, quantity: 0, quantityIsShare: true })
+    expect(unbudgeted?.cells.quantity).toEqual({ kind: 'empty' })
+    expect(forecast.gaps).toContainEqual({ kind: 'no_budget_costs', code: 'P2' })
     expect(unordered?.values.revenue).toBe(0)
     expect(forecast.gaps).toContainEqual({ kind: 'no_ordered', code: 'P3' })
+  })
+
+  it('counts for a fixed price the months before, with the budget written last', () => {
+    const months = [
+      entry('Rossi Mario', '2026-05-04', 16),
+      entry('Rossi Mario', '2026-05-05', 8, 'P1', false),
+      entry('Rossi Mario', '2026-06-03', 16),
+    ]
+    const fixed = { P1: project({ kind: 'fixed_price', ordered: 100000 }) }
+    const settings: ForecastSettings = {
+      ...settingsWith({}, [], [{ name: 'Blu', code: 'P1', costPerDay: 100, ratePerDay: 0 }], fixed),
+      months: {
+        '2026-04': { P1: { ...NO_ROW_INPUTS, budgetCosts: 99 } },
+        '2026-05': {
+          P1: { ...NO_ROW_INPUTS, budgetCosts: 4000, externals: [{ name: 'Blu', hours: 8 }] },
+        },
+        '2026-07': { P1: { ...NO_ROW_INPUTS, budgetCosts: 1 } },
+      },
+    }
+    const [row] = compileForecast(['p1 '], months, settings, '2026-06').rows
+    // May: 400 of hours and 100 of the external; June: 400 more, on 4.000 at budget.
+    expect(row?.cells.quantity).toMatchObject({
+      formula: 'MIN(1,(500+{internalCosts}+{externalCosts})/4000)',
+      percent: true,
+    })
+    expect(row?.values.quantity).toBeCloseTo(0.225)
+    expect(row?.cells.revenue).toMatchObject({ formula: '{ordered}*({quantity}-0.125)' })
+    expect(row?.values.revenue).toBeCloseTo(10000)
+
+    // Costs beyond the budget stop at the whole order.
+    const small = {
+      ...settings,
+      months: { '2026-05': { P1: { ...NO_ROW_INPUTS, budgetCosts: 800 } } },
+    }
+    const [capped] = compileForecast(['P1'], months, small, '2026-06').rows
+    expect(capped?.values.quantity).toBe(1)
+    expect(capped?.values.revenue).toBeCloseTo(50000)
+  })
+
+  it('spreads a fee in equal monthly parts, whatever was worked', () => {
+    const fees = {
+      P1: project({ kind: 'fee', ordered: 22500, feeMonths: 12 }),
+      P2: project({ kind: 'fee', ordered: 6000 }),
+      P3: project({ kind: 'fee', feeMonths: 12 }),
+    }
+    const forecast = compileForecast(CODES, timesheet, settingsWith({}, [], [], fees), '2026-06')
+    const [row, noMonths, unordered] = forecast.rows
+    expect(row?.cells.revenue).toEqual({ kind: 'formula', formula: '{ordered}/12', value: 1875 })
+    expect(row?.cells.quantity).toEqual({ kind: 'number', value: 1 / 12, percent: true })
+    expect(row?.values).toMatchObject({ internalCosts: 700, quantityIsShare: true })
+    expect(row?.note).toContain('canone: ordinato in 12 rate mensili')
+    expect(noMonths?.values.revenue).toBe(0)
+    expect(unordered?.note).toBe('canone: ordinato in 12 rate mensili')
+    expect(forecast.gaps).toContainEqual({ kind: 'no_fee_months', code: 'P2' })
+    expect(forecast.gaps).toContainEqual({ kind: 'no_ordered', code: 'P3' })
+    expect(forecast.gaps.some((gap) => gap.kind === 'no_rate')).toBe(false)
+
+    // What the PM wrote wins over the fee too.
+    const decided = settingsWith({ P1: { revenue: 2000 } }, [], [], fees)
+    const [own] = compileForecast(CODES, timesheet, decided, '2026-06').rows
+    expect(own?.cells.revenue).toEqual({ kind: 'number', value: 2000 })
+    expect(own?.values.quantity).toBeCloseTo(1 / 12)
   })
 
   it('does not guess between two rates that fit a name', () => {
@@ -263,7 +370,7 @@ describe('compiling the forecast', () => {
       { person: 'Rossi Mario', code: null, ratePerDay: 400 },
       { person: 'Rossi Luigi', code: null, ratePerDay: 300 },
     ]
-    const forecast = compileForecast(modelOf(), timesheet, settingsWith({}, rates), '2026-06')
+    const forecast = compileForecast(CODES, timesheet, settingsWith({}, rates), '2026-06')
     expect(forecast.gaps).toContainEqual({
       kind: 'no_rate',
       code: 'P1',
@@ -284,12 +391,12 @@ describe('rates by project code and externals', () => {
       { person: 'Rossi Mario', code: null, ratePerDay: 400 },
       { person: 'Mario Rossi', code: 'P2', ratePerDay: 630 },
     ]
-    const forecast = compileForecast(modelOf(), hours, settingsWith({}, rates), '2026-06')
+    const forecast = compileForecast(CODES, hours, settingsWith({}, rates), '2026-06')
     expect(forecast.rows[0]?.cells.revenue).toMatchObject({ formula: '1*400', value: 400 })
     expect(forecast.rows[1]?.cells.revenue).toMatchObject({ formula: '1*630', value: 630 })
     // A rate written for another code only is not this person's rate here.
     const onlyP2 = settingsWith({}, [{ person: 'Rossi Mario', code: 'P2', ratePerDay: 630 }])
-    expect(compileForecast(modelOf(), hours, onlyP2, '2026-06').gaps).toContainEqual({
+    expect(compileForecast(CODES, hours, onlyP2, '2026-06').gaps).toContainEqual({
       kind: 'no_rate',
       code: 'P1',
       person: 'Rossi Mario',
@@ -310,7 +417,7 @@ describe('rates by project code and externals', () => {
         id: null,
       },
     ]
-    const forecast = compileForecast(modelOf(), mixed, settingsWith(), '2026-06')
+    const forecast = compileForecast(CODES, mixed, settingsWith(), '2026-06')
     expect(forecast.rows[0]?.cells.internalCosts).toEqual({
       kind: 'formula',
       formula: '210.46',
@@ -329,7 +436,7 @@ describe('rates by project code and externals', () => {
     const settings = settingsWith({ P1: { externals: [{ name: 'Blu', hours: 16 }] } }, undefined, [
       { name: 'Blu', code: 'P2', costPerDay: 300, ratePerDay: 500 },
     ])
-    const forecast = compileForecast(modelOf(), [], settings, '2026-06')
+    const forecast = compileForecast(CODES, [], settings, '2026-06')
     expect(forecast.rows[0]?.values).toMatchObject({ externalCosts: 0, revenue: 0, quantity: 0 })
     expect(forecast.rows[0]?.note).toContain(
       'esterni senza costo e tariffa, fuori dal calcolo: Blu',
@@ -347,6 +454,12 @@ describe('the settings of the forecast', () => {
   it('keeps what is usable and drops the rest', () => {
     const clean = cleanForecastSettings({
       modelPath: '  modello.xlsx ',
+      projects: {
+        ' p1 ': { kind: 'fee', description: ' Canone ', ordered: -1, feeMonths: 1.5 },
+        P2: { kind: 'fixed_price', description: '', ordered: 5000, feeMonths: 12 },
+        ' ': NO_FORECAST_PROJECT,
+        P3: { ...NO_FORECAST_PROJECT, kind: 'altro' as ForecastProject['kind'] },
+      },
       hoursPerDay: 0,
       rates: [
         { person: ' Rossi Mario ', code: null, ratePerDay: -1 },
@@ -384,6 +497,11 @@ describe('the settings of the forecast', () => {
     })
     expect(clean).toEqual({
       modelPath: 'modello.xlsx',
+      projects: {
+        P1: { kind: 'fee', description: 'Canone', ordered: null, feeMonths: null },
+        P2: { kind: 'fixed_price', description: '', ordered: 5000, feeMonths: 12 },
+        P3: NO_FORECAST_PROJECT,
+      },
       hoursPerDay: 8,
       rates: [
         { person: 'Mario Rossi', code: null, ratePerDay: 400 },

@@ -8,6 +8,7 @@ import {
 } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import { type DataColumn, DataTable } from './DataTable.tsx'
+import { Dialog } from './Dialog.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { messages } from './messages.ts'
@@ -15,6 +16,18 @@ import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './Rows
 import type { Section } from './sections.ts'
 
 const text = messages.forecast
+
+/** The signs of the two things done to a note; the button says its name to who does not see them. */
+const PENCIL = (
+  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+  </svg>
+)
+const BIN = (
+  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />
+  </svg>
+)
 
 type Props = {
   view: View
@@ -36,8 +49,15 @@ const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
 /** How many columns Octo fills and how many the PM does: the two groups of the heading. */
 const COMPUTED_COLUMNS = 7
 const OWN_COLUMNS = 3
-const FIGURE_WIDTH = '92px'
-const INPUT_WIDTH = '112px'
+/**
+ * Each column as wide as its heading on one line: the room the note left goes to them, and a
+ * page narrower than their sum scrolls the table sideways.
+ */
+const CODE_WIDTH = '112px'
+const FIGURE_WIDTH = { internal: '104px', external: '104px', revenue: '92px', margin: '118px' }
+const QUANTITY_WIDTH = '100px'
+const INPUT_WIDTH = '116px'
+const NOTE_WIDTH = '140px'
 
 const AMOUNT_FIELDS = ['toInvoice', 'revenue', 'budgetCosts', 'totalCosts'] as const
 type AmountField = (typeof AMOUNT_FIELDS)[number]
@@ -105,6 +125,8 @@ export function ForecastMonth({
   const [problems, setProblems] = useState<Record<string, Problems>>({})
   /** The code whose less used data are open under its row. */
   const [open, setOpen] = useState<string | null>(null)
+  /** The note being written in its window, with the code it is of. */
+  const [noting, setNoting] = useState<{ code: string; typed: string } | null>(null)
   // What is typed follows what is saved: another month, or a save, starts from there.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the codes of the model change only with the view of the month.
   useEffect(() => {
@@ -123,8 +145,10 @@ export function ForecastMonth({
     (found) => found.externals.length + found.amounts.length > 0,
   )
 
-  function save() {
-    const found = Object.fromEntries(rows.map((row) => [row.code, problemsOf(draftFor(row.code))]))
+  /** Saves the month as typed; `changed` holds what was just decided and is not in the state yet. */
+  function save(changed: Record<string, Draft> = {}) {
+    const typed = (code: string): Draft => changed[code] ?? draftFor(code)
+    const found = Object.fromEntries(rows.map((row) => [row.code, problemsOf(typed(row.code))]))
     setProblems(found)
     // A figure that is not understood is told: saved as empty, it would change the forecast.
     const firstWrong = rows.find((row) => {
@@ -132,9 +156,15 @@ export function ForecastMonth({
       return of !== undefined && of.externals.length + of.amounts.length > 0
     })
     if (firstWrong) return setOpen(firstWrong.code)
-    void onSaveMonth(
-      Object.fromEntries(rows.map((row) => [row.code, inputsOf(draftFor(row.code))])),
-    )
+    void onSaveMonth(Object.fromEntries(rows.map((row) => [row.code, inputsOf(typed(row.code))])))
+  }
+
+  /** A note written or taken off in its window is kept at once, with the rest of the month. */
+  function saveNote(code: string, note: string) {
+    const next = { ...draftFor(code), note: note.trim() }
+    change(code, next)
+    setNoting(null)
+    save({ [code]: next })
   }
 
   const amountCell = (row: ForecastRow, name: AmountField, label: string) => (
@@ -155,13 +185,14 @@ export function ForecastMonth({
   const figure = <Value extends number | null>(
     key: string,
     label: string,
+    width: string,
     of: (row: ForecastRow) => Value,
     show: (value: Value) => string,
   ): DataColumn<ForecastRow> => ({
     key,
     label,
     kind: 'number',
-    width: FIGURE_WIDTH,
+    width,
     cell: (row) => show(of(row)),
     sort: (row) => of(row),
   })
@@ -169,10 +200,16 @@ export function ForecastMonth({
     {
       key: 'code',
       label: text.columnCode,
-      width: '128px',
+      width: CODE_WIDTH,
       cell: (row) => (
         <>
-          <span title={row.description}>{row.code}</span>
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the name of the project is read with the keyboard too. */}
+          <span className="tip" tabIndex={0} aria-describedby={`forecast-name-${row.code}`}>
+            {row.code}
+            <span role="tooltip" id={`forecast-name-${row.code}`}>
+              {text.projectName(row.description, text.kinds[row.revenueKind])}
+            </span>
+          </span>
           <button
             type="button"
             className="quiet cell-button"
@@ -187,22 +224,52 @@ export function ForecastMonth({
       sort: (row) => row.code,
       text: (row) => `${row.code} ${row.description}`,
     },
-    figure('internal', text.columnInternal, (row) => row.values.internalCosts, text.money),
-    figure('external', text.columnExternal, (row) => row.values.externalCosts, text.money),
-    figure('revenue', text.columnRevenue, (row) => row.values.revenue, text.money),
+    figure(
+      'internal',
+      text.columnInternal,
+      FIGURE_WIDTH.internal,
+      (row) => row.values.internalCosts,
+      text.money,
+    ),
+    figure(
+      'external',
+      text.columnExternal,
+      FIGURE_WIDTH.external,
+      (row) => row.values.externalCosts,
+      text.money,
+    ),
+    figure(
+      'revenue',
+      text.columnRevenue,
+      FIGURE_WIDTH.revenue,
+      (row) => row.values.revenue,
+      text.money,
+    ),
     {
       key: 'quantity',
       label: text.columnQuantity,
       kind: 'number',
-      width: FIGURE_WIDTH,
+      width: QUANTITY_WIDTH,
       cell: ({ values }) =>
         values.quantityIsShare
           ? text.share(values.quantity)
           : text.daysWithUnit(text.days(values.quantity)),
       sort: (row) => row.values.quantity,
     },
-    figure('marginMonth', text.columnMarginMonth, (row) => row.values.marginMonth, text.share),
-    figure('marginEnd', text.columnMarginEnd, (row) => row.values.marginEnd, text.share),
+    figure(
+      'marginMonth',
+      text.columnMarginMonth,
+      FIGURE_WIDTH.margin,
+      (row) => row.values.marginMonth,
+      text.share,
+    ),
+    figure(
+      'marginEnd',
+      text.columnMarginEnd,
+      FIGURE_WIDTH.margin,
+      (row) => row.values.marginEnd,
+      text.share,
+    ),
     {
       key: 'ownRevenue',
       label: text.columnOwnRevenue,
@@ -220,14 +287,50 @@ export function ForecastMonth({
     {
       key: 'ownNote',
       label: text.columnOwnNote,
-      cell: (row) => (
-        <input
-          type="text"
-          aria-label={text.forCode(text.note, row.code)}
-          value={draftFor(row.code).note}
-          onChange={(event) => change(row.code, { note: event.target.value })}
-        />
-      ),
+      width: NOTE_WIDTH,
+      cell: (row) => {
+        const { note } = draftFor(row.code)
+        const write = () => setNoting({ code: row.code, typed: note })
+        if (note === '') {
+          return (
+            <button
+              type="button"
+              className="quiet cell-button"
+              aria-label={text.forCode(text.addNote, row.code)}
+              onClick={write}
+            >
+              {text.addNote}
+            </button>
+          )
+        }
+        return (
+          <>
+            <p className="note-text" title={note}>
+              {note}
+            </p>
+            <span className="row-actions">
+              <button
+                type="button"
+                className="quiet icon-button"
+                aria-label={text.forCode(text.editNote, row.code)}
+                title={text.editNote}
+                onClick={write}
+              >
+                {PENCIL}
+              </button>
+              <button
+                type="button"
+                className="quiet icon-button"
+                aria-label={text.forCode(text.removeNote, row.code)}
+                title={text.removeNote}
+                onClick={() => saveNote(row.code, '')}
+              >
+                {BIN}
+              </button>
+            </span>
+          </>
+        )
+      },
     },
   ]
 
@@ -298,6 +401,44 @@ export function ForecastMonth({
           {wrong && <NotSaved text={messages.notSaved} />}
         </div>
       </form>
+      {noting && (
+        <Dialog title={text.noteTitle(noting.code)} onClose={() => setNoting(null)}>
+          <form
+            className="dialog-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              saveNote(noting.code, noting.typed)
+            }}
+          >
+            <label className="field">
+              {text.note}
+              <textarea
+                rows={6}
+                value={noting.typed}
+                onChange={(event) => setNoting({ ...noting, typed: event.target.value })}
+              />
+            </label>
+            <p className="hint">{text.noteHint}</p>
+            <footer className="dialog-footer">
+              {draftFor(noting.code).note !== '' && (
+                <button
+                  type="button"
+                  className="danger dialog-footer-start"
+                  onClick={() => saveNote(noting.code, '')}
+                >
+                  {text.removeNote}
+                </button>
+              )}
+              <button type="button" onClick={() => setNoting(null)}>
+                {messages.cancel}
+              </button>
+              <button type="submit" className="primary">
+                {text.noteSave}
+              </button>
+            </footer>
+          </form>
+        </Dialog>
+      )}
       {gaps}
     </>
   )
@@ -375,6 +516,10 @@ function gapText(gap: ForecastGap): string {
       return text.gap.no_total_costs(gap.code)
     case 'no_ordered':
       return text.gap.no_ordered(gap.code)
+    case 'no_budget_costs':
+      return text.gap.no_budget_costs(gap.code)
+    case 'no_fee_months':
+      return text.gap.no_fee_months(gap.code)
   }
 }
 
@@ -445,8 +590,8 @@ function Remedy({
   const [rate, setRate] = useState('')
   const [cost, setCost] = useState('')
   const [refused, setRefused] = useState(false)
-  if (gap.kind === 'no_ordered') return null
-  if (gap.kind === 'no_total_costs') {
+  if (gap.kind === 'no_ordered' || gap.kind === 'no_fee_months') return null
+  if (gap.kind === 'no_total_costs' || gap.kind === 'no_budget_costs') {
     return (
       <button type="button" className="quiet" onClick={() => onOpenCode(gap.code)}>
         {text.remedy.openCode(gap.code)}

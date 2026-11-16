@@ -95,6 +95,7 @@ import {
   createOidcIdentityProvider,
   createSignInConfig,
   createUpdateApplier,
+  createWarehouseOrdersReader,
   createWarehouseTimesheetReader,
   createWordRenderer,
   createWorkerTextExtractor,
@@ -569,6 +570,10 @@ function start(seatEnv: Record<string, string | undefined>): void {
     files,
     sheets,
     timesheet: (project) => hours.timesheet(project),
+    codes: async (project) => (await hoursSettings.load(project.folder)).projects,
+    sources: settings,
+    secrets,
+    orders: createWarehouseOrdersReader({ owner }),
     writer,
   })
   const judge = createClaudeTodayJudge(claude)

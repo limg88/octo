@@ -262,11 +262,15 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     forecastCandidates: vi.fn(async () => ok<string[]>([])),
     forecastView: vi.fn(async () => ({
       ok: false as const,
-      code: 'forecast_model_not_set' as const,
+      code: 'forecast_timesheet_not_set' as const,
     })),
     compileForecast: vi.fn(async () => ({
       ok: false as const,
       code: 'forecast_model_not_set' as const,
+    })),
+    readForecastOrders: vi.fn(async () => ({
+      ok: false as const,
+      code: 'source_not_configured' as const,
     })),
     hoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),
     saveHoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)),

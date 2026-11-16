@@ -1,11 +1,18 @@
 import type { ForecastFile, ForecastView as View } from '@octo/application'
-import type { ForecastSettings, Project } from '@octo/domain'
+import {
+  FORECAST_KINDS,
+  type ForecastKind,
+  type ForecastProject,
+  type ForecastSettings,
+  NO_FORECAST_PROJECT,
+  type Project,
+} from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { ForecastMonth } from './ForecastMonth.tsx'
-import { amountOf, amountText } from './forecast-text.ts'
+import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
 import { messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
@@ -20,6 +27,7 @@ type ForecastApi = Pick<
   | 'forecastCandidates'
   | 'forecastView'
   | 'compileForecast'
+  | 'readForecastOrders'
   | 'openEvidence'
   | 'chooseProjectPath'
 >
@@ -41,7 +49,10 @@ export function previousMonthOf(today: Date): string {
   return first.toISOString().slice(0, 7)
 }
 
-/** The monthly forecast of the administration, filled on its own spreadsheet. */
+/**
+ * The monthly forecast of the project codes of the project, computed from its timesheets; the
+ * spreadsheet of the administration is filled only when the PM points at one.
+ */
 export function ForecastView({ api, project, now = () => new Date(), onOpenSection }: Props) {
   const [settings, setSettings] = useState<ForecastSettings | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
@@ -51,6 +62,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   const savedNote = useSavedNote()
   const [compiling, setCompiling] = useState(false)
   const [file, setFile] = useState<ForecastFile | null>(null)
+  const [readingOrders, setReadingOrders] = useState(false)
 
   async function loadView(wanted: string) {
     setError(null)
@@ -72,9 +84,11 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     void api.forecastSettings(project.id).then(async (result) => {
       if (!result.ok) return setError(result.code)
       setSettings(result.value)
-      if (result.value.modelPath !== '') return loadView(month)
-      const found = await api.forecastCandidates(project.id)
-      if (found.ok) setCandidates(found.value)
+      if (result.value.modelPath === '') {
+        const found = await api.forecastCandidates(project.id)
+        if (found.ok) setCandidates(found.value)
+      }
+      await loadView(month)
     })
   }, [api, project.id])
 
@@ -85,7 +99,19 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
     savedNote.saved()
-    if (result.value.modelPath !== '') await loadView(month)
+    await loadView(month)
+  }
+
+  /** Name and ordered amount of the project codes, as the company's system has them now. */
+  async function readOrders() {
+    setReadingOrders(true)
+    setError(null)
+    const result = await api.readForecastOrders(project.id)
+    setReadingOrders(false)
+    if (!result.ok) return setError(result.code)
+    setSettings(result.value.settings)
+    savedNote.saved()
+    await loadView(month)
   }
 
   async function compile() {
@@ -115,31 +141,19 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     )
   }
 
-  if (settings.modelPath === '') {
-    return (
-      <div className="dashboard">
-        {error && <Failure code={error} onOpen={onOpenSection} />}
-        <section aria-label={text.setupTitle}>
-          <h3>{text.setupTitle}</h3>
-          <p className="hint">{text.setupIntro}</p>
-          <SettingsForm
-            settings={settings}
-            candidates={candidates}
-            codes={[]}
-            onSave={save}
-            onChooseModel={chooseModel}
-          />
-        </section>
-      </div>
-    )
-  }
-
   return (
     <div className="dashboard">
       {error && <Failure code={error} onOpen={onOpenSection} />}
       {savedNote.note}
       <details className="dashboard-settings">
         <summary>{text.settings}</summary>
+        <p className="hint">{text.setupIntro}</p>
+        <div className="actions">
+          <button type="button" disabled={readingOrders} onClick={() => void readOrders()}>
+            {text.readOrders}
+          </button>
+          <span className="hint">{readingOrders ? text.readingOrders : text.readOrdersHint}</span>
+        </div>
         <SettingsForm
           settings={settings}
           candidates={candidates}
@@ -158,7 +172,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
             void loadView(value)
           }}
         />
-        {view && view.forecast.rows.length > 0 && (
+        {view && view.forecast.rows.length > 0 && settings.modelPath !== '' && (
           <button
             type="button"
             className="primary"
@@ -184,6 +198,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
           >
             {text.open}
           </button>
+          {file.notInModel.length > 0 && <> {text.notInModel(file.notInModel.join(', '))}</>}
         </p>
       )}
       {view && (
@@ -228,15 +243,29 @@ const EXTERNAL_RATE_COLUMNS: RowsColumn<ExternalRateKey>[] = [
   { key: 'rate', label: text.columns.rate, kind: 'amount', width: '140px' },
 ]
 
+type ProjectDraft = { kind: ForecastKind; description: string; ordered: string; feeMonths: string }
 type SettingsDraft = {
   modelPath: string
+  projects: Record<string, ProjectDraft>
   hoursPerDay: string
   rates: Row<RateKey>[]
   externals: Row<ExternalRateKey>[]
 }
 
+const projectDraft = (project: ForecastProject): ProjectDraft => ({
+  kind: project.kind,
+  description: project.description,
+  ordered: amountText(project.ordered),
+  feeMonths: project.feeMonths === null ? '' : String(project.feeMonths),
+})
+const NO_PROJECT_DRAFT = projectDraft(NO_FORECAST_PROJECT)
+const isMonths = (typed: string): boolean => typed.trim() === '' || /^[1-9]\d*$/.test(typed.trim())
+
 const settingsDraft = (settings: ForecastSettings): SettingsDraft => ({
   modelPath: settings.modelPath,
+  projects: Object.fromEntries(
+    Object.entries(settings.projects).map(([code, project]) => [code, projectDraft(project)]),
+  ),
   hoursPerDay: String(settings.hoursPerDay),
   rates: orOneRow(
     settings.rates.map((rate) => ({
@@ -266,26 +295,38 @@ function SettingsForm({
 }: {
   settings: ForecastSettings
   candidates: string[]
-  /** The project codes the model lists: proposed where a code is typed. */
+  /** The project codes of the project: one line each, and proposed where a code is typed. */
   codes: string[]
   onSave: (settings: ForecastSettings) => Promise<void>
   onChooseModel: () => Promise<string | null>
 }) {
   const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraft(settings))
-  const [problems, setProblems] = useState<{ rates: string[]; externals: string[] } | null>(null)
-  useEffect(() => setDraft(settingsDraft(settings)), [settings])
-  // The only model found is proposed without asking.
-  useEffect(() => {
+  const [problems, setProblems] = useState<{
+    projects: string[]
+    rates: string[]
+    externals: string[]
+  } | null>(null)
+  const projectOf = (code: string): ProjectDraft => draft.projects[code] ?? NO_PROJECT_DRAFT
+  const changeProject = (code: string, part: Partial<ProjectDraft>) =>
     setDraft((current) => ({
       ...current,
-      modelPath: current.modelPath || (candidates.length === 1 ? (candidates[0] ?? '') : ''),
+      projects: { ...current.projects, [code]: { ...projectOf(code), ...part } },
     }))
-  }, [candidates])
+  // What is typed follows what is saved; with no model saved, the only one found is proposed.
+  useEffect(() => {
+    const saved = settingsDraft(settings)
+    const proposed = candidates.length === 1 ? (candidates[0] ?? '') : ''
+    setDraft({ ...saved, modelPath: saved.modelPath || proposed })
+  }, [settings, candidates])
   const withCodes = <Key extends string>(columns: RowsColumn<Key>[]): RowsColumn<Key>[] =>
     columns.map((column) => (column.key === 'code' ? { ...column, suggestions: codes } : column))
 
   function submit() {
     const found = {
+      projects: codes.flatMap((code) => {
+        const { ordered, feeMonths } = projectOf(code)
+        return amountField(ordered).wrong || !isMonths(feeMonths) ? [text.wrong.project(code)] : []
+      }),
       rates: wrongRows(
         draft.rates,
         (row) => filled(row.person) && isAmount(row.rate),
@@ -297,11 +338,24 @@ function SettingsForm({
         text.wrong.external,
       ),
     }
-    if (found.rates.length + found.externals.length > 0) return setProblems(found)
+    if (found.projects.length + found.rates.length + found.externals.length > 0) {
+      return setProblems(found)
+    }
     setProblems(null)
     void onSave({
       ...settings,
       modelPath: draft.modelPath,
+      projects: Object.fromEntries(
+        Object.entries(draft.projects).map(([code, project]) => [
+          code,
+          {
+            kind: project.kind,
+            description: project.description,
+            ordered: amountOf(project.ordered),
+            feeMonths: project.feeMonths.trim() === '' ? null : Number(project.feeMonths),
+          },
+        ]),
+      ),
       hoursPerDay: Number(draft.hoursPerDay),
       rates: draft.rates
         .filter((row) => !blankRow(row))
@@ -329,6 +383,73 @@ function SettingsForm({
         submit()
       }}
     >
+      {codes.length > 0 && (
+        <>
+          <h4>{text.projects}</h4>
+          <p className="hint">{text.projectsHint}</p>
+          <div className="table-wide">
+            <table aria-label={text.projects}>
+              <thead>
+                <tr>
+                  <th scope="col">{text.columnCode}</th>
+                  <th scope="col">{text.columnKind}</th>
+                  <th scope="col">{text.columnOrdered}</th>
+                  <th scope="col">{text.columnFeeMonths}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {codes.map((code) => (
+                  <tr key={code}>
+                    <th scope="row">
+                      {code}
+                      {projectOf(code).description !== '' && (
+                        <span className="hint"> {projectOf(code).description}</span>
+                      )}
+                    </th>
+                    <td>
+                      <select
+                        aria-label={text.forCode(text.columnKind, code)}
+                        value={projectOf(code).kind}
+                        onChange={(event) =>
+                          changeProject(code, { kind: event.target.value as ForecastKind })
+                        }
+                      >
+                        {FORECAST_KINDS.map((kind) => (
+                          <option key={kind} value={kind}>
+                            {text.kinds[kind]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="amount"
+                        aria-label={text.forCode(text.columnOrdered, code)}
+                        value={projectOf(code).ordered}
+                        onChange={(event) => changeProject(code, { ordered: event.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="amount"
+                        aria-label={text.forCode(text.columnFeeMonths, code)}
+                        disabled={projectOf(code).kind !== 'fee'}
+                        value={projectOf(code).feeMonths}
+                        onChange={(event) => changeProject(code, { feeMonths: event.target.value })}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <FieldProblems lines={problems?.projects ?? []} />
       <PathField
         label={text.modelPath}
         value={draft.modelPath}
@@ -372,10 +493,7 @@ function SettingsForm({
       />
       <FieldProblems lines={problems?.externals ?? []} />
       <div className="actions">
-        <button type="submit" disabled={draft.modelPath.trim() === ''}>
-          {text.save}
-        </button>
-        {draft.modelPath.trim() === '' && <span className="hint">{text.saveNeeds}</span>}
+        <button type="submit">{text.save}</button>
         {problems && <NotSaved text={messages.notSaved} />}
       </div>
     </form>

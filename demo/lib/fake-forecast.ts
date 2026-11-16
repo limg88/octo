@@ -1,8 +1,9 @@
-// Writes into a project folder what the monthly forecast needs: the spreadsheet the administration
-// sends (three project codes, one line each) and the daily rates of the people, all but
-// one. Usage: node demo/lib/fake-forecast.ts <project folder> [hours]
+// Writes into a project folder what the monthly forecast needs: the three project codes of the
+// project with how each is sold and what was ordered, the daily rates of the people, all but
+// one, and the spreadsheet the administration sends (those codes and one of another PM).
+// Usage: node demo/lib/fake-forecast.ts <project folder> [hours]
 // `hours` also says where the timesheets are, for a demo that starts from this screen.
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { forecastModelXlsx } from '../../packages/infrastructure/test/support/forecast-xlsx.ts'
 import { month } from './hours-data.ts'
@@ -35,6 +36,7 @@ writeFileSync(
         ordered: 40000,
       },
       { client: 'Cliente Aurora', code: 'PRJ000303', description: 'Assistenza', ordered: 15000 },
+      { client: 'Cliente Altro', code: 'PRJ000404', description: 'Di un altro PM', ordered: 9000 },
     ],
     monthName,
   ),
@@ -48,6 +50,11 @@ writeFileSync(
   JSON.stringify(
     {
       modelPath: '',
+      projects: {
+        PRJ000101: { kind: 'time_material', description: 'Sviluppo a giornate', ordered: 120000 },
+        PRJ000202: { kind: 'fixed_price', description: 'Migrazione a corpo', ordered: 40000 },
+        PRJ000303: { kind: 'fee', description: 'Assistenza', ordered: 15000, feeMonths: 12 },
+      },
       hoursPerDay: 8,
       rates: [
         { person: 'Rossi Mario', code: null, ratePerDay: 450 },
@@ -62,13 +69,19 @@ writeFileSync(
     1,
   ),
 )
-if (hours && !existsSync(join(settings, 'hours.json'))) {
+// The codes of the project are the ones «Ore» keeps: the forecast shows those and no other.
+const PROJECT_CODES = ['PRJ000101', 'PRJ000202', 'PRJ000303']
+const hoursFile = join(settings, 'hours.json')
+if (existsSync(hoursFile)) {
+  const kept = JSON.parse(readFileSync(hoursFile, 'utf8'))
+  writeFileSync(hoursFile, JSON.stringify({ ...kept, projects: PROJECT_CODES }))
+} else if (hours) {
   writeFileSync(
-    join(settings, 'hours.json'),
+    hoursFile,
     JSON.stringify({
       timesheetPath: 'dati/Timesheets',
       worklogPath: `dati/ore-tracker/worklog_${month}.csv`,
-      projects: ['PRJ000101'],
+      projects: PROJECT_CODES,
     }),
   )
 }

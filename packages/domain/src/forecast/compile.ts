@@ -1,13 +1,21 @@
 import { type HoursEntry, personKey } from '../hours/model.ts'
 import {
   type ForecastColumn,
-  type ForecastModel,
+  type ForecastExternal,
+  type ForecastExternalRate,
+  type ForecastKind,
   type ForecastRate,
   type ForecastSettings,
+  forecastCode,
+  NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
 } from './model.ts'
 
-/** What goes in a cell of the model. A formula carries the value it gives, so any reader shows it. */
+/**
+ * What goes in a cell of the model. A formula names the other cells of its row by their column
+ * between braces (`{revenue}`), whatever sheet it ends in, and carries the value it gives, so any
+ * reader shows it.
+ */
 export type ForecastCell =
   | {
       kind: 'formula'
@@ -39,16 +47,18 @@ export type ForecastGap =
   | { kind: 'no_external_rate'; code: string; person: string; hours: number }
   | { kind: 'no_total_costs'; code: string }
   | { kind: 'no_ordered'; code: string }
+  | { kind: 'no_budget_costs'; code: string }
+  | { kind: 'no_fee_months'; code: string }
 
 export type ForecastRow = {
-  number: number
   code: string
   description: string
+  revenueKind: ForecastKind
   ordered: number | null
   hours: number
   values: ForecastValues
   note: string
-  /** What is written, by column; the code and the ordered amount stay the model's. */
+  /** What a model is filled with, by column; the code and the ordered amount stay the model's. */
   cells: Partial<Record<ForecastColumn, ForecastCell>>
 }
 
@@ -56,9 +66,9 @@ export type Forecast = {
   month: string
   rows: ForecastRow[]
   gaps: ForecastGap[]
-  /** Hours of the month on the codes of the model that are not approved yet: left out. */
+  /** Hours of the month on the codes of the project that are not approved yet: left out. */
   notApprovedHours: number
-  /** Codes with approved hours in the month that the model does not list. */
+  /** Codes with approved hours in the month that are not of the project. */
   otherCodes: string[]
 }
 
@@ -66,7 +76,8 @@ export type ForecastTexts = {
   noActivity: string
   timesheet: (hours: number, days: number) => string
   external: (name: string, days: number) => string
-  progress: (share: number, budgetCosts: number) => string
+  progress: (share: number, before: number, budgetCosts: number) => string
+  fee: (months: number) => string
   revenueDecided: string
   left: (people: string[]) => string
   externalLeft: (people: string[]) => string
@@ -83,8 +94,9 @@ export const FORECAST_TEXTS: ForecastTexts = {
   external: (name, days) => `${name}: ${italian(days, 3)} gg dichiarati`,
   externalLeft: (people) =>
     `esterni senza costo e tariffa, fuori dal calcolo: ${people.join(', ')}`,
-  progress: (share, budgetCosts) =>
-    `avanzamento ${italian(share * 100, 2)}% = costi del mese / costi a budget ${italian(budgetCosts, 2)}`,
+  progress: (share, before, budgetCosts) =>
+    `avanzamento ${italian(share * 100, 2)}% (mese prima ${italian(before * 100, 2)}%) = costi fino al mese / costi a budget ${italian(budgetCosts, 2)}`,
+  fee: (months) => `canone: ordinato in ${months} rate mensili`,
   revenueDecided: 'ricavi indicati dal PM',
   left: (people) => `ore senza costo nei timesheet, fuori dai costi: ${people.join(', ')}`,
 }
@@ -97,6 +109,21 @@ const round = (value: number, decimals: number): number => Number(value.toFixed(
 const literal = (value: number): string => String(round(value, 6))
 
 const sum = (terms: readonly string[]): string => terms.join('+')
+
+const cell = (column: ForecastColumn): string => `{${column}}`
+const MONTH_COSTS = `${cell('internalCosts')}+${cell('externalCosts')}`
+const WHOLE = 1
+
+/** A formula of the forecast with its cells at a row of a sheet. */
+export function forecastFormulaAt(
+  formula: string,
+  columns: Readonly<Record<ForecastColumn, string>>,
+  row: number,
+): string {
+  return formula.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in columns ? `${columns[name as ForecastColumn]}${row}` : whole,
+  )
+}
 
 /**
  * The one among `named` that is this person, whatever the order of the name; a name written with
@@ -159,36 +186,182 @@ function hoursByPerson(entries: readonly HoursEntry[]): PersonHours[] {
   return [...people.values()].sort((a, b) => a.person.localeCompare(b.person))
 }
 
+type ExternalCosts = {
+  costs: number
+  days: number
+  /** Each external counted: the days, what a day costs and what it is sold for. */
+  counted: Array<{ name: string; days: number; costPerDay: number; ratePerDay: number }>
+  /** Those with no cost and rate for the code: left out. */
+  left: ForecastExternal[]
+}
+
+/** What the externals declared on a code cost, by the cost written once for the code. */
+function externalCosts(
+  declared: readonly ForecastExternal[],
+  rates: readonly ForecastExternalRate[],
+  code: string,
+  hoursPerDay: number,
+): ExternalCosts {
+  const ofCode = rates.filter((rate) => rate.code === code)
+  const result: ExternalCosts = { costs: 0, days: 0, counted: [], left: [] }
+  for (const external of declared) {
+    const rate = ofPerson(ofCode, (candidate) => candidate.name, external.name)
+    if (rate === null) {
+      result.left.push(external)
+      continue
+    }
+    const days = external.hours / hoursPerDay
+    result.costs += days * rate.costPerDay
+    result.days += days
+    result.counted.push({
+      name: external.name,
+      days,
+      costPerDay: rate.costPerDay,
+      ratePerDay: rate.ratePerDay,
+    })
+  }
+  return result
+}
+
+/** The costs at budget of a fixed price: the last written up to the month. */
+function budgetCostsAt(settings: ForecastSettings, code: string, month: string): number | null {
+  const written = Object.entries(settings.months)
+    .filter(([at, rows]) => at <= month && (rows[code]?.budgetCosts ?? null) !== null)
+    .sort(([a], [b]) => a.localeCompare(b))
+  return written.at(-1)?.[1][code]?.budgetCosts ?? null
+}
+
+/** What a code cost before a month: the approved hours with a cost, and the externals declared. */
+function costsBefore(
+  timesheet: readonly HoursEntry[],
+  settings: ForecastSettings,
+  code: string,
+  month: string,
+): number {
+  const internal = timesheet
+    .filter((entry) => entry.approved && entry.project === code && entry.day < `${month}-01`)
+    .reduce((total, entry) => total + (entry.cost ?? 0), 0)
+  const external = Object.entries(settings.months)
+    .filter(([at]) => at < month)
+    .reduce(
+      (total, [, rows]) =>
+        total +
+        externalCosts(rows[code]?.externals ?? [], settings.externals, code, settings.hoursPerDay)
+          .costs,
+      0,
+    )
+  return internal + external
+}
+
+/** The revenue of a month with how it is told: the cells, the quantity and the line of the note. */
+type Revenue = {
+  revenue: number
+  cell: ForecastCell
+  quantity: number
+  quantityCell: ForecastCell
+  quantityIsShare: boolean
+  notes: string[]
+  gaps: ForecastGap[]
+}
+
+const amountCell = (terms: readonly string[], value: number): ForecastCell =>
+  terms.length > 0 ? { kind: 'formula', formula: sum(terms), value } : { kind: 'number', value: 0 }
+
+const NO_REVENUE = { revenue: 0, cell: { kind: 'number', value: 0 } } as const
+const noShare = (code: string, gap: 'no_budget_costs' | 'no_fee_months'): Revenue => ({
+  ...NO_REVENUE,
+  quantity: 0,
+  quantityCell: { kind: 'empty' },
+  quantityIsShare: true,
+  notes: [],
+  gaps: [{ kind: gap, code }],
+})
+
+/** Fixed price: the share of the order the costs so far are of the costs at budget, less the share before. */
+function progressRevenue(
+  code: string,
+  ordered: number | null,
+  budgetCosts: number | null,
+  before: number,
+  monthCosts: number,
+  texts: ForecastTexts,
+): Revenue {
+  if (budgetCosts === null) return noShare(code, 'no_budget_costs')
+  const shareBefore = Math.min(WHOLE, before / budgetCosts)
+  const share = Math.min(WHOLE, (before + monthCosts) / budgetCosts)
+  const revenue = (ordered ?? 0) * (share - shareBefore)
+  return {
+    revenue,
+    cell: {
+      kind: 'formula',
+      formula: `${cell('ordered')}*(${cell('quantity')}-${literal(shareBefore)})`,
+      value: revenue,
+    },
+    quantity: share,
+    quantityCell: {
+      kind: 'formula',
+      formula: `MIN(${WHOLE},(${literal(before)}+${MONTH_COSTS})/${literal(budgetCosts)})`,
+      value: share,
+      percent: true,
+    },
+    quantityIsShare: true,
+    notes: [texts.progress(share, shareBefore, budgetCosts)],
+    gaps: ordered === null ? [{ kind: 'no_ordered', code }] : [],
+  }
+}
+
+/** A fee: the order in equal monthly parts, whatever was worked. */
+function feeRevenue(
+  code: string,
+  ordered: number | null,
+  months: number | null,
+  texts: ForecastTexts,
+): Revenue {
+  if (months === null) return noShare(code, 'no_fee_months')
+  const revenue = (ordered ?? 0) / months
+  const share = WHOLE / months
+  return {
+    revenue,
+    cell: { kind: 'formula', formula: `${cell('ordered')}/${months}`, value: revenue },
+    quantity: share,
+    quantityCell: { kind: 'number', value: share, percent: true },
+    quantityIsShare: true,
+    notes: [texts.fee(months)],
+    gaps: ordered === null ? [{ kind: 'no_ordered', code }] : [],
+  }
+}
+
 /**
- * Fills the monthly forecast: for each project code of the model, internal costs and revenue from
- * the approved timesheet hours and the rates, external costs from what the PM declared, margins as
- * formulas of the sheet. What has no source is left empty and listed as a gap.
+ * The monthly forecast of the project codes of a project: internal costs from the approved
+ * timesheet hours, external costs from what the PM declared, revenue by how each code is sold
+ * (days at a rate, progress of a fixed price, a monthly fee) unless the PM wrote it, margins as
+ * formulas. What has no source is left out and listed as a gap.
  */
 export function compileForecast(
-  model: ForecastModel,
+  projectCodes: readonly string[],
   timesheet: readonly HoursEntry[],
   settings: ForecastSettings,
   month: string,
   texts: ForecastTexts = FORECAST_TEXTS,
 ): Forecast {
   const inMonth = timesheet.filter((entry) => entry.day.startsWith(`${month}-`))
-  const codes = new Set(model.rows.map((row) => row.code))
+  const codes = [...new Set(projectCodes.map(forecastCode))].filter((code) => code !== '').sort()
   const gaps: ForecastGap[] = []
   const inputs = settings.months[month] ?? {}
 
-  const rows = model.rows.map((line): ForecastRow => {
-    const input = inputs[line.code] ?? NO_ROW_INPUTS
-    const ref = (column: ForecastColumn): string => `${model.columns[column]}${line.number}`
+  const rows = codes.map((code): ForecastRow => {
+    const input = inputs[code] ?? NO_ROW_INPUTS
+    const project = settings.projects[code] ?? NO_FORECAST_PROJECT
     const people = hoursByPerson(
-      inMonth.filter((entry) => entry.approved && entry.project === line.code),
+      inMonth.filter((entry) => entry.approved && entry.project === code),
     )
-    const sold = input.budgetCosts === null && input.revenue === null
+    const byDays = project.kind === 'time_material' && input.revenue === null
     const costTerms: string[] = []
     const revenueTerms: string[] = []
     const left: string[] = []
     const notes: string[] = []
     let internalCosts = 0
-    let revenue = 0
+    let daysRevenue = 0
     let days = 0
     let hours = 0
 
@@ -197,140 +370,128 @@ export function compileForecast(
       hours += personHours
       days += personDays
       if (hoursWithoutCost > 0) {
-        gaps.push({ kind: 'no_cost', code: line.code, person, hours: hoursWithoutCost })
+        gaps.push({ kind: 'no_cost', code, person, hours: hoursWithoutCost })
         left.push(person)
       }
       if (hoursWithoutCost < personHours) {
         costTerms.push(literal(round(cost, MONEY_DECIMALS)))
         internalCosts += cost
       }
-      if (!sold) continue
-      const rate = rateOf(settings.rates, person, line.code)
+      if (!byDays) continue
+      const rate = rateOf(settings.rates, person, code)
       if (rate === null) {
-        gaps.push({ kind: 'no_rate', code: line.code, person, hours: personHours })
+        gaps.push({ kind: 'no_rate', code, person, hours: personHours })
         continue
       }
       revenueTerms.push(`${literal(personDays)}*${literal(rate.ratePerDay)}`)
-      revenue += personDays * rate.ratePerDay
+      daysRevenue += personDays * rate.ratePerDay
     }
     if (people.length > 0) notes.push(texts.timesheet(hours, round(days, DAYS_DECIMALS)))
     if (left.length > 0) notes.push(texts.left(left))
 
-    const externalTerms: string[] = []
-    const externalLeft: string[] = []
-    let externalCosts = 0
-    for (const external of input.externals) {
-      const rate = ofPerson(
-        settings.externals.filter((candidate) => candidate.code === line.code),
-        (candidate) => candidate.name,
-        external.name,
-      )
-      if (rate === null) {
-        gaps.push({
-          kind: 'no_external_rate',
-          code: line.code,
-          person: external.name,
-          hours: external.hours,
-        })
-        externalLeft.push(external.name)
-        continue
-      }
-      const externalDays = external.hours / settings.hoursPerDay
-      externalTerms.push(`${literal(externalDays)}*${literal(rate.costPerDay)}`)
-      externalCosts += externalDays * rate.costPerDay
-      days += externalDays
-      if (sold) {
-        revenueTerms.push(`${literal(externalDays)}*${literal(rate.ratePerDay)}`)
-        revenue += externalDays * rate.ratePerDay
-      }
-      notes.push(texts.external(external.name, round(externalDays, DAYS_DECIMALS)))
+    const externals = externalCosts(input.externals, settings.externals, code, settings.hoursPerDay)
+    for (const external of externals.left) {
+      gaps.push({ kind: 'no_external_rate', code, person: external.name, hours: external.hours })
     }
-    if (externalLeft.length > 0) notes.push(texts.externalLeft(externalLeft))
+    for (const external of externals.counted) {
+      if (byDays) {
+        revenueTerms.push(`${literal(external.days)}*${literal(external.ratePerDay)}`)
+        daysRevenue += external.days * external.ratePerDay
+      }
+      notes.push(texts.external(external.name, round(external.days, DAYS_DECIMALS)))
+    }
+    if (externals.left.length > 0) {
+      notes.push(texts.externalLeft(externals.left.map((external) => external.name)))
+    }
+    days += externals.days
+    const externalTerms = externals.counted.map(
+      (external) => `${literal(external.days)}*${literal(external.costPerDay)}`,
+    )
+    const monthCosts = internalCosts + externals.costs
 
-    const amountCell = (terms: readonly string[], value: number): ForecastCell =>
-      terms.length > 0
-        ? { kind: 'formula', formula: sum(terms), value }
-        : { kind: 'number', value: 0 }
+    const daysQuantity = round(days, DAYS_DECIMALS)
+    const told: Revenue =
+      project.kind === 'fixed_price'
+        ? progressRevenue(
+            code,
+            project.ordered,
+            budgetCostsAt(settings, code, month),
+            costsBefore(timesheet, settings, code, month),
+            monthCosts,
+            texts,
+          )
+        : project.kind === 'fee'
+          ? feeRevenue(code, project.ordered, project.feeMonths, texts)
+          : {
+              revenue: daysRevenue,
+              cell: amountCell(revenueTerms, daysRevenue),
+              quantity: daysQuantity,
+              quantityCell: { kind: 'number', value: daysQuantity },
+              quantityIsShare: false,
+              notes: [],
+              gaps: [],
+            }
+    // What the PM wrote replaces the revenue however it is told; the quantity stays.
+    const decided = input.revenue !== null
+    const revenue = input.revenue ?? told.revenue
+    if (decided) notes.push(texts.revenueDecided)
+    else {
+      notes.push(...told.notes)
+      gaps.push(...told.gaps)
+    }
+
     const cells: ForecastRow['cells'] = {
       internalCosts: amountCell(costTerms, internalCosts),
-      externalCosts: amountCell(externalTerms, externalCosts),
+      externalCosts: amountCell(externalTerms, externals.costs),
+      revenue: decided ? { kind: 'number', value: revenue } : told.cell,
+      quantity: told.quantityCell,
     }
-    const costs = `${ref('internalCosts')}+${ref('externalCosts')}`
-    const monthCosts = internalCosts + externalCosts
-
-    let quantity = round(days, DAYS_DECIMALS)
-    if (input.revenue !== null) {
-      revenue = input.revenue
-      cells.revenue = { kind: 'number', value: revenue }
-      notes.push(texts.revenueDecided)
-    } else if (input.budgetCosts !== null) {
-      quantity = monthCosts / input.budgetCosts
-      revenue = (line.ordered ?? 0) * quantity
-      if (line.ordered === null) gaps.push({ kind: 'no_ordered', code: line.code })
-      cells.revenue = {
-        kind: 'formula',
-        formula: `${ref('ordered')}*${ref('quantity')}`,
-        value: revenue,
-      }
-      notes.push(texts.progress(quantity, input.budgetCosts))
-    } else {
-      cells.revenue = amountCell(revenueTerms, revenue)
-    }
-    const share = input.budgetCosts !== null
-    cells.quantity = share
-      ? {
-          kind: 'formula',
-          formula: `(${costs})/${literal(input.budgetCosts ?? 1)}`,
-          value: quantity,
-          percent: true,
-        }
-      : { kind: 'number', value: quantity }
 
     const marginMonth = revenue === 0 ? null : (revenue - monthCosts) / revenue
     cells.marginMonth = {
       kind: 'formula',
-      formula: `IFERROR((${ref('revenue')}-${ref('internalCosts')}-${ref('externalCosts')})/${ref('revenue')},"")`,
+      formula: `IFERROR((${cell('revenue')}-${cell('internalCosts')}-${cell('externalCosts')})/${cell('revenue')},"")`,
       value: marginMonth,
     }
 
     let marginEnd: number | null = null
     if (input.totalCosts === null) {
       cells.marginEnd = { kind: 'empty' }
-      if (hours > 0 || input.externals.length > 0)
-        gaps.push({ kind: 'no_total_costs', code: line.code })
+      if (hours > 0 || input.externals.length > 0) gaps.push({ kind: 'no_total_costs', code })
     } else {
       const total = input.totalCostsBeforeMonth
-        ? `(${literal(input.totalCosts)}+${costs})`
+        ? `(${literal(input.totalCosts)}+${MONTH_COSTS})`
         : literal(input.totalCosts)
       const totalValue = input.totalCosts + (input.totalCostsBeforeMonth ? monthCosts : 0)
-      marginEnd = line.ordered ? (line.ordered - totalValue) / line.ordered : null
+      marginEnd = project.ordered ? (project.ordered - totalValue) / project.ordered : null
       cells.marginEnd = {
         kind: 'formula',
-        formula: `IFERROR((${ref('ordered')}-${total})/${ref('ordered')},"")`,
+        formula: `IFERROR((${cell('ordered')}-${total})/${cell('ordered')},"")`,
         value: marginEnd,
       }
     }
 
     const toInvoice = input.toInvoice ?? 0
     cells.toInvoice = { kind: 'number', value: toInvoice }
-    const active = people.length > 0 || input.externals.length > 0 || input.revenue !== null
+    const active =
+      people.length > 0 || input.externals.length > 0 || decided || project.kind === 'fee'
     if (!active) notes.unshift(texts.noActivity)
     if (input.note !== '') notes.push(input.note)
     const note = notes.join(' · ')
     cells.note = { kind: 'text', value: note }
 
     return {
-      number: line.number,
-      code: line.code,
-      description: line.description,
-      ordered: line.ordered,
+      code,
+      description: project.description,
+      revenueKind: project.kind,
+      ordered: project.ordered,
       hours,
       values: {
         internalCosts,
-        externalCosts,
+        externalCosts: externals.costs,
         revenue,
-        quantity,
-        quantityIsShare: share,
+        quantity: told.quantity,
+        quantityIsShare: told.quantityIsShare,
         marginMonth,
         marginEnd,
         toInvoice,
@@ -340,11 +501,12 @@ export function compileForecast(
     }
   })
 
+  const ofProject = new Set(codes)
   const otherCodes = new Set<string>()
   let notApprovedHours = 0
   for (const entry of inMonth) {
     if (entry.project === null) continue
-    if (!codes.has(entry.project)) {
+    if (!ofProject.has(entry.project)) {
       if (entry.approved) otherCodes.add(entry.project)
     } else if (!entry.approved) notApprovedHours += entry.hours
   }

@@ -12,6 +12,7 @@ import type {
   FeedingStep,
   FeedView,
   ForecastFile,
+  ForecastOrdersRun,
   ForecastView,
   HoursCandidates,
   HoursView,
@@ -139,6 +140,7 @@ export const CHANNELS = {
   forecastCandidates: 'forecast:candidates',
   forecastView: 'forecast:view',
   forecastCompile: 'forecast:compile',
+  forecastOrdersRead: 'forecast:orders-read',
   progressSettingsGet: 'progress:settings:get',
   progressSettingsSave: 'progress:settings:save',
   progressCandidates: 'progress:candidates',
@@ -393,6 +395,8 @@ export type OctoApi = {
   forecastView(projectId: string, month: string): Promise<Result<ForecastView>>
   /** Writes a filled copy of the model for the month; the model itself is never touched. */
   compileForecast(projectId: string, month: string): Promise<Result<ForecastFile>>
+  /** Reads name and ordered amount of the project codes from the company's system. */
+  readForecastOrders(projectId: string): Promise<Result<ForecastOrdersRun>>
   progressSettings(projectId: string): Promise<Result<ProgressSettings>>
   saveProgressSettings(
     projectId: string,

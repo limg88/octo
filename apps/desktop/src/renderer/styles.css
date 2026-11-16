@@ -470,6 +470,23 @@ legend {
   justify-content: flex-end;
 }
 
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialog-form textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* What undoes stays apart from what confirms: at the start of the footer. */
+.dialog-footer-start {
+  margin-right: auto;
+}
+
 .dialog-choice {
   display: flex;
   flex-direction: column;
@@ -1991,10 +2008,83 @@ details.advanced[open] > summary {
   overflow-x: auto;
 }
 
-.forecast-month th,
-.forecast-month td {
+.forecast-month table.data th,
+.forecast-month table.data td {
   padding-left: 6px;
   padding-right: 6px;
+}
+
+.forecast-month .cell-button {
+  margin-left: 0;
+}
+
+/* With the note in its own window the figures have room: no heading breaks. */
+.forecast-month thead th,
+.forecast-month thead th button {
+  white-space: nowrap;
+}
+
+.forecast-month table.data {
+  min-width: 1120px;
+}
+
+/* The note of a row: two lines of it at most, the whole of it in its window. */
+.forecast-month .note-text {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.forecast-month .row-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* A button that is a sign only: square, with the look of the signs of the app. */
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  min-height: 26px;
+  padding: 0;
+}
+
+.icon-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A word that says more of itself when pointed at or reached with the keyboard. */
+.tip {
+  position: relative;
+  cursor: help;
+}
+
+.tip > [role="tooltip"] {
+  display: none;
+  position: absolute;
+  left: calc(100% + 8px);
+  top: -4px;
+  z-index: 2;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.tip:hover > [role="tooltip"],
+.tip:focus-visible > [role="tooltip"] {
+  display: block;
 }
 
 .forecast-month td input {

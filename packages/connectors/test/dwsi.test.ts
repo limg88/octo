@@ -967,4 +967,18 @@ describe('a DWSI sync', () => {
       dwsiConnector.timesheets(ctx([APOLLO]), { from: '2026-11-01', to: '2026-10-01' }),
     ).rejects.toThrow(TypeError)
   })
+
+  it('reads the name and the ordered amount of the bound projects', async () => {
+    const orders = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
+    // The ordered amount is the sum of the lines of the sales orders; none, it is not known.
+    expect(orders).toEqual([
+      { projectid: 'PRJ000101', name: 'Apollo', ordered: 98000 },
+      { projectid: 'PRJ000202', name: 'Borea', ordered: null },
+    ])
+    const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })
+    expect((await dwsiConnector.orders(asLuca([APOLLO, BOREA]))).map((o) => o.projectid)).toEqual([
+      'PRJ000202',
+    ])
+    expect(await codeOf(dwsiConnector.orders(asLuca([APOLLO])))).toBe('source_not_authorized')
+  })
 })

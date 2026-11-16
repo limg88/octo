@@ -2,8 +2,11 @@ import {
   DEFAULT_FORECAST_SETTINGS,
   type ForecastSettings,
   type HoursEntry,
+  NO_FORECAST_PROJECT,
+  NO_SOURCES,
   type Project,
   type SheetGrid,
+  type WarehouseFeedConfig,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
 import {
@@ -11,10 +14,11 @@ import {
   FORECAST_FOLDER,
   type ForecastSettingsStore,
   type ProjectFiles,
+  type ProjectOrder,
   type SheetWrite,
   type SpreadsheetModel,
 } from '../src/index.ts'
-import { memoryWriter } from './fakes.ts'
+import { memorySourceSettings, memoryVault, memoryWriter } from './fakes.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const HEADINGS = [
@@ -41,6 +45,17 @@ const grid: SheetGrid = {
     },
   ],
 }
+const warehouse: WarehouseFeedConfig = {
+  since: '2026-01-01',
+  targetFolder: '_octo/fonti/NetSuite',
+  host: 'dwsi.example.test',
+  port: 5432,
+  database: 'dwsi',
+  user: 'reader',
+  ownerEmail: 'pm@example.test',
+  projectCodes: ['P1'],
+  tls: 'verify_full',
+}
 const MODEL = new Uint8Array([1, 2, 3])
 const FILLED = new Uint8Array([9])
 const hours: HoursEntry[] = [
@@ -57,7 +72,14 @@ const hours: HoursEntry[] = [
 
 function setup(
   initial: Partial<ForecastSettings> = {},
-  options: { sheet?: SheetGrid; timesheet?: HoursEntry[] | null } = {},
+  options: {
+    sheet?: SheetGrid
+    timesheet?: HoursEntry[] | null
+    codes?: string[]
+    orders?: ProjectOrder[]
+    linked?: boolean
+    secret?: boolean
+  } = {},
 ) {
   let saved: ForecastSettings = { ...DEFAULT_FORECAST_SETTINGS, ...initial }
   const settings: ForecastSettingsStore = {
@@ -90,6 +112,8 @@ function setup(
       return FILLED
     },
   }
+  const secrets = memoryVault()
+  if (options.secret !== false) void secrets.set('p-1/dwsi', 'token')
   const written = new Map<string, Uint8Array>()
   const writer = {
     ...memoryWriter(),
@@ -102,6 +126,12 @@ function setup(
     files,
     sheets,
     timesheet: async () => (options.timesheet === undefined ? hours : options.timesheet),
+    codes: async () => options.codes ?? [],
+    sources: memorySourceSettings(
+      options.linked === false ? NO_SOURCES : { ...NO_SOURCES, dwsi: warehouse },
+    ),
+    secrets,
+    orders: { read: async () => options.orders ?? [] },
     writer,
   })
   return { forecasts, filled, written, saved: () => saved }
@@ -138,18 +168,35 @@ describe('the monthly forecast', () => {
     }
   })
 
-  it('shows the month without writing anything', async () => {
-    const { forecasts, written } = setup(configured)
+  it('shows the month of the codes of the project, with no model and without writing', async () => {
+    const { forecasts, written } = setup({ rates: configured.rates })
     const view = await forecasts.view(project, '2026-06')
-    expect(view.modelPath).toBe(configured.modelPath)
+    expect(view.modelPath).toBe('')
+    expect(view.forecast.rows.map((row) => row.code)).toEqual(['P1'])
     expect(view.forecast.rows[0]?.values).toMatchObject({ internalCosts: 200, revenue: 400 })
     expect(written.size).toBe(0)
   })
 
+  it('keeps to the codes said to be of the project, whatever the timesheets carry', async () => {
+    const other = { ...hours[0], project: 'P9', id: '2' } as HoursEntry
+    const options = { timesheet: [...hours, other] }
+    const all = await setup({}, options).forecasts.view(project, '2026-06')
+    expect(all.forecast.rows.map((row) => row.code)).toEqual(['P1', 'P9'])
+    const chosen = await setup({}, { ...options, codes: [' p9 ', 'P5'] }).forecasts.view(
+      project,
+      '2026-06',
+    )
+    expect(chosen.forecast.rows.map((row) => row.code)).toEqual(['P5', 'P9'])
+    expect(chosen.forecast.otherCodes).toEqual(['P1'])
+  })
+
   it('writes a filled copy under the folder of the month and never the model', async () => {
-    const { forecasts, filled, written } = setup(configured)
+    const { forecasts, filled, written } = setup(configured, { codes: ['P1', 'P7'] })
     const file = await forecasts.compile(project, '2026-06')
-    expect(file.path).toBe(`${FORECAST_FOLDER}/2026-06/Previsionale giugno.xlsx`)
+    expect(file).toEqual({
+      path: `${FORECAST_FOLDER}/2026-06/Previsionale giugno.xlsx`,
+      notInModel: ['P7'],
+    })
     expect(written.get(file.path)).toBe(FILLED)
     expect([...written.keys()]).toEqual([file.path])
     expect(filled[0]?.map((write) => write.ref).sort()).toEqual([
@@ -167,17 +214,42 @@ describe('the monthly forecast', () => {
       formula: '200',
       value: 200,
     })
+    // The formulas name the cells of the row the model keeps the code at.
+    expect(filled[0]?.find((write) => write.ref === 'G2')?.cell).toMatchObject({
+      formula: 'IFERROR((E2-C2-D2)/E2,"")',
+    })
+  })
+
+  it('reads name and ordered amount from the company system, keeping how a code is sold', async () => {
+    const { forecasts, saved } = setup(
+      { projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fee', feeMonths: 12 } } },
+      {
+        orders: [
+          { code: 'p1', description: 'Canone 2026', ordered: 22500 },
+          { code: 'P2', description: 'Senza ordini', ordered: null },
+        ],
+      },
+    )
+    const run = await forecasts.readOrders(project)
+    expect(run.codes).toEqual(['P1', 'P2'])
+    expect(saved().projects).toEqual({
+      P1: { kind: 'fee', description: 'Canone 2026', ordered: 22500, feeMonths: 12 },
+      P2: { ...NO_FORECAST_PROJECT, description: 'Senza ordini' },
+    })
+    expect(run.settings).toEqual(saved())
+    const view = await forecasts.view(project, '2026-06')
+    expect(view.forecast.rows[0]?.values.revenue).toBe(1875)
   })
 
   it('says what is missing before computing', async () => {
-    await expect(setup().forecasts.view(project, '2026-06')).rejects.toThrow(
+    await expect(setup().forecasts.compile(project, '2026-06')).rejects.toThrow(
       'forecast_model_not_set',
     )
     await expect(setup(configured).forecasts.view(project, 'giugno')).rejects.toThrow(
       'forecast_month_invalid',
     )
     await expect(
-      setup({ modelPath: 'altro.xlsx' }).forecasts.view(project, '2026-06'),
+      setup({ modelPath: 'altro.xlsx' }).forecasts.compile(project, '2026-06'),
     ).rejects.toThrow('forecast_model_missing')
     await expect(
       setup(configured, { sheet: { rows: [] } }).forecasts.compile(project, '2026-06'),
@@ -185,5 +257,11 @@ describe('the monthly forecast', () => {
     await expect(
       setup(configured, { timesheet: null }).forecasts.view(project, '2026-06'),
     ).rejects.toThrow('forecast_timesheet_not_set')
+    await expect(setup({}, { linked: false }).forecasts.readOrders(project)).rejects.toThrow(
+      'source_not_configured',
+    )
+    await expect(setup({}, { secret: false }).forecasts.readOrders(project)).rejects.toThrow(
+      'secret_missing',
+    )
   })
 })

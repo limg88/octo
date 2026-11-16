@@ -999,8 +999,20 @@ export const messages = {
       external: (n: number) =>
         `Esterno ${n}: servono nome, commessa, costo e tariffa scritti in cifre.`,
       hours: (n: number) => `Riga ${n}: servono il nome e le ore scritte in cifre.`,
+      project: (code: string) =>
+        `${code}: l’ordinato va scritto in cifre e i mesi del canone come numero intero.`,
     },
-    saveNeeds: 'Per salvare indica il file del modello.',
+    projects: 'Commesse del progetto',
+    projectsHint:
+      'Una riga per ogni codice NetSuite che in «Ore» hai indicato come di questo progetto. Il tipo dice come nascono i ricavi: a giornate (giorni per tariffa), a corpo (avanzamento sull’ordinato) o a canone (ordinato in rate mensili uguali). L’ordinato arriva da NetSuite e puoi correggerlo.',
+    columnKind: 'Tipo',
+    columnOrdered: 'Ordinato',
+    columnFeeMonths: 'Mesi del canone',
+    kinds: { time_material: 'A giornate (T&M)', fixed_price: 'A corpo', fee: 'Canone' },
+    readOrders: 'Leggi ordinato da NetSuite',
+    readingOrders: 'Leggo gli ordini…',
+    readOrdersHint: 'Nome e ordinato di ogni commessa: la somma delle righe dei suoi ordini.',
+    notInModel: (codes: string) => `Il modello non ha una riga per: ${codes}.`,
     monthData: 'Dati del mese',
     moreData: 'Altri dati',
     forCode: (label: string, code: string) => `${label}, ${code}`,
@@ -1010,10 +1022,9 @@ export const messages = {
       of: (person: string, code: string) => `${person} su ${code}`,
       openCode: (code: string) => `Scrivi i costi di ${code}`,
     },
-    setupTitle: 'Il modello dell’amministrazione',
     setupIntro:
-      'Compilo il previsionale mensile sul file Excel che l’amministrazione manda: una riga per codice di progetto. I costi interni vengono dal costo che NetSuite scrive su ogni riga di timesheet approvata; i ricavi dalle stesse ore e dalle tariffe al giorno che indichi qui. Scrivo una copia: il file originale non lo tocco.',
-    modelPath: 'Modello: file Excel dell’amministrazione',
+      'Calcolo il previsionale mensile delle sole commesse di questo progetto: i costi interni dal costo che NetSuite scrive su ogni riga di timesheet approvata, i ricavi secondo il tipo della commessa e le tariffe al giorno che indichi qui. Ricavi, importo da fatturare e nota li puoi sempre correggere mese per mese. Il file Excel dell’amministrazione è facoltativo: se lo indichi ne compilo una copia, solo sulle righe di queste commesse.',
+    modelPath: 'Modello (facoltativo): file Excel dell’amministrazione',
     hoursPerDay: 'Ore in una giornata',
     rates: 'Tariffe al giorno',
     ratesHint:
@@ -1038,8 +1049,9 @@ export const messages = {
     groupComputed: 'Calcolato da Octo',
     groupOwn: 'Da te, per questo mese',
     inputsHint:
-      'A sinistra ciò che Octo calcola (sotto ogni riga, come lo ha calcolato), a destra ciò che puoi aggiungere tu: tutto facoltativo. «Ricavi corretti» sostituisce i ricavi calcolati; vuoto, valgono quelli calcolati. «Da fatturare» e «Tua nota» finiscono nel modello così come li scrivi.',
-    noRows: 'Il modello non elenca codici di progetto.',
+      'A sinistra ciò che Octo calcola (sotto ogni riga, come lo ha calcolato), a destra ciò che puoi correggere tu: tutto facoltativo. «Ricavi corretti» sostituisce i ricavi calcolati; vuoto, valgono quelli calcolati. «Da fatturare» e «Tua nota» restano come li scrivi, anche nel modello Excel se lo compili.',
+    noRows:
+      'Nessuna commessa: indica in «Ore» i codici NetSuite di questo progetto e leggi i timesheet.',
     money: (value: number) =>
       value.toLocaleString('it-IT', {
         minimumFractionDigits: 2,
@@ -1065,23 +1077,37 @@ export const messages = {
       no_total_costs: (code: string) =>
         `${code}: mancano i costi totali previsti, il margine a fine progetto resta vuoto`,
       no_ordered: (code: string) =>
-        `${code}: nel modello manca l’ordinato, i ricavi da avanzamento restano a zero`,
+        `${code}: manca l’ordinato, i ricavi restano a zero. Leggilo da NetSuite o scrivilo nelle impostazioni.`,
+      no_budget_costs: (code: string) =>
+        `${code}: a corpo senza costi totali a budget, avanzamento e ricavi restano a zero`,
+      no_fee_months: (code: string) =>
+        `${code}: canone senza numero di mesi, i ricavi restano a zero. Scrivilo nelle impostazioni.`,
     },
     notApproved: (hours: string) =>
       `${hours} ore del mese non ancora approvate: restano fuori dal previsionale`,
     otherCodes: (codes: string) =>
-      `Nei timesheet del mese ci sono ore su codici che il modello non elenca: ${codes}`,
+      `Nei timesheet del mese ci sono ore approvate su codici che non sono di questo progetto: ${codes}`,
     inputsTitle: (code: string) => `Dati del mese per ${code}`,
     externals: 'Ore degli esterni nel mese',
     toInvoice: 'Da fatturare nel mese',
     revenue: 'Ricavi decisi da te',
-    budgetCosts: 'A corpo: costi totali a budget (l’avanzamento è costi del mese su questi)',
+    budgetCosts:
+      'A corpo: costi totali a budget (l’avanzamento è costi fino al mese su questi; vale anche per i mesi dopo)',
     totalCosts: 'Costi totali previsti del progetto (per il margine a fine progetto)',
     totalCostsBeforeMonth:
       'I costi totali si fermano al mese prima: aggiungi quelli di questo mese',
     note: 'Nota da aggiungere',
+    addNote: '+ Aggiungi una nota',
+    editNote: 'Modifica la nota',
+    noteTitle: (code: string) => `Nota per ${code}`,
+    removeNote: 'Elimina la nota',
+    noteHint:
+      'Finisce accanto a come Octo ha calcolato la riga, e nel modello Excel se lo compili. Salvandola salvi anche gli altri dati del mese che hai scritto.',
+    noteSave: 'Salva la nota',
+    projectName: (name: string, kind: string) =>
+      `${name === '' ? 'Nome non ancora letto da NetSuite' : name} · ${kind}`,
     saveInputs: 'Salva i dati del mese',
-    compile: 'Compila il modello',
+    compile: 'Compila il modello Excel',
     compiling: 'Scrivo il file…',
     compiled: (path: string) => `Modello compilato in ${path}. L’originale non è stato toccato.`,
     open: 'Apri il file',

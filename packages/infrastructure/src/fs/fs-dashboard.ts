@@ -25,11 +25,13 @@ import {
   DEFAULT_HOURS_SETTINGS,
   DEFAULT_PROGRESS_SETTINGS,
   DomainError,
+  FORECAST_KINDS,
   type ForecastExternal,
   type ForecastExternalRate,
   type ForecastSettings,
   isDomainError,
   NO_DECISIONS,
+  NO_FORECAST_PROJECT,
   PHASES,
   TEAM_SIDES,
 } from '@octo/domain'
@@ -135,6 +137,17 @@ const forecastRowSchema = z.object({
 })
 const forecastSchema = z.object({
   modelPath: z.string().default(DEFAULT_FORECAST_SETTINGS.modelPath),
+  projects: z
+    .record(
+      z.string(),
+      z.object({
+        kind: z.enum(FORECAST_KINDS).default(NO_FORECAST_PROJECT.kind),
+        description: z.string().default(''),
+        ordered: amount,
+        feeMonths: amount,
+      }),
+    )
+    .default({}),
   hoursPerDay: z.number().default(DEFAULT_FORECAST_SETTINGS.hoursPerDay),
   rates: z
     .array(
@@ -162,14 +175,19 @@ const forecastSchema = z.object({
  * The settings as the domain has them, from the file as it is or as it was kept before: a rate
  * without an amount was a cost only and is dropped (costs come from the timesheets now); an
  * external written by days with its cost and rate becomes hours, and its cost and rate are kept
- * once for the project code.
+ * once for the project code; a code with costs at budget and no way of selling written was a
+ * fixed price, and is kept as one.
  */
 function forecastSettingsOf(kept: z.infer<typeof forecastSchema>): ForecastSettings {
   const externals: ForecastExternalRate[] = [...kept.externals]
   const months: ForecastSettings['months'] = {}
+  const projects: ForecastSettings['projects'] = { ...kept.projects }
   for (const [month, rows] of Object.entries(kept.months)) {
     months[month] = {}
     for (const [code, row] of Object.entries(rows)) {
+      if (row.budgetCosts !== null && projects[code] === undefined) {
+        projects[code] = { ...NO_FORECAST_PROJECT, kind: 'fixed_price' }
+      }
       const hours: ForecastExternal[] = []
       for (const external of row.externals) {
         const { name, costPerDay, ratePerDay } = external
@@ -184,6 +202,7 @@ function forecastSettingsOf(kept: z.infer<typeof forecastSchema>): ForecastSetti
   }
   return {
     modelPath: kept.modelPath,
+    projects,
     hoursPerDay: kept.hoursPerDay,
     rates: kept.rates.flatMap((rate) =>
       rate.ratePerDay === null ? [] : [{ ...rate, ratePerDay: rate.ratePerDay }],

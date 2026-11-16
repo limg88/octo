@@ -48,3 +48,4 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 `pnpm e2e` segue gli stessi passi delle demo da 01 a 21 (la creazione del progetto nuovo no: la finestra di scelta della cartella è del sistema; nella 15 le finestre del sistema rispondono da sole) (nella 11 il modello è già scelto: la finestra di scelta del file è del sistema) nella finestra vera, senza intervento.
 
 `pnpm e2e:cruscotto` segue i passi delle demo 34 e 35 nella finestra vera, con l'Azure DevOps finto già collegato e la lettura periodica ogni 5 secondi.
+| 41 | Previsionale delle sole commesse del progetto: costi e ricavi calcolati da NetSuite e tariffe (a giornate, a corpo, canone), correzioni del PM, Excel facoltativo | `bash demo/41-previsionale-commesse/run.sh` | [COPIONE](41-previsionale-commesse/COPIONE.md) |
