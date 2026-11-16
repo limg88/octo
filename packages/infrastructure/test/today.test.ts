@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { NO_EVALUATION } from '@octo/application'
 import { type DomainError, NO_RISKS, NO_TODAY_SETTINGS, type SignInConfig } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -20,7 +21,7 @@ import { emlx } from './support/mail-folder.ts'
 const TENANT = '11111111-2222-3333-4444-555555555555'
 const CLIENT = 'octo-client'
 const PERSON = { id: 'u-1', name: 'Paola Verdi', email: 'pm@example.test' }
-const here = new URL('.', import.meta.url).pathname
+const here = fileURLToPath(new URL('.', import.meta.url))
 
 const codeOf = (promise: Promise<unknown>): Promise<string> =>
   promise.then(
