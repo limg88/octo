@@ -207,6 +207,9 @@ export const messages = {
     },
     muteOffer: (kind: string) =>
       `Hai messo da parte più volte segnalazioni di tipo «${kind}». Vuoi che non te le mostri più?`,
+    muteOffers:
+      'Hai messo da parte più volte segnalazioni di questi tipi. Scegli quelli che non vuoi più vedere:',
+    muteKindNamed: (kind: string) => `Non mostrare più: ${kind}`,
     muteKind: 'Non mostrarle più',
     mutedTitle: 'Tipi di segnalazione che non mostro',
     unmute: 'Mostra di nuovo',
