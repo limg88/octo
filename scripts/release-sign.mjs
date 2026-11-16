@@ -23,22 +23,26 @@ const publicFile =
   fileURLToPath(new URL('../apps/desktop/release-keys.json', import.meta.url))
 const gh = (...args) => execFileSync('gh', [...args, '--repo', repository], { encoding: 'utf8' })
 
-const passphrase =
-  process.env.OCTO_RELEASE_PASSPHRASE ?? (await askHidden('Passphrase della chiave: '))
-let key
-try {
-  key = createPrivateKey({ key: readFileSync(join(folder, `${name}.key`)), passphrase })
-} catch {
-  console.error(
-    `Non riesco ad aprire la chiave «${name}» in ${folder}: passphrase o file sbagliati.`,
-  )
-  process.exit(1)
-}
-// A release signed with a key the app does not carry would be refused by every installed Octo.
-const own = createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64')
-if (!JSON.parse(readFileSync(publicFile, 'utf8')).keys.includes(own)) {
-  console.error('Questa chiave non è fra quelle in apps/desktop/release-keys.json: non firmo.')
-  process.exit(1)
+/** Opens the key, asking its passphrase: only once there is something ready to sign. */
+async function openKey() {
+  const passphrase =
+    process.env.OCTO_RELEASE_PASSPHRASE ?? (await askHidden('Passphrase della chiave: '))
+  let key
+  try {
+    key = createPrivateKey({ key: readFileSync(join(folder, `${name}.key`)), passphrase })
+  } catch {
+    console.error(
+      `Non riesco ad aprire la chiave «${name}» in ${folder}: passphrase o file sbagliati.`,
+    )
+    process.exit(1)
+  }
+  // A release signed with a key the app does not carry would be refused by every installed Octo.
+  const own = createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64')
+  if (!JSON.parse(readFileSync(publicFile, 'utf8')).keys.includes(own)) {
+    console.error('Questa chiave non è fra quelle in apps/desktop/release-keys.json: non firmo.')
+    process.exit(1)
+  }
+  return key
 }
 
 /**
@@ -84,14 +88,20 @@ const work = mkdtempSync(join(tmpdir(), 'octo-firma-'))
 try {
   // Every file of the draft is brought down: what is signed is what was checked here, not what
   // the list says of itself.
+  console.log(
+    `Scarico i file di ${tag} per ricontrollarli: può volerci qualche minuto. Non scrivere nulla finché non chiedo la passphrase.`,
+  )
   gh('release', 'download', tag, '--dir', work)
+  console.log('Scaricati. Ricontrollo le impronte…')
   const list = readFileSync(join(work, CHECKSUMS))
   const problems = listProblems(list.toString('utf8'), work)
   if (problems.length > 0) {
     console.error(`Non firmo ${tag}:\n- ${problems.join('\n- ')}`)
     process.exit(1)
   }
-  console.log(`Firmo la lista dei file di ${tag}, ricontrollata qui:\n${list.toString('utf8')}`)
+  console.log(`La lista dei file di ${tag}, ricontrollata qui:\n${list.toString('utf8')}`)
+  // Asked last: nothing is typed while the script works in silence, where it would be seen.
+  const key = await openKey()
   writeFileSync(join(work, SIGNATURE), `${sign(null, list, key).toString('base64')}\n`)
   gh('release', 'upload', tag, join(work, SIGNATURE), '--clobber')
   gh('release', 'edit', tag, '--draft=false', '--latest')
