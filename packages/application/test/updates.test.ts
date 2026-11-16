@@ -141,6 +141,27 @@ describe('Octo that replaces itself with a newer one', () => {
     })
   })
 
+  it('does not take the signed list of one version for another version', async () => {
+    // A release named as newer, with the files, the list and the signature of an older one put
+    // under its name: the list is the publisher's, but it says nothing of a file of this version.
+    const replayed = setup({
+      release: {
+        ...release,
+        version: 'v9.9.9',
+        assets: [
+          asset('Octo-9.9.9-mac-arm64.zip'),
+          asset(CHECKSUMS_ASSET),
+          asset(CHECKSUMS_SIGNATURE_ASSET),
+        ],
+      },
+    })
+    expect(await replayed.updates.check()).toEqual({ version: '9.9.9', notes: 'Novità.' })
+    await expect(replayed.updates.install()).rejects.toMatchObject({
+      code: 'update_checksum_missing',
+    })
+    expect(replayed.applied).toEqual([])
+  })
+
   it('says what stopped it: nothing newer, a download that failed, an app that cannot be replaced', async () => {
     await expect(setup({ current: '1.4.0' }).updates.install()).rejects.toMatchObject({
       code: 'update_unavailable',
