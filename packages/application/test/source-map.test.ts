@@ -57,7 +57,7 @@ function mapWith(options: {
     },
     meetings: {
       view: async () => ({
-        config: options.meetings ? { root: '~/Verbale' } : null,
+        config: options.meetings ? { root: '~/Verbale', since: null } : null,
         suggestedRoot: null,
         targetFolder: MEETINGS_FOLDER,
         state: options.meetings ?? NEVER,

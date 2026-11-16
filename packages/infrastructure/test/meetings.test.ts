@@ -96,8 +96,11 @@ beforeAll(async () => {
     await writeExport(root, meeting)
   }
   // The same folder, written in two ways: the two projects still read the same one.
-  await settings.save(aurora.folder, { ...NO_SOURCES, meetings: { root: '~/Verbale' } })
-  await settings.save(borea.folder, { ...NO_SOURCES, meetings: { root: `${root}/` } })
+  await settings.save(aurora.folder, {
+    ...NO_SOURCES,
+    meetings: { root: '~/Verbale', since: null },
+  })
+  await settings.save(borea.folder, { ...NO_SOURCES, meetings: { root: `${root}/`, since: null } })
   meetings = createMeetings({
     settings,
     states: createJsonSourceStates(join(base, 'dati')),
@@ -218,7 +221,7 @@ describe('the meetings Verbale exported, read from its folder', () => {
       keepQuoted: false,
       targetFolder: '_octo/posta',
     })
-    const linked = { ...NO_SOURCES, meetings: { root: '~/Verbale' } }
+    const linked = { ...NO_SOURCES, meetings: { root: '~/Verbale', since: null } }
     await settings.save(borea.folder, { ...linked, mail: mailOf('Borea') })
     await settings.save(aurora.folder, { ...linked, mail: mailOf('Aurora') })
     const mail = (id: string, method: string, start: string, end: string) =>
@@ -260,7 +263,10 @@ describe('the meetings Verbale exported, read from its folder', () => {
   })
 
   it('says that the folder cannot be opened, and keeps what it had', async () => {
-    await settings.save(aurora.folder, { ...NO_SOURCES, meetings: { root: '~/Sparita' } })
+    await settings.save(aurora.folder, {
+      ...NO_SOURCES,
+      meetings: { root: '~/Sparita', since: null },
+    })
 
     expect(await meetings.sync(aurora)).toMatchObject({ error: 'meetings_root_unreadable' })
     expect((await meetings.view(aurora)).state.lastRun?.error).toBe('meetings_root_unreadable')
@@ -401,15 +407,23 @@ describe('the export of a Verbale that says more', () => {
 
 describe('the meetings among the sources kept in the project folder', () => {
   it('are saved with the other sources and read back; a root that is not a folder is refused', async () => {
-    const view = await meetings.save(borea, { root: ` ${root}/ ` })
-    expect(view.config).toEqual({ root: '~/Verbale' })
+    const view = await meetings.save(borea, { root: ` ${root}/ `, since: '2026-11-01' })
+    expect(view.config).toEqual({ root: '~/Verbale', since: '2026-11-01' })
     expect(view.suggestedRoot).toBeNull()
-    expect((await settings.load(borea.folder)).meetings).toEqual({ root: '~/Verbale' })
-    expect((await meetings.save(borea, { root: join(base, 'altrove') })).config).toEqual({
+    expect((await settings.load(borea.folder)).meetings).toEqual({
+      root: '~/Verbale',
+      since: '2026-11-01',
+    })
+    expect(
+      (await meetings.save(borea, { root: join(base, 'altrove'), since: null })).config,
+    ).toEqual({
       root: join(base, 'altrove'),
+      since: null,
     })
     expect(exportsOf().portable(home)).toBe('~')
-    await expect(meetings.save(borea, { root: 'Verbale' })).rejects.toThrow('source_config_invalid')
+    await expect(meetings.save(borea, { root: 'Verbale', since: null })).rejects.toThrow(
+      'source_config_invalid',
+    )
 
     expect((await meetings.save(borea, null)).config).toBeNull()
     expect(await meetings.configured(borea)).toBe(false)

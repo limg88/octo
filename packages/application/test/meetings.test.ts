@@ -44,7 +44,7 @@ function setup(
     after?: Record<string, MeetingReading | null>
   } = {},
 ) {
-  const linked: SourcesConfig = { ...NO_SOURCES, meetings: { root: ROOT } }
+  const linked: SourcesConfig = { ...NO_SOURCES, meetings: { root: ROOT, since: null } }
   const configs = new Map<string, SourcesConfig>(
     Object.entries(options.configs ?? { [aurora.folder]: linked, [borea.folder]: linked }),
   )
@@ -120,8 +120,8 @@ describe('the meetings of a project', () => {
       state: NEVER_READ,
     })
     // However it is typed, it is kept in the one form two projects are compared by.
-    const saved = await meetings.save(aurora, { root: '/Users/paola/Verbale' })
-    expect(saved).toMatchObject({ config: { root: ROOT }, suggestedRoot: null })
+    const saved = await meetings.save(aurora, { root: '/Users/paola/Verbale', since: null })
+    expect(saved).toMatchObject({ config: { root: ROOT, since: null }, suggestedRoot: null })
     expect(await meetings.configured(aurora)).toBe(true)
   })
 
@@ -201,12 +201,51 @@ describe('the meetings of a project', () => {
     expect(await moved.meetings.imported(aurora)).toHaveLength(1)
   })
 
+  it('leaves alone what was recorded before the first day, but for what the project holds', async () => {
+    const readings: MeetingReading[] = [
+      complete(1, 'Kickoff Aurora'),
+      complete(2, 'Varie di prima'),
+      complete(5, 'Punto Aurora'),
+      complete(6, 'Varie di dopo'),
+      {
+        folder: '2026-11-03_100000_Vecchia_AAAA0000',
+        status: 'skipped',
+        reason: 'corrupt',
+        detail: '',
+      },
+      {
+        folder: '2026-11-15_100000_Nuova_BBBB0000',
+        status: 'skipped',
+        reason: 'corrupt',
+        detail: '',
+      },
+    ]
+    const { meetings, disk } = setup({ readings })
+    // Taken while every meeting was: the old one stays, and is kept up to date.
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 2 })
+    expect(await meetings.unassigned(aurora)).toHaveLength(2)
+    await meetings.save(aurora, { root: ROOT, since: '2026-11-14' })
+
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 0, unchanged: 2 })
+    expect((await meetings.imported(aurora)).map((stored) => stored.title)).toEqual([
+      'Punto Aurora',
+      'Kickoff Aurora',
+    ])
+    expect((await meetings.unassigned(aurora)).map((waiting) => waiting.title)).toEqual([
+      'Varie di dopo',
+    ])
+    const note = disk.get(`${aurora.folder}:${MEETINGS_FOLDER}/_lettura.md`) ?? ''
+    expect(note).toContain('Nuova_BBBB0000')
+    expect(note).not.toContain('Vecchia_AAAA0000')
+    expect(note).not.toContain('Varie di prima')
+  })
+
   it('does not count as a rival a project that reads another folder', async () => {
-    const elsewhere: SourcesConfig = { ...NO_SOURCES, meetings: { root: '/altrove' } }
+    const elsewhere: SourcesConfig = { ...NO_SOURCES, meetings: { root: '/altrove', since: null } }
     const { meetings } = setup({
       readings: [complete(2, 'Punto Borea e Aurora')],
       configs: {
-        [aurora.folder]: { ...NO_SOURCES, meetings: { root: ROOT } },
+        [aurora.folder]: { ...NO_SOURCES, meetings: { root: ROOT, since: null } },
         [borea.folder]: elsewhere,
       },
     })

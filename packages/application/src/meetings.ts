@@ -1,4 +1,5 @@
 import {
+  beforeFirstDay,
   cleanMeetingsSource,
   DomainError,
   isDomainError,
@@ -156,10 +157,12 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     const found: Scan = { mine: [], unassigned: [], skipped: [] }
     for (const reading of readings) {
       if (reading.status === 'skipped') {
-        found.skipped.push(reading)
+        if (!beforeFirstDay(reading, config.since)) found.skipped.push(reading)
         continue
       }
       const holder = holders.get(reading.meeting.id)
+      // From before the first day taken: left alone, unless the project already holds it.
+      if (!holder && beforeFirstDay(reading, config.since)) continue
       let owner = holder?.projectId ?? null
       if (!holder) {
         candidates ??= await Promise.all(projects.map(candidateOf))
@@ -255,7 +258,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     async save(project, config) {
       const current = await deps.settings.load(project.folder)
       const meetings = config
-        ? { root: deps.exports.portable(cleanMeetingsSource(config).root) }
+        ? { ...cleanMeetingsSource(config), root: deps.exports.portable(config.root.trim()) }
         : null
       await deps.settings.save(project.folder, { ...current, meetings })
       return view(project)

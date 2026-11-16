@@ -27,8 +27,8 @@ Le date sono relative al giorno in cui lanci la demo.
    bash demo/25-riunioni-verbale/run.sh
    ```
    Vai in «Impostazioni». Nel pannello «Avvio del progetto» c'è «1 su 6 collegati» (la posta). Sotto «Posta» c'è la riga nuova «Riunioni (Verbale)», con «Le riunioni di questo progetto non sono ancora collegate.». Premi «Collega».
-   Atteso: il campo «Cartella in cui Verbale esporta» è già compilato con `~/…/.tmp/demo-25/Verbale` e sotto c'è scritto «È la cartella che Verbale usa su questo computer». Premi «Salva»: «Salvato.», lo stato diventa «Mai lette.» e il pannello dice «2 su 6 collegati».
-   Dimostra: la cartella non si cerca a mano quando Verbale la dice; «Scegli…» apre la finestra del sistema quando non la dice.
+   Atteso: il campo «Cartella in cui Verbale esporta» è già compilato con `~/…/.tmp/demo-25/Verbale` e sotto c'è scritto «È la cartella che Verbale usa su questo computer». Il campo «Dal giorno» propone oggi: svuotalo, perché le riunioni finte sono dei giorni scorsi. Premi «Salva»: «Salvato.», lo stato diventa «Mai lette.» e il pannello dice «2 su 6 collegati».
+   Dimostra: la cartella non si cerca a mano quando Verbale la dice; «Scegli…» apre la finestra del sistema quando non la dice. Un progetto collegato oggi parte da oggi: ciò che Verbale ha registrato prima entra solo se lo chiedi.
 
 2. **Riempi la memoria.** Premi «Riempi la memoria ora».
    Atteso: fra le righe del risultato, dopo «Posta», c'è «Riunioni (Verbale): 1 nuovi o aggiornati, 0 invariati.». In un terminale:

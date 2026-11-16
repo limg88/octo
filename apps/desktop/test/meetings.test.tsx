@@ -9,6 +9,7 @@ import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
+const now = () => new Date('2026-11-16T09:00:00.000Z')
 const run: SourceRun = { at: '2026-11-14T10:00:00.000Z', written: 2, unchanged: 5, error: null }
 const empty: MeetingsSourceView = {
   config: null,
@@ -17,7 +18,7 @@ const empty: MeetingsSourceView = {
   state: { cursor: null, lastRun: null },
 }
 const linked: MeetingsSourceView = {
-  config: { root: '~/Documents/Verbale' },
+  config: { root: '~/Documents/Verbale', since: '2026-11-10' },
   suggestedRoot: null,
   targetFolder: '_octo/riunioni',
   state: { cursor: run.at, lastRun: run },
@@ -49,7 +50,7 @@ function fakeApi(overrides: Partial<MeetingsApi> = {}) {
 }
 
 const show = (api: OctoApi, open = true) =>
-  render(<MeetingsSection api={api} project={project} open={open} onToggle={() => {}} />)
+  render(<MeetingsSection api={api} project={project} open={open} onToggle={() => {}} now={now} />)
 const rootField = () => screen.getByLabelText<HTMLInputElement>(messages.meetingsRoot)
 
 afterEach(cleanup)
@@ -66,7 +67,22 @@ describe('MeetingsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: messages.meetingsSave }))
 
     expect(await screen.findByText(messages.meetingsSaved)).toBeTruthy()
-    expect(api.saveMeetingsSource).toHaveBeenCalledWith('p-1', { root: '~/Documents/Verbale' })
+    // A project linked now starts from today; after the saving the form shows what was kept.
+    expect(api.saveMeetingsSource).toHaveBeenCalledWith('p-1', {
+      root: '~/Documents/Verbale',
+      since: '2026-11-16',
+    })
+    const since = screen.getByLabelText<HTMLInputElement>(new RegExp(messages.meetingsSince))
+    expect(since.value).toBe('2026-11-10')
+    // Left empty, every meeting of the folder is taken.
+    fireEvent.change(since, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSave }))
+    await waitFor(() =>
+      expect(api.saveMeetingsSource).toHaveBeenLastCalledWith('p-1', {
+        root: '~/Documents/Verbale',
+        since: null,
+      }),
+    )
     expect(screen.queryByText(messages.meetingsRootFound)).toBeNull()
   })
 

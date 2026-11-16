@@ -112,7 +112,12 @@ const mailSaveInput = byProject.extend({ config: mailConfig.nullable() })
 const mailPreviewInput = byProject.extend({ config: mailConfig })
 const MAX_PATH_LENGTH = 4000
 const meetingsSaveInput = byProject.extend({
-  config: z.object({ root: z.string().max(MAX_PATH_LENGTH) }).nullable(),
+  config: z
+    .object({
+      root: z.string().max(MAX_PATH_LENGTH),
+      since: z.string().max(MAX_RULE_LENGTH).nullable(),
+    })
+    .nullable(),
 })
 const meetingAssignInput = byProject.extend({ meetingId: z.string().min(1).max(MAX_RULE_LENGTH) })
 

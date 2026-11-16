@@ -1160,6 +1160,9 @@ export const messages = {
   meetingsRootFound:
     'È la cartella che Verbale usa su questo computer: salvala, o scegline un’altra.',
   meetingsRootMissing: 'Non riesco a ricavare la cartella da Verbale: sceglila tu.',
+  meetingsSince: 'Dal giorno',
+  meetingsSinceHint:
+    'Le riunioni registrate prima non vengono considerate. Lascia vuoto per prenderle tutte: quelle che Octo non sa attribuire compaiono in «Oggi».',
   meetingsTarget: (folder: string) =>
     `Le riunioni vengono scritte in ${folder}, una cartella per riunione; ciò che viene saltato è annotato in _lettura.md.`,
   meetingsSave: 'Salva',

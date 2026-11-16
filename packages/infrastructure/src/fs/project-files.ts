@@ -29,7 +29,8 @@ const mailSchema = z.object({
   targetFolder: z.string(),
 })
 
-const meetingsSchema = z.object({ root: z.string() })
+// A file written before the first day existed takes every meeting.
+const meetingsSchema = z.object({ root: z.string(), since: z.string().nullable().default(null) })
 
 const feedBase = { since: z.string(), targetFolder: z.string() }
 const adoSchema = z.object({

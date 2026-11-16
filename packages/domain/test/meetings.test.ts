@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  beforeFirstDay,
   cleanMeetingsSource,
   MEETINGS_FOLDER,
   type MeetingCandidate,
@@ -140,14 +141,35 @@ describe('the manifest of an export of Verbale', () => {
 
 describe('the folder Verbale exports to', () => {
   it('is kept trimmed, from the root of the disk or from the home', () => {
-    expect(cleanMeetingsSource({ root: '  ~/Documents/Verbale/ ' })).toEqual({
+    expect(cleanMeetingsSource({ root: '  ~/Documents/Verbale/ ', since: ' ' })).toEqual({
       root: '~/Documents/Verbale',
+      since: null,
     })
-    expect(cleanMeetingsSource({ root: '/' }).root).toBe('/')
-    expect(cleanMeetingsSource({ root: 'C:\\Verbale' }).root).toBe('C:\\Verbale')
+    expect(cleanMeetingsSource({ root: '/', since: '2026-11-16' })).toEqual({
+      root: '/',
+      since: '2026-11-16',
+    })
+    expect(cleanMeetingsSource({ root: 'C:\\Verbale', since: null }).root).toBe('C:\\Verbale')
     for (const root of ['', 'Verbale', '../Verbale', '~altro/Verbale']) {
-      expect(() => cleanMeetingsSource({ root })).toThrow('source_config_invalid')
+      expect(() => cleanMeetingsSource({ root, since: null })).toThrow('source_config_invalid')
     }
+    expect(() => cleanMeetingsSource({ root: '/v', since: 'ieri' })).toThrow(
+      'source_config_invalid',
+    )
+  })
+
+  it('leaves alone what Verbale recorded before the first day taken', () => {
+    const finished: MeetingReading = { folder: 'c', status: 'complete', meeting: kickoff }
+    expect(beforeFirstDay(finished, null)).toBe(false)
+    expect(beforeFirstDay(finished, '2026-11-10')).toBe(false)
+    expect(beforeFirstDay(finished, '2026-11-11')).toBe(true)
+    // What was left out is judged by the day Verbale put in the name of its folder.
+    const left = (folder: string) => readMeetingManifest(folder, null)
+    expect(beforeFirstDay(left('2026-11-05_143131_Chiamata_Teams_B03368F3'), '2026-11-10')).toBe(
+      true,
+    )
+    expect(beforeFirstDay(left('2026-11-12_100000_Riunione_AB12CD34'), '2026-11-10')).toBe(false)
+    expect(beforeFirstDay(left('senza-data'), '2026-11-10')).toBe(false)
   })
 })
 

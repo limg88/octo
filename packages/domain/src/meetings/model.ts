@@ -2,11 +2,17 @@ import { DomainError } from '../errors.ts'
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { documentHeader, slugOf } from '../mail/document.ts'
 import { PRODUCT_TIME_ZONE, romeDateString } from '../rome-time.ts'
+import { startOfDay } from '../sources.ts'
 
 /** How the meetings recorded by Verbale reach a project: the folder Verbale exports to. */
 export type MeetingsSourceConfig = {
   /** The export folder of Verbale on this computer; `~` stands for the home of who uses it. */
   root: string
+  /**
+   * The first day taken, `YYYY-MM-DD`; null takes every meeting the folder holds. What Verbale
+   * recorded before the project was linked is seldom of the project.
+   */
+  since: string | null
 }
 
 /** Where Octo keeps the meetings of a project, one folder each. */
@@ -172,7 +178,24 @@ export function sameExport(before: RecordedMeeting, after: MeetingReading): bool
 export function cleanMeetingsSource(config: MeetingsSourceConfig): MeetingsSourceConfig {
   const root = config.root.trim().replace(/(?<=.)[\\/]+$/, '')
   if (!ABSOLUTE_ROOT.test(root)) throw new DomainError('source_config_invalid', `root: ${root}`)
-  return { root }
+  const since = config.since?.trim() || null
+  if (since !== null) startOfDay(since)
+  return { root, since }
+}
+
+const FOLDER_DAY = /^(\d{4}-\d{2}-\d{2})_/
+
+/**
+ * Whether a folder of the export root is from before the first day taken. A finished meeting is
+ * judged by when it started; one left out has no date Octo can trust, so the day Verbale put
+ * in the name of its folder is used, and a folder without one is kept.
+ */
+export function beforeFirstDay(reading: MeetingReading, since: string | null): boolean {
+  if (since === null) return false
+  const first = startOfDay(since).getTime()
+  if (reading.status === 'complete') return Date.parse(reading.meeting.started) < first
+  const day = FOLDER_DAY.exec(reading.folder)?.[1]
+  return day !== undefined && Date.parse(`${day}T00:00:00.000Z`) < first
 }
 
 export const meetingMinutes = (meeting: Pick<RecordedMeeting, 'durationSeconds'>): number =>

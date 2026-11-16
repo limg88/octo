@@ -11,12 +11,18 @@ type Props = {
   project: Project
   open: boolean
   onToggle: () => void
+  now?: () => Date
 }
 
+/** One function for the life of the page: a new one at every render would reload it forever. */
+const systemNow = (): Date => new Date()
+const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
+
 /** The meetings recorded with Verbale: which folder is read, when it last was, and a way to read it now. */
-export function MeetingsSection({ api, project, open, onToggle }: Props) {
+export function MeetingsSection({ api, project, open, onToggle, now = systemNow }: Props) {
   const [view, setView] = useState<MeetingsSourceView | null>(null)
   const [root, setRoot] = useState('')
+  const [since, setSince] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<ErrorCode | null>(null)
@@ -26,9 +32,13 @@ export function MeetingsSection({ api, project, open, onToggle }: Props) {
       const result = await api.meetingsSource(project.id)
       if (!result.ok) return setError(result.code)
       setView(result.value)
-      if (resetForm) setRoot(result.value.config?.root ?? result.value.suggestedRoot ?? '')
+      if (!resetForm) return
+      const config = result.value.config
+      setRoot(config?.root ?? result.value.suggestedRoot ?? '')
+      // A project linked now starts from today: what Verbale holds from before is seldom its own.
+      setSince(config ? (config.since ?? '') : dayOf(now()))
     },
-    [api, project.id],
+    [api, project.id, now],
   )
 
   useEffect(() => {
@@ -44,11 +54,12 @@ export function MeetingsSection({ api, project, open, onToggle }: Props) {
   async function save(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    const result = await api.saveMeetingsSource(project.id, { root })
+    const result = await api.saveMeetingsSource(project.id, { root, since: since || null })
     setSaved(result.ok)
     if (!result.ok) return setError(result.code)
     setView(result.value)
     setRoot(result.value.config?.root ?? '')
+    setSince(result.value.config?.since ?? '')
   }
 
   async function sync() {
@@ -132,6 +143,11 @@ export function MeetingsSection({ api, project, open, onToggle }: Props) {
             {view.suggestedRoot ? messages.meetingsRootFound : messages.meetingsRootMissing}
           </p>
         )}
+        <label>
+          {messages.meetingsSince}
+          <input type="date" value={since} onChange={(event) => setSince(event.target.value)} />
+          <span className="hint">{messages.meetingsSinceHint}</span>
+        </label>
         <p className="hint">{messages.meetingsTarget(view.targetFolder)}</p>
         <div className="actions">
           <button type="submit" disabled={root.trim() === ''}>
