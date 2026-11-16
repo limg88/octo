@@ -686,14 +686,31 @@ export function TodayView({
         </>
       )}
 
-      {view.muteOffers.map((kind) => (
-        <div key={kind} className="notice-bar">
-          <p role="status">{text.muteOffer(text.kinds[kind])}</p>
-          <button type="button" onClick={() => void mute(kind, true)}>
-            {text.muteKind}
-          </button>
+      {view.muteOffers.length === 1 &&
+        view.muteOffers.map((kind) => (
+          <div key={kind} className="notice-bar">
+            <p role="status">{text.muteOffer(text.kinds[kind])}</p>
+            <button type="button" onClick={() => void mute(kind, true)}>
+              {text.muteKind}
+            </button>
+          </div>
+        ))}
+      {/* Several kinds at once are one notice, not a notice each. */}
+      {view.muteOffers.length > 1 && (
+        <div className="notice-bar notice-bar-wrap">
+          <p role="status">{text.muteOffers}</p>
+          {view.muteOffers.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              aria-label={text.muteKindNamed(text.kinds[kind])}
+              onClick={() => void mute(kind, true)}
+            >
+              {text.kinds[kind]}
+            </button>
+          ))}
         </div>
-      ))}
+      )}
       {view.resolvedToday.length > 0 && (
         <p className="hint" role="status">
           {text.resolvedToday(

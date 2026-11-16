@@ -387,6 +387,10 @@ legend {
   padding: 4px 12px 8px;
 }
 
+.notice-bar-wrap {
+  flex-wrap: wrap;
+}
+
 .notice-bar {
   display: flex;
   align-items: center;

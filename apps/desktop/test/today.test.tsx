@@ -468,6 +468,16 @@ describe('the page of the day', () => {
     expect(line.getAttribute('title')).toContain('Jira: ')
   })
 
+  it('offers to stop showing several kinds in one notice, a button for each', async () => {
+    const { api } = todayApi(view({ muteOffers: ['mail_reply', 'risk', 'mail_follow'] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    expect(await screen.findByText(text.muteOffers)).toBeTruthy()
+    expect(screen.queryByText(text.muteOffer(text.kinds.risk))).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Non mostrare più: / })).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: text.muteKindNamed(text.kinds.risk) }))
+    await waitFor(() => expect(api.muteTodayKind).toHaveBeenCalledWith('p-1', 'risk', true))
+  })
+
   it('says when the sources are read next, in minutes', async () => {
     const soon = new Date(Date.now() + 12 * 60 * 1000 - 5000).toISOString()
     const { api } = todayApi(view(), { nextReading: vi.fn(async () => ok<string | null>(soon)) })
