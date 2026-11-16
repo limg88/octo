@@ -1963,7 +1963,7 @@ details.advanced[open] > summary {
 }
 
 .nav-count {
-  margin-left: auto;
+  margin-left: 8px;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent);
@@ -2176,6 +2176,8 @@ details.advanced[open] > summary {
 .today-now {
   display: flex;
   flex-direction: column;
+  /* A panel clips what overflows: in the column of the page it would shrink to nothing. */
+  flex-shrink: 0;
   gap: 6px;
   padding: 10px 12px;
   border-left: 3px solid var(--accent);

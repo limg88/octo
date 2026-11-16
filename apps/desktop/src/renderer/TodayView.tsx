@@ -455,6 +455,24 @@ export function TodayView({
     ),
   )
   const fresh = view.freshness.filter((entry) => !warned.has(entry.source))
+  const freshLine = (entry: (typeof fresh)[number]): string =>
+    `${entry.source}: ${entry.readAt ? dateTimeText(entry.readAt) : text.freshnessNever}`
+  const freshLines = fresh.map(freshLine)
+  // With many sources the line is not read: the one read longest ago says how old the page is,
+  // and each of them is a pointer away.
+  const oldest = [...fresh].sort((a, b) => (a.readAt ?? '').localeCompare(b.readAt ?? ''))[0]
+  const freshShort =
+    oldest === undefined
+      ? []
+      : fresh.length === 1
+        ? [freshLine(oldest)]
+        : [
+            text.freshnessOldest(
+              fresh.length,
+              oldest.source,
+              oldest.readAt ? dateTimeText(oldest.readAt) : text.freshnessNever,
+            ),
+          ]
   const watch = view.items.filter((item) => item.band === 'watch' && !firstKeys.has(item.key))
   const groups = TODAY_GROUPS.map((group) => ({
     group,
@@ -473,17 +491,14 @@ export function TodayView({
         <div className="today-day">
           <h3>{text.title(dayText(view.day))}</h3>
           {(nextReadingAt !== null || fresh.length > 0) && (
-            <p className="hint today-freshness">
+            <p className="hint today-freshness" title={freshLines.join('\n')}>
               {[
                 ...(nextReadingAt === null
                   ? []
                   : [
                       text.nextReading(Math.ceil((Date.parse(nextReadingAt) - minute) / MINUTE_MS)),
                     ]),
-                ...fresh.map(
-                  (entry) =>
-                    `${entry.source}: ${entry.readAt ? dateTimeText(entry.readAt) : text.freshnessNever}`,
-                ),
+                ...freshShort,
               ].join(' · ')}
             </p>
           )}
