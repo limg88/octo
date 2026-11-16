@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, sep } from 'node:path'
+import { dirname, join, posix, relative } from 'node:path'
 import type { UpdateApplier } from '@octo/application'
 import { DomainError } from '@octo/domain'
 
@@ -73,11 +73,14 @@ const run = (command: string, args: string[]): Promise<void> =>
     execFile(command, args, (error) => (error ? reject(error) : resolve()))
   })
 
-/** `/Applications/Octo.app/Contents/MacOS/Octo` gives `/Applications/Octo.app`. */
+/**
+ * `/Applications/Octo.app/Contents/MacOS/Octo` gives `/Applications/Octo.app`. A bundle is a
+ * thing of the Mac: its path is read as a Mac writes it, whatever system this code runs on.
+ */
 export function bundleOf(execPath: string): string | null {
-  const parts = execPath.split(sep)
+  const parts = execPath.split(posix.sep)
   const at = parts.findIndex((part) => part.endsWith(BUNDLE_SUFFIX))
-  return at < 0 ? null : parts.slice(0, at + 1).join(sep)
+  return at < 0 ? null : parts.slice(0, at + 1).join(posix.sep)
 }
 
 /** Replaces the running Octo with a downloaded one: a zipped app on a Mac, an installer on Windows. */

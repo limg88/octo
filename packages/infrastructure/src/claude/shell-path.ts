@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { delimiter } from 'node:path'
+import { posix } from 'node:path'
 
 /** Runs a shell and gives back what it wrote; rejects when it fails or takes too long. */
 export type ShellRun = (shell: string, args: string[], timeoutMs: number) => Promise<string>
@@ -53,6 +53,8 @@ export function withShellPath(
   fromShell: string | null,
 ): Record<string, string | undefined> {
   if (fromShell === null) return env
+  // The PATH of a shell is asked only where paths are written as a shell writes them.
+  const { delimiter } = posix
   const folders = [...fromShell.split(delimiter), ...(env[PATH_VARIABLE] ?? '').split(delimiter)]
   const once = [...new Set(folders.filter((folder) => folder !== ''))]
   return { ...env, [PATH_VARIABLE]: once.join(delimiter) }

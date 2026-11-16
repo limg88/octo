@@ -162,6 +162,14 @@ describe('locateClaude', () => {
   it('looks for the native executable on Windows', () => {
     const found = locateClaude({ ...base, platform: 'win32', exists: () => true })
     expect(found.endsWith('claude.exe')).toBe(true)
+    // The PATH and the paths are read as Windows writes them, whatever system the test runs on.
+    const onPath = locateClaude({
+      ...base,
+      platform: 'win32',
+      env: { PATH: 'C:\\Windows;C:\\Users\\paola\\bin' },
+      exists: (path) => path.includes('paola'),
+    })
+    expect(onPath).toBe('C:\\Users\\paola\\bin\\claude.exe')
   })
 })
 

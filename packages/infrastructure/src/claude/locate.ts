@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 export type LocateInput = {
   platform: NodeJS.Platform
@@ -25,16 +25,20 @@ export function locateClaude(input: LocateInput): string {
   return candidates(input).find((candidate) => input.exists(candidate)) ?? COMMAND_ON_PATH
 }
 
+/** The paths as the system asked about writes them, whatever system this code runs on. */
+const pathsOf = (platform: NodeJS.Platform) => (platform === WINDOWS ? win32 : posix)
+
 function onPath(input: LocateInput): string[] {
-  const windows = input.platform === WINDOWS
-  const name = windows ? WINDOWS_EXECUTABLE : COMMAND_ON_PATH
+  const { join, delimiter } = pathsOf(input.platform)
+  const name = input.platform === WINDOWS ? WINDOWS_EXECUTABLE : COMMAND_ON_PATH
   return (input.env[PATH_VARIABLE] ?? '')
-    .split(windows ? ';' : ':')
+    .split(delimiter)
     .filter((folder) => folder !== '')
     .map((folder) => join(folder, name))
 }
 
 function candidates(input: LocateInput): string[] {
+  const { join } = pathsOf(input.platform)
   if (input.platform === WINDOWS) {
     return [...onPath(input), join(input.home, '.local', 'bin', WINDOWS_EXECUTABLE)]
   }
