@@ -415,6 +415,73 @@ describe('the page of the day', () => {
     ).rejects.toThrow('disk on fire')
   })
 
+  it('lists what was put away, takes it back, and offers the end of the sprint to put off until', async () => {
+    const { today, store } = setup({
+      team: {
+        get: async () => ({
+          people: [],
+          periods: [{ name: 'Sprint 28', from: '2026-11-03', to: '2026-11-27' }],
+        }),
+      },
+      alignments: {
+        view: notSet('alignment_sprint_not_set'),
+        settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
+      },
+    })
+    expect((await today.view(project)).sprintEnd).toBe('2026-11-27')
+    const later = await today.decide(project, {
+      key: 'mail:budget',
+      state: 'later',
+      until: '2026-11-27',
+    })
+    expect(later.hiddenItems).toMatchObject([
+      { item: { key: 'mail:budget' }, state: 'later', at: '2026-11-16', until: '2026-11-27' },
+    ])
+    const back = await today.decide(project, { key: 'mail:budget', state: 'open' })
+    expect(back.hiddenItems).toEqual([])
+    expect(back.items.map((item) => item.key)).toContain('mail:budget')
+    expect(store.settings.decisions).toEqual([])
+  })
+
+  it('tells what went away by itself today, and not what could not be read', async () => {
+    let drafts: Deliverable[] = [
+      { id: 'd-1', title: 'Stato', status: 'review', createdAt: '2026-11-14T09:00:00.000Z' },
+    ] as Deliverable[]
+    let broken = false
+    const { today, store, at } = setup({
+      deliverables: {
+        list: async () => {
+          if (broken) throw new DomainError('deliverable_input_missing')
+          return drafts
+        },
+      },
+    })
+    const first = await today.decide(project, { key: 'draft:d-1', state: 'done' })
+    expect(first.resolvedToday).toEqual([])
+    // The drafts cannot be read: the draft is not gone, and what was decided of it holds.
+    broken = true
+    expect((await today.view(project)).resolvedToday).toEqual([])
+    expect(store.settings.decisions).toHaveLength(1)
+    // The draft was approved: it went away by itself, and «done» is forgotten with it.
+    broken = false
+    drafts = []
+    expect((await today.view(project)).resolvedToday).toEqual(['draft'])
+    expect(store.settings.decisions).toEqual([])
+    // It comes back: it is new, and no longer among what went away.
+    drafts = [
+      { id: 'd-1', title: 'Stato', status: 'review', createdAt: '2026-11-14T09:00:00.000Z' },
+    ] as Deliverable[]
+    const again = await today.view(project)
+    expect(again.resolvedToday).toEqual([])
+    expect(again.items.find((item) => item.key === 'draft:d-1')?.returned).toBeUndefined()
+    // The meeting of the day is over tomorrow: nothing was resolved by that.
+    drafts = []
+    at('2026-11-17T09:00:00.000Z')
+    expect((await today.view(project)).resolvedToday).toEqual(['draft'])
+    at('2026-11-18T09:00:00.000Z')
+    expect((await today.view(project)).resolvedToday).toEqual([])
+  })
+
   it('says what comes first now, by rule: a meeting about to start, what was put off', async () => {
     const { today, at } = setup()
     // At ten the meeting of four in the afternoon is far: nothing comes first.
@@ -897,6 +964,30 @@ describe('whose turn a mail is, on the page of the day', () => {
       facts: { why: 'everyone', judgement: { addressee: 'everyone', addresseeName: null } },
     })
     expect(after.evaluationDue).toBe(false)
+  })
+
+  it('takes back a decision taken when the signal had another key', async () => {
+    const { today, store } = withRecap('everyone')
+    // The mail is written to many: its signal is told by the conversation, and the decision the
+    // PM took when it was told by the mail still holds.
+    store.settings = {
+      ...NO_TODAY_SETTINGS,
+      decisions: [
+        {
+          key: 'mail:recap',
+          kind: 'mail_follow',
+          state: 'muted',
+          at: '2026-11-13',
+          until: null,
+          weight: 0,
+        },
+      ],
+    }
+    const [hidden] = (await today.view(project)).hiddenItems
+    expect(hidden).toMatchObject({ item: { key: 'mail:c:aurora: recap uat' }, state: 'muted' })
+    const back = await today.decide(project, { key: 'mail:c:aurora: recap uat', state: 'open' })
+    expect(back.hiddenItems).toEqual([])
+    expect(store.settings.decisions).toEqual([])
   })
 
   it('asks an answer of a mail to many that Claude reads as the PM’s', async () => {

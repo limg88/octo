@@ -45,6 +45,7 @@ import {
   personKey,
   previousMonth,
   type Reconciliation,
+  reconcileSignals,
   requirementItems,
   riskItems,
   risksMarkdown,
@@ -426,6 +427,81 @@ describe('what the PM decided on a signal', () => {
     expect(applyDecisions([item({ key: 'a', weight: 99 })], muted, '2027-01-01').items).toEqual([])
   })
 
+  it('lists what stays away with its decision, the last decided first', () => {
+    const items = [item({ key: 'a' }), item({ key: 'b' }), item({ key: 'c' })]
+    const page = applyDecisions(
+      items,
+      {
+        ...NO_TODAY_SETTINGS,
+        decisions: [
+          decision({ key: 'a', state: 'muted', at: '2026-11-12' }),
+          decision({ key: 'b', state: 'later', until: '2026-11-20', at: '2026-11-16' }),
+        ],
+      },
+      '2026-11-16',
+    )
+    expect(page.items.map((shown) => shown.key)).toEqual(['c'])
+    expect(page.hiddenItems).toEqual([
+      { item: items[1], state: 'later', at: '2026-11-16', until: '2026-11-20' },
+      { item: items[0], state: 'muted', at: '2026-11-12', until: null },
+    ])
+  })
+
+  it('keeps away what was marked done for as long as it gets better', () => {
+    const settings = { ...NO_TODAY_SETTINGS, decisions: [decision({ weight: 5 })] }
+    // Three working days later it is still there, but lighter: it is being done.
+    const better = applyDecisions([item({ key: 'a', weight: 3 })], settings, '2026-11-20')
+    expect(better.items).toEqual([])
+    expect(better.hiddenItems[0]?.state).toBe('done')
+    // As heavy as it was: after the days of grace it is told again.
+    expect(
+      applyDecisions([item({ key: 'a', weight: 5 })], settings, '2026-11-20').items[0]?.returned,
+    ).toEqual({ why: 'still', since: '2026-11-13' })
+  })
+
+  it('tells what went away by itself, and forgets what was marked done about it', () => {
+    const before = {
+      ...NO_TODAY_SETTINGS,
+      decisions: [
+        decision({ key: 'gone' }),
+        decision({ key: 'there' }),
+        decision({ key: 'muted-gone', state: 'muted' }),
+        decision({ key: 'unread', kind: 'hours' }),
+      ],
+      present: [
+        { key: 'gone', kind: 'bugs_stuck' as const, weight: 2 },
+        { key: 'there', kind: 'bugs_stuck' as const, weight: 1 },
+        { key: 'unread', kind: 'hours' as const, weight: 1 },
+        { key: 'meeting', kind: 'meeting' as const, weight: 1 },
+        { key: 'mail:1', kind: 'mail_reply' as const, weight: 1 },
+      ],
+      resolved: [
+        { key: 'yesterday', kind: 'draft' as const, day: '2026-11-15' },
+        { key: 'earlier', kind: 'draft' as const, day: MID_MONTH },
+        { key: 'there', kind: 'bugs_stuck' as const, day: MID_MONTH },
+      ],
+    }
+    const items = [
+      item({ key: 'there', weight: 3 }),
+      // The mail is told by its conversation now: under the old key it is the same signal.
+      item({ key: 'mail:c:x', formerKeys: ['mail:1'] }),
+    ]
+    const after = reconcileSignals(before, items, new Set(['hours']), MID_MONTH)
+    // A meeting that is over resolved nothing; hours that could not be read are not gone.
+    expect(after.resolved).toEqual([
+      { key: 'earlier', kind: 'draft', day: MID_MONTH },
+      { key: 'gone', kind: 'bugs_stuck', day: MID_MONTH },
+    ])
+    expect(after.decisions.map((kept) => kept.key)).toEqual(['there', 'muted-gone', 'unread'])
+    expect(after.present).toEqual([
+      { key: 'unread', kind: 'hours', weight: 1 },
+      { key: 'there', kind: 'bugs_stuck', weight: 3 },
+      { key: 'mail:c:x', kind: 'bugs_stuck', weight: 1 },
+    ])
+    // Computed again with nothing changed, nothing changes: nothing is written.
+    expect(reconcileSignals(after, items, new Set(['hours']), MID_MONTH)).toEqual(after)
+  })
+
   it('offers to stop showing a kind put away three times, and hides the kinds muted', () => {
     const muted = ['a', 'b', 'c'].map((key) => decision({ key, state: 'muted' }))
     const settings = { ...NO_TODAY_SETTINGS, decisions: muted }
@@ -437,7 +513,7 @@ describe('what the PM decided on a signal', () => {
       { ...settings, mutedKinds: ['bugs_stuck'] },
       MID_MONTH,
     )
-    expect(page).toEqual({ items: [], hidden: 1, muteOffers: [] })
+    expect(page).toEqual({ items: [], hidden: 1, hiddenItems: [], muteOffers: [] })
   })
 
   it('keeps the last word on each signal and cleans the addresses', () => {
@@ -446,6 +522,9 @@ describe('what the PM decided on a signal', () => {
     expect(second.decisions).toHaveLength(1)
     expect(second.decisions[0]?.state).toBe('muted')
     expect(withoutDecision(second, 'a').decisions).toEqual([])
+    // A decision taken under the key the signal had before goes with the signal.
+    expect(withoutDecision(second, 'c', ['b']).decisions).toHaveLength(1)
+    expect(withoutDecision(second, 'c', ['a']).decisions).toEqual([])
     expect(
       cleanTodaySettings({
         ...NO_TODAY_SETTINGS,

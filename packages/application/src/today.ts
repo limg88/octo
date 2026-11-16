@@ -12,10 +12,12 @@ import {
   FEED_NAMES,
   feedLabel,
   forecastItems,
+  type HiddenItem,
   hoursItems,
   type Identity,
   identityAddresses,
   isDomainError,
+  isMonthClosing,
   isSprintEnding,
   type LiveSource,
   type MailJudgement,
@@ -37,12 +39,14 @@ import {
   parseMailDocument,
   previousMonth,
   RISK_PROPOSAL_DAYS,
+  reconcileSignals,
   requirementItems,
   riskItems,
   romeDateString,
   type SourceReading,
   type StoredMail,
   sourceItems,
+  sprintEnd,
   TODAY_BANDS,
   type TodayBand,
   type TodayFreshness,
@@ -108,6 +112,12 @@ export type TodayView = {
   now: NowItem[]
   /** Signals the PM put away and that stay away today. */
   hidden: number
+  /** Those of them a decision keeps away, each with its decision: read, and taken back. */
+  hiddenItems: HiddenItem[]
+  /** The kinds of the signals that went away by themselves today, one for each signal. */
+  resolvedToday: TodayKind[]
+  /** The last day of the sprint the project is set on, when it is still to come. */
+  sprintEnd: string | null
   muteOffers: TodayKind[]
   mutedKinds: TodayKind[]
   freshness: TodayFreshness[]
@@ -172,12 +182,29 @@ export const MEETINGS_SOURCE = 'Riunioni (Verbale)'
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const dayOf = (instant: Date): string => instant.toISOString().slice(0, 10)
 
-/** What a section computes, or nothing when the section is not set up or cannot be read now. */
-async function attempt<T>(compute: () => Promise<T[]>): Promise<T[]> {
+/** The kinds of signal each section of the page tells: unread, none of them is told gone. */
+const MAIL_KINDS: readonly TodayKind[] = ['mail_reply', 'mail_follow', 'mail_waiting', 'meeting']
+const TRACKER_KINDS: readonly TodayKind[] = ['tracker_old', 'bugs_stuck', 'requirements']
+const HOURS_KINDS: readonly TodayKind[] = ['hours']
+const FORECAST_KINDS: readonly TodayKind[] = ['forecast', 'month_due']
+const ALIGNMENT_KINDS: readonly TodayKind[] = ['alignment']
+const DRAFT_KINDS: readonly TodayKind[] = ['draft']
+const RISK_KINDS: readonly TodayKind[] = ['risk', 'risk_candidates']
+const UNASSIGNED_KINDS: readonly TodayKind[] = ['meeting_unassigned']
+/** The kinds told only while the sprint ends, and only while the month is being closed. */
+const SPRINT_END_KINDS: readonly TodayKind[] = ['requirements', 'alignment']
+const MONTH_CLOSING_KINDS: readonly TodayKind[] = ['month_due']
+
+/**
+ * What a section computes, or nothing when the section is not set up or cannot be read now:
+ * then `onUnread` is told, so that nobody takes its signals for gone.
+ */
+async function attempt<T>(compute: () => Promise<T[]>, onUnread: () => void): Promise<T[]> {
   try {
     return await compute()
   } catch (error) {
     if (!isDomainError(error)) throw error
+    onUnread()
     return []
   }
 }
@@ -240,9 +267,9 @@ export function createToday(deps: TodayDeps): Today {
     const today = romeDateString(now)
     const tomorrow = dayOf(new Date(Date.parse(`${today}T00:00:00.000Z`) + DAY_MS))
     const lastMonth = previousMonth(today)
-    const settings = await deps.store.load(project.folder)
+    const saved = await deps.store.load(project.folder)
     const evaluation = await deps.store.loadEvaluation(project.folder)
-    const own = [...new Set([...identityAddresses(deps.identity()), ...settings.ownAddresses])]
+    const own = [...new Set([...identityAddresses(deps.identity()), ...saved.ownAddresses])]
     const freshness: TodayFreshness[] = []
 
     const sources = await readings(project)
@@ -251,7 +278,12 @@ export function createToday(deps: TodayDeps): Today {
       freshness.push({ source, readAt: ok ? (state.lastRun?.at ?? null) : null })
     }
     const team = await deps.team.get(project).catch(() => ({ people: [], periods: [] }))
-    const mails = await attempt(() => recentMail(project, today))
+    /** The kinds that cannot be told now: what is missing of them did not go away. */
+    const unsettled = new Set<TodayKind>()
+    const unread = (kinds: readonly TodayKind[]) => () => {
+      for (const kind of kinds) unsettled.add(kind)
+    }
+    const mails = await attempt(() => recentMail(project, today), unread(MAIL_KINDS))
     const threads = mailThreads(mails, own, now, ownPeopleKeys(team))
     const sprint = await deps.alignments
       .settings(project)
@@ -261,6 +293,9 @@ export function createToday(deps: TodayDeps): Today {
         return ''
       })
     const sprintEnding = isSprintEnding(sprint, team, today)
+    if (!sprintEnding) unread(SPRINT_END_KINDS)()
+    if (!isMonthClosing(today)) unread(MONTH_CLOSING_KINDS)()
+    const lastDay = sprintEnd(sprint, team)
 
     const groups = await Promise.all([
       Promise.resolve(sourceItems(sources, now)),
@@ -272,11 +307,11 @@ export function createToday(deps: TodayDeps): Today {
           ...bugItems(view.bugs.open, dashboard.stuckDays, view.exportedAt),
           ...requirementItems(view.requirements, view.exportedAt, sprintEnding),
         ]
-      }),
+      }, unread(TRACKER_KINDS)),
       attempt(async () => {
         const view = await deps.hours.view(project, monthPeriod(lastMonth))
         return hoursItems(lastMonth, view.reconciliation, today)
-      }),
+      }, unread(HOURS_KINDS)),
       attempt(async () => {
         const { forecast } = await deps.forecasts.view(project, lastMonth)
         const written = await deps.files.under(project.folder, `${FORECAST_FOLDER}/${lastMonth}`)
@@ -284,27 +319,35 @@ export function createToday(deps: TodayDeps): Today {
           ...forecastItems(forecast, today),
           ...monthDueItems(lastMonth, written.length > 0, today),
         ]
-      }),
+      }, unread(FORECAST_KINDS)),
       attempt(async () => {
         const view = await deps.alignments.view(project)
         return alignmentItems(sprint, view.alignment, view.exportedAt, team, today)
-      }),
-      attempt(async () => draftItems(await deps.deliverables.list(project), now)),
+      }, unread(ALIGNMENT_KINDS)),
+      attempt(
+        async () => draftItems(await deps.deliverables.list(project), now),
+        unread(DRAFT_KINDS),
+      ),
       Promise.resolve(calendarItems(team, today)),
       Promise.resolve(meetingItems(meetingsOn(mails, today, romeDateString))),
-      attempt(async () => riskItems(await deps.risks.register(project))),
-      attempt(async () =>
-        unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
+      attempt(async () => riskItems(await deps.risks.register(project)), unread(RISK_KINDS)),
+      attempt(
+        async () => unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
+        unread(UNASSIGNED_KINDS),
       ),
     ])
     const computed = groups.flat()
     /** The signals of the day under some settings: only the mail depends on the PM's word. */
-    const pageFor = (kept: TodaySettings) =>
-      applyDecisions(
-        [...computed, ...mailItems(threads, evaluation.mails, now, tomorrow, mailTurnsOf(kept))],
-        kept,
-        today,
-      )
+    const signalsFor = (kept: TodaySettings): TodayItem[] => [
+      ...computed,
+      ...mailItems(threads, evaluation.mails, now, tomorrow, mailTurnsOf(kept)),
+    ]
+    const pageFor = (kept: TodaySettings) => applyDecisions(signalsFor(kept), kept, today)
+    // What went away since the last time is told, and what was marked done about it forgotten.
+    const settings = reconcileSignals(saved, signalsFor(saved), unsettled, today)
+    if (JSON.stringify(settings) !== JSON.stringify(saved)) {
+      await deps.store.save(project.folder, settings)
+    }
     // A judgement given before Claude was asked whom a mail is for says only how much it matters.
     const unjudged = threads.awaitingMe.filter(
       (mail) => evaluation.mails[mail.id]?.addressee === undefined,
@@ -320,6 +363,7 @@ export function createToday(deps: TodayDeps): Today {
       judgedToday,
       page: pageFor(settings),
       pageFor,
+      sprintEnd: lastDay !== null && lastDay > today ? lastDay : null,
       freshness,
       own,
     }
@@ -347,6 +391,11 @@ export function createToday(deps: TodayDeps): Today {
       items: computed.page.items,
       now: nowItems(computed.page.items, computed.now),
       hidden: computed.page.hidden,
+      hiddenItems: computed.page.hiddenItems,
+      resolvedToday: computed.settings.resolved
+        .filter((signal) => signal.day === computed.today)
+        .map((signal) => signal.kind),
+      sprintEnd: computed.sprintEnd,
       muteOffers: computed.page.muteOffers,
       mutedKinds: computed.settings.mutedKinds,
       freshness: computed.freshness,
@@ -437,7 +486,12 @@ export function createToday(deps: TodayDeps): Today {
       const computed = await compute(project)
       const { page, settings, today } = computed
       if (input.state === 'open') {
-        return keep(project, computed, withoutDecision(settings, input.key))
+        const hidden = page.hiddenItems.find((kept) => kept.item.key === input.key)
+        return keep(
+          project,
+          computed,
+          withoutDecision(settings, input.key, hidden?.item.formerKeys ?? []),
+        )
       }
       if (!DECISION_STATES.includes(input.state)) throw new DomainError('today_decision_invalid')
       const until = input.until ?? null

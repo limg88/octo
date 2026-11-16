@@ -1,5 +1,6 @@
 import type { AgentProgress, TodayView as View } from '@octo/application'
 import {
+  type HiddenItem,
   isToDo,
   type MailTurn,
   type Project,
@@ -23,7 +24,15 @@ import { dateTimeText, messages, progressText } from './messages.ts'
 import { RiskRegister } from './RiskRegister.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
-import { ageText, asOfText, dayText, nowText, personOf, signalText } from './today-text.ts'
+import {
+  ageText,
+  asOfText,
+  dayText,
+  nowText,
+  personOf,
+  shortDayText,
+  signalText,
+} from './today-text.ts'
 import { useSelection } from './use-selection.ts'
 
 type TodayApi = Pick<
@@ -114,6 +123,7 @@ export function TodayView({
   const [judging, setJudging] = useState(false)
   const [step, setStep] = useState<AgentProgress | null>(null)
   const [showRisks, setShowRisks] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const [ownFocus, setOwnFocus] = useState<TodayFocus>(NO_TODAY_FOCUS)
   const [decided, setDecided] = useState<Decided | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
@@ -177,6 +187,7 @@ export function TodayView({
     setAll(false)
     setLater(null)
     setShowRisks(false)
+    setShowHidden(false)
     setReading(false)
     setJudging(false)
     setStep(null)
@@ -525,6 +536,7 @@ export function TodayView({
                 <SignalDetail
                   item={selected}
                   day={view.day}
+                  sprintEnd={view.sprintEnd}
                   judging={judging}
                   opening={opening === selected.key}
                   choosingLater={later === selected.key}
@@ -568,7 +580,38 @@ export function TodayView({
           </button>
         </div>
       ))}
-      {view.hidden > 0 && <p className="hint">{text.hidden(view.hidden)}</p>}
+      {view.resolvedToday.length > 0 && (
+        <p className="hint" role="status">
+          {text.resolvedToday(
+            view.resolvedToday.length,
+            [...new Set(view.resolvedToday.map((kind) => text.kinds[kind]))].join(', '),
+          )}
+        </p>
+      )}
+      {(view.hiddenItems.length > 0 || view.mutedKinds.length > 0) && (
+        <>
+          <div className="actions">
+            <button
+              type="button"
+              className="quiet"
+              aria-expanded={showHidden}
+              onClick={() => setShowHidden(!showHidden)}
+            >
+              {text.hiddenButton(view.hiddenItems.length)}
+            </button>
+          </div>
+          {showHidden && (
+            <HiddenList
+              items={view.hiddenItems}
+              mutedKinds={view.mutedKinds}
+              onRestore={(item) =>
+                void decide({ key: item.key, title: signalText(item).title }, 'open')
+              }
+              onUnmute={(kind) => void mute(kind, false)}
+            />
+          )}
+        </>
+      )}
 
       <Judgement
         view={view}
@@ -647,9 +690,100 @@ function SignalRow(props: {
   )
 }
 
+/** What was put away, to be read and taken back: the signals, then the kinds not shown at all. */
+function HiddenList(props: {
+  items: HiddenItem[]
+  mutedKinds: TodayKind[]
+  onRestore: (item: TodayItem) => void
+  onUnmute: (kind: TodayKind) => void
+}) {
+  const stateText = (hidden: HiddenItem): string =>
+    hidden.state === 'later'
+      ? text.hiddenStates.later(hidden.until ? shortDayText(hidden.until) : null)
+      : text.hiddenStates[hidden.state]
+  const columns: DataColumn<HiddenItem>[] = [
+    {
+      key: 'what',
+      label: text.hiddenWhat,
+      cell: (hidden) => <strong>{signalText(hidden.item).title}</strong>,
+      sort: (hidden) => signalText(hidden.item).title,
+      text: (hidden) => signalText(hidden.item).title,
+    },
+    {
+      key: 'state',
+      label: text.hiddenState,
+      width: '24%',
+      cell: stateText,
+      sort: stateText,
+      text: stateText,
+    },
+    {
+      key: 'since',
+      label: text.hiddenSince,
+      width: '120px',
+      cell: (hidden) => shortDayText(hidden.at),
+      sort: (hidden) => hidden.at,
+      text: (hidden) => shortDayText(hidden.at),
+    },
+    {
+      key: 'actions',
+      label: '',
+      name: text.hiddenActions,
+      kind: 'actions',
+      width: '120px',
+      cell: (hidden) => (
+        <button
+          type="button"
+          className="quiet"
+          aria-label={`${text.restore}: ${signalText(hidden.item).title}`}
+          onClick={() => props.onRestore(hidden.item)}
+        >
+          {text.restore}
+        </button>
+      ),
+    },
+  ]
+  return (
+    <section className="today-hidden" aria-label={text.hiddenTitle}>
+      {props.items.length === 0 ? (
+        <p className="hint">{text.hiddenNone}</p>
+      ) : (
+        <DataTable
+          label={text.hiddenTitle}
+          columns={columns}
+          rows={props.items}
+          rowKey={(hidden) => hidden.item.key}
+        />
+      )}
+      {props.mutedKinds.length > 0 && (
+        <>
+          <h5 className="today-title">{text.mutedTitle}</h5>
+          <ul className="today-muted" aria-label={text.mutedTitle}>
+            {props.mutedKinds.map((kind) => (
+              <li key={kind}>
+                <span>{text.kinds[kind]}</span>
+                <button
+                  type="button"
+                  className="quiet"
+                  aria-label={`${text.unmute}: ${text.kinds[kind]}`}
+                  onClick={() => props.onUnmute(kind)}
+                >
+                  {text.unmute}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  )
+}
+
 type DetailProps = {
   item: TodayItem
   day: string
+  /** The last day of the sprint, when it is still to come: a day to put things off until. */
+  sprintEnd: string | null
   judging: boolean
   opening: boolean
   choosingLater: boolean
@@ -664,6 +798,8 @@ type DetailProps = {
 /** The signal in view: why it is here, what it stands on, and what the PM can do about it. */
 function SignalDetail(props: DetailProps) {
   const { item, day } = props
+  const [laterDay, setLaterDay] = useState('')
+  const tomorrow = plusDays(day, 1)
   const words = signalText(item)
   const facts = item.facts
   const asOf = asOfText(item)
@@ -691,7 +827,7 @@ function SignalDetail(props: DetailProps) {
             {returned.why === 'later'
               ? text.returned.later
               : returned.why === 'still'
-                ? text.returned.still(returned.since.split('-').reverse().join('/'))
+                ? text.returned.still(shortDayText(returned.since))
                 : text.returned.worse(returned.was, returned.now)}
           </p>
         )}
@@ -782,7 +918,7 @@ function SignalDetail(props: DetailProps) {
         {props.choosingLater && (
           <fieldset className="actions today-later">
             <legend className="hint">{text.laterTitle}</legend>
-            <button type="button" onClick={() => props.onDecide('later', plusDays(day, 1))}>
+            <button type="button" onClick={() => props.onDecide('later', tomorrow)}>
               {text.laterTomorrow}
             </button>
             <button type="button" onClick={() => props.onDecide('later', nextMonday(day))}>
@@ -790,6 +926,27 @@ function SignalDetail(props: DetailProps) {
             </button>
             <button type="button" onClick={() => props.onDecide('later', plusDays(day, WEEK_DAYS))}>
               {text.laterWeek}
+            </button>
+            {props.sprintEnd && (
+              <button type="button" onClick={() => props.onDecide('later', props.sprintEnd)}>
+                {text.laterSprintEnd(shortDayText(props.sprintEnd))}
+              </button>
+            )}
+            <label className="today-later-date">
+              <span className="hint">{text.laterDate}</span>
+              <input
+                type="date"
+                min={tomorrow}
+                value={laterDay}
+                onChange={(event) => setLaterDay(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={laterDay < tomorrow}
+              onClick={() => props.onDecide('later', laterDay)}
+            >
+              {text.laterDateConfirm}
             </button>
             <button type="button" className="quiet" onClick={props.onAskLater}>
               {text.laterCancel}

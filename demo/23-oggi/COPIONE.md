@@ -41,7 +41,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
    Atteso: la sezione «Ore» sul mese scorso, con le stesse persone. Torna su «Oggi».
 
 6. **Rimanda, e metti da parte.** Sulle ore premi «Rimanda», poi «A domani». Sull'allineamento premi «Fatto».
-   Atteso: le due segnalazioni spariscono; in fondo: «2 segnalazioni messe da parte.» Il contatore accanto a «Da fare oggi» scende.
+   Atteso: le due segnalazioni spariscono; in fondo: il pulsante «Messe da parte: 2», che apre l'elenco (vedi la demo 31). Il contatore accanto a «Da fare oggi» scende.
    Dimostra: lo stato delle segnalazioni resta nel progetto. Quella rimandata torna domani in cima; quella fatta torna se fra tre giorni lavorativi il problema c'è ancora, o subito se peggiora.
 
 7. **Guarda «Da tenere d'occhio».**

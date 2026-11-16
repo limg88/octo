@@ -4,6 +4,7 @@ import {
   type MeetingReading,
   NEVER_READ,
   NO_SOURCES,
+  NO_TODAY_SETTINGS,
   type Project,
   type RecordedMeeting,
   type SourcesConfig,
@@ -285,7 +286,7 @@ describe('the recorded meetings on the page of the day', () => {
       risks: { register: notSet('risk_invalid'), propose: notSet('risk_invalid') },
       files: { under: async () => [], readText: async () => null },
       store: {
-        load: async () => ({ decisions: [], mutedKinds: [], ownAddresses: [], mailTurns: [] }),
+        load: async () => NO_TODAY_SETTINGS,
         save: async () => {},
         loadEvaluation: async () => ({ at: null, model: null, mails: {} }),
         saveEvaluation: async () => {},

@@ -32,7 +32,16 @@ export type TodaySettings = {
   ownAddresses: string[]
   /** The conversations of which the PM said whose turn it is. */
   mailTurns: MailTurnChoice[]
+  /** The signals of the last time the page was computed: what is gone since is told. */
+  present: PresentSignal[]
+  /** The signals that went away by themselves, with the day they did. */
+  resolved: ResolvedSignal[]
 }
+
+/** A signal as the page last computed it. */
+export type PresentSignal = { key: string; kind: TodayKind; weight: number }
+/** A signal that is no longer there because its data changed, not because the PM said so. */
+export type ResolvedSignal = { key: string; kind: TodayKind; day: string }
 
 /** The PM's word on a conversation of the mail: it is theirs to answer, or it is not. */
 export type MailTurnChoice = { conversation: string; turn: MailTurn; at: string }
@@ -42,7 +51,14 @@ export const NO_TODAY_SETTINGS: TodaySettings = {
   mutedKinds: [],
   ownAddresses: [],
   mailTurns: [],
+  present: [],
+  resolved: [],
 }
+
+/** Signals remembered at most from a computation to the next. */
+export const MAX_PRESENT = 1000
+/** Kinds that end with the hour or the day they name: their going away resolves nothing. */
+export const TIMED_KINDS: readonly TodayKind[] = ['meeting', 'calendar']
 
 /** Words on conversations kept at most: the oldest go first. */
 export const MAX_MAIL_TURNS = 500
@@ -93,15 +109,29 @@ function comesBack(
     return decision.until !== null && today < decision.until ? 'hidden' : { why: 'later' }
   }
   if (item.weight > decision.weight) return { why: 'worse', was: decision.weight, now: item.weight }
+  // What is getting better is being done: it stays away for as long as it does not get worse.
+  if (item.weight < decision.weight) return 'hidden'
   return workdaysBetween(decision.at, today) >= DONE_GRACE_WORKDAYS
     ? { why: 'still', since: decision.at }
     : 'hidden'
 }
 
+/** A signal that stays away today, with the decision that keeps it there. */
+export type HiddenItem = {
+  item: TodayItem
+  state: DecisionState
+  /** The day the decision was taken. */
+  at: string
+  /** For `later`: the day it comes back. */
+  until: string | null
+}
+
 export type TodayPage = {
   items: TodayItem[]
-  /** Signals the PM put away and that stay away today. */
+  /** Signals the PM put away and that stay away today, those of a muted kind included. */
   hidden: number
+  /** The signals a decision keeps away, to be read and taken back. */
+  hiddenItems: HiddenItem[]
   /** Kinds the PM keeps putting away: Octo offers to stop showing them. */
   muteOffers: TodayKind[]
 }
@@ -118,10 +148,11 @@ export function applyDecisions(
   const byKey = latest(settings.decisions)
   const muted = new Set(settings.mutedKinds)
   const shown: TodayItem[] = []
-  let hidden = 0
+  const hiddenItems: HiddenItem[] = []
+  let ofMutedKind = 0
   for (const item of items) {
     if (muted.has(item.facts.kind)) {
-      hidden += 1
+      ofMutedKind += 1
       continue
     }
     // A decision taken when the signal had another key is the decision on this signal.
@@ -133,8 +164,11 @@ export function applyDecisions(
       continue
     }
     const back = comesBack(item, decision, today)
-    if (back === 'hidden') hidden += 1
-    else shown.push({ ...item, returned: back, ...(back.why === 'later' ? { band: 'due' } : {}) })
+    if (back === 'hidden') {
+      hiddenItems.push({ item, state: decision.state, at: decision.at, until: decision.until })
+    } else {
+      shown.push({ ...item, returned: back, ...(back.why === 'later' ? { band: 'due' } : {}) })
+    }
   }
   const mutedTimes = new Map<TodayKind, number>()
   for (const decision of byKey.values()) {
@@ -145,7 +179,54 @@ export function applyDecisions(
   const muteOffers = [...mutedTimes.entries()]
     .filter(([kind, times]) => times >= MUTE_OFFER_AFTER && !muted.has(kind))
     .map(([kind]) => kind)
-  return { items: orderToday(shown), hidden, muteOffers }
+  return {
+    items: orderToday(shown),
+    hidden: hiddenItems.length + ofMutedKind,
+    hiddenItems: hiddenItems.sort(
+      (a, b) => b.at.localeCompare(a.at) || a.item.key.localeCompare(b.item.key),
+    ),
+    muteOffers,
+  }
+}
+
+/**
+ * The settings after the page was computed again. A signal that was there and is gone went away
+ * by itself: it is told for the day, and what the PM had marked done about it is forgotten, so
+ * that the same trouble coming back is new. A signal of a kind that could not be told now
+ * (`unsettled`: its source was not read, or its days are over) is neither gone nor there.
+ */
+export function reconcileSignals(
+  settings: TodaySettings,
+  items: readonly TodayItem[],
+  unsettled: ReadonlySet<TodayKind>,
+  today: string,
+): TodaySettings {
+  const there = new Set(items.flatMap((item) => [item.key, ...(item.formerKeys ?? [])]))
+  const told = (kind: TodayKind): boolean => !unsettled.has(kind) && !TIMED_KINDS.includes(kind)
+  const gone = settings.present.filter((signal) => !there.has(signal.key) && told(signal.kind))
+  const resolved = [
+    ...settings.resolved.filter(
+      (signal) =>
+        signal.day === today &&
+        !there.has(signal.key) &&
+        gone.every((left) => left.key !== signal.key),
+    ),
+    ...gone.map(({ key, kind }) => ({ key, kind, day: today })),
+  ]
+  const untold = settings.present.filter(
+    (signal) => !there.has(signal.key) && unsettled.has(signal.kind),
+  )
+  return {
+    ...settings,
+    decisions: settings.decisions.filter(
+      (decision) => decision.state !== 'done' || there.has(decision.key) || !told(decision.kind),
+    ),
+    present: [
+      ...untold,
+      ...items.map((item) => ({ key: item.key, kind: item.facts.kind, weight: item.weight })),
+    ].slice(-MAX_PRESENT),
+    resolved,
+  }
 }
 
 /** The settings with one more decision; the same signal keeps only its last word. */
@@ -154,9 +235,17 @@ export function withDecision(settings: TodaySettings, decision: TodayDecision): 
   return { ...settings, decisions: [...others, decision].slice(-MAX_DECISIONS) }
 }
 
-/** The settings without the decision on a signal: it is shown again as if never touched. */
-export function withoutDecision(settings: TodaySettings, key: string): TodaySettings {
-  return { ...settings, decisions: settings.decisions.filter((kept) => kept.key !== key) }
+/**
+ * The settings without the decision on a signal: it is shown again as if never touched. A
+ * decision taken when the signal had another key goes with it.
+ */
+export function withoutDecision(
+  settings: TodaySettings,
+  key: string,
+  formerKeys: readonly string[] = [],
+): TodaySettings {
+  const keys = new Set([key, ...formerKeys])
+  return { ...settings, decisions: settings.decisions.filter((kept) => !keys.has(kept.key)) }
 }
 
 const ADDRESS = /^[^\s@]+@[^\s@]+$/
@@ -165,6 +254,8 @@ export function cleanTodaySettings(settings: TodaySettings): TodaySettings {
   return {
     decisions: settings.decisions.slice(-MAX_DECISIONS),
     mailTurns: (settings.mailTurns ?? []).slice(-MAX_MAIL_TURNS),
+    present: (settings.present ?? []).slice(-MAX_PRESENT),
+    resolved: settings.resolved ?? [],
     mutedKinds: [...new Set(settings.mutedKinds)],
     ownAddresses: [
       ...new Set(

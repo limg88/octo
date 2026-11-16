@@ -103,6 +103,9 @@ const view = (overrides: Partial<View> = {}): View => ({
   items: [source, hours, mail, bugs, risk],
   now: [],
   hidden: 1,
+  hiddenItems: [],
+  resolvedToday: [],
+  sprintEnd: null,
   muteOffers: [],
   mutedKinds: [],
   freshness: [
@@ -197,7 +200,6 @@ describe('the page of the day', () => {
     expect(detail.textContent).toContain(text.judgement.verified)
     fireEvent.click(within(detail).getByRole('button', { name: text.open.mail }))
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'Posta/2026-11/budget.md')
-    expect(screen.getByText(text.hidden(1))).toBeTruthy()
     expect(screen.getByText('6 bug fermi da più di 30 giorni')).toBeTruthy()
   })
 
@@ -239,6 +241,89 @@ describe('the page of the day', () => {
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
     expect(await screen.findByRole('list', { name: text.nowList })).toBeTruthy()
     expect(screen.getByText(text.nothingElse)).toBeTruthy()
+  })
+
+  it('lists what was put away with its state, and takes it back with one click', async () => {
+    const { api } = todayApi(
+      view({
+        items: [mail],
+        hiddenItems: [
+          { item: hours, state: 'later', at: '2026-11-13', until: '2026-11-20' },
+          { item: bugs, state: 'done', at: '2026-11-12', until: null },
+          { item: risk, state: 'muted', at: '2026-11-10', until: null },
+        ],
+        mutedKinds: ['meeting'],
+        resolvedToday: ['draft', 'draft', 'hours'],
+      }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    // What the page closed without the PM is said, by kind.
+    expect(
+      await screen.findByText(text.resolvedToday(3, `${text.kinds.draft}, ${text.kinds.hours}`)),
+    ).toBeTruthy()
+    // The list is closed until it is asked for.
+    const toggle = screen.getByRole('button', { name: text.hiddenButton(3) })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('region', { name: text.hiddenTitle })).toBeNull()
+    fireEvent.click(toggle)
+    const hidden = screen.getByRole('region', { name: text.hiddenTitle })
+    expect(hidden.textContent).toContain(text.hiddenStates.later('20/11/2026'))
+    expect(hidden.textContent).toContain('13/11/2026')
+    expect(hidden.textContent).toContain(text.hiddenStates.done)
+    expect(hidden.textContent).toContain(text.hiddenStates.muted)
+    // The kinds not shown at all are shown again from here too.
+    fireEvent.click(
+      within(hidden).getByRole('button', { name: `${text.unmute}: ${text.kinds.meeting}` }),
+    )
+    expect(api.muteTodayKind).toHaveBeenCalledWith('p-1', 'meeting', false)
+    fireEvent.click(
+      within(hidden).getByRole('button', {
+        name: `${text.restore}: 6 bug fermi da più di 30 giorni`,
+      }),
+    )
+    await waitFor(() =>
+      expect(api.decideToday).toHaveBeenCalledWith('p-1', 'bugs-stuck', 'open', null),
+    )
+  })
+
+  it('shows only the kinds not shown when no signal is put away', async () => {
+    const { api } = todayApi(view({ mutedKinds: ['meeting'] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.hiddenButton(0) }))
+    const hidden = screen.getByRole('region', { name: text.hiddenTitle })
+    expect(hidden.textContent).toContain(text.hiddenNone)
+    expect(hidden.textContent).toContain(text.kinds.meeting)
+    expect(text.hiddenStates.later(null)).toBe('Rimandato')
+  })
+
+  it('puts off until the end of the sprint or until a day the PM writes', async () => {
+    const { api } = todayApi(view({ sprintEnd: '2026-11-27' }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const detail = await screen.findByRole('region', { name: text.detailTitle })
+    fireEvent.click(within(detail).getByRole('button', { name: text.later }))
+    fireEvent.click(within(detail).getByRole('button', { name: text.laterSprintEnd('27/11/2026') }))
+    await waitFor(() =>
+      expect(api.decideToday).toHaveBeenCalledWith('p-1', 'hours:2026-10', 'later', '2026-11-27'),
+    )
+  })
+
+  it('refuses a day that is not after today, and takes one that is', async () => {
+    const { api } = todayApi()
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const detail = await screen.findByRole('region', { name: text.detailTitle })
+    fireEvent.click(within(detail).getByRole('button', { name: text.later }))
+    // Without a sprint that is still to end, its day is not offered.
+    expect(within(detail).queryByRole('button', { name: /A fine sprint/ })).toBeNull()
+    const confirm = within(detail).getByRole('button', { name: text.laterDateConfirm })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    const field = within(detail).getByLabelText(text.laterDate)
+    fireEvent.change(field, { target: { value: '2026-11-16' } })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(field, { target: { value: '2026-12-03' } })
+    fireEvent.click(confirm)
+    await waitFor(() =>
+      expect(api.decideToday).toHaveBeenCalledWith('p-1', 'hours:2026-10', 'later', '2026-12-03'),
+    )
   })
 
   it('remembers done, later and not interested, each with one gesture', async () => {

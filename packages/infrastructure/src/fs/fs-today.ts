@@ -49,6 +49,8 @@ const settingsSchema = z.object({
   mailTurns: z
     .array(z.object({ conversation: z.string(), turn: z.enum(MAIL_TURNS), at: z.string() }))
     .default([]),
+  present: z.array(z.object({ key: z.string(), kind: z.string(), weight: z.number() })).default([]),
+  resolved: z.array(z.object({ key: z.string(), kind: z.string(), day: z.string() })).default([]),
 })
 
 const evaluationSchema = z.object({
@@ -109,6 +111,14 @@ export function createFsTodayStore(): TodayStore {
           kind: decision.kind as TodayKind,
         })),
         mutedKinds: parsed.data.mutedKinds as TodayKind[],
+        present: parsed.data.present.map((signal) => ({
+          ...signal,
+          kind: signal.kind as TodayKind,
+        })),
+        resolved: parsed.data.resolved.map((signal) => ({
+          ...signal,
+          kind: signal.kind as TodayKind,
+        })),
       })
     },
     save: (projectFolder, settings) => writeJson(settingsFile(projectFolder), settings),

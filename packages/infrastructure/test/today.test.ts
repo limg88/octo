@@ -194,6 +194,8 @@ describe('what the page of the day keeps in the project', () => {
       mutedKinds: ['meeting' as const],
       ownAddresses: ['pm@example.test'],
       mailTurns: [{ conversation: 'aurora: budget', turn: 'not_mine' as const, at: '2026-11-16' }],
+      present: [{ key: 'bugs-stuck', kind: 'bugs_stuck' as const, weight: 3 }],
+      resolved: [{ key: 'hours:2026-10', kind: 'hours' as const, day: '2026-11-16' }],
     }
     await store.save(folder, settings)
     expect(await store.load(folder)).toEqual(settings)

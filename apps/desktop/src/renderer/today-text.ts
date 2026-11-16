@@ -28,6 +28,8 @@ const HOUR = new Intl.DateTimeFormat('it-IT', {
 const hours = (value: number): string => NUMBER.format(value)
 export const monthText = (month: string): string => MONTH.format(new Date(`${month}-01T00:00:00Z`))
 export const dayText = (day: string): string => DAY.format(new Date(`${day}T00:00:00Z`))
+/** A day in short, as a table writes it: `16/11/2026`. */
+export const shortDayText = (day: string): string => day.split('-').reverse().join('/')
 const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
 const since = (days: number): string =>
