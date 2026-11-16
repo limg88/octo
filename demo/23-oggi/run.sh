@@ -7,49 +7,18 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 work="$root/.tmp/demo-23"
 source "$root/demo/lib/project.sh"
+source "$root/demo/lib/today-project.sh"
 
 cd "$root"
 pnpm install --frozen-lockfile >/dev/null
 pnpm build >/dev/null
 if [[ "${KEEP:-0}" != "1" || ! -d "$work/dati" ]]; then
-  make_demo_project "$work"
-  aurora="$work/Aurora"
-  # The tracker was exported five days ago: the page says its numbers are of that day.
-  node demo/lib/fake-tracker.ts "$aurora" old
-  node demo/lib/fake-hours.ts "$aurora"
-  node demo/lib/fake-forecast.ts "$aurora" hours
-  node demo/lib/fake-alignment.ts "$aurora"
-  node demo/lib/fake-today.ts "$aurora" "$work/Mail"
-  # What a PM sets once is already set, so that the page shows signals and not forms.
-  node -e '
-    const { readFileSync, writeFileSync, existsSync } = require("node:fs")
-    const [folder, month] = process.argv.slice(1)
-    const set = (name, values) => {
-      const file = `${folder}/_octo/.impostazioni/${name}.json`
-      const saved = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {}
-      writeFileSync(file, JSON.stringify({ ...saved, ...values }, null, 1))
-    }
-    set("forecast", { modelPath: "Amministrazione/Previsionale avanzamenti.xlsx" })
-    set("dashboard", {
-      exportPath: "dati/tracker/export.json",
-      historyPath: "dati/tracker/cronologia.json",
-      tags: ["Squadra"],
-      requirementPeriods: ["R2"],
-    })
-    set("hours", {
-      timesheetPath: "dati/Timesheets",
-      worklogPath: `dati/ore-tracker/worklog_${month}.csv`,
-      projects: ["PRJ000101"],
-      // The same person under two names, as demo 08 teaches to set.
-      aliases: [{ worklog: "E. Costa", timesheet: "Costa Elena" }],
-    })
-    set("alignment", { sprint: "Sprint 28", tags: ["Squadra"] })
-  ' "$aurora" "$(ls "$aurora/dati/ore-tracker" | sed -E "s/worklog_(.*)\.csv/\1/")"
+  make_today_project "$work"
   # A second project, with nothing to say: for the page of all the projects.
   mkdir -p "$work/Boreale"
   printf '# Boreale\n\nIl collaudo del progetto Boreale è previsto a gennaio 2027.\n' > "$work/Boreale/stato.md"
   cat > "$work/dati/projects.json" <<JSON
-[{"id":"demo-aurora","name":"Aurora","folder":"$aurora","addedAt":"2026-11-14T08:00:00.000Z"},
+[{"id":"demo-aurora","name":"Aurora","folder":"$work/Aurora","addedAt":"2026-11-14T08:00:00.000Z"},
  {"id":"demo-boreale","name":"Boreale","folder":"$work/Boreale","addedAt":"2026-11-15T08:00:00.000Z"}]
 JSON
 fi

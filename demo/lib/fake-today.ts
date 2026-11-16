@@ -27,14 +27,40 @@ const PM = 'Paola Verdi <pm@example.test>'
 const CLIENT = 'Carla Bianchi <carla@cliente.example>'
 const TECH = 'Luca Neri <luca@cliente.example>'
 
+/**
+ * Demos of «Adesso»: with `OCTO_DEMO_MEETING_IN_MINUTES` the meeting of the day starts that many
+ * minutes from now, instead of at three in the afternoon.
+ */
+const MINUTE_MS = 60 * 1000
+const meetingIn = Number(process.env.OCTO_DEMO_MEETING_IN_MINUTES ?? '')
+/** An instant as an invitation writes it in Italy: `20261116T150000`. */
+function romeStamp(at: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(at)
+  const part = (type: string): string => parts.find((found) => found.type === type)?.value ?? ''
+  return `${part('year')}${part('month')}${part('day')}T${part('hour')}${part('minute')}00`
+}
+const soon = Number.isFinite(meetingIn) && meetingIn > 0
+const meetingStart = soon ? romeStamp(new Date(now + meetingIn * MINUTE_MS)) : `${romeDay}T150000`
+const meetingEnd = soon
+  ? romeStamp(new Date(now + meetingIn * MINUTE_MS + HOUR_MS))
+  : `${romeDay}T160000`
+
 const invitation = [
   'BEGIN:VCALENDAR',
   'METHOD:REQUEST',
   'BEGIN:VEVENT',
   'UID:collaudo-aurora@cliente.example',
   'SUMMARY:Aurora: prova generale del collaudo',
-  `DTSTART;TZID=Europe/Rome:${romeDay}T150000`,
-  `DTEND;TZID=Europe/Rome:${romeDay}T160000`,
+  `DTSTART;TZID=Europe/Rome:${meetingStart}`,
+  `DTEND;TZID=Europe/Rome:${meetingEnd}`,
   'LOCATION:Sala riunioni del cliente',
   'END:VEVENT',
   'END:VCALENDAR',

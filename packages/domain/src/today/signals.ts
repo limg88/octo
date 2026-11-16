@@ -175,11 +175,13 @@ export function bugItems(
 /** How many ids a signal names: the others are a click away. */
 const IDS_SHOWN = 5
 
+/** The requirements that are not clear yet, said only while the sprint ends: before, they are noise. */
 export function requirementItems(
   rows: readonly RequirementRow[],
   exportedAt: string | null,
+  sprintEnding: boolean,
 ): TodayItem[] {
-  if (rows.length === 0) return []
+  if (rows.length === 0 || !sprintEnding) return []
   return [
     {
       key: 'requirements',
@@ -199,7 +201,23 @@ export function requirementItems(
 /** Days before the end of a sprint in which what is not aligned is due. */
 export const SPRINT_ENDING_WORKDAYS = 2
 
-/** What the two trackers do not agree on in the sprint compared. */
+/** The last day of the sprint the project is set on; null when no period of the calendar has its name. */
+export function sprintEnd(sprint: string, team: ProjectTeam): string | null {
+  const name = sprint.trim().toLowerCase()
+  if (name === '') return null
+  return team.periods.find((period) => period.name.trim().toLowerCase() === name)?.to ?? null
+}
+
+/** Whether a day falls in the last working days of the sprint: never, when no sprint is set. */
+export function isSprintEnding(sprint: string, team: ProjectTeam, today: string): boolean {
+  const end = sprintEnd(sprint, team)
+  return end !== null && today <= end && workdaysBetween(today, end) <= SPRINT_ENDING_WORKDAYS
+}
+
+/**
+ * What the two trackers do not agree on in the sprint compared, said only while the sprint ends:
+ * before, it is read in its own page.
+ */
 export function alignmentItems(
   sprint: string,
   alignment: Alignment,
@@ -216,23 +234,16 @@ export function alignmentItems(
     orphans: alignment.orphans.length,
   }
   const weight = facts.missing + facts.needsUpdate + facts.duplicates + facts.orphans
-  if (weight === 0) return []
-  const period = team.periods.find(
-    (candidate) => candidate.name.trim().toLowerCase() === sprint.trim().toLowerCase(),
-  )
-  const ending =
-    period !== undefined &&
-    today <= period.to &&
-    workdaysBetween(today, period.to) <= SPRINT_ENDING_WORKDAYS
+  if (weight === 0 || !isSprintEnding(sprint, team, today)) return []
   return [
     {
       key: `alignment:${sprint.trim().toLowerCase()}`,
-      band: ending ? 'due' : 'numbers',
+      band: 'due',
       facts,
       weight,
       target: 'alignment',
       asOf: exportedAt,
-      ...(ending ? { dueBecause: 'sprint_end' as const } : {}),
+      dueBecause: 'sprint_end',
     },
   ]
 }

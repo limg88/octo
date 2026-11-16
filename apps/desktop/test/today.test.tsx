@@ -21,7 +21,7 @@ import { errorText, messages } from '../src/renderer/messages.ts'
 import { RiskRegister } from '../src/renderer/RiskRegister.tsx'
 import { SignIn } from '../src/renderer/SignIn.tsx'
 import { TodayView } from '../src/renderer/TodayView.tsx'
-import { ageText, personOf, signalText } from '../src/renderer/today-text.ts'
+import { ageText, nowText, personOf, signalText } from '../src/renderer/today-text.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const aurora: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -101,6 +101,7 @@ const risk = item(
 const view = (overrides: Partial<View> = {}): View => ({
   day: '2026-11-16',
   items: [source, hours, mail, bugs, risk],
+  now: [],
   hidden: 1,
   muteOffers: [],
   mutedKinds: [],
@@ -198,6 +199,46 @@ describe('the page of the day', () => {
     expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'Posta/2026-11/budget.md')
     expect(screen.getByText(text.hidden(1))).toBeTruthy()
     expect(screen.getByText('6 bug fermi da più di 30 giorni')).toBeTruthy()
+  })
+
+  it('tells first what comes first now, with the rule that says why, and once only', async () => {
+    const { api } = todayApi(view({ now: [{ item: hours, rule: 'due' }] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const first = await screen.findByRole('list', { name: text.nowList })
+    const [row] = within(first).getAllByRole('button') as [HTMLElement]
+    expect(row.textContent).toContain(text.nowWhy.due.month_end)
+    expect(row.textContent).toContain('Ottobre 2026: le ore di 3 persone non tornano')
+    // It is the one in view, with everything that can be done about it.
+    expect(row.getAttribute('aria-pressed')).toBe('true')
+    const detail = screen.getByRole('region', { name: text.detailTitle })
+    expect(within(detail).getByRole('button', { name: text.done })).toBeTruthy()
+    // The list below goes on without it.
+    const list = screen.getByRole('list', { name: text.list })
+    expect(list.textContent).not.toContain('Ottobre 2026')
+    expect(list.textContent).toContain('Rispondi a Carla Bianchi')
+    fireEvent.click(within(list).getByText(/Rispondi a Carla Bianchi/))
+    expect(row.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('says each rule of what comes first in the words of a PM', () => {
+    const entry = (rule: Parameters<typeof nowText>[0]['rule'], minutes?: number) =>
+      nowText({ item: mail, rule, ...(minutes === undefined ? {} : { minutes }) })
+    expect(entry('meeting_soon', 40)).toBe('Fra 40 minuti')
+    expect(entry('meeting_soon', 1)).toBe('Fra 1 minuto')
+    expect(entry('meeting_soon', 60)).toBe('Fra 1 ora')
+    expect(entry('meeting_soon', 120)).toBe('Fra 2 ore')
+    expect(entry('meeting_soon', 95)).toBe('Fra 1 ora e 35 minuti')
+    expect(entry('due')).toBe(text.nowWhy.due.deadline)
+    expect(entry('later')).toBe(text.nowWhy.later)
+    expect(entry('important_mail')).toBe(text.nowWhy.importantMail)
+    expect(entry('worse')).toBe(text.nowWhy.worse)
+  })
+
+  it('shows what comes first also when nothing else is to do', async () => {
+    const { api } = todayApi(view({ items: [hours], now: [{ item: hours, rule: 'due' }] }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    expect(await screen.findByRole('list', { name: text.nowList })).toBeTruthy()
+    expect(screen.getByText(text.nothingElse)).toBeTruthy()
   })
 
   it('remembers done, later and not interested, each with one gesture', async () => {

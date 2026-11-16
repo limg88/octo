@@ -23,8 +23,8 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
    Atteso: sotto il titolo compare a quando risale ogni fonte («Posta: …», «Tracker del cliente: … di cinque giorni fa»). In cima, su fondo giallo: «Il tracker del cliente è di 5 giorni fa. Bug e requisiti qui sotto sono a quella data.»
    Dimostra: la pagina dice sempre a quando risale ciò che mostra, e un dato vecchio è la prima cosa che si legge.
 
-3. **Guarda «Da fare oggi».**
-   Atteso, dall'alto:
+3. **Guarda «Adesso» e «Da fare oggi».**
+   Atteso, dall'alto (le prime, quelle con una regola che le mette davanti, stanno nel riquadro «Adesso»: vedi la demo 30):
    - «Alle 15:00: Aurora: prova generale del collaudo», dall'invito arrivato per posta;
    - «Sprint 28: i due tracker non sono allineati», con «Perché oggi: lo sprint sta finendo.»;
    - «Rispondi a Carla Bianchi · «Aurora: budget aggiuntivo approvato»»;
@@ -34,7 +34,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
    Non compaiono: la mail «data del collaudo», perché Paola ha già risposto (la risposta non nomina «Aurora» ed è entrata lo stesso, perché risponde a una mail del progetto); l'avviso del sistema di monitoraggio, perché non è una persona; la mail del progetto «Zefiro».
    Dimostra: ogni segnalazione dice da dove viene (l'etichetta), a quando risale e perché è lì. Che una mail aspetti lo calcola il codice, dalle risposte.
 
-4. **Leggi la valutazione di Claude.** Dopo la lettura, sotto la mail di Carla Bianchi compare da sola: «Valutazione di Claude: importanza alta. … «Il comitato ha approvato un budget aggiuntivo di 8.000 euro» fonte controllata». Sotto l'elenco: «Valutazione di Claude del … (modello)».
+4. **Leggi la valutazione di Claude.** Dopo la lettura, sotto la mail di Carla Bianchi compare da sola: «Valutazione di Claude: importanza alta. … «Il comitato ha approvato un budget aggiuntivo di 8.000 euro» fonte controllata». In fondo alla pagina: «Valutazione di Claude del … (modello)».
    Dimostra: ciò che è giudicato sta a parte, si dichiara tale, dice quando e con quale modello, e la frase citata è stata cercata nel file dal codice. Claude è stato interpellato una volta, da solo, perché c'era una mail nuova.
 
 5. **Vai dove si risolve.** Sulla segnalazione delle ore premi «Apri «Ore»».

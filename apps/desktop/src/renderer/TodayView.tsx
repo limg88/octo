@@ -23,7 +23,7 @@ import { dateTimeText, messages, progressText } from './messages.ts'
 import { RiskRegister } from './RiskRegister.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
-import { ageText, asOfText, dayText, personOf, signalText } from './today-text.ts'
+import { ageText, asOfText, dayText, nowText, personOf, signalText } from './today-text.ts'
 import { useSelection } from './use-selection.ts'
 
 type TodayApi = Pick<
@@ -282,12 +282,16 @@ export function TodayView({
   }
 
   const allItems = view?.items ?? []
-  const toDo = allItems.filter(isToDo)
+  const first = view?.now ?? []
+  // What comes first is told once, above: the lists below go on without it.
+  const firstKeys = new Set(first.map((entry) => entry.item.key))
+  const toDo = allItems.filter((item) => isToDo(item) && !firstKeys.has(item.key))
   const inGroup =
     focus.group === 'all' ? toDo : toDo.filter((item) => GROUP_OF[item.facts.kind] === focus.group)
   const shown = all ? inGroup : inGroup.slice(0, TODAY_LIMIT)
+  const inView = [...first.map((entry) => entry.item), ...shown]
   const selectedKey = useSelection(
-    shown.map((item) => item.key),
+    inView.map((item) => item.key),
     focus.key,
   )
 
@@ -368,12 +372,16 @@ export function TodayView({
   ]
 
   const alerts = view.items.filter((item) => item.band === 'alert')
-  const watch = view.items.filter((item) => item.band === 'watch')
+  const watch = view.items.filter((item) => item.band === 'watch' && !firstKeys.has(item.key))
   const groups = TODAY_GROUPS.map((group) => ({
     group,
     count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
   })).filter((entry) => entry.count > 0)
-  const selected = shown.find((item) => item.key === selectedKey) ?? null
+  const selected = inView.find((item) => item.key === selectedKey) ?? null
+  const select = (key: string) => {
+    setLater(null)
+    setFocus({ ...focus, key })
+  }
 
   return (
     <section className="today" aria-label={messages.todayTab} aria-busy={reading || undefined}>
@@ -434,6 +442,27 @@ export function TodayView({
         </div>
       )}
 
+      {first.length > 0 && (
+        <section className="panel today-now" aria-label={text.now}>
+          <h4 className="today-title" title={text.nowHint}>
+            {text.now}
+          </h4>
+          <ul className="entries" aria-label={text.nowList}>
+            {first.map((entry) => (
+              <li key={entry.item.key}>
+                <SignalRow
+                  item={entry.item}
+                  why={nowText(entry)}
+                  selected={entry.item.key === selectedKey}
+                  judging={judging}
+                  onSelect={() => select(entry.item.key)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <h4 className="today-title">
         {text.toDo}
         {toDo.length > 0 && (
@@ -442,7 +471,7 @@ export function TodayView({
       </h4>
       {view.items.length === 0 ? (
         <p className="today-empty">{text.nothing}</p>
-      ) : toDo.length === 0 ? (
+      ) : inView.length === 0 ? (
         <p className="today-empty">{text.nothingToDo}</p>
       ) : (
         <>
@@ -468,7 +497,9 @@ export function TodayView({
           <div className="split">
             <div className="split-list">
               {shown.length === 0 ? (
-                <p className="today-empty">{text.noneInFilter}</p>
+                <p className="today-empty">
+                  {toDo.length === 0 ? text.nothingElse : text.noneInFilter}
+                </p>
               ) : (
                 <ul className="entries" aria-label={text.list}>
                   {shown.map((item) => (
@@ -477,10 +508,7 @@ export function TodayView({
                         item={item}
                         selected={item.key === selectedKey}
                         judging={judging}
-                        onSelect={() => {
-                          setLater(null)
-                          setFocus({ ...focus, key: item.key })
-                        }}
+                        onSelect={() => select(item.key)}
                       />
                     </li>
                   ))}
@@ -520,17 +548,6 @@ export function TodayView({
         </>
       )}
 
-      <Judgement
-        view={view}
-        canJudge={canJudge}
-        judging={judging}
-        step={step}
-        hasMail={view.items.some((item) => item.facts.kind === 'mail_reply')}
-        onUpdate={() => void evaluate(false)}
-        onAll={() => void evaluate(true)}
-        onStop={() => void api.cancelEvaluateToday(project.id)}
-      />
-
       {watch.length > 0 && (
         <>
           <h4 className="today-title">{text.watch}</h4>
@@ -552,6 +569,17 @@ export function TodayView({
         </div>
       ))}
       {view.hidden > 0 && <p className="hint">{text.hidden(view.hidden)}</p>}
+
+      <Judgement
+        view={view}
+        canJudge={canJudge}
+        judging={judging}
+        step={step}
+        hasMail={view.items.some((item) => item.facts.kind === 'mail_reply')}
+        onUpdate={() => void evaluate(false)}
+        onAll={() => void evaluate(true)}
+        onStop={() => void api.cancelEvaluateToday(project.id)}
+      />
 
       {onOpenSettings && (
         <div className="actions">
@@ -585,6 +613,8 @@ function FilterChip(props: {
 /** One thing to do in the list: what it is, where it comes from, how long it has waited. */
 function SignalRow(props: {
   item: TodayItem
+  /** Why the signal comes first now, when it does: said before anything else. */
+  why?: string
   selected: boolean
   judging: boolean
   onSelect: () => void
@@ -601,7 +631,8 @@ function SignalRow(props: {
       onClick={props.onSelect}
     >
       <span className="entry-meta">
-        {item.dueBecause && (
+        {props.why !== undefined && <span className="pill pill-warning">{props.why}</span>}
+        {props.why === undefined && item.dueBecause && (
           <span className="pill pill-warning">{text.dueShort[item.dueBecause]}</span>
         )}
         <span className="pill pill-source">{text.kinds[facts.kind]}</span>
@@ -791,6 +822,7 @@ function Judgement({ view, canJudge, judging, step, hasMail, ...actions }: Judge
         <strong>{at ? text.judgement.when(dateTimeText(at), model) : text.judgement.never}</strong>
       </p>
       <p className="hint">{text.judgement.explain}</p>
+      <p className="hint">{text.judgement.risksToo}</p>
       {judging ? (
         <>
           <Waiting>{step ? progressText(step) : text.judgement.running}</Waiting>

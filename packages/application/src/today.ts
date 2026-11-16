@@ -16,6 +16,7 @@ import {
   type Identity,
   identityAddresses,
   isDomainError,
+  isSprintEnding,
   type LiveSource,
   type MailJudgement,
   type MailThreads,
@@ -29,6 +30,8 @@ import {
   monthDueItems,
   monthOf,
   monthPeriod,
+  type NowItem,
+  nowItems,
   ownPeopleKeys,
   type Project,
   parseMailDocument,
@@ -45,6 +48,7 @@ import {
   type TodayFreshness,
   type TodayItem,
   type TodayKind,
+  type TodaySettings,
   trackerAgeItems,
   unassignedMeetingItems,
   withDecision,
@@ -100,6 +104,8 @@ export type TodayView = {
   day: string
   /** The signals after the PM's decisions, in the order of the page. */
   items: TodayItem[]
+  /** Those of them that come first now, each with the rule that says why. */
+  now: NowItem[]
   /** Signals the PM put away and that stay away today. */
   hidden: number
   muteOffers: TodayKind[]
@@ -176,6 +182,13 @@ async function attempt<T>(compute: () => Promise<T[]>): Promise<T[]> {
   }
 }
 
+/** What a project shows in brief: what comes first now, then the page in its order. */
+function firstOf(page: TodayView): TodayItem[] {
+  const first = page.now.map((entry) => entry.item)
+  const keys = new Set(first.map((item) => item.key))
+  return [...first, ...page.items.filter((item) => !keys.has(item.key))].slice(0, OVERVIEW_ITEMS)
+}
+
 export function createToday(deps: TodayDeps): Today {
   const evaluating = new Set<string>()
 
@@ -240,6 +253,14 @@ export function createToday(deps: TodayDeps): Today {
     const team = await deps.team.get(project).catch(() => ({ people: [], periods: [] }))
     const mails = await attempt(() => recentMail(project, today))
     const threads = mailThreads(mails, own, now, ownPeopleKeys(team))
+    const sprint = await deps.alignments
+      .settings(project)
+      .then((alignment) => alignment.sprint)
+      .catch((error: unknown) => {
+        if (!isDomainError(error)) throw error
+        return ''
+      })
+    const sprintEnding = isSprintEnding(sprint, team, today)
 
     const groups = await Promise.all([
       Promise.resolve(sourceItems(sources, now)),
@@ -249,7 +270,7 @@ export function createToday(deps: TodayDeps): Today {
         return [
           ...trackerAgeItems(view.exportedAt, view.age, now),
           ...bugItems(view.bugs.open, dashboard.stuckDays, view.exportedAt),
-          ...requirementItems(view.requirements, view.exportedAt),
+          ...requirementItems(view.requirements, view.exportedAt, sprintEnding),
         ]
       }),
       attempt(async () => {
@@ -265,30 +286,55 @@ export function createToday(deps: TodayDeps): Today {
         ]
       }),
       attempt(async () => {
-        const { sprint } = await deps.alignments.settings(project)
         const view = await deps.alignments.view(project)
         return alignmentItems(sprint, view.alignment, view.exportedAt, team, today)
       }),
       attempt(async () => draftItems(await deps.deliverables.list(project), now)),
       Promise.resolve(calendarItems(team, today)),
-      Promise.resolve(mailItems(threads, evaluation.mails, now, tomorrow, mailTurnsOf(settings))),
       Promise.resolve(meetingItems(meetingsOn(mails, today, romeDateString))),
       attempt(async () => riskItems(await deps.risks.register(project))),
       attempt(async () =>
         unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
       ),
     ])
-    const page = applyDecisions(groups.flat(), settings, today)
+    const computed = groups.flat()
+    /** The signals of the day under some settings: only the mail depends on the PM's word. */
+    const pageFor = (kept: TodaySettings) =>
+      applyDecisions(
+        [...computed, ...mailItems(threads, evaluation.mails, now, tomorrow, mailTurnsOf(kept))],
+        kept,
+        today,
+      )
     // A judgement given before Claude was asked whom a mail is for says only how much it matters.
     const unjudged = threads.awaitingMe.filter(
       (mail) => evaluation.mails[mail.id]?.addressee === undefined,
     )
     const judgedToday = evaluation.at !== null && romeDateString(new Date(evaluation.at)) === today
-    return { today, settings, evaluation, threads, unjudged, judgedToday, page, freshness, own }
+    return {
+      now,
+      today,
+      settings,
+      evaluation,
+      threads,
+      unjudged,
+      judgedToday,
+      page: pageFor(settings),
+      pageFor,
+      freshness,
+      own,
+    }
   }
 
-  async function view(project: Project): Promise<TodayView> {
-    const computed = await compute(project)
+  type Computed = Awaited<ReturnType<typeof compute>>
+
+  /** What was computed with other settings of the PM: nothing is read again. */
+  const withSettings = (computed: Computed, settings: TodaySettings): Computed => ({
+    ...computed,
+    settings,
+    page: computed.pageFor(settings),
+  })
+
+  function viewOf(computed: Computed): TodayView {
     const visible = new Set(
       computed.page.items.flatMap((item) =>
         item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow'
@@ -299,6 +345,7 @@ export function createToday(deps: TodayDeps): Today {
     return {
       day: computed.today,
       items: computed.page.items,
+      now: nowItems(computed.page.items, computed.now),
       hidden: computed.page.hidden,
       muteOffers: computed.page.muteOffers,
       mutedKinds: computed.settings.mutedKinds,
@@ -310,6 +357,18 @@ export function createToday(deps: TodayDeps): Today {
       ownAddresses: computed.own,
       addedAddresses: computed.settings.ownAddresses,
     }
+  }
+
+  const view = async (project: Project): Promise<TodayView> => viewOf(await compute(project))
+
+  /** Keeps other settings and shows the page under them, computed once. */
+  async function keep(
+    project: Project,
+    computed: Computed,
+    settings: TodaySettings,
+  ): Promise<TodayView> {
+    await deps.store.save(project.folder, settings)
+    return viewOf(withSettings(computed, settings))
   }
 
   async function risksDue(project: Project, now: Date): Promise<boolean> {
@@ -375,10 +434,10 @@ export function createToday(deps: TodayDeps): Today {
     view,
 
     async decide(project, input) {
-      const { page, settings, today } = await compute(project)
+      const computed = await compute(project)
+      const { page, settings, today } = computed
       if (input.state === 'open') {
-        await deps.store.save(project.folder, withoutDecision(settings, input.key))
-        return view(project)
+        return keep(project, computed, withoutDecision(settings, input.key))
       }
       if (!DECISION_STATES.includes(input.state)) throw new DomainError('today_decision_invalid')
       const until = input.until ?? null
@@ -395,30 +454,28 @@ export function createToday(deps: TodayDeps): Today {
         until: input.state === 'later' ? until : null,
         weight: item.weight,
       }
-      await deps.store.save(project.folder, withDecision(settings, decision))
-      return view(project)
+      return keep(project, computed, withDecision(settings, decision))
     },
 
     async mailTurn(project, key, turn) {
-      const { page, settings, today } = await compute(project)
+      const computed = await compute(project)
+      const { page, settings, today } = computed
       const item = page.items.find((candidate) => candidate.key === key)
       const conversation =
         item && (item.facts.kind === 'mail_reply' || item.facts.kind === 'mail_follow')
           ? item.facts.conversation
           : undefined
       if (conversation === undefined) throw new DomainError('today_decision_invalid', key)
-      await deps.store.save(project.folder, withMailTurn(settings, conversation, turn, today))
-      return view(project)
+      return keep(project, computed, withMailTurn(settings, conversation, turn, today))
     },
 
     async muteKind(project, kind, muted) {
-      const settings = await deps.store.load(project.folder)
-      const others = settings.mutedKinds.filter((kept) => kept !== kind)
-      await deps.store.save(project.folder, {
-        ...settings,
+      const computed = await compute(project)
+      const others = computed.settings.mutedKinds.filter((kept) => kept !== kind)
+      return keep(project, computed, {
+        ...computed.settings,
         mutedKinds: muted ? [...others, kind] : others,
       })
-      return view(project)
     },
 
     async saveAddresses(project, addresses) {
@@ -472,7 +529,7 @@ export function createToday(deps: TodayDeps): Today {
           rows.push({
             project,
             counts,
-            first: page.items.slice(0, OVERVIEW_ITEMS),
+            first: firstOf(page),
             evaluatedAt: page.evaluation.at,
             failed: false,
           })

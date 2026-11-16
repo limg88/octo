@@ -23,6 +23,7 @@ import {
   identityAddresses,
   identityOf,
   isMonthClosing,
+  isSprintEnding,
   isToDo,
   MAX_MAIL_TURNS,
   type MailJudgement,
@@ -36,6 +37,7 @@ import {
   NO_RISKS,
   NO_TEAM,
   NO_TODAY_SETTINGS,
+  nowItems,
   opensAsDocument,
   orderToday,
   parseInvite,
@@ -50,6 +52,7 @@ import {
   type StoredMail,
   senderName,
   sourceItems,
+  sprintEnd,
   type TodayItem,
   threadSubject,
   trackerAgeItems,
@@ -218,38 +221,58 @@ describe('the signals computed from the sections', () => {
     const rows = ['2002', '2004'].map((id) => ({ id })) as unknown as Parameters<
       typeof requirementItems
     >[0]
-    expect(requirementItems(rows, null)[0]?.facts).toEqual({
+    expect(requirementItems(rows, null, true)[0]?.facts).toEqual({
       kind: 'requirements',
       count: 2,
       ids: ['2002', '2004'],
     })
-    expect(requirementItems([], null)).toEqual([])
+    expect(requirementItems([], null, true)).toEqual([])
+    // Before the sprint ends the requirements are read in the dashboard, not told every day.
+    expect(requirementItems(rows, null, false)).toEqual([])
   })
 
-  it('says what the two trackers do not agree on, due when the sprint is ending', () => {
+  it('says what the two trackers do not agree on only while the sprint is ending', () => {
     const alignment = {
       missing: [{}],
       needsUpdate: [],
       duplicates: [{}],
       orphans: [{}],
     } as unknown as Alignment
-    const [signal] = alignmentItems('Sprint 28', alignment, null, NO_TEAM, MID_MONTH)
-    expect(signal).toMatchObject({ key: 'alignment:sprint 28', band: 'numbers', weight: 3 })
+    // No period of the calendar has the name of the sprint: when it ends is not known.
+    expect(alignmentItems('Sprint 28', alignment, null, NO_TEAM, MID_MONTH)).toEqual([])
     const team = {
       people: [],
       periods: [{ name: 'sprint 28', from: '2026-11-03', to: '2026-11-17' }],
     }
     expect(alignmentItems('Sprint 28', alignment, null, team, MID_MONTH)[0]).toMatchObject({
+      key: 'alignment:sprint 28',
       band: 'due',
+      weight: 3,
       dueBecause: 'sprint_end',
     })
+    expect(alignmentItems('Sprint 28', alignment, null, team, '2026-11-10')).toEqual([])
     const aligned = {
       missing: [],
       needsUpdate: [],
       duplicates: [],
       orphans: [],
     } as unknown as Alignment
-    expect(alignmentItems('Sprint 28', aligned, null, NO_TEAM, MID_MONTH)).toEqual([])
+    expect(alignmentItems('Sprint 28', aligned, null, team, MID_MONTH)).toEqual([])
+  })
+
+  it('tells the last working days of the sprint, and nothing when no sprint is set', () => {
+    const team = {
+      people: [],
+      periods: [{ name: 'Sprint 28', from: '2026-11-03', to: '2026-11-17' }],
+    }
+    expect(sprintEnd(' sprint 28 ', team)).toBe('2026-11-17')
+    expect(sprintEnd('', team)).toBeNull()
+    expect(sprintEnd('Sprint 29', team)).toBeNull()
+    expect(isSprintEnding('Sprint 28', team, '2026-11-12')).toBe(false)
+    expect(isSprintEnding('Sprint 28', team, '2026-11-13')).toBe(true)
+    expect(isSprintEnding('Sprint 28', team, '2026-11-17')).toBe(true)
+    expect(isSprintEnding('Sprint 28', team, '2026-11-18')).toBe(false)
+    expect(isSprintEnding('', team, '2026-11-17')).toBe(false)
   })
 
   it('says the drafts that wait for the PM and the dates of the calendar that are near', () => {
@@ -1070,5 +1093,89 @@ describe('whose turn a mail is', () => {
       items: [],
       hidden: 1,
     })
+  })
+})
+
+describe('what comes first now', () => {
+  const meeting = (start: string): TodayItem =>
+    item({
+      key: `meeting:${start}`,
+      band: 'due',
+      facts: { kind: 'meeting', subject: 'Stato lavori', start, location: '', path: 'm.md' },
+      weight: 1_000_000,
+      target: 'mail',
+    })
+  const mail = (key: string, importance: 'alta' | 'media', extra: Partial<TodayItem> = {}) =>
+    item({
+      key,
+      band: 'waiting',
+      facts: {
+        kind: 'mail_reply',
+        id: key,
+        path: `${key}.md`,
+        from: 'Anna',
+        subject: key,
+        days: 1,
+        judgement: { importance, reason: '', quote: '', quoteVerified: true, deadline: null },
+      },
+      target: 'mail',
+      ...extra,
+    })
+
+  it('puts a meeting about to start before a date, what was put off, a mail that matters', () => {
+    const chosen = nowItems(
+      [
+        mail('important', 'alta'),
+        item({ key: 'later', band: 'due', returned: { why: 'later' } }),
+        item({ key: 'hours', band: 'due', dueBecause: 'month_end' }),
+        meeting('2026-11-16T09:40:00Z'),
+      ],
+      NOW,
+    )
+    expect(chosen.map((entry) => [entry.item.key, entry.rule])).toEqual([
+      ['meeting:2026-11-16T09:40:00Z', 'meeting_soon'],
+      ['hours', 'due'],
+      ['later', 'later'],
+    ])
+    expect(chosen[0]?.minutes).toBe(40)
+  })
+
+  it('leaves out what falls under no rule, even when there is room', () => {
+    const chosen = nowItems(
+      [
+        mail('plain', 'media'),
+        item({ key: 'bugs', band: 'watch' }),
+        item({ key: 'still', returned: { why: 'still', since: '2026-11-10' } }),
+        item({ key: 'worse', band: 'watch', returned: { why: 'worse', was: 1, now: 4 } }),
+        mail('important', 'alta'),
+      ],
+      NOW,
+    )
+    expect(chosen.map((entry) => [entry.item.key, entry.rule])).toEqual([
+      ['important', 'important_mail'],
+      ['worse', 'worse'],
+    ])
+  })
+
+  it('takes a meeting only when it starts within two hours and has not begun', () => {
+    const keys = (start: string) => nowItems([meeting(start)], NOW).map((entry) => entry.rule)
+    expect(keys('2026-11-16T11:00:00Z')).toEqual(['meeting_soon'])
+    expect(keys('2026-11-16T11:01:00Z')).toEqual([])
+    expect(keys('2026-11-16T09:00:00Z')).toEqual([])
+    expect(keys('2026-11-16T08:30:00Z')).toEqual([])
+  })
+
+  it('never takes a warning on a source, and keeps the order of the page within a rule', () => {
+    const chosen = nowItems(
+      [
+        item({ key: 'source', band: 'alert', dueBecause: 'month_end' }),
+        item({ key: 'light', band: 'due', dueBecause: 'month_end', weight: 1 }),
+        item({ key: 'heavy', band: 'due', dueBecause: 'month_end', weight: 9 }),
+        item({ key: 'b', band: 'due', dueBecause: 'deadline', weight: 5 }),
+        item({ key: 'a', band: 'due', dueBecause: 'deadline', weight: 5 }),
+      ],
+      NOW,
+    )
+    expect(chosen.map((entry) => entry.item.key)).toEqual(['heavy', 'a', 'b'])
   })
 })

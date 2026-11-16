@@ -303,10 +303,12 @@ describe('the page of the day', () => {
         view: async () => ({ alignment, exportedAt: null, tickets: 8 }),
       },
       deliverables: { list: async () => [draft] },
+      // The sprint ends tomorrow: what the trackers do not agree on is due.
       team: {
-        get: async () => {
-          throw new DomainError('team_invalid')
-        },
+        get: async () => ({
+          people: [],
+          periods: [{ name: 'Sprint 28', from: '2026-11-03', to: '2026-11-17' }],
+        }),
       },
       feeds: {
         view: async (_project, feed) => ({
@@ -326,14 +328,19 @@ describe('the page of the day', () => {
       'tracker_old',
       'source',
       'meeting',
+      // The sprint ends tomorrow: the alignment is due.
+      'alignment',
       'draft',
       'mail_reply',
       // Equally heavy: by name.
-      'alignment',
       'forecast',
       'hours',
+      'calendar',
       'bugs_stuck',
       'requirements',
+    ])
+    expect(view.now.map((entry) => [entry.item.facts.kind, entry.rule])).toEqual([
+      ['alignment', 'due'],
     ])
     expect(view.freshness.map((entry) => entry.source)).toEqual([
       'Posta',
@@ -351,6 +358,104 @@ describe('the page of the day', () => {
       },
     })
     await expect(today.view(project)).rejects.toThrow('disk on fire')
+  })
+
+  it('keeps requirements and alignment for the end of the sprint, and off when it is not known', async () => {
+    const alignment = { missing: [{}], needsUpdate: [], duplicates: [], orphans: [] }
+    const tracker = {
+      dashboard: {
+        settings: async () => DEFAULT_DASHBOARD_SETTINGS,
+        view: async () =>
+          ({
+            exportedAt: null,
+            age: 'fresh',
+            bugs: { open: [] },
+            requirements: [{ id: '1' }],
+          }) as never,
+      },
+      alignments: {
+        settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
+        view: async () => ({
+          alignment: alignment as unknown as Alignment,
+          exportedAt: null,
+          tickets: 1,
+        }),
+      },
+    } satisfies Partial<TodayDeps>
+    const kinds = async (overrides: Partial<TodayDeps>) =>
+      (await setup({ ...tracker, ...overrides }).today.view(project)).items.map(
+        (item) => item.facts.kind,
+      )
+    const period = (to: string) => ({
+      get: async () => ({ people: [], periods: [{ name: 'Sprint 28', from: '2026-11-03', to }] }),
+    })
+    expect(await kinds({ team: period('2026-11-17') })).toEqual(
+      expect.arrayContaining(['alignment', 'requirements']),
+    )
+    const quiet = ['meeting', 'mail_reply']
+    // The sprint ends in two weeks: both are read in their own pages.
+    expect(await kinds({ team: period('2026-11-27') })).toEqual(quiet)
+    // The calendar cannot be read, or no sprint is set: when it ends is not known.
+    expect(await kinds({ team: { get: notSet('team_invalid') } })).toEqual(quiet)
+    expect(
+      await kinds({
+        team: period('2026-11-17'),
+        alignments: { ...tracker.alignments, settings: notSet('alignment_sprint_not_set') },
+      }),
+    ).toEqual([...quiet, 'calendar'])
+    await expect(
+      setup({
+        alignments: {
+          ...tracker.alignments,
+          settings: async () => {
+            throw new Error('disk on fire')
+          },
+        },
+      }).today.view(project),
+    ).rejects.toThrow('disk on fire')
+  })
+
+  it('says what comes first now, by rule: a meeting about to start, what was put off', async () => {
+    const { today, at } = setup()
+    // At ten the meeting of four in the afternoon is far: nothing comes first.
+    expect((await today.view(project)).now).toEqual([])
+    at('2026-11-16T12:30:00.000Z')
+    const soon = await today.view(project)
+    expect(soon.now.map((entry) => [entry.item.facts.kind, entry.rule, entry.minutes])).toEqual([
+      ['meeting', 'meeting_soon', 90],
+    ])
+    // The page keeps it in its own order too: who shows the page tells it once.
+    expect(soon.items.map((item) => item.facts.kind)).toContain('meeting')
+    await today.decide(project, { key: 'mail:budget', state: 'later', until: '2026-11-17' })
+    at('2026-11-17T09:00:00.000Z')
+    const next = await today.view(project)
+    expect(next.now.map((entry) => [entry.item.key, entry.rule])).toEqual([
+      ['mail:budget', 'later'],
+    ])
+    const [row] = await today.overview([project])
+    expect(row?.first[0]?.key).toBe('mail:budget')
+  })
+
+  it('computes the page once for a decision: the mail is not read a second time', async () => {
+    let read = 0
+    const { today } = setup({
+      files: {
+        under: async (_folder, folder) =>
+          Object.keys(FILES).filter((path) => path.startsWith(`${folder}/`)),
+        readText: async (_folder, path) => {
+          read += 1
+          return FILES[path] ?? null
+        },
+      },
+    })
+    await today.view(project)
+    const once = read
+    read = 0
+    await today.decide(project, { key: 'mail:budget', state: 'done' })
+    expect(read).toBe(once)
+    read = 0
+    await today.muteKind(project, 'meeting', true)
+    expect(read).toBe(once)
   })
 
   it('remembers what the PM decides and refuses what makes no sense', async () => {

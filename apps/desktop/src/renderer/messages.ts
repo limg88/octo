@@ -3,6 +3,16 @@ import type { CitationStatus } from '@octo/domain'
 import type { ErrorCode } from '../shared/api.ts'
 
 /** Every text the PM reads, in one place: a second language is a second file like this. */
+const MINUTES_IN_HOUR = 60
+
+/** How far ahead something is, in hours and minutes: «Fra 1 ora e 20 minuti». */
+function hoursAhead(minutes: number): string {
+  const whole = Math.floor(minutes / MINUTES_IN_HOUR)
+  const rest = minutes % MINUTES_IN_HOUR
+  const hours = whole === 1 ? '1 ora' : `${whole} ore`
+  return rest === 0 ? `Fra ${hours}` : `Fra ${hours} e ${rest} minuti`
+}
+
 export const messages = {
   appName: 'Octo',
   projects: 'Progetti',
@@ -100,7 +110,28 @@ export const messages = {
     freshnessNever: 'mai letta',
     readNow: 'Leggi ora',
     reading: 'Leggo le fonti…',
+    now: 'Adesso',
+    nowHint:
+      'Ciò che viene prima, scelto da una regola: una riunione vicina, una scadenza, ciò che avevi rimandato a oggi, una mail importante, ciò che è peggiorato.',
+    nowList: 'Cose che vengono prima',
+    nowWhy: {
+      meetingSoon: (minutes: number) =>
+        minutes === 1
+          ? 'Fra 1 minuto'
+          : minutes < 60
+            ? `Fra ${minutes} minuti`
+            : hoursAhead(minutes),
+      due: {
+        month_end: 'Si chiudono i numeri del mese',
+        sprint_end: 'Lo sprint sta finendo',
+        deadline: 'Scade entro domani',
+      },
+      later: 'L’avevi rimandata a oggi',
+      importantMail: 'Mail di importanza alta',
+      worse: 'È peggiorata',
+    },
     toDo: 'Da fare oggi',
+    nothingElse: 'Nient’altro da fare oggi.',
     toDoCount: (shown: number, all: number) => (shown === all ? `${all}` : `${shown} di ${all}`),
     watch: 'Da tenere d’occhio',
     watchWhat: 'Che cosa',
@@ -166,6 +197,8 @@ export const messages = {
       verified: 'fonte controllata',
       unverified: 'frase non trovata nella mail',
       deadline: (day: string) => `chiede una risposta entro il ${day}`,
+      risksToo:
+        'Con la valutazione delle mail, una volta a settimana, Claude propone anche i rischi del progetto: li trovi nel registro dei rischi.',
       explain:
         'Che una mail aspetti lo calcola Octo. Se sei l’unico destinatario tocca a te; per le altre Claude legge a chi è rivolta la richiesta e quanto pesa: è un giudizio, con la frase su cui si fonda. Ciò che non tocca a te sta in «Da tenere d’occhio», una riga per conversazione.',
     },

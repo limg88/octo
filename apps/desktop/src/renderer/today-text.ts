@@ -2,10 +2,11 @@ import type {
   ForecastGap,
   HoursPersonFact,
   MailReplyWhy,
+  NowItem,
   TodayFacts,
   TodayItem,
 } from '@octo/domain'
-import { dateTimeText, errorText } from './messages.ts'
+import { dateTimeText, errorText, messages } from './messages.ts'
 
 /** What a signal says to the PM: a line to read first, and one that explains it. */
 export type SignalText = { title: string; detail: string }
@@ -285,4 +286,13 @@ export function ageText(item: TodayItem): string {
     default:
       return ''
   }
+}
+
+/** Why a signal comes first now, in the words of the rule that put it there. */
+export function nowText(entry: NowItem): string {
+  const why = messages.today.nowWhy
+  if (entry.rule === 'meeting_soon') return why.meetingSoon(entry.minutes ?? 0)
+  if (entry.rule === 'due') return why.due[entry.item.dueBecause ?? 'deadline']
+  if (entry.rule === 'later') return why.later
+  return entry.rule === 'important_mail' ? why.importantMail : why.worse
 }

@@ -2163,6 +2163,18 @@ details.advanced[open] > summary {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
+.today-now {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.today-now .today-title {
+  margin: 0;
+}
+
 .today-evaluation {
   display: flex;
   flex-direction: column;

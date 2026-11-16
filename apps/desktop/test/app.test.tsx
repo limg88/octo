@@ -128,6 +128,7 @@ const signedIn: SessionView = {
 const emptyToday: TodayView = {
   day: '2026-11-16',
   items: [],
+  now: [],
   hidden: 0,
   muteOffers: [],
   mutedKinds: [],
