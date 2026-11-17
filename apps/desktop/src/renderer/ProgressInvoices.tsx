@@ -64,7 +64,7 @@ export function ProgressInvoices({ invoices, order, linked, onLink, onRegister }
             <span className="hint">{invoiceWords(position.invoice)}</span>
           </>
         ) : (
-          <span className="status status-warning">{text.notBilled}</span>
+          <span className="status status-neutral">{text.notBilled}</span>
         ),
       sort: (position) => (position.invoice ? 1 : 0),
       text: (position) =>

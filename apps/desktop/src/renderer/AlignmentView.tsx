@@ -11,6 +11,7 @@ import { PathField } from './PathField.tsx'
 import { listOf, listText } from './progress-text.ts'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import { useSavedNote } from './SavedNote.tsx'
+import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
 
 type AlignmentApi = Pick<
@@ -34,10 +35,12 @@ type Props = {
 const text = messages.alignment
 const NO_CHOICES: AlignmentChoices = { sprints: [], periods: [], tags: [] }
 type GroupKey = 'name' | 'item' | 'ticket'
+/** A list of states takes the room there is, and never less than what a few of them need. */
+const LIST_WIDTH = 'minmax(160px, 1fr)'
 const GROUP_COLUMNS: RowsColumn<GroupKey>[] = [
-  { key: 'name', label: text.groupColumns.name, width: '200px' },
-  { key: 'item', label: text.groupColumns.item },
-  { key: 'ticket', label: text.groupColumns.ticket },
+  { key: 'name', label: text.groupColumns.name, width: '160px' },
+  { key: 'item', label: text.groupColumns.item, kind: 'textarea', width: LIST_WIDTH },
+  { key: 'ticket', label: text.groupColumns.ticket, kind: 'textarea', width: LIST_WIDTH },
 ]
 
 /** The client's tracker and the supplier's own, compared sprint by sprint. */
@@ -101,7 +104,9 @@ export function AlignmentView({ api, project, onOpenSection }: Props) {
     return error ? (
       <Failure code={error} onOpen={onOpenSection} />
     ) : (
-      <p className="progress">{text.loading}</p>
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
     )
   }
   /** The export is a JSON file of the project, the tickets a folder of it. */
@@ -237,8 +242,8 @@ function List({
         {title} ({rows.length})
       </h3>
       {intro && rows.length > 0 && <p className="hint">{intro}</p>}
-      {rows.length === 0 ? <p className="hint">{text.none}</p> : table}
       {children}
+      {rows.length === 0 ? <p className="hint">{text.none}</p> : table}
     </section>
   )
 }
@@ -302,15 +307,23 @@ function Result({
           alignment.missing.length,
         )}
       </p>
-      {view.stateMismatches.map((mismatch) => (
-        <p key={`${mismatch.group} ${mismatch.state}`} className="warning">
-          {text.stateMismatch(
-            mismatch.state,
-            mismatch.group,
-            text.phaseNames[mismatch.dashboardPhase],
-          )}
-        </p>
-      ))}
+      {view.stateMismatches.length > 0 && (
+        <details className="warning alignment-mismatches">
+          <summary>{text.stateMismatchSummary(view.stateMismatches.length)}</summary>
+          <ul>
+            {view.stateMismatches.map((mismatch) => (
+              <li key={`${mismatch.group} ${mismatch.state}`}>
+                {text.stateMismatch(
+                  mismatch.state,
+                  mismatch.group,
+                  text.phaseNames[mismatch.dashboardPhase],
+                )}
+              </li>
+            ))}
+          </ul>
+          <p>{text.stateMismatchHelp}</p>
+        </details>
+      )}
       {alignment.adds ? (
         <p className="badge badge-ok">{text.adds}</p>
       ) : (
@@ -547,6 +560,7 @@ function SettingsForm({
         known={choices.tags}
         chosen={draft.tags}
         onChange={(tags) => setDraft((current) => ({ ...current, tags }))}
+        foldOptions
       />
       <label className="check">
         <input

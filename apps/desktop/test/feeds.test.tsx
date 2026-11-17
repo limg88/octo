@@ -71,7 +71,9 @@ describe('FeedSection', () => {
     expect(screen.getByText(messages.elsewhere.reading(who))).toBeTruthy()
     expect(screen.getByText(messages.elsewhere.noCredential)).toBeTruthy()
     // Nothing to read from here: no way to ask for it.
-    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.feedSync })
+    const ask = [messages.feedSync, messages.readSavedSource].flatMap((name) =>
+      screen.queryAllByRole<HTMLButtonElement>('button', { name }),
+    )
     expect(ask.every((button) => button.disabled)).toBe(true)
   })
 
@@ -120,7 +122,8 @@ describe('FeedSection', () => {
     expect(await screen.findByText(/4 aggiornati, 120 invariati/)).toBeTruthy()
     expect(screen.getByLabelText<HTMLTextAreaElement>(fields.areas).value).toBe('Team A\nTeam B')
 
-    fireEvent.click(screen.getByRole('button', { name: messages.feedSync }))
+    // Beside what is being typed the command says what it reads with: what is saved.
+    fireEvent.click(screen.getByRole('button', { name: messages.readSavedSource }))
     expect(await screen.findByText(messages.feedSyncing)).toBeTruthy()
     await act(async () => finish(ok(run)))
     await waitFor(() => expect(api.feed).toHaveBeenCalledTimes(2))
@@ -278,6 +281,32 @@ describe('FeedSection', () => {
     expect(sent?.[3]).toBe('segreto')
   })
 
+  it('shows the codes found in the warehouse after the address they are sought by, above the codes', async () => {
+    const dwsi: FeedView = { ...empty, feed: 'dwsi', suggestedFolder: 'raw/NetSuite' }
+    const { api } = fakeApi({
+      feed: vi.fn(async () => ok(dwsi)),
+      feedChoices: vi.fn(async () =>
+        ok({ projects: [{ value: 'PRJ000101', label: 'PRJ000101 Aurora' }], areas: [] }),
+      ),
+    })
+    render(<FeedSection api={api} project={project} feed="dwsi" now={now} />)
+    await screen.findByText(messages.feedNotConfigured)
+    fireEvent.click(screen.getByRole('button', { name: messages.feedChoicesCodes }))
+    const found = await screen.findByRole('button', { name: 'PRJ000101 Aurora' })
+    // The address is typed once, before the search; what is found sits right above the codes.
+    expect(screen.getAllByLabelText(fields.ownerEmail)).toHaveLength(1)
+    const after = (earlier: Element, later: Element) =>
+      Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const codes = screen.getByLabelText<HTMLTextAreaElement>(fields.projectCodes)
+    const search = screen.getByRole('button', { name: messages.feedChoicesCodes })
+    expect(after(screen.getByLabelText(fields.ownerEmail), search)).toBe(true)
+    expect(after(search, found)).toBe(true)
+    expect(after(found, codes)).toBe(true)
+    fireEvent.click(found)
+    fireEvent.click(found)
+    expect(codes.value).toBe('PRJ000101')
+  })
+
   it('warns when the data are stale, never read, or the last reading failed', async () => {
     const state = (lastRun: SourceRun | null) => ({ ...linked, state: { cursor: null, lastRun } })
     const old = fakeApi({ feed: async () => ok(state({ ...run, at: '2026-11-12T09:00:00.000Z' })) })
@@ -308,7 +337,7 @@ describe('FeedSection', () => {
     render(<FeedSection api={api} project={project} feed="ado" now={now} />)
     fireEvent.click(await screen.findByRole('button', { name: messages.feedSave }))
     expect(await screen.findByText(/ha rifiutato la credenziale/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.feedSync }))
+    fireEvent.click(screen.getByRole('button', { name: messages.readSavedSource }))
     expect(await screen.findByText('Una lettura è già in corso.')).toBeTruthy()
   })
 })

@@ -236,6 +236,28 @@ describe('hours', () => {
     ])
   })
 
+  it('tells an absence that was foreseen from hours that add up', async () => {
+    const [first, ...others] = view.reconciliation.rows
+    const foreseen: View = {
+      ...view,
+      reconciliation: {
+        ...view.reconciliation,
+        rows: [{ ...(first as (typeof others)[number]), status: 'expected' }, ...others],
+      },
+    }
+    render(
+      <HoursView
+        api={fakeApi({ hoursView: vi.fn(async () => ok(foreseen)) })}
+        project={project}
+        now={now}
+      />,
+    )
+    const expected = await screen.findByText(text.status.expected)
+    expect(expected.className).toBe('status status-neutral')
+    expect(screen.getByText(text.status.ok).className).toBe('status status-ok')
+    expect(text.status.expected).not.toBe(text.status.ok)
+  })
+
   it('asks where the hours are the first time, proposing what it found', async () => {
     const api = fakeApi({ hoursSettings: vi.fn(async () => ok(DEFAULT_HOURS_SETTINGS)) })
     render(<HoursView api={api} project={project} now={now} />)
@@ -244,6 +266,12 @@ describe('hours', () => {
     await waitFor(() => expect(path.value).toBe('ore/Timesheets'))
     fireEvent.change(screen.getByLabelText(text.projects), { target: { value: 'P1, P2' } })
     fireEvent.change(screen.getByLabelText(text.threshold), { target: { value: '30' } })
+    // The day the comparison stops at says what it does, and what leaving it empty means.
+    const cutoff = screen.getByLabelText<HTMLInputElement>(text.cutoff)
+    expect(cutoff.type).toBe('date')
+    expect(
+      document.getElementById(cutoff.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe(text.cutoffHint)
     const alias = (column: string, row: number) =>
       screen.getByLabelText(text.aliasCell(column, row))
     fireEvent.change(alias(text.aliasColumns.worklog, 1), { target: { value: 'anna.b' } })

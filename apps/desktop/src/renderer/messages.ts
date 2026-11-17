@@ -442,7 +442,7 @@ export const messages = {
     proposing: 'Claude sta cercando rischi nel progetto…',
     accept: 'Accetta',
     dismiss: 'Scarta',
-    source: 'Fonte',
+    source: 'Apri la fonte',
     verified: 'fonte controllata',
     unverified: 'frase non trovata nel file',
     titleLabel: (title: string) => `Titolo del rischio «${title}»`,
@@ -556,7 +556,7 @@ export const messages = {
     title: 'Conversazioni',
     fresh: 'Nuova chat',
     freshHint:
-      'Chat nuova: fai una domanda. Le domande successive di questa chat tengono conto delle precedenti; le fonti sono ricontrollate a ogni risposta.',
+      'In questa chat Octo tiene conto delle tue domande precedenti e ricontrolla le fonti a ogni risposta.',
     none: 'Nessuna chat ancora.',
     legacy: 'Domande precedenti',
     filter: 'Cerca fra le chat',
@@ -633,6 +633,7 @@ export const messages = {
   feedMissingFields: 'Non ho provato il collegamento: compila i campi segnalati.',
   feedSaved: 'Collegamento riuscito e salvato.',
   feedSync: 'Leggi ora',
+  readSavedSource: 'Leggi con le impostazioni salvate',
   feedSyncing: 'Sto leggendo…',
   feedOff: 'Scollega',
   feedNotConfigured: 'Non collegato.',
@@ -648,7 +649,7 @@ export const messages = {
     email: 'La tua email su Atlassian',
     spaces: 'Spazi (chiave o nome, uno per riga)',
     projects: 'Progetti (chiave o nome, uno per riga)',
-    host: 'Server (nome, non indirizzo)',
+    host: 'Server (nome DNS o indirizzo IPv4 privato)',
     port: 'Porta',
     database: 'Database',
     user: 'Utente',
@@ -717,7 +718,7 @@ export const messages = {
   models: {
     title: 'Quale Claude lavora',
     intro:
-      'Quale modello di Claude risponde alle domande, scrive i deliverable e li rilegge in questo progetto. «Predefinito» è quello che Claude Code usa su questo computer: su un altro può essere diverso. Accanto a ogni risposta e a ogni deliverable resta scritto il modello che ha lavorato davvero.',
+      'Con “Predefinito” usi il modello di Claude Code su questo computer. Accanto alla risposta o al deliverable trovi il modello usato.',
     task: {
       ask: 'Risposte in «Chiedi»',
       write: 'Scrittura dei deliverable',
@@ -796,8 +797,14 @@ export const messages = {
     summary: (total: number, linked: number, needsUpdate: number, missing: number) =>
       `${total} voci del cliente nello sprint: ${linked} con il ticket nello sprint, ${needsUpdate} con il ticket altrove, ${missing} senza ticket.`,
     adds: 'Quadratura: ogni voce è in una sola delle tre liste.',
+    stateMismatchSummary: (count: number) =>
+      count === 1
+        ? 'Uno stato è letto in modo diverso dal Cruscotto'
+        : `${count} stati sono letti in modo diverso dal Cruscotto`,
     stateMismatch: (state: string, group: string, dashboardPhase: string) =>
-      `Lo stato «${state}» è nel gruppo «${group}» dell’allineamento, ma il cruscotto lo legge «${dashboardPhase}»: le due sezioni possono dare conti diversi dello stesso sprint. Per farle coincidere cambia la fase dello stato in «Cruscotto» → «Impostazioni del cruscotto» → «Come leggo gli stati dei bug», oppure il gruppo qui sotto.`,
+      `«${state}» appartiene al gruppo «${group}» qui e alla fase «${dashboardPhase}» nel Cruscotto.`,
+    stateMismatchHelp:
+      'I conti dello sprint possono differire. Per allinearli, cambia il gruppo in “Che cosa confronto” oppure la fase in “Impostazioni del cruscotto”, sotto “Come leggo gli stati dei bug”.',
     phaseNames: {
       work: 'in lavorazione',
       verify: 'in verifica',
@@ -912,7 +919,8 @@ export const messages = {
       removeCell: (n: number) => `Togli la riga ${n}`,
       cellWrong: (n: number) =>
         `Riga ${n}: una cella si scrive con lettere e numero, per esempio D2.`,
-      insert: 'Inserisci nella riga selezionata:',
+      insert: 'Scegli una riga con una cella valida per inserire un dato.',
+      insertInto: (ref: string) => `Inserisci nella cella ${ref}`,
       placeholders: [
         { token: '{n}', label: 'Numero della richiesta' },
         { token: '{ordine}', label: 'Ordine' },
@@ -1058,7 +1066,8 @@ export const messages = {
     columnKind: 'Tipo',
     columnOrdered: 'Ordinato',
     columnFeeMonths: 'Mesi del canone',
-    columnStartMonth: 'Inizio (anno-mese)',
+    columnStartMonth: 'Mese di inizio (AAAA-MM)',
+    startMonthFormat: 'AAAA-MM',
     kinds: { time_material: 'A giornate (T&M)', fixed_price: 'A corpo', fee: 'Canone' },
     readOrders: 'Leggi ordinato da NetSuite',
     readingOrders: 'Leggo gli ordini…',
@@ -1066,7 +1075,7 @@ export const messages = {
       'Nome e ordinato di ogni commessa: la somma delle righe dei suoi ordini. Per una commessa nuova anche il tipo di vendita, dalla voce dell’ordine; poi resta quello che scegli tu.',
     notInModel: (codes: string) => `Il modello non ha una riga per: ${codes}.`,
     monthData: 'Dati del mese',
-    moreData: 'Altri dati',
+    moreData: 'Calcolo e dettagli',
     forCode: (label: string, code: string) => `${label}, ${code}`,
     daysWithUnit: (days: string) => `${days} gg`,
     remedy: {
@@ -1094,6 +1103,7 @@ export const messages = {
     settings: 'Impostazioni del previsionale',
     month: 'Mese',
     columnCode: 'Codice',
+    columnProject: 'Progetto',
     columnInternal: 'Costi interni',
     columnExternal: 'Costi esterni',
     columnRevenue: 'Ricavi',
@@ -1113,7 +1123,7 @@ export const messages = {
     groupComputed: 'Calcolato da Octo',
     groupOwn: 'Da te, per questo mese',
     inputsHint:
-      'A sinistra ciò che Octo calcola (sotto ogni riga, come lo ha calcolato), a destra ciò che puoi correggere tu: tutto facoltativo. «Ricavi corretti» sostituisce i ricavi calcolati; vuoto, valgono quelli calcolati. «Da fatturare» e «Tua nota» restano come li scrivi, anche nel modello Excel se lo compili.',
+      'I campi sono facoltativi. Se scrivi i ricavi corretti, sostituiscono quelli calcolati. Nel modello Excel ritrovi anche Da fatturare e Tua nota.',
     noRows:
       'Nessuna commessa: indica in «Ore» i codici NetSuite di questo progetto e leggi i timesheet.',
     money: (value: number) =>
@@ -1135,7 +1145,7 @@ export const messages = {
       loading: 'Leggo la commessa…',
       code: 'Commessa',
       through: (month: string) =>
-        `Dall’inizio della commessa a ${month}: ore approvate dei timesheet, ore di chi non ha timesheet e, per i mesi non ancora in NetSuite, ore del tracker come stima.`,
+        `Dall’inizio della commessa a ${month}. Per i mesi ancora da leggere in NetSuite, le ore del tracker sono una stima.`,
       ordered: 'Ordinato',
       invoiced: 'Fatturato (NetSuite)',
       recognized: 'Ricavi riconosciuti (NetSuite)',
@@ -1214,11 +1224,14 @@ export const messages = {
     externals: 'Ore degli esterni nel mese',
     toInvoice: 'Da fatturare nel mese',
     revenue: 'Ricavi decisi da te',
-    budgetCosts:
-      'A corpo: costi totali a budget (l’avanzamento è costi fino al mese su questi; vale anche per i mesi dopo)',
-    totalCosts: 'Costi totali previsti del progetto (per il margine a fine progetto)',
+    budgetCosts: 'Costi totali a budget',
+    budgetCostsHint:
+      'Solo per un progetto a corpo: quanto hai previsto di spendere in tutto. L’avanzamento è la parte di questa cifra già spesa fino al mese. Lo scrivi una volta: vale anche per i mesi successivi.',
+    totalCosts: 'Costi totali previsti a fine progetto',
+    totalCostsHint:
+      'Quanto pensi che costerà il progetto quando sarà finito. Serve a calcolare il margine finale; senza, quella colonna resta vuota.',
     totalCostsBeforeMonth:
-      'I costi totali si fermano al mese prima: aggiungi quelli di questo mese',
+      'La cifra qui sopra arriva fino al mese scorso: aggiungi tu i costi di questo mese',
     note: 'Nota da aggiungere',
     addNote: '+ Aggiungi una nota',
     editNote: 'Modifica la nota',
@@ -1227,8 +1240,10 @@ export const messages = {
     noteHint:
       'Finisce accanto a come Octo ha calcolato la riga, e nel modello Excel se lo compili. Salvandola salvi anche gli altri dati del mese che hai scritto.',
     noteSave: 'Salva la nota',
-    projectName: (name: string, kind: string) =>
-      `${name === '' ? 'Nome non ancora letto da NetSuite' : name} · ${kind}`,
+    /** A project as it is named in a row: its name, then its code. */
+    project: (name: string, code: string) => (name === '' ? code : `${name} · ${code}`),
+    projectName: (name: string, code: string, kind: string) =>
+      `${name === '' ? 'Nome non ancora letto da NetSuite' : name} · ${code} · ${kind}`,
     saveInputs: 'Salva i dati del mese',
     compile: 'Compila il modello Excel',
     compiling: 'Scrivo il file…',
@@ -1265,7 +1280,9 @@ export const messages = {
       'Va bene l’esportazione dello strumento con cui si segnano le ore sul tracker: servono le colonne persona, data e ore.',
     projects: 'Codici di progetto dei timesheet che sono di questo progetto (nessuno: tutti)',
     threshold: 'Scostamento oltre il quale una persona è da guardare (%)',
-    cutoff: 'Ultimo giorno completo (i giorni dopo restano fuori dal confronto; vuoto: nessuno)',
+    cutoff: 'Confronta fino al',
+    cutoffHint:
+      'Le ore dei giorni successivi restano fuori dal confronto. Lascia vuoto per usare tutto il periodo scelto.',
     noWorklogExpected: 'Persone che non segnano ore sul tracker',
     noTimesheetExpected: 'Persone senza timesheet qui, per esempio esterni',
     aliases: 'Stessa persona, nomi diversi',
@@ -1288,7 +1305,7 @@ export const messages = {
       outlier: 'Da guardare',
       no_worklog: 'Nessuna ora sul tracker',
       no_timesheet: 'Nessun timesheet',
-      expected: 'Atteso',
+      expected: 'Assenza prevista',
     },
     markExpected: 'È atteso',
     markExpectedHint: 'Da ora la mancanza di ore di questa persona non è più segnalata.',
@@ -1612,8 +1629,9 @@ export const messages = {
   ownKindTitle: 'Come si chiama',
   ownKindSummary: 'A che cosa serve (una riga)',
   ownKindAudience: 'Chi lo legge',
-  ownKindQuestions:
-    'Che cosa chiederti prima di scriverlo (una domanda per riga; * in fondo se è obbligatoria)',
+  ownKindQuestions: 'Domande da fare prima della bozza',
+  ownKindQuestionsHint:
+    'Scrivi una domanda per riga. Aggiungi * alla fine delle domande obbligatorie.',
   ownKindInstructions: 'Come va scritto',
   ownKindInstructionsHint:
     'Struttura, tono, che cosa non deve mai mancare, che cosa non va mai detto. Puoi incollare qui le istruzioni che usi già.',
@@ -1659,7 +1677,7 @@ export const messages = {
   deckModelChoose: 'Scegli una presentazione',
   deliverableRegister: 'Registro',
   deliverableRegisterIntro:
-    'Che cosa è costato ogni deliverable: minuti di scrittura, minuti di revisione e giri. Una pausa oltre 20 minuti non conta come revisione.',
+    'Qui trovi i tempi e i giri di revisione. Le pause oltre 20 minuti sono escluse dal tempo di revisione.',
   deliverableRegisterEmpty: 'Ancora nessun deliverable.',
   deliverableRegisterHead: [
     'Data',
@@ -1696,6 +1714,7 @@ export const messages = {
   deliverableRedTeam: 'Rilettura critica',
   deliverableRedTeamOk: 'Può uscire: nessun punto contestabile trovato.',
   deliverableRedTeamFix: 'Da correggere prima di farlo uscire.',
+  deliverableRedTeamFixApproved: 'La rilettura segnalava correzioni prima dell’invio.',
   deliverableHolds: 'Che cosa regge',
   deliverableSeverity: { grave: 'Grave', media: 'Media', lieve: 'Lieve' },
   deliverableChecklist: 'Da controllare prima di approvare',
@@ -1712,7 +1731,7 @@ export const messages = {
   guideTitle: 'Avvio del progetto',
   guideIntro:
     'Collega ciò che alimenta la memoria di questo progetto, una riga per volta. Ogni collegamento è facoltativo: puoi tornarci quando vuoi.',
-  guideFill: 'Riempi la memoria ora',
+  guideFill: 'Leggi tutte le fonti',
   guideFilling: 'Sto leggendo tutte le fonti collegate…',
   guideStep: (label: string, written: number, unchanged: number) =>
     `${label}: ${written} nuovi o aggiornati, ${unchanged} invariati.`,
@@ -1802,6 +1821,7 @@ export const messages = {
     searchIn: (label: string) => `Cerca: ${label}`,
     search: (values: number) => `Cerca fra ${values} valori`,
     nothingFound: 'Nessun valore corrisponde.',
+    showOptions: (count: number) => `Scegli tra ${count} opzioni`,
   },
   rows: {
     count: (rows: number) => (rows === 1 ? '1 riga' : `${rows} righe`),
@@ -1848,8 +1868,7 @@ export const messages = {
     orphan: (n: number) =>
       `Il richiamo [${n}] non ha una fonte: ciò che gli sta accanto non è appoggiato a nessun file.`,
     found: 'Frase riscontrata nel file',
-    foundNote:
-      'Il controllo dice che la frase è nel file. Non dice che la conclusione tratta sia giusta: quella resta da leggere.',
+    foundNote: 'Leggi il contesto della fonte per valutare la conclusione.',
     notFoundNote:
       'Questa citazione non regge il controllo: verifica sull’originale prima di usarla.',
     open: 'Apri l’originale',
@@ -1905,7 +1924,6 @@ export const messages = {
           ? '1 rilievo da rivedere'
           : `${count} rilievi da rivedere`,
     reset: 'La bozza è cambiata: i rilievi sono da rivedere di nuovo.',
-    exported: 'Approvato: i file sono pronti qui sopra.',
   },
 } as const
 

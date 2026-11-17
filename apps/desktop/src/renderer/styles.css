@@ -790,6 +790,12 @@ main {
   font-weight: 500;
 }
 
+/* Something foreseen: neither a success nor a thing to check. */
+.status-neutral {
+  background: var(--hover);
+  color: var(--muted);
+}
+
 .source-date {
   margin-left: 8px;
 }
@@ -808,6 +814,22 @@ blockquote {
   border-radius: var(--radius);
   background: var(--warning-bg);
   color: var(--warning);
+}
+
+/* The states the two sections read differently: one line, the list on request. */
+.alignment-mismatches {
+  align-self: flex-start;
+  max-width: min(100%, 720px);
+}
+
+.alignment-mismatches > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.alignment-mismatches > ul {
+  margin-block: 6px;
+  padding-inline-start: 20px;
 }
 
 main > .warning {
@@ -834,7 +856,7 @@ main > .warning {
   min-height: 32px;
 }
 
-/* A tab is a quiet pill: the one in use is filled, not underlined. */
+/* A tab is a quiet pill: the one in use is tinted, heavier and underlined. */
 .tab {
   min-height: 28px;
   padding: 0 10px;
@@ -850,8 +872,10 @@ main > .warning {
 
 .tab-selected,
 .tab-selected:hover:not(:disabled) {
-  background: var(--hover);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px var(--accent);
 }
 
 .sources-page {
@@ -1436,6 +1460,11 @@ table.data tr:has(+ tr.row-details) td {
   min-width: 960px;
 }
 
+/* A table of few columns is as wide as what it holds. */
+.table-wide.table-intrinsic > table {
+  min-width: 0;
+}
+
 table.data tfoot td {
   font-weight: 600;
   border-bottom: 0;
@@ -1483,6 +1512,22 @@ button.sort:hover {
   font-size: 9px;
   min-width: 9px;
   color: var(--accent);
+}
+
+/* The heading of a measure ends where its figures end: the mark of the order sits on the left. */
+table.data th.number > button.sort {
+  display: block;
+  position: relative;
+  width: 100%;
+  text-align: right;
+  padding-inline-start: 13px;
+}
+
+table.data th.number > button.sort > .sort-mark {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0.25em;
+  color: var(--accent-text);
 }
 
 .cell-note {
@@ -1601,20 +1646,34 @@ button.sort:hover {
   background: var(--ok);
 }
 
+/* Each state of the tracker with its phase beside it, not at the far edge of the form. */
+.settings-form .phase-mapping .phase-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, max-content);
+  gap: 12px;
+  max-width: 32rem;
+  align-items: center;
+}
+
 .settings-form .phase-row span {
-  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-settings summary {
   cursor: pointer;
   width: fit-content;
   padding: 5px 12px;
-  margin-bottom: 12px;
   border: 1px solid var(--field-line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-control);
   font-size: 13px;
   font-weight: 500;
+}
+
+/* Closed, the settings take one line; open, the form keeps its distance from the command. */
+.dashboard-settings[open] > summary {
+  margin-bottom: 8px;
 }
 
 .dashboard-settings summary:hover {
@@ -1841,6 +1900,14 @@ details.advanced[open] > summary {
   margin-bottom: 8px;
 }
 
+/* What opens under a line of a form: its fields one under the other. */
+.known-options,
+.fold-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* A label with something beside it: the small guide of a field. */
 .field-head {
   display: flex;
@@ -1920,6 +1987,12 @@ details.advanced[open] > summary {
   min-width: 0;
 }
 
+.rows textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+
 /* A path with the button that opens the dialog of the system beside it. */
 .path-field {
   display: flex;
@@ -1933,6 +2006,15 @@ details.advanced[open] > summary {
 
 /* A form whose rows have many columns takes the room there is. */
 .wide-form {
+  max-width: 1000px;
+}
+
+/* The people have more columns than the calendar: only their rows take the wider room. */
+.settings-form.wide-form.team-form {
+  max-width: 1280px;
+}
+
+.team-form .calendar-rows {
   max-width: 1000px;
 }
 
@@ -2005,7 +2087,6 @@ details.advanced[open] > summary {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow-x: auto;
 }
 
 .forecast-month table.data th,
@@ -2016,6 +2097,27 @@ details.advanced[open] > summary {
 
 .forecast-month .cell-button {
   margin-left: 0;
+}
+
+/* A project in its row: name and code on one line, cut short when long and read whole on hover. */
+.project-tip {
+  display: block;
+}
+
+.project-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What can be done with the row and what it lacks, on a line of their own under the name. */
+.project-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
 }
 
 /* With the note in its own window the figures have room: no heading breaks. */
@@ -3086,6 +3188,11 @@ fieldset.metrics {
   gap: 6px;
 }
 
+/* The command that opens the file of a risk is as wide as its words, on the left. */
+.today .today-judgement > .risk-source {
+  align-self: flex-start;
+}
+
 .today .today-item-actions {
   justify-content: flex-start;
 }
@@ -3149,6 +3256,14 @@ span.marker-warning {
 .answer .sources {
   gap: 3px;
   font-size: 13px;
+}
+
+/* A long list of sources is one line that opens. */
+.answer details.sources-fold > summary {
+  cursor: pointer;
+  width: fit-content;
+  font-weight: 600;
+  color: var(--accent-text);
 }
 
 .source-path[aria-pressed="true"] {

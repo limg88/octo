@@ -123,7 +123,9 @@ describe('MeetingsSection', () => {
     expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
     expect(screen.getByText(messages.elsewhere.noMeetings)).toBeTruthy()
     // Nothing to read from here: no way to ask for it.
-    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.meetingsSync })
+    const ask = [messages.meetingsSync, messages.readSavedSource].flatMap((name) =>
+      screen.queryAllByRole<HTMLButtonElement>('button', { name }),
+    )
     expect(ask.every((button) => button.disabled)).toBe(true)
   })
 
@@ -166,7 +168,7 @@ describe('MeetingsSection', () => {
     expect(await screen.findByText(errorText('meetings_root_unreadable'))).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: messages.meetingsSave }))
     expect(await screen.findByText(errorText('source_config_invalid'))).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.meetingsSync }))
+    fireEvent.click(screen.getByRole('button', { name: messages.readSavedSource }))
     expect(await screen.findByText(errorText('source_busy'))).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(messages.choosePath) }))
     expect(await screen.findByText(errorText('unexpected'))).toBeTruthy()

@@ -220,7 +220,7 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
             disabled={busy || view.config === null || !view.readableHere}
             onClick={() => void sync()}
           >
-            {messages.mailSync}
+            {messages.readSavedSource}
           </button>
           <button type="button" disabled={preview === 'loading'} onClick={() => void showPreview()}>
             {messages.mailPreview}

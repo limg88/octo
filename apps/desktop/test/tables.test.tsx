@@ -158,6 +158,33 @@ describe('a list of known values', () => {
     expect(screen.getByText(messages.knownList.nothingFound)).toBeTruthy()
   })
 
+  it('folds a long list in a form, leaving in sight what is chosen and how to take it off', () => {
+    function Folded({ known }: { known: string[] }) {
+      const [chosen, setChosen] = useState<string[]>(['CAES-3001', 'vecchio'])
+      return (
+        <KnownList label="Tag" known={known} chosen={chosen} onChange={setChosen} foldOptions />
+      )
+    }
+    const long = render(<Folded known={MANY} />)
+    const chosen = screen.getByRole('list', { name: messages.knownList.chosen('Tag') })
+    const fold = screen.getByText(messages.knownList.showOptions(41)).parentElement
+    expect((fold as HTMLDetailsElement).open).toBe(false)
+    // What is chosen is outside the line that opens; the search and the values are inside.
+    expect(fold?.contains(chosen)).toBe(false)
+    const inside = within(fold as HTMLElement)
+    expect(inside.getByRole('searchbox', { name: messages.knownList.searchIn('Tag') })).toBeTruthy()
+    fireEvent.click(inside.getByLabelText('CAES-3039'))
+    expect(within(chosen).getByText('CAES-3039')).toBeTruthy()
+    // A value of before, no longer among the known ones, is still taken off from above.
+    fireEvent.click(screen.getByRole('button', { name: messages.knownList.remove('vecchio') }))
+    expect(within(chosen).queryByText('vecchio')).toBeNull()
+    long.unmount()
+    // A short list stays in sight, folded or not.
+    render(<Folded known={['BE', 'FE']} />)
+    expect(screen.queryByText(/^Scegli tra/)).toBeNull()
+    expect(screen.getByLabelText('FE').closest('details')).toBeNull()
+  })
+
   it('shows a few values all at once, and says when nothing is chosen among many', () => {
     const few = render(<Tags known={['BE', 'FE']} />)
     expect(screen.queryByRole('searchbox')).toBeNull()

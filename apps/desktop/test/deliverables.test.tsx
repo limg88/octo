@@ -10,6 +10,7 @@ import {
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SOURCES_SHOWN } from '../src/renderer/AnswerView.tsx'
 import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
 import { handoffField, handoffText } from '../src/renderer/handoff-text.ts'
@@ -214,6 +215,59 @@ describe('DeliverablesView', () => {
     await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md'))
   })
 
+  it('says in the past what the reading asked to correct, once the PM approved', async () => {
+    const approvedAnyway: Deliverable = { ...approved, redTeam: review.redTeam }
+    const { api } = fakeApi({ listDeliverables: vi.fn(async () => ok([approvedAnyway])) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    expect(await screen.findByText(messages.deliverableRedTeamFixApproved)).toBeTruthy()
+    expect(screen.queryByText(messages.deliverableRedTeamFix)).toBeNull()
+    // The findings stay to read and the files stay at hand.
+    expect(screen.getByText('Il budget non ha una fonte')).toBeTruthy()
+    expect(screen.getByText(messages.deliverableFiles)).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: '2026-11-14_email-cliente_collaudo.docx' }),
+    ).toBeTruthy()
+  })
+
+  it('folds a long list of sources, which still answer to their markers', async () => {
+    const [source] = review.draft?.citations ?? []
+    if (!source || !review.draft) throw new Error('the draft of the fixture has a source')
+    const many = Array.from({ length: SOURCES_SHOWN + 1 }, (_, at) => ({
+      ...source,
+      // Numbers that skip one: the list keeps those of the text.
+      n: at * 2 + 1,
+      path: `posta/${at}.md`,
+    }))
+    const long: Deliverable = {
+      ...review,
+      draft: { ...review.draft, text: 'Il collaudo è il 17 dicembre [3].', citations: many },
+    }
+    const { api } = fakeApi({ listDeliverables: vi.fn(async () => ok([long])) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    const summary = await screen.findByText(`${messages.sources} · ${many.length}`)
+    const fold = summary.closest('details') as HTMLDetailsElement
+    expect(fold.open).toBe(false)
+    expect(
+      within(fold)
+        .getAllByRole('listitem')
+        .map((item) => (item as HTMLLIElement).value),
+    ).toEqual(many.map((citation) => citation.n))
+    // A marker of the text shows its source beside it with the list still closed.
+    const panel = screen.getByRole('complementary', { name: messages.citation.panel })
+    fireEvent.click(screen.getByRole('button', { name: messages.citation.marker(3) }))
+    expect(within(panel).getByText('posta/1.md')).toBeTruthy()
+    expect(fold.open).toBe(false)
+    // A short list is read as it is.
+    cleanup()
+    const short = fakeApi({ listDeliverables: vi.fn(async () => ok([review])) })
+    render(<DeliverablesView api={short.api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    const heading = await screen.findByRole('heading', { name: `${messages.sources} · 2` })
+    expect(heading.closest('details')).toBeNull()
+  })
+
   it('shows the draft formatted: headings, tables and the lines of an email', async () => {
     const formatted: Deliverable = {
       ...review,
@@ -316,7 +370,11 @@ describe('DeliverablesView', () => {
     expect(save.disabled).toBe(true)
     type(messages.ownKindTitle, 'Nota di rilascio')
     type(messages.ownKindAudience, 'internal')
-    type(/^Che cosa chiederti/, 'Quale versione *\nChe cosa evidenziare')
+    // The name of the field is short: how to write the questions is told under it, and read with it.
+    const questions = screen.getByLabelText(messages.ownKindQuestions)
+    const told = document.getElementById(questions.getAttribute('aria-describedby') ?? '')
+    expect(told?.textContent).toBe(messages.ownKindQuestionsHint)
+    type(messages.ownKindQuestions, 'Quale versione *\nChe cosa evidenziare')
     type(/^Come va scritto/, 'Scrivi le novità.')
     type(/^Che cosa controllare/, 'Nessun nome interno')
     fireEvent.click(save)
@@ -339,7 +397,7 @@ describe('DeliverablesView', () => {
     )
     // A kind that exists shows its template where it is changed.
     expect(await screen.findByRole('region', { name: words.title })).toBeTruthy()
-    expect(screen.getByLabelText<HTMLTextAreaElement>(/^Che cosa chiederti/).value).toBe(
+    expect(screen.getByLabelText<HTMLTextAreaElement>(messages.ownKindQuestions).value).toBe(
       'Quale versione *',
     )
     fireEvent.click(screen.getByRole('button', { name: messages.deliverableNew }))

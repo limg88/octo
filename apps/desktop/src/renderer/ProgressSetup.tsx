@@ -145,9 +145,12 @@ function Status({ done }: { done: boolean }) {
 export function ProgressSetup({ settings, candidates, onSave, onChooseModel, onClose }: Props) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
   const [problems, setProblems] = useState<Problems | null>(null)
-  /** The row of the map a datum is inserted into: the last one the PM typed in. */
-  const [activeCell, setActiveCell] = useState(0)
-  useEffect(() => setDraft(draftOf(settings)), [settings])
+  /** The row of the map a datum is inserted into: the one the PM typed in last, none at first. */
+  const [activeCell, setActiveCell] = useState<number | null>(null)
+  useEffect(() => {
+    setDraft(draftOf(settings))
+    setActiveCell(null)
+  }, [settings])
   // The only form found is proposed without asking.
   useEffect(() => {
     setDraft((current) => ({
@@ -174,6 +177,17 @@ export function ProgressSetup({ settings, candidates, onSave, onChooseModel, onC
     }),
   )
   const declared = amountOf(draft.total)
+
+  // A datum goes into a cell that is named: the row chosen, when its reference is one.
+  const target =
+    activeCell === null ? '' : (draft.cells[activeCell]?.ref.trim().toUpperCase() ?? '')
+  const insertInto = activeCell !== null && CELL.test(target) ? activeCell : null
+  /** The rows after the one taken off move up by one: the row chosen is followed, or forgotten. */
+  const followRemoved = (removed: number) =>
+    setActiveCell((current) => {
+      if (current === null || current === removed) return null
+      return current > removed ? current - 1 : current
+    })
 
   function submit() {
     const found = problemsOf(draft)
@@ -222,18 +236,24 @@ export function ProgressSetup({ settings, candidates, onSave, onChooseModel, onC
           cellLabel={(column, row) => (column === 'ref' ? text.cellN(row) : text.cellTextN(row))}
           removeLabel={text.removeCell}
           onFocusRow={setActiveCell}
+          onRemoveRow={followRemoved}
         />
         <FieldProblems lines={problems?.cells ?? []} />
         <div className="choices">
-          <span className="hint">{text.insert}</span>
+          <span className="hint">
+            {insertInto === null ? text.insert : text.insertInto(target)}
+          </span>
           {text.placeholders.map((placeholder) => (
             <button
               key={placeholder.token}
               type="button"
               title={placeholder.token}
+              disabled={insertInto === null}
               onClick={() => {
-                const row = Math.min(activeCell, draft.cells.length - 1)
-                setCell(row, { text: `${draft.cells[row]?.text ?? ''}${placeholder.token}` })
+                if (insertInto === null) return
+                setCell(insertInto, {
+                  text: `${draft.cells[insertInto]?.text ?? ''}${placeholder.token}`,
+                })
               }}
             >
               {placeholder.label}

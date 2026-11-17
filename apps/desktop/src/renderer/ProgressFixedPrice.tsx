@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { messages } from './messages.ts'
+import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
 
 type Props = {
@@ -35,25 +36,31 @@ export function ProgressFixedPrice({ api, project, onOpenSection, onUseForm }: P
   }, [api, project.id])
 
   if (error) return <Failure code={error} onOpen={onOpenSection} />
-  if (codes === null) return <p className="progress">{text.loading}</p>
+  if (codes === null) {
+    return (
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
+    )
+  }
   return (
     <div className="dashboard">
       <p className="hint">{text.intro}</p>
-      <div className="table-wide">
-        <table aria-label={text.title}>
+      <div className="table-wide table-intrinsic">
+        <table className="data" aria-label={text.title}>
           <thead>
             <tr>
               <th scope="col">{text.code}</th>
-              <th scope="col" className="amount">
+              <th scope="col" className="number">
                 {text.ordered}
               </th>
-              <th scope="col" className="amount">
+              <th scope="col" className="number">
                 {text.invoiced}
               </th>
-              <th scope="col" className="amount">
+              <th scope="col" className="number">
                 {text.toInvoice}
               </th>
-              <th scope="col" className="amount">
+              <th scope="col" className="number">
                 {text.recognized}
               </th>
             </tr>
@@ -74,10 +81,10 @@ export function ProgressFixedPrice({ api, project, onOpenSection, onUseForm }: P
                       <span className="hint code-name">{code.description}</span>
                     )}
                   </th>
-                  <td className="amount">{amount(ordered)}</td>
-                  <td className="amount">{ofOrder(invoiced)}</td>
-                  <td className="amount">{ofOrder(left)}</td>
-                  <td className="amount">{ofOrder(recognized)}</td>
+                  <td className="number">{amount(ordered)}</td>
+                  <td className="number">{ofOrder(invoiced)}</td>
+                  <td className="number">{ofOrder(left)}</td>
+                  <td className="number">{ofOrder(recognized)}</td>
                 </tr>
               )
             })}

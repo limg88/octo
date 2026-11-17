@@ -4,6 +4,7 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { lifetimeMail, lifetimeSourceText } from './forecast-text.ts'
 import { messages } from './messages.ts'
+import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
 
 type Props = {
@@ -54,7 +55,7 @@ export function ForecastLifetime({ api, project, onOpenSection, onUseBudget, ver
   }, [api, project.id, version])
 
   if (error) return <Failure code={error} onOpen={onOpenSection} />
-  if (lifetimes === null) return <p className="progress">{text.loading}</p>
+  if (lifetimes === null) return <Waiting>{text.loading}</Waiting>
   const life = lifetimes.find((entry) => entry.code === code)
   if (!life) return <p className="hint">{messages.forecast.noRows}</p>
 
@@ -107,15 +108,15 @@ export function ForecastLifetime({ api, project, onOpenSection, onUseBudget, ver
       {life.lines.length === 0 ? (
         <p className="hint">{text.noLines}</p>
       ) : (
-        <div className="table-wide">
-          <table aria-label={text.people}>
+        <div className="table-wide table-intrinsic">
+          <table className="data" aria-label={text.people}>
             <thead>
               <tr>
                 <th scope="col">{text.person}</th>
-                <th scope="col" className="amount">
+                <th scope="col" className="number">
                   {text.hours}
                 </th>
-                <th scope="col" className="amount">
+                <th scope="col" className="number">
                   {text.cost}
                 </th>
                 <th scope="col">{text.source}</th>
@@ -125,8 +126,8 @@ export function ForecastLifetime({ api, project, onOpenSection, onUseBudget, ver
               {life.lines.map((line) => (
                 <tr key={`${line.source} ${line.person}`}>
                   <th scope="row">{line.person}</th>
-                  <td className="amount">{hours(line.hours)}</td>
-                  <td className="amount">{amount(line.cost)}</td>
+                  <td className="number">{hours(line.hours)}</td>
+                  <td className="number">{amount(line.cost)}</td>
                   <td>{lifetimeSourceText(line)}</td>
                 </tr>
               ))}
@@ -134,8 +135,8 @@ export function ForecastLifetime({ api, project, onOpenSection, onUseBudget, ver
             <tfoot>
               <tr>
                 <th scope="row">{text.total}</th>
-                <td className="amount">{hours(life.hours)}</td>
-                <td className="amount">{money(life.costs)}</td>
+                <td className="number">{hours(life.hours)}</td>
+                <td className="number">{money(life.costs)}</td>
                 <td />
               </tr>
             </tfoot>

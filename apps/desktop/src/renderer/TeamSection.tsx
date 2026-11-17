@@ -142,7 +142,7 @@ export function TeamSection({ api, project }: Props) {
       )}
       {loaded && (
         <form
-          className="settings-form wide-form"
+          className="settings-form wide-form team-form"
           onSubmit={(event) => {
             event.preventDefault()
             void save()
@@ -161,15 +161,17 @@ export function TeamSection({ api, project }: Props) {
           />
           <FieldProblems lines={problems?.people ?? []} />
           <h4>{text.periods}</h4>
-          <RowsField
-            label={text.periods}
-            columns={PERIOD_COLUMNS}
-            rows={periods}
-            onChange={setPeriods}
-            addLabel={text.addPeriod}
-            cellLabel={(column, row) => text.cell(text.periodN(row), PERIOD_LABELS[column])}
-            removeLabel={(row) => text.remove(text.periodN(row))}
-          />
+          <div className="calendar-rows">
+            <RowsField
+              label={text.periods}
+              columns={PERIOD_COLUMNS}
+              rows={periods}
+              onChange={setPeriods}
+              addLabel={text.addPeriod}
+              cellLabel={(column, row) => text.cell(text.periodN(row), PERIOD_LABELS[column])}
+              removeLabel={(row) => text.remove(text.periodN(row))}
+            />
+          </div>
           <FieldProblems lines={problems?.periods ?? []} />
           <div className="actions">
             <button type="submit">{text.save}</button>

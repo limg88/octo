@@ -11,7 +11,15 @@ import {
   type RedTeamReport,
   registerTotals,
 } from '@octo/domain'
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import type { OpenSource } from './CitationPanel.tsx'
@@ -459,12 +467,10 @@ function Review({
         )}
       </div>
       <div className="panel-body">
-        {deliverable.status === 'approved' && (
-          <p className="badge badge-ok">{messages.review.exported}</p>
-        )}
         {deliverable.redTeam && (
           <RedTeam
             report={deliverable.redTeam}
+            approved={deliverable.status === 'approved'}
             seen={inReview ? seenKeys : null}
             onSeen={toggleSeen}
           />
@@ -594,20 +600,26 @@ function ClientFilter({ text }: { text: string }) {
 
 function RedTeam({
   report,
+  approved,
   seen,
   onSeen,
 }: {
   report: RedTeamReport
+  /** True once the PM approved: what the reading asked to correct is then history. */
+  approved: boolean
   /** The findings the PM marked as seen; null when the draft is no longer under review. */
   seen: readonly string[] | null
   onSeen: (key: string) => void
 }) {
   const ok = report.verdict === 'deliverable'
+  const toCorrect = approved
+    ? messages.deliverableRedTeamFixApproved
+    : messages.deliverableRedTeamFix
   return (
     <section className="red-team" aria-label={messages.deliverableRedTeam}>
       <h4>{messages.deliverableRedTeam}</h4>
       <p className={ok ? 'badge badge-ok' : 'badge badge-warning'}>
-        {ok ? messages.deliverableRedTeamOk : messages.deliverableRedTeamFix}
+        {ok ? messages.deliverableRedTeamOk : toCorrect}
       </p>
       {report.findings.length > 0 && (
         <ul className="findings">
@@ -749,6 +761,7 @@ function OwnKindForm({
   onSave: (input: OwnKindInput, withTemplate: boolean) => void
 }) {
   const [input, setInput] = useState<OwnKindInput>(kind ? ownKindInput(kind) : EMPTY_KIND)
+  const questionsHint = useId()
   const set = (change: Partial<OwnKindInput>) => setInput({ ...input, ...change })
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -793,10 +806,14 @@ function OwnKindForm({
           {messages.ownKindQuestions}
           <textarea
             rows={3}
+            aria-describedby={questionsHint}
             value={input.questions.join('\n')}
             onChange={(event) => set({ questions: event.target.value.split('\n') })}
           />
         </label>
+        <p id={questionsHint} className="hint">
+          {messages.ownKindQuestionsHint}
+        </p>
         <label>
           {messages.ownKindInstructions}
           <textarea

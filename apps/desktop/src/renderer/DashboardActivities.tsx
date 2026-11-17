@@ -37,15 +37,15 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
   return (
     <section aria-label={text.title}>
       <p className="hint">{text.intro}</p>
-      <div className="table-wide">
-        <table aria-label={text.title}>
+      <div className="table-wide table-intrinsic">
+        <table className="data" aria-label={text.title}>
           <thead>
             <tr>
               <th scope="col">{text.columnItem}</th>
               <th scope="col">{text.columnTitle}</th>
               <th scope="col">{text.columnState}</th>
               <th scope="col">{text.columnAssignee}</th>
-              <th scope="col" className="amount">
+              <th scope="col" className="number">
                 {text.columnHours}
               </th>
               <th scope="col">{text.columnLast}</th>
@@ -70,7 +70,7 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
                   <td>{row.title}</td>
                   <td>{row.state}</td>
                   <td>{row.assignee ?? messages.dashboard.unassigned}</td>
-                  <td className="amount">{hoursText(row.hours)}</td>
+                  <td className="number">{hoursText(row.hours)}</td>
                   <td>
                     {last === undefined ? (
                       text.noComment
@@ -117,7 +117,7 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
               <th scope="row" colSpan={4}>
                 {text.total}
               </th>
-              <td className="amount">{hoursText(hours)}</td>
+              <td className="number">{hoursText(hours)}</td>
               <td />
             </tr>
           </tfoot>
@@ -128,46 +128,48 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
       {people.length === 0 ? (
         <p className="hint">{text.noHours}</p>
       ) : (
-        <table aria-label={text.people}>
-          <thead>
-            <tr>
-              <th scope="col">{text.columnPerson}</th>
-              <th scope="col" className="amount">
-                {text.columnHours}
-              </th>
-              {capped && <th scope="col">{text.columnCap}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {people.map((person) => (
-              <tr key={person.person}>
-                <th scope="row">{person.person}</th>
-                <td className="amount">{hoursText(person.hours)}</td>
-                {capped && (
-                  <td>
-                    {person.capHours === null ? (
-                      text.noCap
-                    ) : (
-                      <>
-                        {text.cap(
-                          hoursText(person.capHours),
-                          hoursText(person.capHours / HOURS_PER_DAY),
-                          shareText(person.hours / person.capHours),
-                        )}
-                        {person.hours > person.capHours && (
-                          <>
-                            {' '}
-                            <span className="pill pill-late">{text.overCap}</span>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </td>
-                )}
+        <div className="table-wide table-intrinsic">
+          <table className="data" aria-label={text.people}>
+            <thead>
+              <tr>
+                <th scope="col">{text.columnPerson}</th>
+                <th scope="col" className="number">
+                  {text.columnHours}
+                </th>
+                {capped && <th scope="col">{text.columnCap}</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {people.map((person) => (
+                <tr key={person.person}>
+                  <th scope="row">{person.person}</th>
+                  <td className="number">{hoursText(person.hours)}</td>
+                  {capped && (
+                    <td>
+                      {person.capHours === null ? (
+                        text.noCap
+                      ) : (
+                        <>
+                          {text.cap(
+                            hoursText(person.capHours),
+                            hoursText(person.capHours / HOURS_PER_DAY),
+                            shareText(person.hours / person.capHours),
+                          )}
+                          {person.hours > person.capHours && (
+                            <>
+                              {' '}
+                              <span className="pill pill-late">{text.overCap}</span>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   )

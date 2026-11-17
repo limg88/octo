@@ -79,6 +79,8 @@ const NOTHING_MISSING = { fields: [], secret: false }
 const systemNow = (): Date => new Date()
 const dayOf = (date: Date): string => date.toISOString().slice(0, 10)
 const fieldsOf = (feed: FeedName): Field[] => [...FIELDS[feed], ...SHARED]
+/** The field the search of a system goes by, where it has one: the address whose codes are sought. */
+const SEARCHED_BY: Partial<Record<FeedName, FieldKey>> = { dwsi: 'ownerEmail' }
 
 function formOf(view: FeedView, now: Date): Form {
   const stored = (view.config ?? {}) as Record<string, unknown>
@@ -239,18 +241,20 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
   }
 
   const linked = view.config !== null
-  const inputs = (step: Step) =>
-    fieldsOf(feed)
-      .filter((field) => field.step === step)
-      .map((field) => (
-        <FieldInput
-          key={field.key}
-          field={field}
-          value={form[field.key] ?? ''}
-          missing={missing.fields.includes(field.key)}
-          onChange={(value) => setForm({ ...form, [field.key]: value })}
-        />
-      ))
+  const inputsOf = (fields: Field[]) =>
+    fields.map((field) => (
+      <FieldInput
+        key={field.key}
+        field={field}
+        value={form[field.key] ?? ''}
+        missing={missing.fields.includes(field.key)}
+        onChange={(value) => setForm({ ...form, [field.key]: value })}
+      />
+    ))
+  const inputs = (step: Step) => inputsOf(fieldsOf(feed).filter((field) => field.step === step))
+  // What the search goes by is typed before it: what is found then sits above what it fills.
+  const scope = fieldsOf(feed).filter((field) => field.step === 'scope')
+  const searchedBy = scope.filter((field) => field.key === SEARCHED_BY[feed])
 
   return (
     <section className="sources" aria-label={label}>
@@ -304,6 +308,7 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
         </div>
         {missing.secret && <Missing />}
         <h4>{messages.feedSteps.scope}</h4>
+        {inputsOf(searchedBy)}
         <div className="actions">
           <button type="button" disabled={busy} onClick={() => void search()}>
             {searchText.button}
@@ -320,7 +325,7 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
             />
           </div>
         )}
-        {inputs('scope')}
+        {inputsOf(scope.filter((field) => !searchedBy.includes(field)))}
         <details className="advanced">
           <summary>{messages.advanced}</summary>
           {inputs('advanced')}
@@ -334,7 +339,7 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
             disabled={busy || !linked || !view.hasSecret}
             onClick={() => void sync()}
           >
-            {messages.feedSync}
+            {messages.readSavedSource}
           </button>
           {linked && !leaving && (
             <button

@@ -150,9 +150,47 @@ describe('the alignment', () => {
     }
     const api = fakeApi({ alignmentView: vi.fn(async () => ok(mismatched)) })
     render(<AlignmentView api={api} project={project} />)
+    // One line says how many: the states and the way out open under it.
+    const summary = await screen.findByText(text.stateMismatchSummary(1))
+    const warning = summary.closest('details')
+    expect(warning?.open).toBe(false)
+    expect(summary.tagName).toBe('SUMMARY')
+    const inside = within(warning as HTMLElement)
+    expect(inside.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      text.stateMismatch('Demo', 'Chiuso', text.phaseNames.verify),
+    ])
+    expect(inside.getByText(text.stateMismatchHelp)).toBeTruthy()
+  })
+
+  it('counts the states read in another way in one warning, and shows none when they agree', async () => {
+    const more: View = {
+      ...view,
+      stateMismatches: [
+        { state: 'Demo', group: 'Chiuso', groupPhase: 'closed', dashboardPhase: 'verify' },
+        { state: 'Pronto', group: 'Aperto', groupPhase: 'work', dashboardPhase: 'validated' },
+      ],
+    }
+    render(
+      <AlignmentView
+        api={fakeApi({ alignmentView: vi.fn(async () => ok(more)) })}
+        project={project}
+      />,
+    )
+    const summary = await screen.findByText(text.stateMismatchSummary(2))
+    // The order is the one the app gives.
     expect(
-      await screen.findByText(text.stateMismatch('Demo', 'Chiuso', text.phaseNames.verify)),
-    ).toBeTruthy()
+      within(summary.closest('details') as HTMLElement)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      text.stateMismatch('Demo', 'Chiuso', text.phaseNames.verify),
+      text.stateMismatch('Pronto', 'Aperto', text.phaseNames.validated),
+    ])
+    expect(screen.getAllByText(text.stateMismatchHelp)).toHaveLength(1)
+    cleanup()
+    render(<AlignmentView api={fakeApi()} project={project} />)
+    await screen.findByRole('button', { name: text.exportMissing })
+    expect(screen.queryByText(text.stateMismatchHelp)).toBeNull()
   })
 
   it('warns when the lists do not add up, and says so for empty lists', async () => {
@@ -192,7 +230,11 @@ describe('the alignment', () => {
   it('writes the import file of the missing tickets and opens it', async () => {
     const api = fakeApi()
     render(<AlignmentView api={api} project={project} />)
-    fireEvent.click(await screen.findByRole('button', { name: text.exportMissing }))
+    const command = await screen.findByRole('button', { name: text.exportMissing })
+    // The command comes before the rows it writes, not after the last of them.
+    const rows = screen.getByRole('table', { name: text.missingTitle })
+    expect(command.compareDocumentPosition(rows) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(command)
     const path = '_octo/allineamento/mancanti_sprint-28.csv'
     expect(await screen.findByText(new RegExp(path))).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.open }))

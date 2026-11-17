@@ -8,7 +8,7 @@ import { hourText, shortDayText } from './today-text.ts'
 
 const text = messages.today.points
 /** Points read every morning: the others are a click away. */
-export const POINTS_LIMIT = 7
+export const POINTS_LIMIT = 4
 
 type Props = {
   brief: PointBrief

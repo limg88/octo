@@ -70,7 +70,7 @@ describe('SourcesView', () => {
     expect(screen.getByLabelText<HTMLInputElement>(messages.mailTarget).value).toBe('raw/Mail')
     expect(screen.getByLabelText<HTMLInputElement>(messages.mailSince).value).toBe('2026-10-15')
     expect(
-      screen.getByRole<HTMLButtonElement>('button', { name: messages.mailSync }).disabled,
+      screen.getByRole<HTMLButtonElement>('button', { name: messages.readSavedSource }).disabled,
     ).toBe(true)
 
     fireEvent.change(screen.getByLabelText(new RegExp(messages.mailKeywords.slice(0, 14))), {
@@ -100,7 +100,9 @@ describe('SourcesView', () => {
     expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
     expect(screen.getByText(messages.elsewhere.noMail)).toBeTruthy()
     // Nothing to read from here: no way to ask for it.
-    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.mailSync })
+    const ask = [messages.mailSync, messages.readSavedSource].flatMap((name) =>
+      screen.queryAllByRole<HTMLButtonElement>('button', { name }),
+    )
     expect(ask.every((button) => button.disabled)).toBe(true)
   })
 
@@ -114,7 +116,9 @@ describe('SourcesView', () => {
     expect(await screen.findByText(/3 nuove, 12 già presenti/)).toBeTruthy()
     expect(screen.queryByText(messages.mailStale)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: messages.mailSync }))
+    // The preview reads what is typed; this command says it reads with what is saved.
+    expect(screen.getByRole('button', { name: messages.mailPreview })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: messages.readSavedSource }))
     expect(await screen.findByText(messages.mailSyncing)).toBeTruthy()
     await act(async () => finish(ok(run)))
     await waitFor(() => expect(api.mailSource).toHaveBeenCalledTimes(2))
@@ -188,7 +192,7 @@ describe('SourcesView', () => {
     render(<SourcesView api={api} project={project} now={now} />)
     fireEvent.click(await screen.findByRole('button', { name: messages.mailSave }))
     expect(await screen.findByText(/uno dei due non è valido/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: messages.mailSync }))
+    fireEvent.click(screen.getByRole('button', { name: messages.readSavedSource }))
     expect(await screen.findByText('Una lettura è già in corso.')).toBeTruthy()
   })
 })

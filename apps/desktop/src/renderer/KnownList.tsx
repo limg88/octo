@@ -7,6 +7,8 @@ type Props = {
   known: readonly string[]
   chosen: readonly string[]
   onChange: (chosen: string[]) => void
+  /** In a long form a long list shows what is chosen: the search and the values open on request. */
+  foldOptions?: boolean
 }
 
 const text = messages.knownList
@@ -26,7 +28,7 @@ const SEARCH_FROM_VALUES = 9
  * What was chosen before and is no longer among the known values stays in the list, so it can be
  * seen and taken off. While nothing is known yet the values are typed, separated by commas.
  */
-export function KnownList({ label, known, chosen, onChange }: Props) {
+export function KnownList({ label, known, chosen, onChange, foldOptions = false }: Props) {
   const [typed, setTyped] = useState(() => chosen.join(`${SEPARATOR} `))
   const [sought, setSought] = useState('')
   const options = [...known, ...chosen.filter((value) => !known.includes(value))]
@@ -56,49 +58,65 @@ export function KnownList({ label, known, chosen, onChange }: Props) {
     onChange(
       chosen.includes(option) ? chosen.filter((value) => value !== option) : [...chosen, option],
     )
+  const search = searchable && (
+    <input
+      type="search"
+      aria-label={text.searchIn(label)}
+      placeholder={text.search(options.length)}
+      value={sought}
+      onChange={(event) => setSought(event.target.value)}
+    />
+  )
+  const checks = (
+    <div className={searchable ? 'checks checks-scroll' : 'checks'}>
+      {found.map((option) => (
+        <label key={option} className="check">
+          <input
+            type="checkbox"
+            checked={chosen.includes(option)}
+            onChange={() => toggle(option)}
+          />
+          {option}
+        </label>
+      ))}
+      {found.length === 0 && <p className="hint">{text.nothingFound}</p>}
+    </div>
+  )
   return (
     <fieldset className="known-list">
       <legend>{label}</legend>
       {searchable && (
+        <ul className="chosen" aria-label={text.chosen(label)}>
+          {chosen.length === 0 && <li className="hint">{text.noneChosen}</li>}
+          {chosen.map((value) => (
+            <li key={value} className="chosen-value">
+              {value}
+              <button
+                type="button"
+                className="signal-remove"
+                aria-label={text.remove(value)}
+                onClick={() => toggle(value)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searchable && foldOptions ? (
+        <details className="advanced">
+          <summary>{text.showOptions(options.length)}</summary>
+          <div className="known-options">
+            {search}
+            {checks}
+          </div>
+        </details>
+      ) : (
         <>
-          <ul className="chosen" aria-label={text.chosen(label)}>
-            {chosen.length === 0 && <li className="hint">{text.noneChosen}</li>}
-            {chosen.map((value) => (
-              <li key={value} className="chosen-value">
-                {value}
-                <button
-                  type="button"
-                  className="signal-remove"
-                  aria-label={text.remove(value)}
-                  onClick={() => toggle(value)}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-          <input
-            type="search"
-            aria-label={text.searchIn(label)}
-            placeholder={text.search(options.length)}
-            value={sought}
-            onChange={(event) => setSought(event.target.value)}
-          />
+          {search}
+          {checks}
         </>
       )}
-      <div className={searchable ? 'checks checks-scroll' : 'checks'}>
-        {found.map((option) => (
-          <label key={option} className="check">
-            <input
-              type="checkbox"
-              checked={chosen.includes(option)}
-              onChange={() => toggle(option)}
-            />
-            {option}
-          </label>
-        ))}
-        {found.length === 0 && <p className="hint">{text.nothingFound}</p>}
-      </div>
     </fieldset>
   )
 }

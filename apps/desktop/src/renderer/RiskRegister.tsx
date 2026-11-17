@@ -209,16 +209,20 @@ type SourceProps = {
 /** Where a risk comes from: the file, the words, and whether Octo found them there. */
 function Source({ source, onOpen }: SourceProps) {
   return (
-    <p className="today-judgement">
-      <strong>{text.source}:</strong>{' '}
-      <button type="button" className="quiet" onClick={() => onOpen(source.path)}>
-        {source.path}
-      </button>{' '}
-      «{source.quote}»{' '}
+    <div className="today-judgement">
+      <button
+        type="button"
+        className="quiet risk-source"
+        title={source.path}
+        onClick={() => onOpen(source.path)}
+      >
+        {text.source}
+      </button>
+      <span>«{source.quote}»</span>
       <span className={source.verified ? 'badge badge-ok' : 'badge badge-warning'}>
         {source.verified ? text.verified : text.unverified}
       </span>
-    </p>
+    </div>
   )
 }
 

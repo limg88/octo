@@ -401,10 +401,11 @@ describe('the brief of the open points', () => {
     await waitFor(() => expect(api.confirmOpenPoint).toHaveBeenCalledWith('p-1', 'w', false))
 
     const list = screen.getByRole('list', { name: text.points.list })
-    expect(within(list).getAllByRole('listitem')).toHaveLength(7)
-    fireEvent.click(screen.getByRole('button', { name: text.points.more(2) }))
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4)
+    fireEvent.click(screen.getByRole('button', { name: text.points.more(5) }))
     expect(within(list).getAllByRole('listitem')).toHaveLength(9)
     fireEvent.click(screen.getByRole('button', { name: text.points.fewer }))
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: `${text.points.resolve}: Punto p0` }))
     expect(await screen.findByText(errorText('open_point_invalid'))).toBeTruthy()
   })
@@ -1561,9 +1562,10 @@ describe('the register of the risks', () => {
 
     const again = todayApi(view(), { risks: vi.fn(async () => ok(register)) })
     render(<RiskRegister api={again.api} project={aurora} canJudge onBack={() => {}} />)
-    fireEvent.click(
-      (await screen.findAllByRole('button', { name: 'wiki/stato.md' }))[0] as HTMLElement,
-    )
+    // The command is short; the path is under the pointer, and it is the one that is opened.
+    const [source] = await screen.findAllByRole('button', { name: words.source })
+    expect(source?.title).toBe('wiki/stato.md')
+    fireEvent.click(source as HTMLElement)
     expect(again.api.openEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md')
     fireEvent.click(await screen.findByRole('button', { name: words.dismiss }))
     await waitFor(() => expect(again.api.dismissRisk).toHaveBeenCalledWith('p-1', 'c1'))

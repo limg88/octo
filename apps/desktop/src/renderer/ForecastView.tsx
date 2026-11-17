@@ -10,7 +10,7 @@ import {
   NO_ROW_INPUTS,
   type Project,
 } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
@@ -22,6 +22,7 @@ import { messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import { useSavedNote } from './SavedNote.tsx'
+import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
 
 type ForecastApi = Pick<
@@ -202,7 +203,9 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     return error ? (
       <Failure code={error} onOpen={onOpenSection} />
     ) : (
-      <p className="progress">{text.loading}</p>
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
     )
   }
 
@@ -449,6 +452,9 @@ function SettingsForm({
   const withCodes = <Key extends string>(columns: RowsColumn<Key>[]): RowsColumn<Key>[] =>
     columns.map((column) => (column.key === 'code' ? { ...column, suggestions: codes } : column))
 
+  /** The rates open on request: they are long, and most visits to the form are for something else. */
+  const ratesFold = useRef<HTMLDetailsElement>(null)
+
   function submit() {
     const found = {
       projects: codes.flatMap((code) => {
@@ -473,6 +479,8 @@ function SettingsForm({
         text.wrong.hourlyCost,
       ),
     }
+    // A rate that is wrong is shown where it is typed, not left under a line that is closed.
+    if (found.rates.length > 0 && ratesFold.current) ratesFold.current.open = true
     if (Object.values(found).some((lines) => lines.length > 0)) return setProblems(found)
     setProblems(null)
     void onSave({
@@ -586,7 +594,7 @@ function SettingsForm({
                       <input
                         type="text"
                         className="amount"
-                        placeholder="2026-09"
+                        placeholder={text.startMonthFormat}
                         aria-label={text.forCode(text.columnStartMonth, code)}
                         value={projectOf(code).startMonth}
                         onChange={(event) =>
@@ -621,20 +629,22 @@ function SettingsForm({
         />
       </label>
       {byTheDay ? (
-        <>
-          <h4>{text.rates}</h4>
-          <p className="hint">{text.ratesHint}</p>
-          <RowsField
-            label={text.rates}
-            columns={withCodes(RATE_COLUMNS)}
-            rows={draft.rates}
-            onChange={(rates) => setDraft((current) => ({ ...current, rates }))}
-            addLabel={text.add.rate}
-            cellLabel={(column, row) => text.cell(RATE_LABELS[column], row)}
-            removeLabel={text.removeRow}
-          />
-          <FieldProblems lines={problems?.rates ?? []} />
-        </>
+        <details ref={ratesFold} className="advanced">
+          <summary>{text.rates}</summary>
+          <div className="fold-fields">
+            <p className="hint">{text.ratesHint}</p>
+            <RowsField
+              label={text.rates}
+              columns={withCodes(RATE_COLUMNS)}
+              rows={draft.rates}
+              onChange={(rates) => setDraft((current) => ({ ...current, rates }))}
+              addLabel={text.add.rate}
+              cellLabel={(column, row) => text.cell(RATE_LABELS[column], row)}
+              removeLabel={text.removeRow}
+            />
+            <FieldProblems lines={problems?.rates ?? []} />
+          </div>
+        </details>
       ) : (
         <p className="hint">{text.noRatesNeeded}</p>
       )}

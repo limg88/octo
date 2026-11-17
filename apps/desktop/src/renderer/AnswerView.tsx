@@ -22,6 +22,9 @@ type Props = {
  */
 const MARKDOWN_PLUGINS = [remarkGfm, remarkBreaks]
 
+/** A list of sources longer than this opens on request: its markers in the text still work. */
+export const SOURCES_SHOWN = 8
+
 /**
  * The answer as the model wrote it, with what the code found about each of its sources. A marker
  * shows its source beside the text, so the answer is never left to read where it comes from.
@@ -29,6 +32,27 @@ const MARKDOWN_PLUGINS = [remarkGfm, remarkBreaks]
 export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
   const [selected, setSelected] = useState<number | null>(answer.citations[0]?.n ?? null)
   const statusOf = new Map(answer.citations.map((citation) => [citation.n, citation.status]))
+  const sourcesTitle = `${messages.sources} · ${answer.citations.length}`
+  const sources = (
+    <ol className="sources">
+      {answer.citations.map((citation) => (
+        <li key={citation.n} id={sourceElementId(citation.n)} value={citation.n}>
+          <button
+            type="button"
+            className="source-path"
+            title={citation.path}
+            aria-pressed={selected === citation.n}
+            onClick={() => setSelected(citation.n)}
+          >
+            {sourceTitle(citation.path)}
+          </button>
+          {citation.status !== 'verified' && (
+            <span className="status status-warning">{citationStatusText(citation.status)}</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
   return (
     <div className="answer split">
       <div className="answer-main">
@@ -92,29 +116,17 @@ export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
         {actions && <div className="actions">{actions}</div>}
         {answer.citations.length > 0 && (
           <section aria-label={messages.sources}>
-            <h3>
-              {messages.sources} · {answer.citations.length}
-            </h3>
-            <ol className="sources">
-              {answer.citations.map((citation) => (
-                <li key={citation.n} id={sourceElementId(citation.n)} value={citation.n}>
-                  <button
-                    type="button"
-                    className="source-path"
-                    title={citation.path}
-                    aria-pressed={selected === citation.n}
-                    onClick={() => setSelected(citation.n)}
-                  >
-                    {sourceTitle(citation.path)}
-                  </button>
-                  {citation.status !== 'verified' && (
-                    <span className="status status-warning">
-                      {citationStatusText(citation.status)}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
+            {answer.citations.length > SOURCES_SHOWN ? (
+              <details className="sources-fold">
+                <summary>{sourcesTitle}</summary>
+                {sources}
+              </details>
+            ) : (
+              <>
+                <h3>{sourcesTitle}</h3>
+                {sources}
+              </>
+            )}
           </section>
         )}
       </div>

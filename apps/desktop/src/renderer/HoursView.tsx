@@ -1,6 +1,6 @@
 import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/application'
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Failure } from './Failure.tsx'
@@ -11,6 +11,7 @@ import { dateText, dateTimeText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import { useSavedNote } from './SavedNote.tsx'
+import { Waiting } from './Spinner.tsx'
 import { Unlinked } from './Unlinked.tsx'
 
 type HoursApi = Pick<
@@ -53,6 +54,13 @@ export function monthPeriod(month: string): HoursPeriod | null {
     from: dayOf(new Date(Date.UTC(year, number - 1, 1))),
     to: dayOf(new Date(Date.UTC(year, number, 0))),
   }
+}
+
+/** Green for what adds up, neutral for an absence foreseen, amber for what is to check. */
+function statusClass(status: HoursRow['status']): string {
+  if (status === 'ok') return 'status status-ok'
+  if (status === 'expected') return 'status status-neutral'
+  return 'status status-warning'
 }
 
 /** Timesheet hours against the hours logged on the tracker, computed by the app. */
@@ -224,7 +232,13 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
   }
 
   if (settings === null) {
-    return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+    return error ? (
+      <Failure code={error} />
+    ) : (
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
+    )
   }
 
   if (!ready(settings)) {
@@ -417,15 +431,7 @@ function Comparison({
                 width: '300px',
                 cell: (row) => (
                   <>
-                    <span
-                      className={
-                        row.status === 'ok' || row.status === 'expected'
-                          ? 'status status-ok'
-                          : 'status status-warning'
-                      }
-                    >
-                      {text.status[row.status]}
-                    </span>
+                    <span className={statusClass(row.status)}>{text.status[row.status]}</span>
                     {(row.status === 'no_worklog' || row.status === 'no_timesheet') && (
                       <button
                         type="button"
@@ -551,18 +557,27 @@ function SettingsForm({
     }))
   }, [candidates])
 
-  const field = (name: TextField, label: string, type: 'number' | 'date') => (
-    <label>
-      {label}
-      <input
-        type={type}
-        value={draft[name]}
-        onChange={(event) => {
-          const { value } = event.target
-          setDraft((current) => ({ ...current, [name]: value }))
-        }}
-      />
-    </label>
+  const hintId = useId()
+  const field = (name: TextField, label: string, type: 'number' | 'date', hint?: string) => (
+    <>
+      <label>
+        {label}
+        <input
+          type={type}
+          value={draft[name]}
+          aria-describedby={hint ? `${hintId}-${name}` : undefined}
+          onChange={(event) => {
+            const { value } = event.target
+            setDraft((current) => ({ ...current, [name]: value }))
+          }}
+        />
+      </label>
+      {hint && (
+        <p id={`${hintId}-${name}`} className="hint">
+          {hint}
+        </p>
+      )}
+    </>
   )
 
   return (
@@ -613,12 +628,13 @@ function SettingsForm({
         onChange={(projects) => setDraft((current) => ({ ...current, projects }))}
       />
       {field('thresholdPct', text.threshold, 'number')}
-      {field('cutoff', text.cutoff, 'date')}
+      {field('cutoff', text.cutoff, 'date', text.cutoffHint)}
       <KnownList
         label={text.noWorklogExpected}
         known={people}
         chosen={draft.noWorklogExpected}
         onChange={(noWorklogExpected) => setDraft((current) => ({ ...current, noWorklogExpected }))}
+        foldOptions
       />
       <KnownList
         label={text.noTimesheetExpected}
@@ -627,6 +643,7 @@ function SettingsForm({
         onChange={(noTimesheetExpected) =>
           setDraft((current) => ({ ...current, noTimesheetExpected }))
         }
+        foldOptions
       />
       <h4>{text.aliases}</h4>
       <RowsField

@@ -5,7 +5,7 @@ import { messages } from './messages.ts'
 export type RowsColumn<Key extends string> = {
   key: Key
   label: string
-  kind?: 'text' | 'amount' | 'date' | 'select'
+  kind?: 'text' | 'textarea' | 'amount' | 'date' | 'select'
   /** The choices of a `select` column, as value and words. */
   options?: ReadonlyArray<{ value: string; label: string }>
   /** Values the field proposes while typing: what Octo already knows. */
@@ -28,7 +28,12 @@ type Props<Key extends string> = {
   removeLabel: (row: number) => string
   /** The row the PM is typing in, for what is inserted from outside the table. */
   onFocusRow?: (row: number) => void
+  /** The row taken off, as it was counted before: who points at a row follows the others. */
+  onRemoveRow?: (row: number) => void
 }
+
+/** A list typed in a row is read whole: it wraps on this many lines before it scrolls. */
+const TEXTAREA_ROWS = 2
 
 const REMOVE_WIDTH = '30px'
 /** With fewer rows than this all are in sight: a filter would only take room. */
@@ -62,6 +67,7 @@ export function RowsField<Key extends string>({
   cellLabel,
   removeLabel,
   onFocusRow,
+  onRemoveRow,
 }: Props<Key>) {
   const id = useId()
   const [typed, setTyped] = useState('')
@@ -126,6 +132,16 @@ export function RowsField<Key extends string>({
                       </select>
                     )
                   }
+                  if (column.kind === 'textarea') {
+                    return (
+                      <textarea
+                        key={column.key}
+                        {...common}
+                        rows={TEXTAREA_ROWS}
+                        onChange={(event) => set(index, column.key, event.target.value)}
+                      />
+                    )
+                  }
                   const list = column.suggestions?.length ? `${id}-${column.key}` : undefined
                   return (
                     <input
@@ -143,14 +159,15 @@ export function RowsField<Key extends string>({
                   type="button"
                   className="quiet"
                   aria-label={removeLabel(index + 1)}
-                  onClick={() =>
+                  onClick={() => {
+                    onRemoveRow?.(index)
                     onChange(
                       orOneRow(
                         rows.filter((_row, at) => at !== index),
                         columns,
                       ),
                     )
-                  }
+                  }}
                 >
                   ×
                 </button>

@@ -86,18 +86,21 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         known={view?.tags ?? []}
         chosen={draft.tags}
         onChange={(tags) => change({ tags })}
+        foldOptions
       />
       <KnownList
         label={text.bugTypes}
         known={typesRead}
         chosen={draft.bugTypes}
         onChange={(bugTypes) => change({ bugTypes })}
+        foldOptions
       />
       <KnownList
         label={text.storyTypes}
         known={typesRead}
         chosen={draft.storyTypes}
         onChange={(storyTypes) => change({ storyTypes })}
+        foldOptions
       />
       {view && view.types.length > 0 && (
         <p className="hint">
@@ -148,7 +151,7 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         />
       )}
       {view && view.states.length > 0 && (
-        <fieldset>
+        <fieldset className="phase-mapping">
           <legend>{text.phasesTitle}</legend>
           <p className="hint">{text.phasesHint}</p>
           {view.states.map((entry) => (

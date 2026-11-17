@@ -5,7 +5,7 @@ import {
   type ProgressSettings,
   progressWarnings,
 } from '@octo/domain'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { amountField, amountText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { ProgressShares } from './ProgressShares.tsx'
@@ -49,6 +49,11 @@ function draftOf(settings: ProgressSettings, n: number): Draft {
 export function ProgressRequestForm({ settings, n, onSave, onCancel }: Props) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(settings, n))
   const [refused, setRefused] = useState(false)
+  const title = useRef<HTMLHeadingElement>(null)
+  // Opened from a request far down the page, the form is read from its title.
+  useEffect(() => {
+    title.current?.focus()
+  }, [])
   const change = (part: Partial<Draft>) => setDraft((current) => ({ ...current, ...part }))
 
   const isNew = n > settings.requests.length
@@ -91,7 +96,9 @@ export function ProgressRequestForm({ settings, n, onSave, onCancel }: Props) {
         submit(true)
       }}
     >
-      <h3>{isNew ? text.request.titleNew(n) : text.request.titleEdit(n)}</h3>
+      <h3 ref={title} tabIndex={-1}>
+        {isNew ? text.request.titleNew(n) : text.request.titleEdit(n)}
+      </h3>
       {after.length > 0 && <p className="badge badge-warning">{text.request.laterRecomputed}</p>}
       <div className="range-fields">
         <label>

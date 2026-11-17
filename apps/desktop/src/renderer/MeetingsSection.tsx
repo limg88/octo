@@ -167,7 +167,7 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
             disabled={busy || !linked || !view.readableHere}
             onClick={() => void sync()}
           >
-            {messages.meetingsSync}
+            {messages.readSavedSource}
           </button>
           {saved && <span className="hint">{messages.meetingsSaved}</span>}
         </div>

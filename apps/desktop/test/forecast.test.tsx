@@ -110,6 +110,12 @@ function fakeApi(overrides: Partial<Api> = {}) {
 }
 
 const UNLINKED = { ok: false as const, code: 'source_not_configured' as const }
+
+/** The headings of the columns of a table, as they are read. */
+const headings = (table: HTMLElement): string[] =>
+  within(table)
+    .getAllByRole('columnheader')
+    .map((heading) => heading.textContent ?? '')
 /** What NetSuite says of the codes of the project. */
 const ordersRead = (projects: ForecastSettings['projects']) =>
   ok({ settings: { ...configured, projects }, codes: Object.keys(projects) })
@@ -143,13 +149,13 @@ describe('the forecast', () => {
   it('shows the last complete month with what is missing', async () => {
     const api = fakeApi()
     render(<ForecastView api={api} project={project} now={now} />)
-    expect((await screen.findAllByText('P1')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(text.project('Sviluppo', 'P1'))).length).toBeGreaterThan(0)
     expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-06')
     expect(screen.getAllByText('3.200,00')).toHaveLength(2)
     // Days sold and progress of a fixed price each in its own column: the other stays empty.
     const table = screen.getByRole('table', { name: text.monthData })
     const cellsOf = (code: string) =>
-      within(within(table).getByRole('row', { name: new RegExp(`^${code}`) }))
+      within(within(table).getByRole('row', { name: new RegExp(`· ${code} `) }))
         .getAllByRole('cell')
         .map((cell) => cell.textContent)
     expect(cellsOf('P1').slice(1, 7)).toEqual([
@@ -162,8 +168,8 @@ describe('the forecast', () => {
     ])
     expect(cellsOf('P2').slice(5, 7)).toEqual(['—', '12,5%'])
     // The name of the code is in the row, not only under the pointer.
-    expect(within(table).getAllByText('Sviluppo').length).toBeGreaterThan(0)
-    expect(within(table).getAllByText('A corpo').length).toBeGreaterThan(0)
+    expect(within(table).getByText(text.project('Sviluppo', 'P1'))).toBeTruthy()
+    expect(within(table).getByText(text.project('A corpo', 'P2'))).toBeTruthy()
     // A row whose figures miss something says so itself; both rows here do.
     expect(within(table).getAllByText(text.incomplete)).toHaveLength(2)
     // The project as a whole: ordered, costs, revenue, days, and the margin of the month on them.
@@ -208,7 +214,79 @@ describe('the forecast', () => {
     expect(within(table).queryByText(text.totalRow)).toBeNull()
     // The margin at the end that is missing does not make the figures of the month wrong.
     expect(within(table).queryByText(text.incomplete)).toBeNull()
-    expect(within(table).getAllByText(text.none).length).toBeGreaterThan(1)
+    // A month sold by the day only has no column of dashes for the progress.
+    expect(headings(table)).toContain(text.columnDays)
+    expect(headings(table)).not.toContain(text.columnProgress)
+    const cells = within(within(table).getByRole('row', { name: /· P1 / })).getAllByRole('cell')
+    expect(cells.map((cell) => cell.textContent).slice(1, 7)).toEqual([
+      text.none,
+      '3.200,00',
+      '750,00',
+      '6.400,00',
+      '18,5',
+      '38,28%',
+    ])
+    // Octo fills one column less: the heading of its group covers those that are there.
+    expect(
+      within(table).getByRole('columnheader', { name: text.groupComputed }).getAttribute('colspan'),
+    ).toBe('8')
+  })
+
+  it('shows the progress and no days for a month sold at a fixed price only', async () => {
+    const share = view.forecast.rows[1] as View['forecast']['rows'][number]
+    const shares: View = {
+      ...view,
+      forecast: { ...view.forecast, rows: [share, { ...share, code: 'P3' }], gaps: [] },
+    }
+    render(
+      <ForecastView
+        api={fakeApi({ forecastView: vi.fn(async () => ok(shares)) })}
+        project={project}
+        now={now}
+      />,
+    )
+    const table = await screen.findByRole('table', { name: text.monthData })
+    expect(headings(table)).toContain(text.columnProgress)
+    expect(headings(table)).not.toContain(text.columnDays)
+    const cellsOf = (name: string) =>
+      within(within(table).getByRole('row', { name: new RegExp(`(^|· )${name} `) }))
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    expect(cellsOf('P3')[5]).toBe('12,5%')
+    // The total has a cell for each column that is there: nothing slips under another heading.
+    expect(cellsOf(text.totalRow).slice(0, 6)).toEqual([
+      '100.000,00',
+      '6.400,00',
+      '1.500,00',
+      '12.800,00',
+      '',
+      '38,28%',
+    ])
+    expect(
+      within(table).getByRole('columnheader', { name: text.groupComputed }).getAttribute('colspan'),
+    ).toBe('8')
+  })
+
+  it('says it is reading until the settings come, then shows the month or why it cannot', async () => {
+    const failing = { ok: false as const, code: 'forecast_settings_invalid' as const }
+    for (const answer of [ok(configured), failing]) {
+      let arrive: (value: Result<ForecastSettings>) => void = () => {}
+      const late = new Promise<Result<ForecastSettings>>((resolve) => {
+        arrive = resolve
+      })
+      render(
+        <ForecastView
+          api={fakeApi({ forecastSettings: vi.fn(() => late) })}
+          project={project}
+          now={now}
+        />,
+      )
+      expect(screen.getByRole('status').textContent).toBe(text.loading)
+      arrive(answer)
+      await waitFor(() => expect(screen.queryByText(text.loading)).toBeNull())
+      expect(screen.queryByRole('alert') !== null).toBe(!answer.ok)
+      cleanup()
+    }
   })
 
   it('says when nothing is missing and when the model lists no code', async () => {
@@ -284,7 +362,12 @@ describe('the forecast', () => {
     await waitFor(() => expect(cell(text.toInvoice, 'P1').value).toBe('12000'))
     // What is used less often opens under the row of its code.
     expect(screen.queryByRole('group', { name: text.inputsTitle('P1') })).toBeNull()
+    // How a row is computed is read with its details, not under every row.
+    const howP1 = `${text.howComputed} timesheet approvati`
+    expect(screen.queryByText(howP1)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: text.forCode(text.moreData, 'P1') }))
+    expect(screen.getByText(howP1)).toBeTruthy()
+    expect(screen.queryByText(`${text.howComputed} avanzamento`)).toBeNull()
     const more = within(screen.getByRole('group', { name: text.inputsTitle('P1') }))
     // A figure that is not one is told under its field, and the month is not saved.
     fireEvent.change(more.getByLabelText(text.cell(text.columns.name, 1)), {
@@ -330,8 +413,8 @@ describe('the forecast', () => {
     vi.mocked(api.saveForecastSettings).mockClear()
     // Pointing at a code tells the name of its project and how it is sold.
     expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toEqual([
-      text.projectName('Sviluppo', text.kinds.time_material),
-      text.projectName('A corpo', text.kinds.fixed_price),
+      text.projectName('Sviluppo', 'P1', text.kinds.time_material),
+      text.projectName('A corpo', 'P2', text.kinds.fixed_price),
     ])
     fireEvent.change(cell(text.toInvoice, 'P2'), { target: { value: '500' } })
     fireEvent.click(screen.getByRole('button', { name: text.saveInputs }))
@@ -449,7 +532,11 @@ describe('the forecast', () => {
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
     const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     await waitFor(() => expect(model.value).toBe('amministrazione/Previsionale.xlsx'))
-    const rates = within(screen.getByRole('group', { name: text.rates }))
+    // The rates are long: they open on request, under a line with their name.
+    const ratesFold = screen.getByText(text.rates, { selector: 'summary' })
+      .parentElement as HTMLDetailsElement
+    expect(ratesFold.open).toBe(false)
+    const rates = within(within(ratesFold).getByRole('group', { name: text.rates }))
     const externals = within(screen.getByRole('group', { name: text.externalRates }))
     const set = (group: typeof rates, column: string, row: number, value: string) =>
       fireEvent.change(group.getByLabelText(text.cell(column, row)), { target: { value } })
@@ -460,6 +547,8 @@ describe('the forecast', () => {
     set(externals, text.columns.code, 1, 'p1')
     set(externals, text.columns.rate, 1, '500')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
+    // A rate that is wrong opens its line: the error is never left where it is not seen.
+    expect(ratesFold.open).toBe(true)
     expect(screen.getByText(text.wrong.rate(1))).toBeTruthy()
     expect(screen.getByText(text.wrong.external(1))).toBeTruthy()
     expect(api.saveForecastSettings).not.toHaveBeenCalled()
@@ -511,7 +600,7 @@ describe('the forecast', () => {
         externals: [{ name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 }],
       }),
     )
-    expect((await screen.findAllByText('P1')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(text.project('Sviluppo', 'P1'))).length).toBeGreaterThan(0)
   })
 
   it('reads name and ordered amount from NetSuite, and says when it cannot', async () => {
@@ -578,12 +667,12 @@ describe('the forecast', () => {
       screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnOrdered, 'P2')).value,
     ).toBe('7500')
     expect(screen.getByText(text.noRatesNeeded)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: text.rates })).toBeNull()
+    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
     // Sold by the day again, the rates are asked again.
     fireEvent.change(screen.getByLabelText(text.forCode(text.columnKind, 'P2')), {
       target: { value: 'time_material' },
     })
-    expect(screen.getByRole('heading', { name: text.rates })).toBeTruthy()
+    expect(screen.getByRole('group', { name: text.rates })).toBeTruthy()
     expect(screen.queryByText(text.noRatesNeeded)).toBeNull()
 
     cleanup()
@@ -605,12 +694,15 @@ describe('the forecast', () => {
       readForecastOrders: vi.fn(async () => ordersRead(known)),
     })
     render(<ForecastView api={asking} project={project} now={now} />)
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnStartMonth, 'P2')).value,
-      ).toBe('2026-04'),
-    )
+    const start = () =>
+      screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnStartMonth, 'P2'))
+    await waitFor(() => expect(start().value).toBe('2026-04'))
     expect(asking.readForecastOrders).toHaveBeenCalledTimes(1)
+    // A month that is read is a value; an empty field shows the format only, never a month.
+    expect(start().placeholder).toBe(text.startMonthFormat)
+    fireEvent.change(start(), { target: { value: '' } })
+    expect(start().value).toBe('')
+    expect(start().placeholder).not.toMatch(/\d/)
   })
 
   it('offers to a new code the rates of the code before, one by one or all at once', async () => {

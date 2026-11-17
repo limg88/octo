@@ -18,6 +18,7 @@ import { ProgressSetup } from './ProgressSetup.tsx'
 import { ProgressShares } from './ProgressShares.tsx'
 import { problemText, warningRequest, warningText } from './progress-words.ts'
 import { useSavedNote } from './SavedNote.tsx'
+import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
 
 type ProgressApi = Pick<
@@ -124,7 +125,13 @@ export function ProgressView({ api, project, fixedPrice = false, onOpenSection }
   }
 
   if (settings === null) {
-    return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+    return error ? (
+      <Failure code={error} />
+    ) : (
+      <div className="page-wait">
+        <Waiting>{text.loading}</Waiting>
+      </div>
+    )
   }
 
   if (fixedPrice && !ready(settings) && panel.kind !== 'setup') {
@@ -178,15 +185,6 @@ export function ProgressView({ api, project, fixedPrice = false, onOpenSection }
         invoiced={invoiced}
         onSetup={() => setPanel({ kind: 'setup' })}
       />
-      {view?.invoices && (
-        <ProgressInvoices
-          invoices={view.invoices}
-          order={settings.order}
-          linked={settings.salesOrders}
-          onLink={(salesOrders) => void save({ ...settings, salesOrders })}
-          onRegister={() => void registerInvoices()}
-        />
-      )}
       {warnings
         .filter((warning) => warningRequest(warning) === null)
         .map((warning) => (
@@ -222,6 +220,15 @@ export function ProgressView({ api, project, fixedPrice = false, onOpenSection }
             </button>
           </div>
         )
+      )}
+      {view?.invoices && (
+        <ProgressInvoices
+          invoices={view.invoices}
+          order={settings.order}
+          linked={settings.salesOrders}
+          onLink={(salesOrders) => void save({ ...settings, salesOrders })}
+          onRegister={() => void registerInvoices()}
+        />
       )}
       {requests.length === 0 && <p className="hint">{text.noRequests}</p>}
       {[...requests].reverse().map((request) => (

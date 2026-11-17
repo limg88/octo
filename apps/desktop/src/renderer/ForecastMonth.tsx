@@ -6,7 +6,7 @@ import {
   type ForecastSettings,
   NO_ROW_INPUTS,
 } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Dialog } from './Dialog.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
@@ -208,38 +208,63 @@ export function ForecastMonth({
     cell: (row) => show(of(row)),
     sort: (row) => of(row),
   })
+  // A column of dashes says nothing: days and progress are there when a code of the month has them.
+  const showDays = rows.some((row) => !row.values.quantityIsShare)
+  const showProgress = rows.some((row) => row.values.quantityIsShare)
+  const computedColumns = COMPUTED_COLUMNS - (showDays ? 0 : 1) - (showProgress ? 0 : 1)
+  const daysColumn: DataColumn<ForecastRow> = {
+    key: 'days',
+    label: text.columnDays,
+    kind: 'number',
+    width: QUANTITY_WIDTH,
+    cell: ({ values }) => (values.quantityIsShare ? text.none : text.days(values.quantity)),
+    sort: (row) => (row.values.quantityIsShare ? null : row.values.quantity),
+  }
+  const progressColumn: DataColumn<ForecastRow> = {
+    key: 'progress',
+    label: text.columnProgress,
+    kind: 'number',
+    width: QUANTITY_WIDTH,
+    cell: ({ values }) => (values.quantityIsShare ? text.share(values.quantity) : text.none),
+    sort: (row) => (row.values.quantityIsShare ? row.values.quantity : null),
+  }
   const columns: DataColumn<ForecastRow>[] = [
     {
       key: 'code',
-      label: text.columnCode,
+      label: text.columnProject,
       width: CODE_WIDTH,
       cell: (row) => (
         <>
-          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the name of the project is read with the keyboard too. */}
-          <span className="tip" tabIndex={0} aria-describedby={`forecast-name-${row.code}`}>
-            {row.code}
+          <span
+            className="tip project-tip"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: a name cut short is read whole with the keyboard too.
+            tabIndex={0}
+            aria-describedby={`forecast-name-${row.code}`}
+          >
+            <span className="project-name">{text.project(row.description, row.code)}</span>
             <span role="tooltip" id={`forecast-name-${row.code}`}>
-              {text.projectName(row.description, text.kinds[row.revenueKind])}
+              {text.projectName(row.description, row.code, text.kinds[row.revenueKind])}
             </span>
           </span>
-          {row.description !== '' && <span className="hint code-name">{row.description}</span>}
-          {incomplete.has(row.code) && (
-            <span className="pill pill-late" title={text.incompleteHint}>
-              {text.incomplete}
-            </span>
-          )}
-          <button
-            type="button"
-            className="quiet cell-button"
-            aria-expanded={open === row.code}
-            aria-label={text.forCode(text.moreData, row.code)}
-            onClick={() => setOpen(open === row.code ? null : row.code)}
-          >
-            {text.moreData}
-          </button>
+          <span className="project-row-actions">
+            <button
+              type="button"
+              className="quiet cell-button"
+              aria-expanded={open === row.code}
+              aria-label={text.forCode(text.moreData, row.code)}
+              onClick={() => setOpen(open === row.code ? null : row.code)}
+            >
+              {text.moreData}
+            </button>
+            {incomplete.has(row.code) && (
+              <span className="pill pill-late" title={text.incompleteHint}>
+                {text.incomplete}
+              </span>
+            )}
+          </span>
         </>
       ),
-      sort: (row) => row.code,
+      sort: (row) => text.project(row.description, row.code),
       text: (row) => `${row.code} ${row.description}`,
     },
     {
@@ -272,22 +297,8 @@ export function ForecastMonth({
       text.money,
     ),
     // Days sold and progress of a fixed price are two things: a column each, never one for both.
-    {
-      key: 'days',
-      label: text.columnDays,
-      kind: 'number',
-      width: QUANTITY_WIDTH,
-      cell: ({ values }) => (values.quantityIsShare ? text.none : text.days(values.quantity)),
-      sort: (row) => (row.values.quantityIsShare ? null : row.values.quantity),
-    },
-    {
-      key: 'progress',
-      label: text.columnProgress,
-      kind: 'number',
-      width: QUANTITY_WIDTH,
-      cell: ({ values }) => (values.quantityIsShare ? text.share(values.quantity) : text.none),
-      sort: (row) => (row.values.quantityIsShare ? row.values.quantity : null),
-    },
+    ...(showDays ? [daysColumn] : []),
+    ...(showProgress ? [progressColumn] : []),
     figure(
       'marginMonth',
       text.columnMarginMonth,
@@ -415,7 +426,7 @@ export function ForecastMonth({
           <DataTable
             label={text.monthData}
             groups={[
-              { label: text.groupComputed, span: COMPUTED_COLUMNS },
+              { label: text.groupComputed, span: computedColumns },
               { label: text.groupOwn, span: OWN_COLUMNS },
             ]}
             columns={columns}
@@ -431,23 +442,25 @@ export function ForecastMonth({
                   <td className="number">{text.money(totals.internal)}</td>
                   <td className="number">{text.money(totals.external)}</td>
                   <td className="number">{text.money(totals.revenue)}</td>
-                  <td className="number">
-                    {totals.days === 0 ? text.none : text.days(totals.days)}
-                  </td>
-                  <td />
+                  {showDays && (
+                    <td className="number">
+                      {totals.days === 0 ? text.none : text.days(totals.days)}
+                    </td>
+                  )}
+                  {showProgress && <td />}
                   <td className="number">{text.share(totals.margin)}</td>
                   <td colSpan={OWN_COLUMNS + 1} />
                 </tr>
               ) : undefined
             }
-            detail={(row) => (
-              <>
-                {row.note !== '' && (
-                  <p className="hint row-note">
-                    {text.howComputed} {row.note}
-                  </p>
-                )}
-                {open === row.code && (
+            detail={(row) =>
+              open === row.code ? (
+                <>
+                  {row.note !== '' && (
+                    <p className="hint row-note">
+                      {text.howComputed} {row.note}
+                    </p>
+                  )}
                   <CodeDetails
                     code={row.code}
                     wholeFirst={row.revenueKind === 'fixed_price'}
@@ -458,9 +471,9 @@ export function ForecastMonth({
                       .map((external) => external.name)}
                     onChange={(part) => change(row.code, part)}
                   />
-                )}
-              </>
-            )}
+                </>
+              ) : null
+            }
           />
         </div>
         <div className="actions">
@@ -534,7 +547,8 @@ function CodeDetails({
   externalNames: string[]
   onChange: (part: Partial<Draft>) => void
 }) {
-  const amount = (name: AmountField, label: string) => (
+  const hintId = useId()
+  const amount = (name: AmountField, label: string, hint: string) => (
     <>
       <label>
         {label}
@@ -542,10 +556,14 @@ function CodeDetails({
           type="text"
           inputMode="decimal"
           className="amount"
+          aria-describedby={`${hintId}-${name}`}
           value={draft[name]}
           onChange={(event) => onChange({ [name]: event.target.value })}
         />
       </label>
+      <p id={`${hintId}-${name}`} className="hint">
+        {hint}
+      </p>
       <FieldProblems lines={problems?.amounts.includes(name) ? [messages.amountWrong] : []} />
     </>
   )
@@ -568,8 +586,8 @@ function CodeDetails({
   )
   const whole = (
     <>
-      {amount('budgetCosts', text.budgetCosts)}
-      {amount('totalCosts', text.totalCosts)}
+      {amount('budgetCosts', text.budgetCosts, text.budgetCostsHint)}
+      {amount('totalCosts', text.totalCosts, text.totalCostsHint)}
       <label className="check">
         <input
           type="checkbox"

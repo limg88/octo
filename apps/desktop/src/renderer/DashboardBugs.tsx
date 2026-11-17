@@ -317,20 +317,6 @@ function BugDetail({
           {row.severity && ` · ${severityName}: ${row.severity}`}
           {row.environment && ` · ${text.environment}: ${row.environment}`}
         </p>
-        {row.note && (
-          <div className="box">
-            <strong>{text.noteOf(dateText(row.note.at))}</strong>
-            <p className="quote">{row.note.text}</p>
-          </div>
-        )}
-        {row.lastComment ? (
-          <div className="box box-source">
-            <strong>{text.lastComment(row.lastComment.by, dateText(row.lastComment.at))}</strong>
-            <p className="quote">{plain(row.lastComment.text)}</p>
-          </div>
-        ) : (
-          !row.note && <p className="hint">{text.noComment}</p>
-        )}
         {editing ? (
           <form className="note-form" onSubmit={submit}>
             <textarea
@@ -365,6 +351,20 @@ function BugDetail({
             </button>
             <OpenItem id={row.id} onOpen={onOpenItem} />
           </div>
+        )}
+        {row.note && (
+          <div className="box">
+            <strong>{text.noteOf(dateText(row.note.at))}</strong>
+            <p className="quote">{row.note.text}</p>
+          </div>
+        )}
+        {row.lastComment ? (
+          <div className="box box-source">
+            <strong>{text.lastComment(row.lastComment.by, dateText(row.lastComment.at))}</strong>
+            <p className="quote">{plain(row.lastComment.text)}</p>
+          </div>
+        ) : (
+          !row.note && <p className="hint">{text.noComment}</p>
         )}
       </div>
     </>

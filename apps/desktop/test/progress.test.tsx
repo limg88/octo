@@ -264,6 +264,9 @@ describe('the requests of an order', () => {
     render(<ProgressView api={api} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: text.correctN(2) }))
     let form = screen.getByRole('form', { name: text.request.titleEdit(2) })
+    // The form opens above the requests: who corrects from far down is taken to its title.
+    expect(document.activeElement?.textContent).toBe(text.request.titleEdit(2))
+    expect(document.activeElement?.tagName).toBe('H3')
     // The positions the request names are ticked, and can be given up for the usual order.
     expect(
       (within(form).getByLabelText(text.request.positionLeft('2', '300,00')) as HTMLInputElement)
@@ -350,10 +353,34 @@ describe('the settings of the order and of the form', () => {
     press(setup.addCell)
     type(setup.cellN(2), 'A4')
     type(setup.cellTextN(2), 'Fornitore')
+    // No row is chosen yet: nothing says where a datum would go, and nothing can be inserted.
+    const datum = () =>
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Numero della richiesta' })
+    expect(datum().disabled).toBe(true)
+    expect(screen.getByText(setup.insert)).toBeTruthy()
     fireEvent.focus(screen.getByLabelText(setup.cellTextN(1)))
+    expect(screen.getByText(setup.insertInto('D2'))).toBeTruthy()
     press('Numero della richiesta')
     press(setup.removeCell(2))
     expect(screen.queryByLabelText(setup.cellN(3))).toBeNull()
+    // A row taken off after the chosen one changes nothing of where the datum goes.
+    expect(screen.getByText(setup.insertInto('D2'))).toBeTruthy()
+    // A row with no cell is not a place for a datum.
+    fireEvent.focus(screen.getByLabelText(setup.cellTextN(2)))
+    expect(datum().disabled).toBe(true)
+    press(setup.addCell)
+    type(setup.cellN(3), 'b7')
+    fireEvent.focus(screen.getByLabelText(setup.cellTextN(3)))
+    expect(screen.getByText(setup.insertInto('B7'))).toBeTruthy()
+    // Taking off a row before the chosen one keeps the cell; taking off the chosen one forgets it.
+    press(setup.removeCell(2))
+    expect(screen.getByText(setup.insertInto('B7'))).toBeTruthy()
+    press('Numero della richiesta')
+    expect(screen.getByLabelText<HTMLInputElement>(setup.cellTextN(2)).value).toBe('{n}')
+    expect(screen.getByLabelText<HTMLInputElement>(setup.cellTextN(1)).value).toBe('{n}')
+    press(setup.removeCell(2))
+    expect(datum().disabled).toBe(true)
+    expect(screen.getByText(setup.insert)).toBeTruthy()
     for (const [label, value] of [
       [setup.rows, '6'],
       [setup.position, 'a'],
@@ -433,6 +460,24 @@ describe('the settings of the order and of the form', () => {
     press(text.setup.close)
     expect(screen.queryByRole('form')).toBeNull()
     expect(api.saveProgressSettings).not.toHaveBeenCalled()
+  })
+
+  it('says it is reading until the settings come, then shows them or why it cannot', async () => {
+    const failing = { ok: false as const, code: 'progress_settings_invalid' as const }
+    for (const answer of [ok(configured), failing]) {
+      let arrive: (value: Result<ProgressSettings>) => void = () => {}
+      const late = new Promise<Result<ProgressSettings>>((resolve) => {
+        arrive = resolve
+      })
+      render(
+        <ProgressView api={fakeApi({ progressSettings: vi.fn(() => late) })} project={project} />,
+      )
+      expect(screen.getByRole('status').textContent).toBe(text.loading)
+      arrive(answer)
+      await waitFor(() => expect(screen.queryByText(text.loading)).toBeNull())
+      expect(screen.queryByRole('alert') !== null).toBe(!answer.ok)
+      cleanup()
+    }
   })
 
   it('shows why the settings or the shares cannot be read', async () => {
@@ -535,7 +580,8 @@ describe('the settings of the order and of the form', () => {
 
       const netsuite = screen.getByRole('region', { name: words.title })
       expect(within(netsuite).getByText(words.billed)).toBeTruthy()
-      expect(within(netsuite).getByText(words.notBilled)).toBeTruthy()
+      // A position still to bill is the usual course of an order, not a thing to check.
+      expect(within(netsuite).getByText(words.notBilled).className).toBe('status status-neutral')
       expect(within(netsuite).getByText(words.unregistered(2, '2026/1, 2026/7'))).toBeTruthy()
       expect(
         within(netsuite).getByText(
