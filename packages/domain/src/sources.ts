@@ -51,11 +51,16 @@ export const READING_LEASE_MS = 10 * 60 * 1000
 /** Two readers are the same when they read from the same computer, whoever is signed in. */
 export const sameComputer = (a: Reader, b: Reader): boolean => a.computer === b.computer
 
+/** How far apart the clocks of two computers that share a folder are taken to be, at most. */
+export const CLOCK_SKEW_ALLOWANCE_MS = 5 * 60 * 1000
+
 /** Who reads the source from another computer right now; null when nobody does. */
 export function readingElsewhere(shared: SharedReading, me: Reader, now: Date): Reader | null {
   const lease = shared.lease
   if (lease === null || sameComputer(lease.by, me)) return null
-  return Date.parse(lease.until) > now.getTime() ? lease.by : null
+  const left = Date.parse(lease.until) - now.getTime()
+  // A lease longer than one can be is of a computer with a wrong clock: it would never end.
+  return left > 0 && left <= READING_LEASE_MS + CLOCK_SKEW_ALLOWANCE_MS ? lease.by : null
 }
 
 export type ReadingTurn = 'read' | 'fresh' | 'busy_elsewhere'
@@ -74,10 +79,10 @@ export function readingTurn(
   if (readingElsewhere(shared, me, now) !== null) return 'busy_elsewhere'
   const last = shared.lastRun
   const byAnother = last?.by !== undefined && !sameComputer(last.by, me)
-  if (maxAgeMs !== null && last && byAnother && now.getTime() - Date.parse(last.at) < maxAgeMs) {
-    return 'fresh'
-  }
-  return 'read'
+  if (maxAgeMs === null || !last || !byAnother) return 'read'
+  const age = now.getTime() - Date.parse(last.at)
+  // A reading dated in the future, beyond what two clocks differ by, would stay fresh for ever.
+  return age > -CLOCK_SKEW_ALLOWANCE_MS && age < maxAgeMs ? 'fresh' : 'read'
 }
 
 /**

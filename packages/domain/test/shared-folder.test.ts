@@ -67,6 +67,20 @@ describe('whose turn it is to read a source of a shared folder', () => {
     expect(readingElsewhere(left, giovanna, NOW)).toBeNull()
   })
 
+  it('is not kept out for ever by a computer whose clock is wrong', () => {
+    // Clocks a few minutes apart are the ordinary case: the turn and the reading still stand.
+    const ahead = shared({ lease: { by: giovanni, until: ago(-13) } })
+    expect(readingTurn(ahead, giovanna, NOW, null)).toBe('busy_elsewhere')
+    const justAhead = shared({ lastRun: run(ago(-2), giovanni) })
+    expect(readingTurn(justAhead, giovanna, NOW, 15 * MINUTE)).toBe('fresh')
+    // A turn or a reading dated far in the future would never run out: it is not believed.
+    const endless = shared({ lease: { by: giovanni, until: ago(-60 * 24) } })
+    expect(readingTurn(endless, giovanna, NOW, null)).toBe('read')
+    expect(readingElsewhere(endless, giovanna, NOW)).toBeNull()
+    const future = shared({ lastRun: run(ago(-60 * 24), giovanni) })
+    expect(readingTurn(future, giovanna, NOW, 15 * MINUTE)).toBe('read')
+  })
+
   it('shows the newest of what this computer tried and what the folder holds', () => {
     const good = run(ago(10), giovanni)
     const failed = run(ago(2), giovanna, 'feed_credential_refused')
