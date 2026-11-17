@@ -1,7 +1,7 @@
 {
   "name": "@octo/desktop",
   "productName": "Octo",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Octo: la memoria del progetto e i suoi deliverable, sul PC del Project Manager.",
   "author": "Octo",
   "private": true,
