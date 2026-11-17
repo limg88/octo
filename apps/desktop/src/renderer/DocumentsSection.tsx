@@ -1,6 +1,8 @@
-import type { Project, SourceState } from '@octo/domain'
+import type { ReadingView } from '@octo/application'
+import type { Project } from '@octo/domain'
 import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Elsewhere } from './Elsewhere.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { SourceHeader } from './SourceHeader.tsx'
 
@@ -11,7 +13,7 @@ type Props = {
 
 /** Office and PDF files of the project made readable: when it last ran, and a way to run it now. */
 export function DocumentsSection({ api, project }: Props) {
-  const [state, setState] = useState<SourceState | null>(null)
+  const [state, setState] = useState<ReadingView | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<ErrorCode | null>(null)
 
@@ -39,7 +41,7 @@ export function DocumentsSection({ api, project }: Props) {
     await reload()
   }
 
-  const run = state?.lastRun ?? null
+  const run = state?.state.lastRun ?? null
   return (
     <section className="sources" aria-label={messages.documentsTitle}>
       <SourceHeader
@@ -47,19 +49,26 @@ export function DocumentsSection({ api, project }: Props) {
         linked
         open={false}
         status={
-          busy ? (
-            <p className="progress" role="status">
-              {messages.documentsConverting}
-            </p>
-          ) : run ? (
-            <p className={run.error ? 'warning' : 'badge badge-ok'}>
-              {run.error
-                ? errorText(run.error)
-                : messages.documentsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
-            </p>
-          ) : (
-            state && <p className="badge badge-warning">{messages.documentsNever}</p>
-          )
+          <>
+            {busy ? (
+              <p className="progress" role="status">
+                {messages.documentsConverting}
+              </p>
+            ) : run ? (
+              <p className={run.error ? 'warning' : 'badge badge-ok'}>
+                {run.error
+                  ? errorText(run.error)
+                  : messages.documentsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
+              </p>
+            ) : (
+              state && <p className="badge badge-warning">{messages.documentsNever}</p>
+            )}
+            <Elsewhere
+              readBy={state?.readBy ?? null}
+              readingBy={state?.readingBy ?? null}
+              notHere={null}
+            />
+          </>
         }
       >
         <button type="button" disabled={busy} onClick={() => void convert()}>

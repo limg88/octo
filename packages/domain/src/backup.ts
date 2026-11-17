@@ -1,5 +1,6 @@
 import type { FeedIndex, FeedName } from './feeds.ts'
 import type { Project } from './project.ts'
+import type { QuestionRecord } from './question.ts'
 import type { SourceState } from './sources.ts'
 
 export const BACKUP_FORMAT = 'octo-backup'
@@ -15,12 +16,15 @@ export type BackupProject = {
   /** Where each source had got to, by the name of the source. */
   sources: Record<string, SourceState>
   feeds: Partial<Record<FeedName, BackupFeedIndex>>
+  /** The questions this person asked of the project; absent in a backup made before they were. */
+  questions?: QuestionRecord[] | undefined
 }
 
 /**
- * What a new computer needs to go on from where the old one stopped: the list of the projects and
- * the state of their readings. Never the credentials: they are entered again. The memory, the
- * settings and the questions of a project are in its folder, and are copied with it.
+ * What a new computer needs to go on from where the old one stopped: the list of the projects,
+ * what this computer keeps of their readings and the questions the person asked. Never the
+ * credentials: they are entered again. The memory and the settings of a project, with what its
+ * feeds wrote and where they go on from, are in its folder, and are copied with it.
  */
 export type Backup = {
   format: typeof BACKUP_FORMAT

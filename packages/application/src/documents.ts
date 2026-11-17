@@ -1,43 +1,44 @@
 import {
-  DomainError,
   EXTRACTED_TEXT_FOLDER,
   extractedDocument,
   extractedTextPath,
   isCurrentText,
-  isDomainError,
   type Project,
   type SourceFileStamp,
   type SourceRun,
-  type SourceState,
   sourcePathOf,
 } from '@octo/domain'
-import type { Clock, MemoryWriter, ProjectFiles, SourceStates, TextExtractor } from './ports.ts'
+import type { MemoryWriter, ProjectFiles, TextExtractor } from './ports.ts'
+import type { ReadingCounts, ReadingOptions, Readings, ReadingView } from './readings.ts'
 
 export type DocumentsDeps = {
   files: ProjectFiles
   extractor: TextExtractor
   writer: MemoryWriter
-  states: SourceStates
-  clock: Clock
+  /** The turns of the readings, between the computers that share the folder of a project. */
+  readings: Readings
 }
 
 export type Documents = {
-  state(project: Project): Promise<SourceState>
+  /** The last conversion, of this computer or of whoever shares the folder, and who converts now. */
+  state(project: Project): Promise<ReadingView>
   /**
    * Writes the text of every Office and PDF file of the project beside it, so the agent can
    * search and quote it. A file already converted and not changed since is left alone; the text
-   * of a file that is gone is removed. One conversion per project at a time.
+   * of a file that is gone is removed. One conversion per project at a time, on every computer
+   * that shares the folder.
    */
-  convert(project: Project): Promise<SourceRun>
+  convert(project: Project, options?: ReadingOptions): Promise<SourceRun>
 }
 
 /** A larger file is not a document a PM reads: it is left out. */
 export const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024
 
 export function createDocuments(deps: DocumentsDeps): Documents {
-  const running = new Set<string>()
-
-  async function convertOne(project: Project, stamp: SourceFileStamp): Promise<keyof Counts> {
+  async function convertOne(
+    project: Project,
+    stamp: SourceFileStamp,
+  ): Promise<keyof ReadingCounts> {
     const target = extractedTextPath(stamp.path)
     const existing = await deps.files.readText(project.folder, target)
     if (existing !== null && isCurrentText(existing, stamp, deps.extractor.version)) {
@@ -58,10 +59,10 @@ export function createDocuments(deps: DocumentsDeps): Documents {
     }
   }
 
-  async function run(project: Project): Promise<Counts> {
+  async function run(project: Project): Promise<ReadingCounts> {
     const all = await deps.files.withExtensions(project.folder, deps.extractor.extensions)
     const stamps = all.filter((stamp) => stamp.size <= MAX_DOCUMENT_BYTES)
-    const counts: Counts = { written: 0, unchanged: 0 }
+    const counts: ReadingCounts = { written: 0, unchanged: 0 }
     for (const stamp of stamps) {
       counts[await convertOne(project, stamp)] += 1
     }
@@ -69,25 +70,11 @@ export function createDocuments(deps: DocumentsDeps): Documents {
     return counts
   }
 
-  async function convert(project: Project): Promise<SourceRun> {
-    if (running.has(project.id)) throw new DomainError('source_busy', 'documents')
-    running.add(project.id)
-    const at = deps.clock.now().toISOString()
-    try {
-      const outcome: SourceRun = { at, ...(await run(project)), error: null }
-      await deps.states.set(project.id, 'documents', { cursor: at, lastRun: outcome })
-      return outcome
-    } catch (error) {
-      if (!isDomainError(error)) throw error
-      const outcome: SourceRun = { at, written: 0, unchanged: 0, error: error.code }
-      await deps.states.set(project.id, 'documents', { cursor: null, lastRun: outcome })
-      return outcome
-    } finally {
-      running.delete(project.id)
-    }
-  }
+  const convert = (project: Project, options: ReadingOptions = {}): Promise<SourceRun> =>
+    deps.readings.run(project, { source: 'documents' }, options, async () => ({
+      ...(await run(project)),
+      cursor: null,
+    }))
 
-  return { state: (project) => deps.states.get(project.id, 'documents'), convert }
+  return { state: (project) => deps.readings.view(project, 'documents'), convert }
 }
-
-type Counts = Pick<SourceRun, 'written' | 'unchanged'>

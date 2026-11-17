@@ -2,6 +2,7 @@ import type { MeetingsSourceView } from '@octo/application'
 import type { Project } from '@octo/domain'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Elsewhere } from './Elsewhere.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { SourceHeader } from './SourceHeader.tsx'
@@ -100,26 +101,33 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
         open={open}
         onToggle={onToggle}
         status={
-          busy ? (
-            <p className="progress" role="status">
-              {messages.meetingsSyncing}
-            </p>
-          ) : !linked ? (
-            <p className="badge">{messages.meetingsNotConfigured}</p>
-          ) : !run ? (
-            <p className="badge badge-warning">{messages.meetingsNever}</p>
-          ) : run.error ? (
-            <p className="warning" role="alert">
-              {errorText(run.error)}
-            </p>
-          ) : (
-            <p className="badge badge-ok">
-              {messages.meetingsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
-            </p>
-          )
+          <>
+            {busy ? (
+              <p className="progress" role="status">
+                {messages.meetingsSyncing}
+              </p>
+            ) : !linked ? (
+              <p className="badge">{messages.meetingsNotConfigured}</p>
+            ) : !run ? (
+              <p className="badge badge-warning">{messages.meetingsNever}</p>
+            ) : run.error ? (
+              <p className="warning" role="alert">
+                {errorText(run.error)}
+              </p>
+            ) : (
+              <p className="badge badge-ok">
+                {messages.meetingsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
+              </p>
+            )}
+            <Elsewhere
+              readBy={view.readBy}
+              readingBy={view.readingBy}
+              notHere={linked && !view.readableHere ? messages.elsewhere.noMeetings : null}
+            />
+          </>
         }
       >
-        {linked && (
+        {linked && view.readableHere && (
           <button type="button" disabled={busy} onClick={() => void sync()}>
             {messages.meetingsSync}
           </button>
@@ -153,7 +161,11 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
           <button type="submit" disabled={root.trim() === ''}>
             {messages.meetingsSave}
           </button>
-          <button type="button" disabled={busy || !linked} onClick={() => void sync()}>
+          <button
+            type="button"
+            disabled={busy || !linked || !view.readableHere}
+            onClick={() => void sync()}
+          >
             {messages.meetingsSync}
           </button>
           {saved && <span className="hint">{messages.meetingsSaved}</span>}

@@ -1,7 +1,7 @@
 // Composition root of the desktop app: the only place where adapters meet use cases.
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, hostname, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -15,6 +15,7 @@ import {
   createDocuments,
   createFeeding,
   createFeeds,
+  createFolderMigration,
   createForecasts,
   createHours,
   createMeetings,
@@ -23,6 +24,7 @@ import {
   createPreferences,
   createProgress,
   createProjects,
+  createReadings,
   createRisks,
   createSession,
   createSourceMap,
@@ -50,6 +52,7 @@ import {
   meetingNotices,
   type Project,
   prepCount,
+  sameFolder,
 } from '@octo/domain'
 import {
   createAdoTrackerReader,
@@ -67,6 +70,7 @@ import {
   createFsAlignmentSettings,
   createFsDashboardSettings,
   createFsEvidenceReader,
+  createFsFeedIndexes,
   createFsFolderProbe,
   createFsForecastSettings,
   createFsHoursSettings,
@@ -77,23 +81,27 @@ import {
   createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
-  createFsQuestionLog,
   createFsRiskRegisterStore,
+  createFsSharedReadings,
   createFsSourceSettings,
   createFsTeamStore,
-  createFsTodayStore,
   createFsTrackerExports,
   createGithubReleaseFeed,
   createHttpDownloads,
   createJiraHoursReader,
   createJsonBackupFiles,
-  createJsonFeedIndexes,
+  createJsonPersonalSources,
   createJsonPreferences,
   createJsonProjectRegistry,
+  createJsonQuestionLog,
   createJsonSetAsideProjects,
   createJsonSourceStates,
+  createJsonTodayStore,
+  createLegacyFeedIndexes,
   createOidcIdentityProvider,
   createSignInConfig,
+  createSignInSetupStore,
+  createSplitSourceSettings,
   createUpdateApplier,
   createWarehouseOrdersReader,
   createWarehouseTimesheetReader,
@@ -132,6 +140,8 @@ const DATA_FOLDER_VARIABLE = 'OCTO_DATA_DIR'
 const MAIL_ROOT_VARIABLE = 'OCTO_MAIL_ROOT'
 /** Demos and tests only: a folder that stands for Verbale's own data on this computer. */
 const VERBALE_FOLDER_VARIABLE = 'OCTO_VERBALE_DIR'
+/** Demos only: the name this computer goes by, to show two computers on one. */
+const COMPUTER_NAME_VARIABLE = 'OCTO_COMPUTER_NAME'
 /** Demos and tests only: a publisher of releases on this computer instead of the real one. */
 const UPDATE_URL_VARIABLE = 'OCTO_UPDATE_URL'
 /** Demos and tests only: the key that publisher signs with. Read only together with its address. */
@@ -205,7 +215,7 @@ function mailArchive(): MailArchive {
   const missing = async (): Promise<never> => {
     throw new DomainError('mail_reader_missing')
   }
-  return { between: missing, read: missing }
+  return { available: false, between: missing, read: missing }
 }
 
 /** What came first on the page of the day of each project at the reading before, by its key. */
@@ -280,7 +290,8 @@ async function feedAll(
   if (session.current() === null) return
   for (const project of await projects.list()) {
     try {
-      await feeding.fill(project)
+      // What another computer that shares the folder read within the interval is not read again.
+      await feeding.fill(project, undefined, { maxAgeMs: syncIntervalMs })
     } catch (error) {
       console.error('[octo] periodic reading failed', error)
     }
@@ -381,7 +392,11 @@ function start(seatEnv: Record<string, string | undefined>): void {
   const dataFolder = process.env[DATA_FOLDER_VARIABLE] ?? app.getPath('userData')
   const clock = { now: () => new Date() }
   const ids = { next: () => randomUUID() }
-  const questions = createFsQuestionLog()
+  const registry = createJsonProjectRegistry(dataFolder)
+  /** Which project of this computer a folder is: what a person keeps of it is kept by its id. */
+  const projectOf = async (folder: string): Promise<Project | null> =>
+    (await registry.list()).find((project) => sameFolder(project.folder, folder)) ?? null
+  const questions = createJsonQuestionLog(dataFolder, projectOf)
   const sourceStates = createJsonSourceStates(dataFolder)
   const evidence = createFsEvidenceReader()
   const claude = {
@@ -412,6 +427,8 @@ function start(seatEnv: Record<string, string | undefined>): void {
           allowLoopbackAuthority: process.env[DEV_ENTRA_VARIABLE] !== undefined,
         }),
     secrets,
+    // A demo person needs no organization: there is nothing to be told.
+    ...(demoPerson ? {} : { setup: createSignInSetupStore(dataFolder) }),
   })
   const identity = () => session.current()
   // The company system is read as who is signed in, by the mail address and the sign-in name.
@@ -421,7 +438,6 @@ function start(seatEnv: Record<string, string | undefined>): void {
     const person = session.current()
     return person === null ? null : { email: person.email, upn: person.username }
   }
-  const registry = createJsonProjectRegistry(dataFolder)
   const folders = createFsFolderProbe()
   const projects = createProjects({
     registry,
@@ -433,12 +449,28 @@ function start(seatEnv: Record<string, string | undefined>): void {
     identity,
   })
   const writer = createFsMemoryWriter()
-  // The company system is read as who is signed in, wherever its settings are read from.
-  const settings = settingsOwnedBy(createFsSourceSettings(), identity)
+  // The folder holds what is of the project; the account each system is entered with and the
+  // folder of Verbale are of who reads on this computer. The company system is read as who is
+  // signed in, wherever its settings are read from.
+  const settings = settingsOwnedBy(
+    createSplitSourceSettings(
+      createFsSourceSettings(),
+      createJsonPersonalSources(dataFolder, projectOf),
+    ),
+    identity,
+  )
   const files = createFsProjectFiles()
+  /** Who reads from here: the folder of a project tells the other computers that share it. */
+  const me = () => ({
+    name: session.current()?.name || userInfo().username,
+    computer: process.env[COMPUTER_NAME_VARIABLE] || hostname(),
+  })
+  const sharedReadings = createFsSharedReadings()
+  const readings = createReadings({ shared: sharedReadings, states: sourceStates, clock, me })
   const sources = createSources({
     settings,
     states: sourceStates,
+    readings,
     archive: mailArchive(),
     writer,
     clock,
@@ -447,7 +479,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
   const verbaleFolder = process.env[VERBALE_FOLDER_VARIABLE]
   const meetings = createMeetings({
     settings,
-    states: sourceStates,
+    readings,
     exports: createFsMeetingExports({
       home: homedir(),
       ...(verbaleFolder ? { verbaleFolder } : {}),
@@ -462,10 +494,10 @@ function start(seatEnv: Record<string, string | undefined>): void {
     ado: process.env[DEV_ADO_VARIABLE],
     confluence: process.env[DEV_CONFLUENCE_VARIABLE],
   }
-  const indexes = createJsonFeedIndexes(dataFolder)
+  const indexes = createFsFeedIndexes()
   const feeds = createFeeds({
     settings,
-    states: sourceStates,
+    readings,
     indexes,
     secrets,
     reader: createConnectorFeedReader({ devEndpoints, owner }),
@@ -478,9 +510,24 @@ function start(seatEnv: Record<string, string | undefined>): void {
     files,
     extractor: createWorkerTextExtractor(join(here, EXTRACT_WORKER_FILE)),
     writer,
-    states: sourceStates,
-    clock,
+    readings,
   })
+  const folderMigration = createFolderMigration({
+    legacy: createLegacyFeedIndexes(dataFolder),
+    indexes,
+    states: sourceStates,
+    shared: sharedReadings,
+    folders,
+    me,
+  })
+  /** What an earlier Octo kept here of the readings goes to the folders, before anything reads. */
+  const handOverReadings = async (): Promise<void> => {
+    for (const project of await registry.list()) {
+      await folderMigration
+        .run(project)
+        .catch((error: unknown) => console.error('[octo] readings not handed over', error))
+    }
+  }
   const team = createTeam({ store: createFsTeamStore(), writer })
   const models = createModels({ store: createFsModelSettings() })
   const chosenModels = (project: Project) => models.get(project)
@@ -514,6 +561,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
   // At every start the sign-in kept on this computer is renewed; a demo person is simply in.
   void (demoPerson ? session.signIn() : session.resume())
     .catch((error: unknown) => console.error('[octo] sign-in at start failed', error))
+    .then(handOverReadings)
     .then(() => {
       readingIn(FIRST_SYNC_DELAY_MS)
       setTimeout(periodic, FIRST_SYNC_DELAY_MS)
@@ -547,6 +595,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     team: (project) => team.get(project),
     exports: trackerExports,
     clock,
+    readings,
   })
   const dashboardAdvice = createDashboardAdvice({
     dashboard,
@@ -613,7 +662,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     team,
     risks,
     files,
-    store: createFsTodayStore(),
+    store: createJsonTodayStore(dataFolder, projectOf),
     judge,
     evidence,
     clock,
@@ -680,6 +729,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
       folders,
       files: createJsonBackupFiles(),
       clock,
+      questions,
     }),
     backupDialogs: { ...BACKUP_DIALOGS, defaultFileName: () => backupFileName(clock.now()) },
   })

@@ -9,6 +9,7 @@ import {
 } from '@octo/domain'
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Elsewhere } from './Elsewhere.tsx'
 import { InfoTip } from './InfoTip.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { SourceHeader } from './SourceHeader.tsx'
@@ -258,9 +259,19 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
         linked={linked}
         open={open}
         onToggle={onToggle}
-        status={<Freshness view={view} busy={busy} now={now()} />}
+        status={
+          <>
+            <Freshness view={view} busy={busy} now={now()} />
+            <Elsewhere
+              readBy={view.readBy}
+              readingBy={view.readingBy}
+              notHere={linked && !view.hasSecret ? messages.elsewhere.noCredential : null}
+            />
+          </>
+        }
       >
-        {linked && (
+        {/* Without the credential here there is nothing to read from this computer. */}
+        {linked && view.hasSecret && (
           <button type="button" disabled={busy} onClick={() => void sync()}>
             {messages.feedSync}
           </button>
@@ -318,7 +329,11 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
           <button type="submit" disabled={busy}>
             {messages.feedSave}
           </button>
-          <button type="button" disabled={busy || !linked} onClick={() => void sync()}>
+          <button
+            type="button"
+            disabled={busy || !linked || !view.hasSecret}
+            onClick={() => void sync()}
+          >
             {messages.feedSync}
           </button>
           {linked && !leaving && (

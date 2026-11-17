@@ -60,7 +60,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | F3 | codice chiuso il 14/11/2026, demo `demo/05-avvio-guidato`. Criterio di uscita (il pilota collega un suo progetto in meno di 30 minuti, senza aiuto) da verificare con il pilota |
 | F4 | codice chiuso il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale, stima), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Aggiunti stima, registro e carta intestata. Criterio di uscita da verificare su due deliverable reali |
 | F5 | in corso. Fatti il 14/11/2026: tipi di deliverable definiti dal PM a parole. Non fattibile oggi: i connettori del PM dentro Chiedi (vedi sotto). Fatti poi: Excel e PowerPoint su modello (previsionale, modulo di avanzamento, presentazione: demo 09, 10, 11) e la cartella di un progetto nuovo creata da Octo con un posto per contratti, documenti, riunioni e tracker (demo 14). Restano le prove su un progetto vero |
-| T1 | in corso. Riunioni da Verbale: fatte il 16/11/2026, demo `demo/25-riunioni-verbale` (fonte «Riunioni (Verbale)», assegnazione al progetto per invito o parole chiave, altrimenti segnalazione in «Oggi»; verbale dalla riunione scelta). Octo legge anche ciò che Verbale ha aggiunto all'export (cartella dichiarata, riepilogo leggero, partecipanti, revisione dell'esportazione). Stato delle richieste a Verbale in `docs/verbale-richieste.md`: manca il legame con l'evento di calendario. Restano: condivisione della cartella su SharePoint e la prova con due persone sullo stesso progetto. Criterio «le riunioni entrano senza intervento» da verificare su riunioni vere |
+| T1 | in corso. Riunioni da Verbale: fatte il 16/11/2026, demo `demo/25-riunioni-verbale` (fonte «Riunioni (Verbale)», assegnazione al progetto per invito o parole chiave, altrimenti segnalazione in «Oggi»; verbale dalla riunione scelta). Octo legge anche ciò che Verbale ha aggiunto all'export (cartella dichiarata, riepilogo leggero, partecipanti, revisione dell'esportazione). Stato delle richieste a Verbale in `docs/verbale-richieste.md`: manca il legame con l'evento di calendario. Cartella condivisa: fatta il 16/11/2026, demo `demo/42-cartella-condivisa` (vedi «Scelte prese per la cartella condivisa»). Resta: la prova con due persone vere su SharePoint, e la posta su Windows. Criterio «le riunioni entrano senza intervento» da verificare su riunioni vere |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -209,7 +209,7 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **La ricerca di Claude salta ciò che git ignora**: verificato, una cartella ignorata diventava invisibile a Chiedi. Un file `.ignore` nella stessa cartella la riammette alla ricerca e lascia git com'è.
 - Chiedi legge per primo anche il manifest delle fonti, se il progetto ne ha uno.
 
-**Conseguenza accettata**: su un vault condiviso via git, posta e testi estratti restano sul computer di chi li genera. Ogni persona alimenta la propria copia.
+**Conseguenza accettata**: su un vault condiviso via git, posta e testi estratti restano sul computer di chi li genera. Ogni persona alimenta la propria copia. *Superata il 16/11/2026 dalla cartella condivisa: vedi «Scelte prese per la cartella condivisa».*
 
 ## Disegno di F4 (deliverable)
 - **Catalogo dentro l'app**: ogni deliverable è una cartella (istruzioni, contratto di output, modello) distribuita con Octo. Punto di partenza: le skill generalizzate di `second-brain-starter` (stato avanzamento, email al cliente, stima, verbale).
@@ -241,6 +241,27 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **Carta intestata**: il PM sceglie una volta un documento Word; Octo ne tiene una copia nel progetto (`_octo/.modelli/`) e a ogni approvazione ci scrive dentro solo il testo. Intestazione, piè di pagina, margini, caratteri e ogni altra parte restano quelli del documento: provato su una carta intestata vera, cambia una sola parte su 36.
 - **Il Word lo scrive il codice di Octo, senza librerie di impaginazione**: titoli, paragrafi, elenchi e tabelle hanno la loro formattazione diretta, senza stili né numerazioni da cui dipendere. Per questo lo stesso corpo sta in qualunque documento.
 - **Non fatto**: PowerPoint ed Excel, deliverable specifici di un cliente.
+
+## Scelte prese per la cartella condivisa (T1, 16/11/2026)
+Richiesta del PM: provare Octo con la collega su Windows, sullo stesso progetto, senza git; cartella su SharePoint; lei deve poter usare tutto da subito, costi compresi.
+
+Sostituisce la «conseguenza accettata» del 14/11 (ognuno alimenta la propria copia): ora la memoria è una, nella cartella.
+
+- **Che cosa sta dove.** Nella cartella ciò che è del progetto, con l'app ciò che è della persona. Sono usciti dalla cartella: cronologia delle domande, decisioni e giudizi di «Oggi», l'account con cui si entra in Jira, Confluence e NetSuite, la cartella di Verbale. Sono entrati nella cartella (`_octo/.stato/`): cursore e indice di ogni feed, ultima lettura riuscita e di chi.
+- **Il perimetro di un feed non comprende più l'account.** Prima due email diverse erano due perimetri: a ogni cambio di mano Octo avrebbe cancellato e riletto tutto.
+- **Un turno per fonte, scritto nella cartella**, che scade dopo 10 minuti senza rinnovo. Con una cartella sincronizzata il turno arriva in ritardo: la correttezza non dipende da lui ma dal fatto che le letture scrivono lo stesso contenuto e non riscrivono ciò che è uguale. Il turno serve a non sprecare letture e a non creare copie in conflitto.
+- **Posta e riunioni sono del computer che le ha**: il loro punto di ripresa resta lì, e la lettura di un altro non le rende «fresche». Nella cartella va solo quando e da chi sono state lette.
+- **Un fallimento resta sul computer dove è avvenuto**: la credenziale rifiutata di una persona non copre la lettura riuscita dell'altra.
+- **Niente errori per ciò che un computer non può leggere** (nessuna credenziale, nessun programma di posta, nessuna cartella di Verbale): la lettura periodica lo salta e la pagina dice di chi è la lettura che vale.
+- **Un testo estratto resta valido se la data dell'originale differisce solo per la frazione di secondo**: una copia sincronizzata la perde. Senza questo, due computer si sarebbero riconvertiti a vicenda tutti i documenti a ogni giro.
+- **Scritture che riprovano** quando un altro programma tiene il file (`EPERM`, `EBUSY`, `EACCES`): su Windows il client di sincronizzazione e l'antivirus lo fanno di continuo.
+- **«Cambia cartella…»**: il progetto è legato a un identificativo, non al percorso; spostarlo sotto OneDrive non fa perdere credenziali né stato.
+- **Passaggio dalla versione precedente** al primo avvio, senza riletture: indice e cursori locali vanno nella cartella (il perimetro vecchio è riconosciuto come quello nuovo); cronologia e «Oggi» escono dalla cartella, presi solo dal computer che li ha scritti.
+- **Un Octo appena installato chiede dove far entrare.** L'accesso aziendale è obbligatorio e la sua configurazione (`accesso.json`) stava solo sul computer di chi aveva preparato Octo: un collega non sarebbe entrato. Ora la pagina di accesso chiede i due identificativi, una volta; un Octo che li ha già non li accetta di nuovo.
+- **La copia di sicurezza porta anche le domande** di chi la fa: non viaggiano più con la cartella.
+- **«Leggi ora» non c'è dove non si può leggere** (nessuna credenziale, nessuna posta, nessuna cartella di Verbale su questo computer).
+- *Verificato*: test, e il copione della demo 42 in due finestre vere sulla stessa cartella (`pnpm e2e:condivisa`), spostamento compreso. *Non verificato*: OneDrive e SharePoint veri (ritardi, copie in conflitto, file segnaposto), Windows, due persone vere. NetSuite resta di chi è PM dei codici.
+- *Non fatto*: unire le modifiche concorrenti ai registri (vince l'ultima); bozze di deliverable per persona (restano del progetto); togliere le copie in conflitto fuori dalle cartelle dei feed e dei testi estratti.
 
 ## Scelte prese durante F5
 - **Tipi di deliverable del progetto, a parole**: il PM dà un titolo, dice chi lo legge, che cosa chiedergli prima (una domanda per riga, `*` se obbligatoria), come va scritto e che cosa controllare. Octo lo aggiunge al catalogo di quel progetto e lo scrive con gli stessi tre controlli degli altri. Le istruzioni si possono incollare: è la via per portare in Octo, senza codice, le skill che oggi stanno nell'account del PM.

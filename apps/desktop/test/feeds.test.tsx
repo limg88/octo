@@ -27,6 +27,8 @@ const empty: FeedView = {
   suggestedFolder: 'raw/ADO',
   hasSecret: false,
   state: { cursor: null, lastRun: null },
+  readBy: null,
+  readingBy: null,
 }
 const linked: FeedView = { ...empty, config, hasSecret: true, state: { cursor: 'x', lastRun: run } }
 
@@ -58,6 +60,30 @@ const secretInput = () =>
 afterEach(cleanup)
 
 describe('FeedSection', () => {
+  it('says who read the feed from another computer, and why this one leaves it to them', async () => {
+    const giovanni = { name: 'Giovanni', computer: 'mac-di-giovanni' }
+    const shared: FeedView = { ...linked, hasSecret: false, readBy: giovanni, readingBy: giovanni }
+    const { api } = fakeApi({ feed: vi.fn(async () => ok(shared)) })
+    render(<FeedSection api={api} project={project} feed="ado" now={now} />)
+
+    const who = messages.elsewhere.who(giovanni)
+    expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
+    expect(screen.getByText(messages.elsewhere.reading(who))).toBeTruthy()
+    expect(screen.getByText(messages.elsewhere.noCredential)).toBeTruthy()
+    // Nothing to read from here: no way to ask for it.
+    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.feedSync })
+    expect(ask.every((button) => button.disabled)).toBe(true)
+  })
+
+  it('says nothing of other computers for a feed only this one reads', async () => {
+    const { api } = fakeApi()
+    render(<FeedSection api={api} project={project} feed="ado" now={now} />)
+
+    expect(await screen.findByText(/4 aggiornati, 120 invariati/)).toBeTruthy()
+    expect(screen.queryByText(messages.elsewhere.noCredential)).toBeNull()
+    expect(screen.queryByText(/^Letta da /)).toBeNull()
+  })
+
   it('links Azure DevOps with what the PM types and a token that is never shown again', async () => {
     const { api } = fakeApi({ feed: vi.fn(async () => ok(empty)) })
     render(<FeedSection api={api} project={project} feed="ado" now={now} />)

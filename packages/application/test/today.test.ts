@@ -15,6 +15,7 @@ import {
   type Project,
   type Reconciliation,
   type RiskRegister,
+  type SignInSetup,
   type TodaySettings,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
@@ -38,7 +39,13 @@ import {
   type TodayStore,
   type TodayView,
 } from '../src/index.ts'
-import { evidenceFrom, memorySourceSettings, memoryVault, memoryWriter } from './fakes.ts'
+import {
+  evidenceFrom,
+  memorySourceSettings,
+  memoryVault,
+  memoryWriter,
+  READ_HERE,
+} from './fakes.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 /** A Monday in the middle of the month. */
@@ -213,6 +220,8 @@ function setup(overrides: Partial<TodayDeps> = {}, judgeScript: JudgeScript = {}
           cursor: null,
           lastRun: { at: '2026-11-16T08:45:00.000Z', written: 1, unchanged: 0, error: null },
         },
+        ...READ_HERE,
+        readableHere: true,
       }),
     },
     feeds: {
@@ -222,6 +231,7 @@ function setup(overrides: Partial<TodayDeps> = {}, judgeScript: JudgeScript = {}
         suggestedFolder: '',
         hasSecret: false,
         state: NEVER_READ,
+        ...READ_HERE,
       }),
     },
     team: { get: async () => NO_TEAM },
@@ -636,6 +646,7 @@ describe('the page of the day', () => {
             cursor: null,
             lastRun: { at: '2026-11-12T08:00:00.000Z', written: 0, unchanged: 0, error: null },
           },
+          ...READ_HERE,
         }),
       },
     })
@@ -1228,6 +1239,50 @@ describe('the sign-in', () => {
       ...overrides,
     }
   }
+
+  it('is told where the organization signs in, once, by an Octo just installed', async () => {
+    const saved: SignInSetup[] = []
+    let known: SignInSetup | null = null
+    const session = createSession({
+      provider: provider({
+        configured: async () => (known ? { ...known, authority: 'a' } : null),
+      }),
+      secrets: memoryVault(),
+      setup: {
+        save: async (setup) => {
+          saved.push(setup)
+          known = setup
+        },
+      },
+    })
+    const TENANT = '11111111-2222-3333-4444-555555555555'
+    expect(await session.view()).toEqual({ identity: null, configured: false })
+    await expect(session.signIn()).rejects.toMatchObject({ code: 'sign_in_not_configured' })
+    await expect(session.configure('non un id', 'app-1')).rejects.toMatchObject({
+      code: 'sign_in_setup_invalid',
+    })
+    await expect(session.configure(TENANT, 'con spazi dentro')).rejects.toMatchObject({
+      code: 'sign_in_setup_invalid',
+    })
+    expect(saved).toEqual([])
+
+    expect(await session.configure(` ${TENANT} `, ' app-1 ')).toEqual({
+      identity: null,
+      configured: true,
+    })
+    expect(saved).toEqual([{ tenantId: TENANT, clientId: 'app-1' }])
+    // An Octo that knows is not told again: nobody is sent to sign in somewhere else.
+    await session.configure('99999999-2222-3333-4444-555555555555', 'altra-app')
+    expect(saved).toHaveLength(1)
+    expect((await session.signIn()).identity).toEqual(paola)
+
+    // Without a place to keep it, as in a demo, there is nothing to be told.
+    const fixed = createSession({
+      provider: provider({ configured: async () => null }),
+      secrets: memoryVault(),
+    })
+    expect(await fixed.configure(TENANT, 'app-1')).toEqual({ identity: null, configured: false })
+  })
 
   it('lets nobody in until the person signs in, and renews the sign-in at the next start', async () => {
     const secrets = memoryVault()

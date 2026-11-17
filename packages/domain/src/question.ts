@@ -1,10 +1,11 @@
 import type { CheckedAnswer } from './answer.ts'
 import { DomainError, type DomainErrorCode } from './errors.ts'
-import { OCTO_FOLDER, PRIVATE_FOLDER, SETTINGS_FOLDER } from './extracted-document.ts'
+import { OCTO_FOLDER, PRIVATE_FOLDER, SETTINGS_FOLDER, STATE_FOLDER } from './extracted-document.ts'
 
 /**
- * Where the questions of a project are kept: in its folder, so they travel with it. Earlier
- * answers are not a source: nothing in here may be cited.
+ * Where an Octo from before a folder could be shared kept the questions of a project, inside its
+ * folder. They are now kept with the app, each person their own; what is still here is taken out
+ * by the computer that asked it. Earlier answers are not a source: nothing in here may be cited.
  */
 export const HISTORY_FOLDER = `${OCTO_FOLDER}/.cronologia`
 
@@ -16,6 +17,7 @@ export const UNCITABLE_FOLDERS = [
   HISTORY_FOLDER,
   SETTINGS_FOLDER,
   PRIVATE_FOLDER,
+  STATE_FOLDER,
   `${OCTO_FOLDER}/.lavori`,
 ] as const
 

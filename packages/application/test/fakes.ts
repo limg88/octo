@@ -7,9 +7,12 @@ import {
   type FeedStep,
   type MailMessage,
   NEVER_READ,
+  NEVER_SHARED,
   NO_SOURCES,
   type Project,
   type QuestionRecord,
+  type Reader,
+  type SharedReading,
   type SourceState,
   type SourcesConfig,
 } from '@octo/domain'
@@ -27,10 +30,13 @@ import type {
   ProjectFiles,
   ProjectRegistry,
   QuestionLog,
+  Readings,
   SecretVault,
+  SharedReadings,
   SourceSettings,
   SourceStates,
 } from '../src/index.ts'
+import { createReadings } from '../src/index.ts'
 
 export const STEP_MS = 1000
 
@@ -165,6 +171,7 @@ export function archiveOf(
     },
     read: async (mail) =>
       mails instanceof Error ? null : (mails.find((m) => m.id === mail.id)?.message ?? null),
+    available: true,
   }
 }
 
@@ -185,16 +192,44 @@ export function memoryVault(): SecretVault & { all: Map<string, string> } {
 export function memoryFeedIndexes(): FeedIndexes {
   const all = new Map<string, { scope: string | null; items: FeedIndex }>()
   return {
-    load: async (projectId, feed) => all.get(`${projectId}/${feed}`) ?? { scope: null, items: {} },
-    save: async (projectId, feed, scope, items) => {
-      all.set(`${projectId}/${feed}`, { scope, items: { ...items } })
-    },
-    removeProject: async (projectId) => {
-      for (const key of [...all.keys()]) {
-        if (key.startsWith(`${projectId}/`)) all.delete(key)
-      }
+    load: async (folder, feed) => all.get(`${folder}/${feed}`) ?? { scope: null, items: {} },
+    save: async (folder, feed, scope, items) => {
+      all.set(`${folder}/${feed}`, { scope, items: { ...items } })
     },
   }
+}
+
+/** Who reads in the tests, unless a test is about two computers. */
+export const PAOLA_AT_HER_MAC: Reader = { name: 'Paola Verdi', computer: 'mac-di-paola' }
+
+/** What a view says of a source nobody else reads. */
+export const READ_HERE = { readBy: null, readingBy: null } as const
+
+/** What the folders of the projects know of their readings, as a folder shared would hold it. */
+export function memorySharedReadings(): SharedReadings & { all: Map<string, SharedReading> } {
+  const all = new Map<string, SharedReading>()
+  return {
+    all,
+    get: async (folder, source) => all.get(`${folder}/${source}`) ?? NEVER_SHARED,
+    set: async (folder, source, reading) => {
+      all.set(`${folder}/${source}`, reading)
+    },
+  }
+}
+
+/** The turns of the readings of one computer; give two of them one `shared` for two computers. */
+export function readingsOf(
+  states: SourceStates,
+  clock: Clock,
+  options: { shared?: SharedReadings; me?: Reader } = {},
+): Readings {
+  const me = options.me ?? PAOLA_AT_HER_MAC
+  return createReadings({
+    shared: options.shared ?? memorySharedReadings(),
+    states,
+    clock,
+    me: () => me,
+  })
 }
 
 /** The removals of a project, applied to the files a memory writer holds. */
@@ -206,7 +241,8 @@ export function removerOf(files: Map<string, string>): ProjectFiles {
     withExtensions: unused,
     read: unused,
     readText: async (_folder, path) => files.get(path) ?? null,
-    under: unused,
+    under: async (_folder, folder) =>
+      [...files.keys()].filter((path) => path.startsWith(`${folder}/`)).sort(),
     remove: async (_folder, path) => {
       files.delete(path)
     },

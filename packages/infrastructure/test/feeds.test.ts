@@ -26,15 +26,15 @@ import {
   type ConnectorFeedOptions,
   createAdoTrackerReader,
   createConnectorFeedReader,
+  createFsFeedIndexes,
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
   createJiraHoursReader,
-  createJsonFeedIndexes,
-  createJsonSourceStates,
   createWarehouseTimesheetReader,
   jiraSite,
 } from '../src/index.ts'
+import { fsReadings } from './support/readings.ts'
 
 const HAS_TEST_DATABASE =
   Boolean(process.env.DATABASE_OWNER_URL) ||
@@ -76,8 +76,8 @@ async function setup(options: ConnectorFeedOptions) {
   const data = join(root, `dati-${count}`)
   const feeds = createFeeds({
     settings: createFsSourceSettings(),
-    states: createJsonSourceStates(data),
-    indexes: createJsonFeedIndexes(data),
+    readings: fsReadings(data, { now: () => new Date('2026-11-14T10:00:00.000Z') }),
+    indexes: createFsFeedIndexes(),
     secrets: memoryVault(),
     reader: createConnectorFeedReader(options),
     writer: createFsMemoryWriter(),

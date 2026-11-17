@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,7 @@ import {
   NO_OPEN_POINTS,
   NO_RISKS,
   NO_TODAY_SETTINGS,
+  type Project,
   type SignInConfig,
 } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -17,9 +18,10 @@ import {
   createFixedIdentityProvider,
   createFsOpenPointStore,
   createFsRiskRegisterStore,
-  createFsTodayStore,
+  createJsonTodayStore,
   createOidcIdentityProvider,
   createSignInConfig,
+  createSignInSetupStore,
   fixedPersonOf,
   parseEmlx,
 } from '../src/index.ts'
@@ -143,6 +145,13 @@ describe('where the organization signs in', () => {
     const dataFolder = mkdtempSync(join(tmpdir(), 'octo-accesso-'))
     const from = (env: object) => createSignInConfig({ dataFolder, env })()
     expect(await from({})).toBeNull()
+    // What an Octo just installed is told is what the next start reads.
+    const told = mkdtempSync(join(tmpdir(), 'octo-accesso-detto-'))
+    await createSignInSetupStore(told).save({ tenantId: TENANT, clientId: CLIENT })
+    expect(await createSignInConfig({ dataFolder: told, env: {} })()).toMatchObject({
+      tenantId: TENANT,
+      clientId: CLIENT,
+    })
     expect(await from({ tenantId: TENANT })).toBeNull()
     expect(await from({ tenantId: 'non-un-id', clientId: CLIENT })).toBeNull()
     expect(await from({ tenantId: TENANT, clientId: CLIENT })).toEqual({
@@ -183,10 +192,41 @@ describe('where the organization signs in', () => {
   })
 })
 
-describe('what the page of the day keeps in the project', () => {
+describe('what the page of the day keeps', () => {
+  const projectIn = (folder: string, addedAt: string): Project => ({
+    id: 'p-oggi',
+    name: 'Aurora',
+    folder,
+    addedAt,
+  })
+
+  it('takes out of the folder what an earlier Octo of this computer left there', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'octo-oggi-prima-'))
+    const data = mkdtempSync(join(tmpdir(), 'octo-oggi-dati-'))
+    const legacy = join(folder, '_octo', '.impostazioni', 'oggi.json')
+    mkdirSync(join(folder, '_octo', '.impostazioni'), { recursive: true })
+    writeFileSync(legacy, JSON.stringify({ ...NO_TODAY_SETTINGS, notify: false }))
+    utimesSync(legacy, new Date('2026-11-16T09:00:00Z'), new Date('2026-11-16T09:00:00Z'))
+
+    // Added here after the file was written: it is of another computer, and stays where it is.
+    const later = createJsonTodayStore(data, async () => projectIn(folder, '2026-11-17T08:00:00Z'))
+    expect(await later.load(folder)).toEqual(NO_TODAY_SETTINGS)
+    expect(existsSync(legacy)).toBe(true)
+
+    // Here since before: it is of this computer, and leaves the folder.
+    const mine = mkdtempSync(join(tmpdir(), 'octo-oggi-miei-'))
+    const earlier = createJsonTodayStore(mine, async () =>
+      projectIn(folder, '2026-11-14T08:00:00Z'),
+    )
+    expect((await earlier.load(folder)).notify).toBe(false)
+    expect(existsSync(legacy)).toBe(false)
+    expect((await earlier.load(folder)).notify).toBe(false)
+  })
+
   it('keeps decisions, judgements and risks, and starts over from a file it cannot read', async () => {
     const folder = mkdtempSync(join(tmpdir(), 'octo-oggi-'))
-    const store = createFsTodayStore()
+    const data = mkdtempSync(join(tmpdir(), 'octo-oggi-dati-'))
+    const store = createJsonTodayStore(data, async () => projectIn(folder, '2026-11-14T08:00:00Z'))
     expect(await store.load(folder)).toEqual(NO_TODAY_SETTINGS)
     expect(await store.loadEvaluation(folder)).toEqual(NO_EVALUATION)
     const settings = {
@@ -246,8 +286,10 @@ describe('what the page of the day keeps in the project', () => {
     }
     await store.saveEvaluation(folder, evaluation)
     expect(await store.loadEvaluation(folder)).toEqual(evaluation)
-    writeFileSync(join(folder, '_octo', '.impostazioni', 'oggi.json'), '{"decisions": "tutte"}')
-    writeFileSync(join(folder, '_octo', '.oggi', 'valutazione.json'), '{"mails": 3}')
+    // What one person decided is with the app: the folder other people open holds none of it.
+    expect(existsSync(join(folder, '_octo'))).toBe(false)
+    writeFileSync(join(data, 'today', 'p-oggi', 'oggi.json'), '{"decisions": "tutte"}')
+    writeFileSync(join(data, 'today', 'p-oggi', 'valutazione.json'), '{"mails": 3}')
     expect(await store.load(folder)).toEqual(NO_TODAY_SETTINGS)
     expect(await store.loadEvaluation(folder)).toEqual(NO_EVALUATION)
 

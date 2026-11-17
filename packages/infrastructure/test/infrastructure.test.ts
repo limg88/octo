@@ -1,4 +1,13 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,10 +19,10 @@ import {
   createClaudeCliRunner,
   createFsEvidenceReader,
   createFsFolderProbe,
-  createFsQuestionLog,
   createJsonBackupFiles,
   createJsonPreferences,
   createJsonProjectRegistry,
+  createJsonQuestionLog,
   createJsonSetAsideProjects,
   locateClaude,
   shellPath,
@@ -280,25 +289,42 @@ describe('json stores', () => {
     expect(await createJsonProjectRegistry(data).list()).toEqual([])
   })
 
-  it('keeps the questions in the project folder, out of the sources', async () => {
+  it('keeps the questions of a person with the app, out of the folder other people open', async () => {
     const folder = join(root, 'con-domande')
+    const data = join(root, 'dati-domande')
     await mkdir(folder)
-    expect(await createFsQuestionLog().list(folder)).toEqual([])
+    const here: Project = { ...sample, folder }
+    const log = () => createJsonQuestionLog(data, async (asked) => (asked === folder ? here : null))
+    expect(await log().list(folder)).toEqual([])
 
-    await createFsQuestionLog().append(folder, record)
-    await createFsQuestionLog().append(folder, {
-      ...record,
-      id: 'q-2',
-      answer: null,
-      error: 'agent_failed',
-    })
+    await log().append(folder, record)
+    await log().append(folder, { ...record, id: 'q-2', answer: null, error: 'agent_failed' })
 
-    const questions = await createFsQuestionLog().list(folder)
-    expect(questions.map((question) => question.id)).toEqual(['q-1', 'q-2'])
-    // The search tools skip the folder, and a citation of an earlier answer is never verified.
-    expect(await readFile(join(folder, HISTORY_FOLDER, '.ignore'), 'utf8')).toBe('*\n')
+    expect((await log().list(folder)).map((question) => question.id)).toEqual(['q-1', 'q-2'])
+    expect(await readdir(folder)).toEqual([])
+    // A citation of an earlier answer is never verified: there is nothing of it in the folder.
     const cited = await createFsEvidenceReader().read(folder, `${HISTORY_FOLDER}/domande.json`)
     expect(cited).toEqual({ kind: 'missing' })
+  })
+
+  it('takes out of a shared folder only the questions this computer asked', async () => {
+    const folder = join(root, 'domande-di-due')
+    const legacy = join(folder, HISTORY_FOLDER, 'domande.json')
+    await mkdir(join(folder, HISTORY_FOLDER), { recursive: true })
+    const mine = { ...record, id: 'q-mia' }
+    const hers = { ...record, id: 'q-sua', projectId: 'p-di-un-altro-computer' }
+    await writeFile(legacy, JSON.stringify([mine, hers]))
+    const here: Project = { ...sample, folder }
+    const log = createJsonQuestionLog(join(root, 'dati-di-due'), async () => here)
+
+    expect((await log.list(folder)).map((question) => question.id)).toEqual(['q-mia'])
+    expect(JSON.parse(await readFile(legacy, 'utf8'))).toEqual([hers])
+
+    // The other computer takes its own: nothing personal is left in the folder.
+    const there: Project = { ...sample, id: 'p-di-un-altro-computer', folder }
+    const other = createJsonQuestionLog(join(root, 'dati-dell-altra'), async () => there)
+    expect((await other.list(folder)).map((question) => question.id)).toEqual(['q-sua'])
+    await expect(readFile(legacy, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('writes a backup and reads it back, and refuses what is not one', async () => {

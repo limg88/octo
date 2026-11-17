@@ -60,6 +60,8 @@ type ManageProps = {
   error: ErrorCode | null
   onClose: () => void
   onRemove: (project: Project) => void
+  /** The folder of the project was moved: the PM says where it is now. */
+  onRelocate: (project: Project) => void
   onSaveBackup: () => void
   onRestoreBackup: () => void
 }
@@ -70,6 +72,7 @@ export function ManageProjectsDialog({
   error,
   onClose,
   onRemove,
+  onRelocate,
   onSaveBackup,
   onRestoreBackup,
 }: ManageProps) {
@@ -109,6 +112,13 @@ export function ManageProjectsDialog({
                 <strong>{project.name}</strong>
                 <p className="hint folder-path">{project.folder}</p>
               </div>
+              <button
+                type="button"
+                aria-label={text.relocateOf(project.name)}
+                onClick={() => onRelocate(project)}
+              >
+                {text.relocate}
+              </button>
               <button
                 type="button"
                 aria-label={text.removeOf(project.name)}

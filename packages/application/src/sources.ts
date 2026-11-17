@@ -2,7 +2,6 @@ import {
   cleanMailSource,
   DomainError,
   folderWanted,
-  isDomainError,
   type MailPreview,
   type MailSourceConfig,
   mailAllowed,
@@ -10,6 +9,7 @@ import {
   mailWanted,
   type Project,
   parseMailDocument,
+  type Reader,
   type SourceRun,
   type SourceState,
   startOfDay,
@@ -22,10 +22,16 @@ import type {
   SourceSettings,
   SourceStates,
 } from './ports.ts'
+import type { ReadingKind, ReadingOptions, Readings } from './readings.ts'
+
+/** The mail is of the archive of one computer: its turn is its own. */
+const MAIL: ReadingKind = { source: 'mail', ownToComputer: true }
 
 export type SourcesDeps = {
   settings: SourceSettings
   states: SourceStates
+  /** The turns of the readings, between the computers that share the folder of a project. */
+  readings: Readings
   archive: MailArchive
   writer: MemoryWriter
   clock: Clock
@@ -38,7 +44,14 @@ export type MailSourceView = {
   config: MailSourceConfig | null
   /** The folder proposed when the PM configures the mail for the first time. */
   suggestedFolder: string
+  /** The last reading: of this computer, or the last good one of whoever shares the folder. */
   state: SourceState
+  /** Who made that reading, when it was made from another computer. */
+  readBy: Reader | null
+  /** Who is writing the mail of the project from another computer right now. */
+  readingBy: Reader | null
+  /** Whether this computer has a mail program Octo reads. */
+  readableHere: boolean
 }
 
 export type Sources = {
@@ -47,9 +60,11 @@ export type Sources = {
   /** What these rules would bring in from the archive, without writing anything. */
   previewMail(project: Project, config: MailSourceConfig): Promise<MailPreview>
   /** Reads the new mail into the project folder. One reading per project at a time. */
-  syncMail(project: Project): Promise<SourceRun>
-  /** The projects whose mail is configured: those a periodic reading takes. */
+  syncMail(project: Project, options?: ReadingOptions): Promise<SourceRun>
+  /** Whether the mail of the project is configured. */
   hasMail(project: Project): Promise<boolean>
+  /** Whether a periodic reading takes the mail here: configured, and this computer has it. */
+  mailReadableHere(project: Project): Promise<boolean>
 }
 
 /**
@@ -62,14 +77,13 @@ export const PREVIEW_SUBJECTS = 5
 export const MAIL_OVERLAP_MS = 2 * 24 * 60 * 60 * 1000
 
 export function createSources(deps: SourcesDeps): Sources {
-  const running = new Set<string>()
-
   async function mail(project: Project): Promise<MailSourceView> {
     const config = (await deps.settings.load(project.folder)).mail
     return {
       config,
       suggestedFolder: await deps.settings.suggestMailFolder(project.folder),
-      state: await deps.states.get(project.id, 'mail'),
+      ...(await deps.readings.view(project, 'mail')),
+      readableHere: deps.archive.available,
     }
   }
 
@@ -127,30 +141,17 @@ export function createSources(deps: SourcesDeps): Sources {
     return counts
   }
 
-  async function syncMail(project: Project): Promise<SourceRun> {
+  async function syncMail(project: Project, options: ReadingOptions = {}): Promise<SourceRun> {
     const config = (await deps.settings.load(project.folder)).mail
     if (!config) throw new DomainError('source_not_configured', 'mail')
-    if (running.has(project.id)) throw new DomainError('source_busy', 'mail')
-    running.add(project.id)
-    const state = await deps.states.get(project.id, 'mail')
-    const now = deps.clock.now()
-    try {
+    // A failure leaves the cursor where it was: the next reading tries the same days again.
+    return deps.readings.run(project, MAIL, options, async ({ cursor }) => {
+      const now = deps.clock.now()
       const since = startOfDay(config.since)
-      const resume = state.cursor ? new Date(Date.parse(state.cursor) - MAIL_OVERLAP_MS) : since
+      const resume = cursor ? new Date(Date.parse(cursor) - MAIL_OVERLAP_MS) : since
       const from = resume.getTime() > since.getTime() ? resume : since
-      const counts = await read(project, config, from, now)
-      const run: SourceRun = { at: now.toISOString(), ...counts, error: null }
-      await deps.states.set(project.id, 'mail', { cursor: now.toISOString(), lastRun: run })
-      return run
-    } catch (error) {
-      if (!isDomainError(error)) throw error
-      // The cursor stays where it was: the next reading tries the same days again.
-      const run: SourceRun = { at: now.toISOString(), written: 0, unchanged: 0, error: error.code }
-      await deps.states.set(project.id, 'mail', { ...state, lastRun: run })
-      return run
-    } finally {
-      running.delete(project.id)
-    }
+      return { ...(await read(project, config, from, now)), cursor: now.toISOString() }
+    })
   }
 
   async function previewMail(_project: Project, raw: MailSourceConfig): Promise<MailPreview> {
@@ -174,5 +175,7 @@ export function createSources(deps: SourcesDeps): Sources {
     previewMail,
     syncMail,
     hasMail: async (project) => (await deps.settings.load(project.folder)).mail !== null,
+    mailReadableHere: async (project) =>
+      deps.archive.available && (await deps.settings.load(project.folder)).mail !== null,
   }
 }

@@ -119,6 +119,7 @@ const MAC = 'darwin'
 const DISK_ACCESS_SETTINGS =
   'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles'
 const preferencesInput = z.object({ theme: z.enum(THEME_CHOICES) })
+const signInSetupInput = z.object({ tenantId: z.string().max(200), clientId: z.string().max(200) })
 const byProject = z.object({ projectId: z.string().min(1) })
 const askInput = byProject.extend({
   question: z.string().max(MAX_QUESTION_LENGTH),
@@ -452,6 +453,10 @@ export function registerIpc(deps: IpcDeps): void {
   open(CHANNELS.preferencesGet, none, () => deps.preferences.get())
   open(CHANNELS.preferencesSave, preferencesInput, (input) => deps.preferences.save(input))
   open(CHANNELS.sessionSignIn, none, () => deps.session.signIn())
+  // Asked before anybody can sign in: it is what lets somebody do it.
+  open(CHANNELS.sessionConfigure, signInSetupInput, ({ tenantId, clientId }) =>
+    deps.session.configure(tenantId, clientId),
+  )
   open(CHANNELS.sessionCancel, none, async () => {
     deps.session.cancelSignIn()
     return null
@@ -677,6 +682,19 @@ export function registerIpc(deps: IpcDeps): void {
   })
 
   handle(CHANNELS.projectsRestore, byProject, ({ projectId }) => deps.projects.restore(projectId))
+
+  handle(CHANNELS.projectsRelocate, byProject, async ({ projectId }) => {
+    const project = await deps.projects.get(projectId)
+    const title = deps.backupDialogs.locateTitle(project.name)
+    const choice = await dialog.showOpenDialog(deps.window, {
+      title,
+      message: title,
+      properties: ['openDirectory'],
+    })
+    const folder = choice.filePaths[0]
+    if (choice.canceled || !folder) return null
+    return deps.projects.relocate(projectId, folder)
+  })
 
   handle(CHANNELS.projectsChoosePath, choosePathInput, async ({ projectId, what, extensions }) => {
     const project = await deps.projects.get(projectId)

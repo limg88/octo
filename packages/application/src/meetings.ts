@@ -19,6 +19,7 @@ import {
   parseMailDocument,
   parseMeetingMeta,
   projectKeywords,
+  type Reader,
   type RecordedMeeting,
   type SourceRun,
   type SourceState,
@@ -31,13 +32,17 @@ import type {
   MemoryWriter,
   ProjectFiles,
   SourceSettings,
-  SourceStates,
   WriteOutcome,
 } from './ports.ts'
+import type { ReadingCounts, ReadingKind, ReadingOptions, Readings } from './readings.ts'
+
+/** Verbale exports on one computer: the turn of its meetings is that computer's own. */
+const MEETINGS: ReadingKind = { source: 'meetings', ownToComputer: true }
 
 export type MeetingsDeps = {
   settings: SourceSettings
-  states: SourceStates
+  /** The turns of the readings, between the computers that share the folder of a project. */
+  readings: Readings
   exports: MeetingExports
   /** The projects of who uses Octo: a meeting is of one of those that read the same folder. */
   projects: () => Promise<Project[]>
@@ -53,7 +58,14 @@ export type MeetingsSourceView = {
   suggestedRoot: string | null
   /** Where the meetings are written, inside the project folder. */
   targetFolder: string
+  /** The last reading: of this computer, or the last good one of whoever shares the folder. */
   state: SourceState
+  /** Who made that reading, when it was made from another computer. */
+  readBy: Reader | null
+  /** Who is writing the meetings of the project from another computer right now. */
+  readingBy: Reader | null
+  /** Whether the folder of Verbale the project names is one this computer can open. */
+  readableHere: boolean
 }
 
 export type Meetings = {
@@ -61,8 +73,13 @@ export type Meetings = {
   /** Null switches the meetings of the project off; what was imported stays. */
   save(project: Project, config: MeetingsSourceConfig | null): Promise<MeetingsSourceView>
   /** Brings in the finished meetings that are of the project. One reading per project at a time. */
-  sync(project: Project): Promise<SourceRun>
+  sync(project: Project, options?: ReadingOptions): Promise<SourceRun>
   configured(project: Project): Promise<boolean>
+  /**
+   * Whether a periodic reading takes the meetings here: configured, and the folder of Verbale is
+   * on this computer. Elsewhere the meetings are those another computer brought in.
+   */
+  readableHere(project: Project): Promise<boolean>
   /** The meetings the project holds, the newest first. */
   imported(project: Project): Promise<StoredMeeting[]>
   /** The finished meetings of the folder that no project could be told for. */
@@ -81,10 +98,13 @@ const CALENDAR_CANCEL = 'CANCEL'
 const SOURCE = 'meetings'
 
 export function createMeetings(deps: MeetingsDeps): Meetings {
-  const running = new Set<string>()
-
   const configOf = async (project: Project): Promise<MeetingsSourceConfig | null> =>
     (await deps.settings.load(project.folder)).meetings
+
+  async function readableHere(project: Project): Promise<boolean> {
+    const config = await configOf(project)
+    return config !== null && (await deps.exports.readable(config.root))
+  }
 
   async function view(project: Project): Promise<MeetingsSourceView> {
     const config = await configOf(project)
@@ -92,7 +112,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       config,
       suggestedRoot: config ? null : await deps.exports.defaultRoot(),
       targetFolder: MEETINGS_FOLDER,
-      state: await deps.states.get(project.id, SOURCE),
+      ...(await deps.readings.view(project, SOURCE)),
+      readableHere: config === null || (await deps.exports.readable(config.root)),
     }
   }
 
@@ -210,10 +231,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     return outcomes.includes('written') ? 'written' : 'unchanged'
   }
 
-  async function read(
-    project: Project,
-    config: MeetingsSourceConfig,
-  ): Promise<Pick<SourceRun, 'written' | 'unchanged'>> {
+  async function read(project: Project, config: MeetingsSourceConfig): Promise<ReadingCounts> {
     const found = await scan(project, config)
     const counts = { written: 0, unchanged: 0 }
     const changing: Skipped[] = []
@@ -230,24 +248,13 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     return counts
   }
 
-  async function sync(project: Project): Promise<SourceRun> {
+  async function sync(project: Project, options: ReadingOptions = {}): Promise<SourceRun> {
     const config = await configOf(project)
     if (!config) throw new DomainError('source_not_configured', SOURCE)
-    if (running.has(project.id)) throw new DomainError('source_busy', SOURCE)
-    running.add(project.id)
-    const at = deps.clock.now().toISOString()
-    try {
-      const run: SourceRun = { at, ...(await read(project, config)), error: null }
-      await deps.states.set(project.id, SOURCE, { cursor: at, lastRun: run })
-      return run
-    } catch (error) {
-      if (!isDomainError(error)) throw error
-      const run: SourceRun = { at, written: 0, unchanged: 0, error: error.code }
-      await deps.states.set(project.id, SOURCE, { cursor: null, lastRun: run })
-      return run
-    } finally {
-      running.delete(project.id)
-    }
+    return deps.readings.run(project, MEETINGS, options, async () => ({
+      ...(await read(project, config)),
+      cursor: deps.clock.now().toISOString(),
+    }))
   }
 
   return {
@@ -265,6 +272,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     },
 
     configured: async (project) => (await configOf(project)) !== null,
+    readableHere,
 
     async unassigned(project) {
       const config = await configOf(project)

@@ -161,14 +161,70 @@ export function cleanFeedConfig<Name extends FeedName>(
 }
 
 /**
- * What of the system a configuration reads. When it changes, the files of the feed are from
- * another perimeter: they are removed and the reading starts over.
+ * What of a configuration is of the person who reads, not of the project: the account a system
+ * is entered with. Two people read the same items with two accounts.
  */
-export function feedScope(config: FeedConfig): string {
-  const { targetFolder: _folder, ...settings } = config
+export const PERSONAL_FEED_FIELDS: { readonly [Name in FeedName]: readonly string[] } = {
+  ado: [],
+  jira: ['email'],
+  confluence: ['email'],
+  dwsi: ['user', 'ownerEmail'],
+}
+
+const sorted = (what: Record<string, unknown>): string =>
+  JSON.stringify(what, Object.keys(what).sort())
+
+/**
+ * What of the system a configuration reads. When it changes, the files of the feed are from
+ * another perimeter: they are removed and the reading starts over. The account it is read with
+ * is not part of it: the same perimeter read by another person is the same reading.
+ */
+export function feedScope(feed: FeedName, config: FeedConfig): string {
+  const left = ['targetFolder', ...PERSONAL_FEED_FIELDS[feed]]
+  const settings = Object.fromEntries(
+    Object.entries(config).filter(([field]) => !left.includes(field)),
+  )
   // An issue tracker read for more fields than before is another reading: it starts over once.
-  const what = 'projects' in config ? { ...settings, fields: ISSUE_FIELDS_REVISION } : settings
-  return JSON.stringify(what, Object.keys(what).sort())
+  return sorted(feed === 'jira' ? { ...settings, fields: ISSUE_FIELDS_REVISION } : settings)
+}
+
+/**
+ * A perimeter written when the account was part of it, as it is written now: what an earlier
+ * Octo left on a computer is recognised as the same reading. Null when it cannot be read.
+ */
+export function scopeWithoutAccount(feed: FeedName, scope: string): string | null {
+  try {
+    const what: unknown = JSON.parse(scope)
+    if (typeof what !== 'object' || what === null || Array.isArray(what)) return null
+    return sorted(
+      Object.fromEntries(
+        Object.entries(what).filter(([field]) => !PERSONAL_FEED_FIELDS[feed].includes(field)),
+      ),
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether a file of the folder of a feed is the copy a sync client leaves beside a file when two
+ * computers wrote it at once: the name of a file the feed holds, then a dash or a space and what
+ * the client added, with the same extension.
+ */
+export function isConflictCopy(path: string, held: ReadonlySet<string>): boolean {
+  if (held.has(path)) return false
+  const dot = path.lastIndexOf('.')
+  const slash = path.lastIndexOf('/')
+  if (dot <= slash) return false
+  const extension = path.slice(dot)
+  const stem = path.slice(0, dot)
+  for (let at = stem.length - 1; at > slash + 1; at -= 1) {
+    const separator = stem[at]
+    if ((separator === '-' || separator === ' ') && held.has(`${stem.slice(0, at)}${extension}`)) {
+      return true
+    }
+  }
+  return false
 }
 
 /** Raised when the fields read of every issue change: the sprint and the estimate, since 2. */

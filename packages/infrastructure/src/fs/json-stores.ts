@@ -21,7 +21,8 @@ import {
   type QuestionRecord,
 } from '@octo/domain'
 import { z } from 'zod'
-import { readJsonOr, writeJson } from './json-file.ts'
+import { readJsonOr, removeFile, writeJson } from './json-file.ts'
+import { createPersonalFiles, type ProjectOfFolder } from './personal-files.ts'
 
 const projectSchema = z.object({
   id: z.string(),
@@ -90,22 +91,52 @@ function projectListIn(file: string): ProjectRegistry {
   }
 }
 
-/** Tells the search tools to leave the folder out: an earlier answer is not a source. */
-const SEARCH_DENY = { name: '.ignore', content: '*\n' }
+const QUESTIONS_AREA = 'questions'
 
-/** The questions of a project in its own folder: they follow it to another computer. */
-export function createFsQuestionLog(): QuestionLog {
-  const folderOf = (projectFolder: string) => join(projectFolder, ...HISTORY_FOLDER.split('/'))
-  const fileOf = (projectFolder: string) => join(folderOf(projectFolder), QUESTIONS_FILE)
-  const list = async (projectFolder: string): Promise<QuestionRecord[]> =>
-    z.array(questionSchema).parse(await readJsonOr(fileOf(projectFolder), []))
+/**
+ * The questions one person asked of a project, kept with the app: a folder other people open
+ * too is not where one's own conversations live. What an Octo from before a folder could be
+ * shared left in the folder is taken out of it once, by the computer that asked it: each
+ * question carries the id the project has on the computer it was asked from.
+ */
+export function createJsonQuestionLog(dataFolder: string, projectOf: ProjectOfFolder): QuestionLog {
+  const personal = createPersonalFiles(dataFolder, QUESTIONS_AREA, projectOf)
+  const ownFile = async (projectFolder: string): Promise<string> =>
+    join(await personal.folderOf(projectFolder), QUESTIONS_FILE)
+  const legacyFile = (projectFolder: string) =>
+    join(projectFolder, ...HISTORY_FOLDER.split('/'), QUESTIONS_FILE)
+  const read = async (file: string): Promise<QuestionRecord[] | null> => {
+    const raw = await readJsonOr(file, null)
+    return raw === null ? null : z.array(questionSchema).parse(raw)
+  }
+
+  /** The questions of this computer the folder still holds, moved here; the others stay. */
+  async function takeOver(projectFolder: string, own: string): Promise<QuestionRecord[]> {
+    const project = await projectOf(projectFolder)
+    const legacy = legacyFile(projectFolder)
+    const kept = project === null ? null : await read(legacy).catch(() => null)
+    const mine = (kept ?? []).filter((record) => record.projectId === project?.id)
+    if (kept === null || mine.length === 0) return []
+    await writeJson(own, mine, PRIVATE_FILE_MODE)
+    const others = kept.filter((record) => record.projectId !== project?.id)
+    if (others.length === 0) await removeFile(legacy)
+    else await writeJson(legacy, others)
+    return mine
+  }
+
+  const list = async (projectFolder: string): Promise<QuestionRecord[]> => {
+    const own = await ownFile(projectFolder)
+    return (await read(own)) ?? takeOver(projectFolder, own)
+  }
+
   return {
     list,
-    append: async (projectFolder, record) => {
-      await writeJson(fileOf(projectFolder), [...(await list(projectFolder)), record])
-      const marker = join(folderOf(projectFolder), SEARCH_DENY.name)
-      await writeFile(marker, SEARCH_DENY.content, 'utf8')
-    },
+    append: async (projectFolder, record) =>
+      writeJson(
+        await ownFile(projectFolder),
+        [...(await list(projectFolder)), record],
+        PRIVATE_FILE_MODE,
+      ),
   }
 }
 
@@ -135,6 +166,7 @@ const backupSchema = z.object({
       project: projectSchema,
       sources: z.record(z.string(), sourceStateSchema),
       feeds: z.partialRecord(z.enum(FEED_NAMES), feedIndexSchema),
+      questions: z.array(questionSchema).optional(),
     }),
   ),
 })

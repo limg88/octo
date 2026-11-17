@@ -34,6 +34,8 @@ export type Projects = {
   remove(id: string): Promise<void>
   /** Puts back a project taken off the list, as it was. */
   restore(id: string): Promise<Project>
+  /** Points a project at the folder it was moved to. */
+  relocate(id: string, folder: string): Promise<Project>
 }
 
 export function createProjects(deps: ProjectsDeps): Projects {
@@ -119,5 +121,24 @@ export function createProjects(deps: ProjectsDeps): Projects {
     return add(await deps.scaffold.create(parent, folderName, starterFiles(folderName)))
   }
 
-  return { list, get, add, create, remove, restore }
+  /**
+   * Says where the folder of a project is now, after it was moved: the project stays the same,
+   * with its credentials and everything this computer keeps of it.
+   */
+  async function relocate(id: string, folder: string): Promise<Project> {
+    const project = await get(id)
+    if (!(await deps.folders.isReadableFolder(folder))) {
+      throw new DomainError('folder_not_readable', folder)
+    }
+    const projects = await deps.registry.list()
+    const taken = projects.some(
+      (other) => other.id !== project.id && sameFolder(other.folder, folder),
+    )
+    if (taken) throw new DomainError('project_already_added', folder)
+    const moved: Project = { ...project, folder }
+    await deps.registry.save(projects.map((other) => (other.id === project.id ? moved : other)))
+    return moved
+  }
+
+  return { list, get, add, create, remove, restore, relocate }
 }

@@ -837,12 +837,14 @@ try {
   await page.getByText('Ripristinati: Aurora.').waitFor({ timeout: TIMEOUT_MS })
   await page.getByText(/Rimetti le credenziali/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
-  // The questions came with the folder, the readings with the backup.
+  // The questions came with the backup; what the feeds wrote, and where they go on from, with
+  // the folder: neither computer keeps any of it.
   await page.getByRole('tab', { name: 'Chiedi' }).click()
   await openChatWith('1 punto da controllare')
-  const readings = (dataFolder) =>
-    JSON.parse(readFileSync(`${work}/${dataFolder}/feeds/demo-aurora/ado.json`, 'utf8'))
-  assert.deepEqual(readings('dati-nuovo'), readings('dati'))
+  const heldByAdo = JSON.parse(readFileSync(`${movedFolder}/_octo/.stato/ado.indice.json`, 'utf8'))
+  assert.ok(Object.keys(heldByAdo.items).length > 0)
+  assert.equal(existsSync(`${work}/dati-nuovo/feeds`), false)
+  assert.equal(existsSync(`${work}/dati/feeds`), false)
   assert.equal(
     JSON.parse(readFileSync(`${work}/dati-nuovo/projects.json`, 'utf8'))[0].folder,
     movedFolder,

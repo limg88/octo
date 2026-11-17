@@ -28,6 +28,7 @@ function feeding(options: {
       saveMail: never,
       previewMail: never,
       hasMail: async () => options.mail,
+      mailReadableHere: async () => options.mail,
       syncMail: async () => {
         calls.push('mail')
         if (options.busy) throw new DomainError('source_busy')
@@ -36,6 +37,7 @@ function feeding(options: {
     },
     meetings: {
       configured: async () => options.meetings ?? false,
+      readableHere: async () => options.meetings ?? false,
       sync: async () => {
         calls.push('meetings')
         return run(3)
@@ -47,6 +49,7 @@ function feeding(options: {
       choices: never,
       assignment: never,
       configured: async () => options.feeds,
+      readableHere: async () => options.feeds,
       sync: async (_project, feed) => {
         calls.push(feed)
         if (options.broken) throw new Error('disk full')

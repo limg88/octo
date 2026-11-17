@@ -1,10 +1,12 @@
-import { DomainError, type Identity, isDomainError } from '@octo/domain'
-import type { IdentityProvider, SecretVault } from './ports.ts'
+import { DomainError, type Identity, isDomainError, signInSetupOf } from '@octo/domain'
+import type { IdentityProvider, SecretVault, SignInSetupStore } from './ports.ts'
 
 export type SessionDeps = {
   provider: IdentityProvider
   /** Where what renews the sign-in is kept: the system's own store, never the project folder. */
   secrets: SecretVault
+  /** With it, an Octo just installed can be told where its organization signs in. */
+  setup?: SignInSetupStore
 }
 
 /** What the interface is told about who is using Octo. */
@@ -25,6 +27,12 @@ export type Session = {
    * (no network, access withdrawn), nobody is signed in and the person is asked again.
    */
   resume(): Promise<SessionView>
+  /**
+   * Tells an Octo that does not know it yet where the organization signs in, with the two ids a
+   * colleague who already uses Octo passes on. Throws `sign_in_setup_invalid` for what is not
+   * such ids. An Octo that already knows is not told again: nobody is sent to sign in elsewhere.
+   */
+  configure(tenantId: string, clientId: string): Promise<SessionView>
   signIn(): Promise<SessionView>
   /** Stops a sign-in that waits for the browser. */
   cancelSignIn(): void
@@ -72,6 +80,14 @@ export function createSession(deps: SessionDeps): Session {
       } catch (error) {
         if (!isDomainError(error)) throw error
       }
+      return view()
+    },
+
+    async configure(tenantId, clientId) {
+      if (!deps.setup || (await deps.provider.configured()) !== null) return view()
+      const setup = signInSetupOf(tenantId, clientId)
+      if (setup === null) throw new DomainError('sign_in_setup_invalid')
+      await deps.setup.save(setup)
       return view()
     },
 

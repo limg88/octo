@@ -21,6 +21,19 @@ export type SignInConfig = {
   tenantId: string
 }
 
+/** What an organization gives to let its people sign in to Octo. Neither is a secret. */
+export type SignInSetup = { tenantId: string; clientId: string }
+
+/** A tenant is named by its id: the sign-in says which organization a person belongs to with it. */
+const TENANT_ID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+const CLIENT_ID = /^[A-Za-z0-9-]{1,100}$/
+
+/** The two ids as they are kept, trimmed; null when either is not an id an organization gives. */
+export function signInSetupOf(tenantId: string, clientId: string): SignInSetup | null {
+  const setup = { tenantId: tenantId.trim(), clientId: clientId.trim() }
+  return TENANT_ID.test(setup.tenantId) && CLIENT_ID.test(setup.clientId) ? setup : null
+}
+
 const ADDRESS = /^[^\s@]+@[^\s@]+$/
 
 /** The addresses the person is written to at, in lower case: the mail address and the sign-in name. */

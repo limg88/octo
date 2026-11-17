@@ -1708,6 +1708,7 @@ describe('the way into Octo', () => {
     const api = {
       signIn: vi.fn(() => new Promise<Result<SessionView>>((resolve) => (finish = resolve))),
       cancelSignIn: vi.fn(async () => ok(null)),
+      configureSignIn: vi.fn(),
     }
     const entered: SessionView[] = []
     render(
@@ -1724,8 +1725,16 @@ describe('the way into Octo', () => {
     expect(entered).toEqual([paola])
   })
 
-  it('says when Octo is still finding out, and when nobody told it where to sign in', () => {
-    const api = { signIn: vi.fn(), cancelSignIn: vi.fn() }
+  it('says when Octo is still finding out, and asks where to sign in when nobody told it', async () => {
+    const api = {
+      signIn: vi.fn(),
+      cancelSignIn: vi.fn(),
+      configureSignIn: vi
+        .fn<OctoApi['configureSignIn']>()
+        .mockResolvedValueOnce({ ok: false, code: 'sign_in_setup_invalid' })
+        .mockResolvedValue(ok(out)),
+    }
+    const told: SessionView[] = []
     const { rerender } = render(
       <SignIn api={api} session={null} error={null} onSignedIn={() => {}} />,
     )
@@ -1735,11 +1744,22 @@ describe('the way into Octo', () => {
         api={api}
         session={{ identity: null, configured: false }}
         error={null}
-        onSignedIn={() => {}}
+        onSignedIn={(next) => told.push(next)}
       />,
     )
-    expect(screen.getByRole('alert').textContent).toBe(words.notConfigured)
+    expect(screen.getByText(words.notConfigured)).toBeTruthy()
     expect(screen.queryByRole('button', { name: words.signIn })).toBeNull()
+    // An Octo just installed is told by who uses it, with the two ids a colleague passes on.
+    const save = screen.getByRole<HTMLButtonElement>('button', { name: words.configure })
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(words.tenantId), { target: { value: 'sbagliato' } })
+    fireEvent.change(screen.getByLabelText(words.clientId), { target: { value: 'app-1' } })
+    fireEvent.click(save)
+    expect((await screen.findByRole('alert')).textContent).toContain('non è scritto bene')
+    expect(told).toEqual([])
+    fireEvent.click(save)
+    await waitFor(() => expect(told).toEqual([out]))
+    expect(api.configureSignIn).toHaveBeenLastCalledWith('sbagliato', 'app-1')
   })
 })
 

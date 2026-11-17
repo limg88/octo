@@ -7,10 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   createFsMemoryWriter,
   createFsProjectFiles,
-  createJsonSourceStates,
   createWorkerTextExtractor,
 } from '../src/index.ts'
 import { docx, xlsx } from './support/files.ts'
+import { fsReadings, PAOLA_AT_HER_MAC } from './support/readings.ts'
 
 const WORKER = new URL('../src/extract/worker.ts', import.meta.url)
 const NOW = new Date('2026-11-14T10:00:00.000Z')
@@ -49,8 +49,7 @@ function documents(timeoutMs?: number) {
     files,
     extractor: createWorkerTextExtractor(WORKER, timeoutMs),
     writer: createFsMemoryWriter(),
-    states: createJsonSourceStates(join(root, 'dati')),
-    clock: { now: () => NOW },
+    readings: fsReadings(join(root, 'dati'), { now: () => NOW }),
   })
 }
 
@@ -75,7 +74,13 @@ describe('files of a project to convert', () => {
 describe('converting the documents of a project', () => {
   it('writes the text of each file once, and again only when the file changes', async () => {
     const first = await documents().convert(project)
-    expect(first).toEqual({ at: NOW.toISOString(), written: 2, unchanged: 0, error: null })
+    expect(first).toEqual({
+      at: NOW.toISOString(),
+      written: 2,
+      unchanged: 0,
+      error: null,
+      by: PAOLA_AT_HER_MAC,
+    })
 
     const word = await files.readText(folder, extractedTextPath('raw/SOW/Offerta.docx'))
     expect(word).toContain('origine: "raw/SOW/Offerta.docx"')
@@ -93,7 +98,7 @@ describe('converting the documents of a project', () => {
     expect(await files.readText(folder, extractedTextPath('raw/SOW/Offerta.docx'))).toContain(
       '15.000',
     )
-    expect((await documents().state(project)).lastRun?.written).toBe(1)
+    expect((await documents().state(project)).state.lastRun?.written).toBe(1)
   })
 
   it('removes the text of a file that is gone', async () => {

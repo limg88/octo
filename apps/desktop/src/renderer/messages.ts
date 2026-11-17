@@ -48,7 +48,12 @@ export const messages = {
     cancel: 'Annulla',
     checking: 'Controllo chi sei…',
     notConfigured:
-      'Questo Octo non sa ancora dove farti entrare. Chi te l’ha dato deve aggiungere la configurazione dell’accesso aziendale.',
+      'Questo Octo non sa ancora dove farti entrare. Scrivi qui i due identificativi dell’accesso aziendale: te li dà chi usa già Octo. Non sono segreti.',
+    tenantId: 'Identificativo dell’organizzazione (tenant)',
+    clientId: 'Identificativo dell’applicazione (client)',
+    whereToFind:
+      'Chi usa già Octo li trova nel file «accesso.json» della cartella dei dati di Octo, alle voci «tenantId» e «clientId».',
+    configure: 'Salva',
     signedInAs: (name: string) => `Sei ${name}`,
     signOut: 'Esci',
   },
@@ -533,6 +538,8 @@ export const messages = {
     none: 'Nessun progetto in elenco.',
     remove: 'Togli da Octo',
     removeOf: (name: string) => `Togli ${name} da Octo`,
+    relocate: 'Cambia cartella…',
+    relocateOf: (name: string) => `Cambia la cartella di ${name}`,
     confirmTitle: (name: string) => `Togliere «${name}» da Octo?`,
     confirmBody:
       'La cartella e tutto ciò che contiene restano dove sono. Anche le credenziali e il punto a cui sono arrivate le letture restano su questo computer: se aggiungi di nuovo la stessa cartella, il progetto torna com’era.',
@@ -593,6 +600,17 @@ export const messages = {
     `Ultima lettura ${at}: ${written} nuove, ${unchanged} già presenti.`,
   mailLastFailed: (at: string) => `Ultima lettura ${at} non riuscita.`,
   mailStale: 'La posta non viene letta da più di un giorno.',
+  elsewhere: {
+    who: (reader: { name: string; computer: string }) => `${reader.name} · ${reader.computer}`,
+    read: (who: string) => `Letta da ${who}`,
+    reading: (who: string) => `In lettura da ${who}`,
+    noCredential:
+      'Su questo computer non c’è la credenziale: vale la lettura di chi condivide la cartella. Per leggerla anche da qui, premi «Modifica» e inserisci la tua.',
+    noMail:
+      'Su questo computer la posta non si legge: vale quella scritta nel progetto da chi condivide la cartella.',
+    noMeetings:
+      'La cartella di Verbale non è su questo computer: valgono le riunioni portate nel progetto da chi condivide la cartella.',
+  },
   mailNotConfigured: 'La posta di questo progetto non è ancora configurata.',
   feedIntro: {
     ado: 'Le voci del tracker del progetto (bug, storie, attività), una per file, lette con il tuo token personale di sola lettura.',
@@ -682,7 +700,7 @@ export const messages = {
     title: 'Se cambi computer',
     save: 'Copia di sicurezza',
     restore: 'Ripristina',
-    hint: 'La copia tiene l’elenco dei progetti e il punto a cui sono arrivate le letture. Le cartelle dei progetti vanno copiate a parte; le credenziali si rimettono.',
+    hint: 'La copia tiene l’elenco dei progetti, le tue domande e ciò che questo computer sa delle letture. Le cartelle dei progetti vanno copiate a parte; le credenziali si rimettono.',
     saved: (file: string, projects: number) =>
       `Copia scritta in ${file}: ${projects === 1 ? '1 progetto' : `${projects} progetti`}. Le credenziali non ci sono: sul nuovo computer vanno rimesse.`,
     restored: (names: string[]) => `Ripristinati: ${names.join(', ')}.`,
@@ -1752,6 +1770,8 @@ const errors: Record<ErrorCode, string> = {
   source_not_configured: 'Questa fonte non è ancora configurata.',
   source_config_invalid: 'Controlla il giorno di inizio e la cartella: uno dei due non è valido.',
   source_busy: 'Una lettura è già in corso.',
+  source_busy_elsewhere:
+    'Un altro computer che condivide la cartella sta leggendo questa fonte. Riprova fra poco: la sua lettura vale anche qui.',
   mail_archive_unreadable:
     'Non riesco a leggere la posta di Mail. In Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo. Dopo un aggiornamento di Octo il permesso va rimesso: togli Octo dall’elenco con «−» e aggiungilo di nuovo con «+».',
   mail_reader_missing: 'Su questo sistema la lettura della posta non è ancora disponibile.',
@@ -1780,6 +1800,8 @@ const errors: Record<ErrorCode, string> = {
   private_host_ca_too_long: 'Il certificato dell’autorità è troppo lungo.',
   private_host_ca_not_verified: 'Il certificato del server non è stato verificato.',
   not_signed_in: 'Per continuare devi entrare con il tuo utente aziendale.',
+  sign_in_setup_invalid:
+    'Uno dei due identificativi non è scritto bene. Quello dell’organizzazione ha la forma 00000000-0000-0000-0000-000000000000; copiali così come sono.',
   sign_in_not_configured:
     'Octo non sa dove farti entrare: manca la configurazione dell’accesso aziendale. Chiedila a chi ti ha dato Octo.',
   sign_in_failed:

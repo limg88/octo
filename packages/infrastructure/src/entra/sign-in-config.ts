@@ -1,14 +1,13 @@
 import { join } from 'node:path'
-import type { SignInConfig } from '@octo/domain'
+import type { SignInSetupStore } from '@octo/application'
+import { type SignInConfig, signInSetupOf } from '@octo/domain'
 import { z } from 'zod'
-import { readJsonOr } from '../fs/json-file.ts'
+import { readJsonOr, writeJson } from '../fs/json-file.ts'
 
 /** The file, beside the app's own state, that says where the organization signs in. */
 export const SIGN_IN_FILE = 'accesso.json'
 const MICROSOFT = 'https://login.microsoftonline.com'
-/** A tenant is named by its id: the sign-in says which organization a person belongs to with it. */
-const TENANT_ID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
-const CLIENT_ID = /^[A-Za-z0-9-]{1,100}$/
+const PRIVATE_FILE_MODE = 0o600
 
 const fileSchema = z.object({
   tenantId: z.string(),
@@ -37,14 +36,24 @@ export function createSignInConfig(source: SignInConfigSource): () => Promise<Si
       await readJsonOr(join(source.dataFolder, SIGN_IN_FILE), {}).catch(() => ({})),
     )
     const file = parsed.success ? parsed.data : null
-    const tenantId = (source.env.tenantId ?? file?.tenantId ?? '').trim()
-    const clientId = (source.env.clientId ?? file?.clientId ?? '').trim()
-    if (!TENANT_ID.test(tenantId) || !CLIENT_ID.test(clientId)) return null
+    const setup = signInSetupOf(
+      source.env.tenantId ?? file?.tenantId ?? '',
+      source.env.clientId ?? file?.clientId ?? '',
+    )
+    if (setup === null) return null
+    const { tenantId, clientId } = setup
     const authority = (source.env.authority ?? file?.authority ?? '').trim()
     return {
       tenantId,
       clientId,
       authority: authority === '' ? `${MICROSOFT}/${tenantId}/v2.0` : authority,
     }
+  }
+}
+
+/** Writes `accesso.json` in the app's data folder: what the next reading of the sign-in finds. */
+export function createSignInSetupStore(dataFolder: string): SignInSetupStore {
+  return {
+    save: (setup) => writeJson(join(dataFolder, SIGN_IN_FILE), setup, PRIVATE_FILE_MODE),
   }
 }

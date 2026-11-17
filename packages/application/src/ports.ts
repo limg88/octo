@@ -36,12 +36,15 @@ import type {
   Project,
   ProjectTeam,
   QuestionRecord,
+  Reader,
   RedTeamReport,
   Release,
   ReleaseAsset,
   RiskRegister,
+  SharedReading,
   SheetGrid,
   SignInConfig,
+  SignInSetup,
   SourceFileStamp,
   SourceState,
   SourcesConfig,
@@ -95,7 +98,7 @@ export interface ProjectRegistry {
   save(projects: Project[]): Promise<void>
 }
 
-/** The questions of a project, kept in the project folder so they travel with it. */
+/** The questions one person asked of a project: theirs, not of who else opens its folder. */
 export interface QuestionLog {
   list(projectFolder: string): Promise<QuestionRecord[]>
   append(projectFolder: string, record: QuestionRecord): Promise<void>
@@ -128,6 +131,8 @@ export interface IdGenerator {
  * not asked. Throws a DomainError `mail_archive_unreadable` when it cannot be opened.
  */
 export interface MailArchive {
+  /** Whether this computer has a mail program Octo reads: where it has none, mail is not read. */
+  readonly available: boolean
   /** The mail received from `from` (included) to `to` (excluded), oldest first. */
   between(from: Date, to: Date): Promise<ArchivedMail[]>
   /** The message, or null when it is not downloaded or cannot be read as a mail. */
@@ -146,6 +151,8 @@ export interface MeetingExports {
    * projects that read the same folder have the same root, however each was typed.
    */
   portable(root: string): string
+  /** Whether the root is a folder this computer can open: Verbale exports on one computer. */
+  readable(root: string): Promise<boolean>
   /**
    * Every export folder under the root, in the order of their names: a finished meeting, or one
    * left out with its reason. Throws a DomainError `meetings_root_unreadable` when the root
@@ -175,7 +182,10 @@ export interface MemoryWriter {
   claim(projectFolder: string): Promise<void>
 }
 
-/** The sources of a project, kept in the project folder so they travel with it. */
+/**
+ * The sources of a project as who uses this computer reads them. What is of the project is kept
+ * in its folder and travels with it; the account each system is entered with is of the person.
+ */
 export interface SourceSettings {
   load(projectFolder: string): Promise<SourcesConfig>
   save(projectFolder: string, config: SourcesConfig): Promise<void>
@@ -187,14 +197,33 @@ export interface SourceSettings {
 
 export type SourceName = 'mail' | 'meetings' | 'documents' | FeedName
 
-/** What each source did last on this computer, and where its next reading starts. */
+/** What takes turns between computers: a source, or the tracker read for the dashboard. */
+export type ReadingName = SourceName | 'tracker'
+
+/**
+ * What this computer did last with each source, gone well or not, and where the next reading
+ * starts for what only this computer holds (its mail, its meetings). Kept with the app.
+ */
 export interface SourceStates {
-  get(projectId: string, source: SourceName): Promise<SourceState>
-  set(projectId: string, source: SourceName, state: SourceState): Promise<void>
+  get(projectId: string, source: ReadingName): Promise<SourceState>
+  set(projectId: string, source: ReadingName, state: SourceState): Promise<void>
   /** Every state of the project, by the name of its source. */
   ofProject(projectId: string): Promise<Record<string, SourceState>>
   removeProject(projectId: string): Promise<void>
 }
+
+/**
+ * What the folder of a project knows of the readings of each source, kept in the folder itself:
+ * every computer that opens the folder finds the same. A state that cannot be read is the state
+ * of a source never read: the next reading puts it right.
+ */
+export interface SharedReadings {
+  get(projectFolder: string, source: ReadingName): Promise<SharedReading>
+  set(projectFolder: string, source: ReadingName, reading: SharedReading): Promise<void>
+}
+
+/** Who reads from this computer: the person signed in, or who uses the computer, and its name. */
+export type ThisReader = () => Reader
 
 /** Text from the bytes of an Office or PDF file. Never throws: what fails is a warning. */
 export interface TextExtractor {
@@ -250,11 +279,19 @@ export interface SecretVault {
   remove(key: string): Promise<void>
 }
 
-/** What each feed wrote in a project from this computer. */
+/**
+ * What each feed wrote in a project, kept in the folder of the project: whoever reads next,
+ * from any computer, goes on from what is there.
+ */
 export interface FeedIndexes {
+  load(projectFolder: string, feed: FeedName): Promise<{ scope: string | null; items: FeedIndex }>
+  save(projectFolder: string, feed: FeedName, scope: string, items: FeedIndex): Promise<void>
+}
+
+/** The index a feed kept on this computer before a folder could be shared. */
+export interface LegacyFeedIndexes {
   load(projectId: string, feed: FeedName): Promise<{ scope: string | null; items: FeedIndex }>
-  save(projectId: string, feed: FeedName, scope: string, items: FeedIndex): Promise<void>
-  removeProject(projectId: string): Promise<void>
+  remove(projectId: string, feed: FeedName): Promise<void>
 }
 
 /** What the writer of a deliverable is given. */
@@ -522,7 +559,10 @@ export const NO_EVALUATION: TodayEvaluation = {
   prep: [],
 }
 
-/** What the PM decided on the page of the day and what Claude judged, kept in the project. */
+/**
+ * What one PM decided on the page of the day and what Claude judged for that PM: theirs, not of
+ * who else opens the folder of the project.
+ */
 export interface TodayStore {
   load(projectFolder: string): Promise<TodaySettings>
   save(projectFolder: string, settings: TodaySettings): Promise<void>
@@ -720,6 +760,14 @@ export interface IdentityProvider {
   signIn(signal: AbortSignal): Promise<SignedIn>
   /** Renews a sign-in without asking; throws `sign_in_failed` when it cannot. */
   renew(refreshToken: string): Promise<SignedIn>
+}
+
+/**
+ * Where this computer keeps what its organization gave to let its people sign in: beside the
+ * app's own state. Whoever installs Octo for a colleague writes it once.
+ */
+export interface SignInSetupStore {
+  save(setup: SignInSetup): Promise<void>
 }
 
 /** Where the releases of Octo are published. */

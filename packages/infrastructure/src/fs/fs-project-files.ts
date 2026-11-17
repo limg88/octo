@@ -1,8 +1,8 @@
-import { readdir, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import type { ProjectFiles } from '@octo/application'
 import { DomainError, EXTRACTED_TEXT_FOLDER, type SourceFileStamp } from '@octo/domain'
-import { isMissing } from './json-file.ts'
+import { isMissing, removeFile } from './json-file.ts'
 
 /** Folders never walked: hidden ones, Octo's own, and what package managers fill. */
 const SKIPPED_FOLDERS = new Set([EXTRACTED_TEXT_FOLDER.split('/')[0] ?? '', 'node_modules'])
@@ -76,7 +76,13 @@ export function createFsProjectFiles(): ProjectFiles {
       const files = await walkFiles(root, portable(folder), false)
       return files.sort()
     },
-    remove: async (projectFolder, relativePath) =>
-      rm(await realPathInside(projectFolder, relativePath), { force: true }),
+    async remove(projectFolder, relativePath) {
+      try {
+        await removeFile(await realPathInside(projectFolder, relativePath))
+      } catch (error) {
+        // Already gone: another computer that shares the folder removed it first.
+        if (!isMissing(error)) throw error
+      }
+    },
   }
 }

@@ -28,16 +28,18 @@ import {
 } from '@octo/domain'
 import { z } from 'zod'
 import { readJsonOr, writeJson } from './json-file.ts'
+import { createPersonalFiles, type ProjectOfFolder } from './personal-files.ts'
 import { PROJECT_SETTINGS_FOLDER } from './project-files.ts'
 
 const TODAY_FILE = 'oggi.json'
 const RISKS_SETTINGS_FILE = 'rischi.json'
 const OPEN_POINTS_SETTINGS_FILE = 'open-point.json'
-/**
- * What Claude judged is kept in a hidden folder of its own: it is neither a setting of the PM
- * nor a source, and the agent's search skips hidden folders.
- */
-const EVALUATION_FILE = `${OCTO_FOLDER}/.oggi/valutazione.json`
+const EVALUATION_FILE = 'valutazione.json'
+/** Where an Octo from before a folder could be shared kept the two files, inside the project. */
+const LEGACY_SETTINGS_PATH = `${PROJECT_SETTINGS_FOLDER}/${TODAY_FILE}`
+const LEGACY_EVALUATION_PATH = `${OCTO_FOLDER}/.oggi/${EVALUATION_FILE}`
+const TODAY_AREA = 'today'
+const PRIVATE_FILE_MODE = 0o600
 
 const settingsSchema = z.object({
   decisions: z
@@ -176,15 +178,22 @@ const pointsSchema = z.object({
   closedBy: z.string().nullable().default(null),
 })
 
-/** What the PM decided on the page of the day and what Claude judged, in the project folder. */
-export function createFsTodayStore(): TodayStore {
+/**
+ * What one PM decided on the page of the day and what Claude judged for that PM: kept with the
+ * app, by project. The page of the day is of who reads it; the folder of a project is of
+ * everybody who opens it.
+ */
+export function createJsonTodayStore(dataFolder: string, projectOf: ProjectOfFolder): TodayStore {
+  const personal = createPersonalFiles(dataFolder, TODAY_AREA, projectOf)
   const settingsFile = (projectFolder: string) =>
-    join(projectFolder, PROJECT_SETTINGS_FOLDER, TODAY_FILE)
-  const evaluationFile = (projectFolder: string) => join(projectFolder, EVALUATION_FILE)
+    personal.fileOf(projectFolder, TODAY_FILE, LEGACY_SETTINGS_PATH)
+  const evaluationFile = (projectFolder: string) =>
+    personal.fileOf(projectFolder, EVALUATION_FILE, LEGACY_EVALUATION_PATH)
   return {
     async load(projectFolder): Promise<TodaySettings> {
       // A file that cannot be read as settings loses nothing of the project: the page starts over.
-      const parsed = settingsSchema.safeParse(await readJsonOr(settingsFile(projectFolder), {}))
+      const file = await settingsFile(projectFolder)
+      const parsed = settingsSchema.safeParse(await readJsonOr(file, {}))
       if (!parsed.success) return NO_TODAY_SETTINGS
       return cleanTodaySettings({
         ...parsed.data,
@@ -204,13 +213,15 @@ export function createFsTodayStore(): TodayStore {
         seen: parsed.data.seen.map((signal) => ({ ...signal, kind: signal.kind as TodayKind })),
       })
     },
-    save: (projectFolder, settings) => writeJson(settingsFile(projectFolder), settings),
+    save: async (projectFolder, settings) =>
+      writeJson(await settingsFile(projectFolder), settings, PRIVATE_FILE_MODE),
     async loadEvaluation(projectFolder): Promise<TodayEvaluation> {
-      const parsed = evaluationSchema.safeParse(await readJsonOr(evaluationFile(projectFolder), {}))
+      const file = await evaluationFile(projectFolder)
+      const parsed = evaluationSchema.safeParse(await readJsonOr(file, {}))
       return parsed.success ? parsed.data : NO_EVALUATION
     },
-    saveEvaluation: (projectFolder, evaluation) =>
-      writeJson(evaluationFile(projectFolder), evaluation),
+    saveEvaluation: async (projectFolder, evaluation) =>
+      writeJson(await evaluationFile(projectFolder), evaluation, PRIVATE_FILE_MODE),
   }
 }
 

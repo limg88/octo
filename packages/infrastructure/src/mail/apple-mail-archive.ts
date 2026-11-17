@@ -98,6 +98,8 @@ export function createAppleMailArchive(root: string = defaultAppleMailRoot()): M
   }
 
   return {
+    available: true,
+
     async between(from, to) {
       return rowsBetween(from, to).map((row): ArchivedMail => {
         const url = new URL(row.url)

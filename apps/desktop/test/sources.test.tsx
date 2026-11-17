@@ -25,11 +25,17 @@ const empty: MailSourceView = {
   config: null,
   suggestedFolder: 'raw/Mail',
   state: { cursor: null, lastRun: null },
+  readBy: null,
+  readingBy: null,
+  readableHere: true,
 }
 const configured: MailSourceView = {
   config,
   suggestedFolder: 'raw/Mail',
   state: { cursor: run.at, lastRun: run },
+  readBy: null,
+  readingBy: null,
+  readableHere: true,
 }
 
 type SourcesApi = Pick<
@@ -82,6 +88,20 @@ describe('SourcesView', () => {
       keepQuoted: true,
       targetFolder: 'raw/Mail',
     })
+  })
+
+  it('says whose mail this is on a computer that reads none', async () => {
+    const giovanni = { name: 'Giovanni', computer: 'mac-di-giovanni' }
+    const elsewhere = { ...configured, readBy: giovanni, readableHere: false }
+    const { api } = fakeApi({ mailSource: vi.fn(async () => ok(elsewhere)) })
+    render(<SourcesView api={api} project={project} now={now} />)
+
+    const who = messages.elsewhere.who(giovanni)
+    expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
+    expect(screen.getByText(messages.elsewhere.noMail)).toBeTruthy()
+    // Nothing to read from here: no way to ask for it.
+    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.mailSync })
+    expect(ask.every((button) => button.disabled)).toBe(true)
   })
 
   it('shows how fresh the mail is and reads it on request', async () => {

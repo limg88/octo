@@ -2,6 +2,7 @@ import type { MailSourceView } from '@octo/application'
 import type { MailPreview, MailSourceConfig, Project, SourceState } from '@octo/domain'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { Elsewhere } from './Elsewhere.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { SourceHeader } from './SourceHeader.tsx'
 
@@ -141,16 +142,25 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
         open={open}
         onToggle={onToggle}
         status={
-          <Freshness
-            state={view.state}
-            configured={view.config !== null}
-            busy={busy}
-            now={now()}
-            onOpenDiskAccess={openDiskAccess}
-          />
+          <>
+            <Freshness
+              state={view.state}
+              configured={view.config !== null}
+              busy={busy}
+              now={now()}
+              onOpenDiskAccess={openDiskAccess}
+            />
+            <Elsewhere
+              readBy={view.readBy}
+              readingBy={view.readingBy}
+              notHere={
+                view.config !== null && !view.readableHere ? messages.elsewhere.noMail : null
+              }
+            />
+          </>
         }
       >
-        {view.config !== null && (
+        {view.config !== null && view.readableHere && (
           <button type="button" disabled={busy} onClick={() => void sync()}>
             {messages.mailSync}
           </button>
@@ -205,7 +215,11 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
         </label>
         <div className="actions">
           <button type="submit">{messages.mailSave}</button>
-          <button type="button" disabled={busy || view.config === null} onClick={() => void sync()}>
+          <button
+            type="button"
+            disabled={busy || view.config === null || !view.readableHere}
+            onClick={() => void sync()}
+          >
             {messages.mailSync}
           </button>
           <button type="button" disabled={preview === 'loading'} onClick={() => void showPreview()}>

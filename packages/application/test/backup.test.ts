@@ -49,7 +49,7 @@ function computer(projects: Project[], readable: string[], files = memoryBackupF
 async function oldComputer() {
   const old = computer([aurora, boreale], [aurora.folder, boreale.folder])
   await old.sourceStates.set(aurora.id, 'mail', MAIL_STATE)
-  await old.indexes.save(aurora.id, 'jira', 'AUR', JIRA_ITEMS)
+  await old.indexes.save(aurora.folder, 'jira', 'AUR', JIRA_ITEMS)
   expect(await old.backups.save('/chiavetta/copia.json')).toBe(2)
   return old
 }
@@ -95,7 +95,10 @@ describe('backup and restore', () => {
     ])
     // The readings go on from where they were: nothing is read again from the start.
     expect(await fresh.sourceStates.get(aurora.id, 'mail')).toEqual(MAIL_STATE)
-    expect(await fresh.indexes.load(aurora.id, 'jira')).toEqual({ scope: 'AUR', items: JIRA_ITEMS })
+    expect(await fresh.indexes.load(aurora.folder, 'jira')).toEqual({
+      scope: 'AUR',
+      items: JIRA_ITEMS,
+    })
   })
 
   it('leaves out a project whose folder is not there, and says so', async () => {

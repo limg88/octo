@@ -16,6 +16,7 @@ import {
   NETSUITE_TIMESHEET_FOLDER,
   TRACKER_HOURS_FOLDER,
 } from '../src/index.ts'
+import { READ_HERE } from './fakes.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const NEVER: SourceState = { cursor: null, lastRun: null }
@@ -53,6 +54,8 @@ function mapWith(options: {
           : null,
         suggestedFolder: '_octo/posta',
         state: read('2026-11-15T07:00:00.000Z'),
+        ...READ_HERE,
+        readableHere: true,
       }),
     },
     meetings: {
@@ -61,6 +64,8 @@ function mapWith(options: {
         suggestedRoot: null,
         targetFolder: MEETINGS_FOLDER,
         state: options.meetings ?? NEVER,
+        ...READ_HERE,
+        readableHere: true,
       }),
     },
     feeds: {

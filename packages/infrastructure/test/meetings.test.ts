@@ -18,8 +18,8 @@ import {
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
-  createJsonSourceStates,
 } from '../src/index.ts'
+import { fsReadings, PAOLA_AT_HER_MAC } from './support/readings.ts'
 import { type FakeExport, publishDestination, writeExport } from './support/verbale-export.ts'
 
 const NOW = new Date('2026-11-14T10:00:00.000Z')
@@ -103,7 +103,7 @@ beforeAll(async () => {
   await settings.save(borea.folder, { ...NO_SOURCES, meetings: { root: `${root}/`, since: null } })
   meetings = createMeetings({
     settings,
-    states: createJsonSourceStates(join(base, 'dati')),
+    readings: fsReadings(join(base, 'dati'), { now: () => NOW }),
     exports: exportsOf(),
     projects: async () => [aurora, borea],
     files,
@@ -120,7 +120,13 @@ describe('the meetings Verbale exported, read from its folder', () => {
   it('brings the finished meeting of the project in: its texts and a description, nothing else', async () => {
     const run = await meetings.sync(aurora)
 
-    expect(run).toEqual({ at: NOW.toISOString(), written: 1, unchanged: 0, error: null })
+    expect(run).toEqual({
+      at: NOW.toISOString(),
+      written: 1,
+      unchanged: 0,
+      error: null,
+      by: PAOLA_AT_HER_MAC,
+    })
     const folder = '2026-11-10_kickoff-aurora_ab12cd34'
     expect((await readdir(join(aurora.folder, MEETINGS_FOLDER, folder))).sort()).toEqual([
       '_meta.md',

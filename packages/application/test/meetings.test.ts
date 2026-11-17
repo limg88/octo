@@ -17,7 +17,7 @@ import {
   NO_EVALUATION,
   type TodayDeps,
 } from '../src/index.ts'
-import { memorySourceStates } from './fakes.ts'
+import { memorySourceStates, PAOLA_AT_HER_MAC, READ_HERE, readingsOf } from './fakes.ts'
 
 const NOW = new Date('2026-11-16T09:00:00.000Z')
 const ROOT = '~/Verbale'
@@ -69,9 +69,10 @@ function setup(
       suggestMailFolder: async () => '',
       suggestFeedFolder: async () => '',
     },
-    states,
+    readings: readingsOf(states, { now: () => NOW }),
     exports: {
       defaultRoot: async () => ROOT,
+      readable: async () => true,
       portable: (root) => root.replace('/Users/paola', '~'),
       list: async () => {
         await gate
@@ -125,6 +126,8 @@ describe('the meetings of a project', () => {
       suggestedRoot: ROOT,
       targetFolder: MEETINGS_FOLDER,
       state: NEVER_READ,
+      ...READ_HERE,
+      readableHere: true,
     })
     // However it is typed, it is kept in the one form two projects are compared by.
     const saved = await meetings.save(aurora, { root: '/Users/paola/Verbale', since: null })
@@ -156,6 +159,7 @@ describe('the meetings of a project', () => {
       written: 0,
       unchanged: 0,
       error: 'meetings_root_unreadable',
+      by: PAOLA_AT_HER_MAC,
     })
     expect(await unreadable.meetings.unassigned(aurora)).toEqual([])
 
@@ -277,7 +281,15 @@ describe('the recorded meetings on the page of the day', () => {
         settings: notSet('alignment_sprint_not_set'),
       },
       deliverables: { list: async () => [] },
-      sources: { mail: async () => ({ config: null, suggestedFolder: '', state: NEVER_READ }) },
+      sources: {
+        mail: async () => ({
+          config: null,
+          suggestedFolder: '',
+          state: NEVER_READ,
+          ...READ_HERE,
+          readableHere: true,
+        }),
+      },
       feeds: {
         view: async (_project, feed) => ({
           feed,
@@ -285,6 +297,7 @@ describe('the recorded meetings on the page of the day', () => {
           suggestedFolder: '',
           hasSecret: false,
           state: NEVER_READ,
+          ...READ_HERE,
         }),
       },
       ...(meetings ? { meetings } : {}),

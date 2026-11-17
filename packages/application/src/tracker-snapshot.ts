@@ -2,6 +2,7 @@ import {
   assignedToOwnPeople,
   cleanDashboardSettings,
   DomainError,
+  isDomainError,
   type Project,
   type ProjectTeam,
   parseTrackerExport,
@@ -20,6 +21,7 @@ import type {
   TrackerExports,
   TrackerSnapshotReader,
 } from './ports.ts'
+import type { Readings } from './readings.ts'
 
 export type TrackerSnapshotsDeps = {
   settings: DashboardSettingsStore
@@ -32,7 +34,14 @@ export type TrackerSnapshotsDeps = {
   /** With these, the tracker is read again by itself when its reading is old enough. */
   exports?: Pick<TrackerExports, 'readJson'>
   clock?: Clock
+  /**
+   * The turns of the readings: with them the tracker is read by one computer at a time among
+   * those that share the folder of the project.
+   */
+  readings?: Pick<Readings, 'exclusive' | 'busyElsewhere'>
 }
+
+const SOURCE = 'tracker'
 
 /** A reading younger than this is not asked again by the periodic one. */
 export const TRACKER_REFRESH_MS = 60 * 60 * 1000
@@ -119,7 +128,9 @@ export function createTrackerSnapshots(deps: TrackerSnapshotsDeps): TrackerSnaps
     if (running.has(project.id)) throw new DomainError('source_busy', 'ado')
     running.add(project.id)
     try {
-      return await read(project)
+      return await (deps.readings
+        ? deps.readings.exclusive(project, SOURCE, () => read(project))
+        : read(project))
     } finally {
       running.delete(project.id)
     }
@@ -148,7 +159,14 @@ export function createTrackerSnapshots(deps: TrackerSnapshotsDeps): TrackerSnaps
       const last = await readAt(project)
       const now = (deps.clock?.now() ?? new Date()).getTime()
       if (last !== null && now - last < olderThanMs) return null
-      return guarded(project)
+      // Another computer is reading it right now: its reading is the one the dashboard will use.
+      if (await deps.readings?.busyElsewhere(project, SOURCE)) return null
+      try {
+        return await guarded(project)
+      } catch (error) {
+        if (isDomainError(error) && error.code === 'source_busy_elsewhere') return null
+        throw error
+      }
     },
   }
 }

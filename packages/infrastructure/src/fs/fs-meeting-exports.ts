@@ -144,6 +144,12 @@ export function createFsMeetingExports(options: MeetingExportsOptions): MeetingE
 
     portable: (root) => shortened(resolve(expanded(root))),
 
+    readable: (root) =>
+      stat(expanded(root)).then(
+        (info) => info.isDirectory(),
+        () => false,
+      ),
+
     async list(root) {
       const folder = expanded(root)
       const entries = await readdir(folder, { withFileTypes: true }).catch(() => {

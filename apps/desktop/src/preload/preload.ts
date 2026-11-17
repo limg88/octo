@@ -9,6 +9,7 @@ const api: OctoApi = {
   addProject: () => ipcRenderer.invoke(CHANNELS.projectsAdd),
   removeProject: (projectId) => ipcRenderer.invoke(CHANNELS.projectsRemove, { projectId }),
   restoreProject: (projectId) => ipcRenderer.invoke(CHANNELS.projectsRestore, { projectId }),
+  relocateProject: (projectId) => ipcRenderer.invoke(CHANNELS.projectsRelocate, { projectId }),
   chooseProjectPath: (projectId, what, extensions) =>
     ipcRenderer.invoke(CHANNELS.projectsChoosePath, { projectId, what, extensions }),
   listQuestions: (projectId) => ipcRenderer.invoke(CHANNELS.questionsList, { projectId }),
@@ -159,6 +160,8 @@ const api: OctoApi = {
   },
   session: () => ipcRenderer.invoke(CHANNELS.sessionGet),
   signIn: () => ipcRenderer.invoke(CHANNELS.sessionSignIn),
+  configureSignIn: (tenantId, clientId) =>
+    ipcRenderer.invoke(CHANNELS.sessionConfigure, { tenantId, clientId }),
   cancelSignIn: () => ipcRenderer.invoke(CHANNELS.sessionCancel),
   signOut: () => ipcRenderer.invoke(CHANNELS.sessionSignOut),
   todayView: (projectId) => ipcRenderer.invoke(CHANNELS.todayView, { projectId }),

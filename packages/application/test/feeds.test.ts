@@ -9,10 +9,13 @@ import { describe, expect, it } from 'vitest'
 import { createFeeds } from '../src/index.ts'
 import {
   memoryFeedIndexes,
+  memorySharedReadings,
   memorySourceSettings,
   memorySourceStates,
   memoryVault,
   memoryWriter,
+  PAOLA_AT_HER_MAC,
+  readingsOf,
   removerOf,
   scriptedFeed,
 } from './fakes.ts'
@@ -48,9 +51,10 @@ function setup(
   const secrets = memoryVault()
   const reader = scriptedFeed(script)
   const states = memorySourceStates()
+  const shared = memorySharedReadings()
   const feeds = createFeeds({
     settings: memorySourceSettings({ ...NO_SOURCES, ado: initial }),
-    states,
+    readings: readingsOf(states, { now: () => NOW }, { shared }),
     indexes: memoryFeedIndexes(),
     secrets,
     reader,
@@ -58,7 +62,7 @@ function setup(
     files: removerOf(writer.files),
     clock: { now: () => NOW },
   })
-  return { feeds, writer, secrets, reader, states, script }
+  return { feeds, writer, secrets, reader, states, shared, script }
 }
 
 describe('configuring a feed', () => {
@@ -122,6 +126,7 @@ describe('reading a feed', () => {
       written: 3,
       unchanged: 0,
       error: null,
+      by: PAOLA_AT_HER_MAC,
     })
     expect(reader.cursors).toEqual([null])
     expect(writer.files.get('Fonti/ADO/_lettura.md')).toContain(
@@ -158,7 +163,7 @@ describe('reading a feed', () => {
     // Another computer: the same project folder, no index and no cursor.
     const fresh = createFeeds({
       settings: memorySourceSettings({ ...NO_SOURCES, ado: config }),
-      states: memorySourceStates(),
+      readings: readingsOf(memorySourceStates(), { now: () => NOW }),
       indexes: memoryFeedIndexes(),
       secrets,
       reader: scriptedFeed(script),
@@ -188,7 +193,7 @@ describe('reading a feed', () => {
   })
 
   it('keeps what a reading wrote before it failed, and goes on from there', async () => {
-    const { feeds, writer, secrets, reader, script, states } = setup({
+    const { feeds, writer, secrets, reader, script, shared } = setup({
       steps: [step({ files: [file('1', 'a')], cursor: { at: 1 } })],
       fails: new DomainError('feed_unreachable'),
     })
@@ -199,7 +204,8 @@ describe('reading a feed', () => {
       error: 'feed_unreachable',
     })
     expect(writer.files.has('Fonti/ADO/1.md')).toBe(true)
-    expect(states.all().get('p-1/ado')?.cursor).toBe('{"at":1}')
+    // How far it got is told to the folder: any computer that shares it goes on from there.
+    expect(shared.all.get(`${project.folder}/ado`)?.cursor).toBe('{"at":1}')
 
     delete script.fails
     script.steps = []

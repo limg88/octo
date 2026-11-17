@@ -21,6 +21,7 @@ import {
   memorySourceStates,
   memoryVault,
   memoryWriter,
+  readingsOf,
   removerOf,
   steppingClock,
 } from './fakes.ts'
@@ -116,7 +117,7 @@ describe('the company system read as who is signed in', () => {
     const settings = memorySourceSettings({ ...NO_SOURCES, dwsi })
     const feeds = createFeeds({
       settings,
-      states: memorySourceStates(),
+      readings: readingsOf(memorySourceStates(), { now: () => NOW }),
       indexes: memoryFeedIndexes(),
       secrets,
       reader,
@@ -218,6 +219,7 @@ describe('the mail of a conversation of the project', () => {
       createSources({
         settings: memorySourceSettings({ ...NO_SOURCES, mail: config }),
         states: memorySourceStates(),
+        readings: readingsOf(memorySourceStates(), { now: () => NOW }),
         archive: archiveOf(mails),
         writer,
         clock: { now: () => NOW },

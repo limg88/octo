@@ -1,6 +1,13 @@
 import { mkdir, readFile, realpath, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import type { FeedIndexes, MemoryWriter, SourceSettings, SourceStates } from '@octo/application'
+import type {
+  FeedIndexes,
+  LegacyFeedIndexes,
+  MemoryWriter,
+  SharedReadings,
+  SourceSettings,
+  SourceStates,
+} from '@octo/application'
 import {
   cleanFeedConfig,
   cleanMailSource,
@@ -8,17 +15,24 @@ import {
   DOMAIN_ERROR_CODES,
   DomainError,
   type FeedName,
+  mergeSources,
   NEVER_READ,
+  NEVER_SHARED,
+  NO_PERSONAL_SOURCES,
   NO_SOURCES,
   OCTO_FOLDER,
+  type PersonalSources,
   SETTINGS_FOLDER,
   type SourceState,
   type SourcesConfig,
+  STATE_FOLDER,
+  splitSources,
   UNCITABLE_FOLDERS,
   WAREHOUSE_TLS_MODES,
 } from '@octo/domain'
 import { z } from 'zod'
 import { isMissing, readJsonOr, writeAtomic, writeJson } from './json-file.ts'
+import type { ProjectOfFolder } from './personal-files.ts'
 
 const mailSchema = z.object({
   since: z.string(),
@@ -77,19 +91,30 @@ const indexSchema = z.object({
   items: z.record(z.string(), z.object({ version: z.string(), path: z.string() })),
 })
 
-const stateSchema = z.object({
-  cursor: z.string().nullable(),
-  lastRun: z
-    .object({
-      at: z.string(),
-      written: z.number(),
-      unchanged: z.number(),
-      error: z.enum(DOMAIN_ERROR_CODES).nullable(),
-    })
-    .nullable(),
+const readerSchema = z.object({ name: z.string(), computer: z.string() })
+
+const runSchema = z.object({
+  at: z.string(),
+  written: z.number(),
+  unchanged: z.number(),
+  error: z.enum(DOMAIN_ERROR_CODES).nullable(),
+  by: readerSchema.optional(),
 })
 
+const stateSchema = z.object({ cursor: z.string().nullable(), lastRun: runSchema.nullable() })
+
 const statesSchema = z.record(z.string(), stateSchema)
+
+const sharedSchema = z.object({
+  cursor: z.string().nullable().default(null),
+  lastRun: runSchema.nullable().default(null),
+  lease: z.object({ by: readerSchema, until: z.string() }).nullable().default(null),
+})
+
+const personalSchema = z.object({
+  meetings: z.object({ root: z.string() }).optional(),
+  feeds: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+})
 
 /** Octo's settings of a project: with the rest of what Octo writes, under its own folder. */
 export const PROJECT_SETTINGS_FOLDER = SETTINGS_FOLDER
@@ -104,6 +129,9 @@ const FEED_FOLDERS: Readonly<Record<FeedName, string>> = {
   dwsi: 'NetSuite',
 }
 const INDEXES_FOLDER = 'feeds'
+const PERSONAL_SOURCES_FOLDER = 'personal-sources'
+const INDEX_SUFFIX = '.indice.json'
+const READING_SUFFIX = '.json'
 /** Tells git to leave Octo's folder alone: a versioned project is never dirtied by Octo. */
 const GIT_IGNORE = { name: '.gitignore', content: '*\n' }
 /**
@@ -204,16 +232,112 @@ export function createJsonSourceStates(dataFolder: string): SourceStates {
   }
 }
 
-/** What each feed wrote from this computer: kept in the app's data folder, beside the cursors. */
-export function createJsonFeedIndexes(dataFolder: string): FeedIndexes {
-  const folderOf = (projectId: string) =>
-    join(dataFolder, INDEXES_FOLDER, encodeURIComponent(projectId))
-  const fileOf = (projectId: string, feed: FeedName) => join(folderOf(projectId), `${feed}.json`)
+/** Where the folder of a project keeps what it knows of its own readings. */
+const stateFile = (projectFolder: string, name: string): string =>
+  join(projectFolder, ...STATE_FOLDER.split('/'), name)
+
+/**
+ * JSON a folder shared between computers holds. A file a sync client left half way, or one that
+ * is no longer what Octo wrote, reads as nothing: the next reading writes it again.
+ */
+async function sharedJson(file: string): Promise<unknown> {
+  try {
+    return await readJsonOr(file, null)
+  } catch (error) {
+    if (error instanceof SyntaxError) return null
+    throw error
+  }
+}
+
+/** What the folder of a project knows of the readings of each source, one small file each. */
+export function createFsSharedReadings(): SharedReadings {
+  const fileOf = (projectFolder: string, source: string) =>
+    stateFile(projectFolder, `${source}${READING_SUFFIX}`)
   return {
-    load: async (projectId, feed) =>
-      indexSchema.parse(await readJsonOr(fileOf(projectId, feed), { scope: null, items: {} })),
-    save: (projectId, feed, scope, items) =>
-      writeJson(fileOf(projectId, feed), { scope, items }, PRIVATE_FILE_MODE),
-    removeProject: (projectId) => rm(folderOf(projectId), { recursive: true, force: true }),
+    async get(projectFolder, source) {
+      const parsed = sharedSchema.safeParse(await sharedJson(fileOf(projectFolder, source)))
+      return parsed.success ? parsed.data : NEVER_SHARED
+    },
+    set: (projectFolder, source, reading) => writeJson(fileOf(projectFolder, source), reading),
+  }
+}
+
+/** What each feed wrote in a project, in the folder of the project. */
+export function createFsFeedIndexes(): FeedIndexes {
+  const fileOf = (projectFolder: string, feed: FeedName) =>
+    stateFile(projectFolder, `${feed}${INDEX_SUFFIX}`)
+  return {
+    async load(projectFolder, feed) {
+      const parsed = indexSchema.safeParse(await sharedJson(fileOf(projectFolder, feed)))
+      return parsed.success ? parsed.data : { scope: null, items: {} }
+    },
+    save: (projectFolder, feed, scope, items) =>
+      writeJson(fileOf(projectFolder, feed), { scope, items }),
+  }
+}
+
+/** What each feed wrote, as an Octo from before a folder could be shared kept it on this computer. */
+export function createLegacyFeedIndexes(dataFolder: string): LegacyFeedIndexes {
+  const fileOf = (projectId: string, feed: FeedName) =>
+    join(dataFolder, INDEXES_FOLDER, encodeURIComponent(projectId), `${feed}.json`)
+  return {
+    async load(projectId, feed) {
+      const parsed = indexSchema.safeParse(
+        await readJsonOr(fileOf(projectId, feed), null).catch(() => null),
+      )
+      return parsed.success ? parsed.data : { scope: null, items: {} }
+    },
+    remove: (projectId, feed) => rm(fileOf(projectId, feed), { force: true }),
+  }
+}
+
+/** What of the sources of a project is of who reads them here: kept with the app, by project. */
+export type PersonalSourcesStore = {
+  load(projectFolder: string): Promise<PersonalSources>
+  save(projectFolder: string, personal: PersonalSources): Promise<void>
+}
+
+export function createJsonPersonalSources(
+  dataFolder: string,
+  projectOf: ProjectOfFolder,
+): PersonalSourcesStore {
+  const fileOf = async (projectFolder: string): Promise<string | null> => {
+    const project = await projectOf(projectFolder)
+    return project === null
+      ? null
+      : join(dataFolder, PERSONAL_SOURCES_FOLDER, `${encodeURIComponent(project.id)}.json`)
+  }
+  return {
+    async load(projectFolder) {
+      const file = await fileOf(projectFolder)
+      if (file === null) return NO_PERSONAL_SOURCES
+      const parsed = personalSchema.safeParse(await readJsonOr(file, {}))
+      return parsed.success ? parsed.data : NO_PERSONAL_SOURCES
+    },
+    async save(projectFolder, personal) {
+      const file = await fileOf(projectFolder)
+      if (file !== null) await writeJson(file, personal, PRIVATE_FILE_MODE)
+    },
+  }
+}
+
+/**
+ * The sources of a project as one person reads them on one computer. The folder holds what is
+ * of the project; the account each system is entered with and the folder of Verbale are kept
+ * with the app, so two people share a project without changing each other's.
+ */
+export function createSplitSourceSettings(
+  shared: SourceSettings,
+  personal: PersonalSourcesStore,
+): SourceSettings {
+  return {
+    ...shared,
+    load: async (projectFolder) =>
+      mergeSources(await shared.load(projectFolder), await personal.load(projectFolder)),
+    async save(projectFolder, config) {
+      const split = splitSources(config, await shared.load(projectFolder))
+      await personal.save(projectFolder, split.personal)
+      await shared.save(projectFolder, split.shared)
+    },
   }
 }

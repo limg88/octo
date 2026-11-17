@@ -115,6 +115,9 @@ describe('the mail of a new project', () => {
     config: null,
     suggestedFolder: 'Posta',
     state: { cursor: null, lastRun: null },
+    readBy: null,
+    readingBy: null,
+    readableHere: true,
   }
   const base = {
     mailSource: vi.fn(async () => ok(empty)),
@@ -162,6 +165,8 @@ describe('choosing a project and its areas instead of typing them', () => {
     suggestedFolder: `Fonti/${feed}`,
     hasSecret: false,
     state: { cursor: null, lastRun: null },
+    readBy: null,
+    readingBy: null,
   })
   const apiWith = (feed: 'ado' | 'jira' | 'dwsi', choices: Result<FeedChoices>) =>
     ({

@@ -21,6 +21,7 @@ import type {
   ProgressFile,
   ProgressView,
   ProjectOverview,
+  ReadingView,
   Reminder,
   SessionView,
   TodayView,
@@ -56,7 +57,6 @@ import type {
   RiskChange,
   RiskRegister,
   SourceRun,
-  SourceState,
   StoredMeeting,
   TemplateFormat,
   TodayItem,
@@ -77,6 +77,7 @@ export const CHANNELS = {
   projectsAdd: 'projects:add',
   projectsRemove: 'projects:remove',
   projectsRestore: 'projects:restore',
+  projectsRelocate: 'projects:relocate',
   projectsChoosePath: 'projects:choose-path',
   questionsList: 'questions:list',
   questionsAsk: 'questions:ask',
@@ -168,6 +169,7 @@ export const CHANNELS = {
   sourcesChanged: 'sources:changed',
   sessionGet: 'session:get',
   sessionSignIn: 'session:sign-in',
+  sessionConfigure: 'session:configure',
   sessionCancel: 'session:cancel',
   sessionSignOut: 'session:sign-out',
   todayView: 'today:view',
@@ -226,6 +228,11 @@ export type OctoApi = {
   ): Promise<Result<string | null>>
   /** Puts back, as it was, a project taken off the list. */
   restoreProject(projectId: string): Promise<Result<Project>>
+  /**
+   * Lets the PM say where the folder of a project is now, after it was moved: the project stays
+   * the same. Null when the PM closes the dialog.
+   */
+  relocateProject(projectId: string): Promise<Result<Project | null>>
   listQuestions(projectId: string): Promise<Result<QuestionRecord[]>>
   /** The newer Octo there is for this computer; null when this one is the latest. */
   checkForUpdate(): Promise<Result<UpdateOffer | null>>
@@ -296,7 +303,7 @@ export type OctoApi = {
     secret: string | null,
   ): Promise<Result<FeedView>>
   syncFeed(projectId: string, feed: FeedName): Promise<Result<SourceRun>>
-  documentsState(projectId: string): Promise<Result<SourceState>>
+  documentsState(projectId: string): Promise<Result<ReadingView>>
   /** Writes the text of the Office and PDF files of the project beside them, now. */
   convertDocuments(projectId: string): Promise<Result<SourceRun>>
   /** The kinds Octo ships with, then the ones the PM defined for this project. */
@@ -452,6 +459,8 @@ export type OctoApi = {
   session(): Promise<Result<SessionView>>
   /** Opens the organization's sign-in in the system's browser and waits for it to come back. */
   signIn(): Promise<Result<SessionView>>
+  /** Tells an Octo just installed where the organization signs in, with the two ids it gives. */
+  configureSignIn(tenantId: string, clientId: string): Promise<Result<SessionView>>
   cancelSignIn(): Promise<Result<null>>
   signOut(): Promise<Result<SessionView>>
   /** The page of the day of a project: what the code computed, with what Claude last judged. */

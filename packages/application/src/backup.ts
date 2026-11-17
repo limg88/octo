@@ -14,6 +14,7 @@ import type {
   FeedIndexes,
   FolderProbe,
   ProjectRegistry,
+  QuestionLog,
   SourceName,
   SourceStates,
 } from './ports.ts'
@@ -27,6 +28,8 @@ export type BackupsDeps = {
   folders: FolderProbe
   files: BackupFiles
   clock: Clock
+  /** The questions of who uses this computer: they are with the app, so the backup takes them. */
+  questions?: QuestionLog
 }
 
 /** A backup that was opened, and the projects whose folder has to be pointed at by hand. */
@@ -51,10 +54,16 @@ export function createBackups(deps: BackupsDeps): Backups {
   async function entryOf(project: Project): Promise<BackupProject> {
     const feeds: BackupProject['feeds'] = {}
     for (const feed of FEED_NAMES) {
-      const index = await deps.indexes.load(project.id, feed)
+      const index = await deps.indexes.load(project.folder, feed)
       if (index.scope !== null) feeds[feed] = { scope: index.scope, items: index.items }
     }
-    return { project, sources: await deps.sourceStates.ofProject(project.id), feeds }
+    const questions = (await deps.questions?.list(project.folder)) ?? []
+    return {
+      project,
+      sources: await deps.sourceStates.ofProject(project.id),
+      feeds,
+      ...(questions.length > 0 ? { questions } : {}),
+    }
   }
 
   const isHere = (entry: BackupProject, projects: readonly Project[], folder: string): boolean =>
@@ -85,7 +94,7 @@ export function createBackups(deps: BackupsDeps): Backups {
     return { backup, toLocate }
   }
 
-  async function putReadings(entry: BackupProject): Promise<void> {
+  async function putReadings(entry: BackupProject, folder: string): Promise<void> {
     const { id } = entry.project
     for (const source of SOURCE_NAMES) {
       const state = entry.sources[source]
@@ -93,8 +102,18 @@ export function createBackups(deps: BackupsDeps): Backups {
     }
     for (const feed of FEED_NAMES) {
       const index = entry.feeds[feed]
-      if (index) await deps.indexes.save(id, feed, index.scope, index.items)
+      // The folder knows what its feeds wrote: what it says is newer than any backup.
+      const held = await deps.indexes.load(folder, feed)
+      if (index && held.scope === null)
+        await deps.indexes.save(folder, feed, index.scope, index.items)
     }
+  }
+
+  /** The questions of the backup, unless this computer already holds some for the project. */
+  async function putQuestions(folder: string, entry: BackupProject): Promise<void> {
+    const questions = entry.questions ?? []
+    if (!deps.questions || (await deps.questions.list(folder)).length > 0) return
+    for (const question of questions) await deps.questions.append(folder, question)
   }
 
   async function restore(
@@ -102,6 +121,7 @@ export function createBackups(deps: BackupsDeps): Backups {
     folders: Readonly<Record<string, string>>,
   ): Promise<RestoreOutcome> {
     const outcome: RestoreOutcome = { restored: [], alreadyHere: [], skipped: [] }
+    const asked: Array<{ folder: string; entry: BackupProject }> = []
     let projects = await deps.registry.list()
     for (const entry of backup.projects) {
       const folder = folders[entry.project.id] ?? entry.project.folder
@@ -110,12 +130,15 @@ export function createBackups(deps: BackupsDeps): Backups {
       } else if (!(await deps.folders.isReadableFolder(folder))) {
         outcome.skipped.push(entry.project.name)
       } else {
-        await putReadings(entry)
+        await putReadings(entry, folder)
         projects = [...projects, { ...entry.project, folder }]
         outcome.restored.push(entry.project.name)
+        asked.push({ folder, entry })
       }
     }
     await deps.registry.save(projects)
+    // After the list: the questions are kept by project, and the project has to be in it.
+    for (const { folder, entry } of asked) await putQuestions(folder, entry)
     return outcome
   }
 

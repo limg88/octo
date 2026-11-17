@@ -1,14 +1,15 @@
 import type { SessionView } from '@octo/application'
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 
 type Props = {
-  api: Pick<OctoApi, 'signIn' | 'cancelSignIn'>
+  api: Pick<OctoApi, 'signIn' | 'cancelSignIn' | 'configureSignIn'>
   /** Null while Octo is still finding out whether somebody is signed in. */
   session: SessionView | null
   error: ErrorCode | null
+  /** Told the session as it is after a sign-in, or after Octo learnt where to sign in. */
   onSignedIn: (session: SessionView) => void
 }
 
@@ -18,12 +19,22 @@ const text = messages.session
 export function SignIn({ api, session, error, onSignedIn }: Props) {
   const [waiting, setWaiting] = useState(false)
   const [failure, setFailure] = useState<ErrorCode | null>(null)
+  const [tenantId, setTenantId] = useState('')
+  const [clientId, setClientId] = useState('')
 
   async function signIn() {
     setWaiting(true)
     setFailure(null)
     const result = await api.signIn()
     setWaiting(false)
+    if (result.ok) onSignedIn(result.value)
+    else setFailure(result.code)
+  }
+
+  async function configure(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFailure(null)
+    const result = await api.configureSignIn(tenantId, clientId)
     if (result.ok) onSignedIn(result.value)
     else setFailure(result.code)
   }
@@ -41,9 +52,40 @@ export function SignIn({ api, session, error, onSignedIn }: Props) {
           {session === null ? (
             <p className="progress">{text.checking}</p>
           ) : !session.configured ? (
-            <p className="warning" role="alert">
-              {text.notConfigured}
-            </p>
+            <form className="source-form" onSubmit={(event) => void configure(event)}>
+              <p>{text.notConfigured}</p>
+              <label>
+                {text.tenantId}
+                <input
+                  value={tenantId}
+                  spellCheck={false}
+                  onChange={(event) => setTenantId(event.target.value)}
+                />
+              </label>
+              <label>
+                {text.clientId}
+                <input
+                  value={clientId}
+                  spellCheck={false}
+                  onChange={(event) => setClientId(event.target.value)}
+                />
+              </label>
+              <p className="hint">{text.whereToFind}</p>
+              {failure && (
+                <p className="warning" role="alert">
+                  {errorText(failure)}
+                </p>
+              )}
+              <div className="actions">
+                <button
+                  type="submit"
+                  className="primary"
+                  disabled={tenantId.trim() === '' || clientId.trim() === ''}
+                >
+                  {text.configure}
+                </button>
+              </div>
+            </form>
           ) : (
             <>
               <p>{text.body}</p>

@@ -13,6 +13,12 @@ export const OCTO_FOLDER = '_octo'
 export const PRIVATE_FOLDER = `${OCTO_FOLDER}/.riservato`
 /** Octo's settings of a project: not a source either. */
 export const SETTINGS_FOLDER = `${OCTO_FOLDER}/.impostazioni`
+/**
+ * What the folder knows of its own readings: who read each source last, from where the next
+ * reading goes on, what each system left in the project. Shared by every computer that opens the
+ * folder, and not a source.
+ */
+export const STATE_FOLDER = `${OCTO_FOLDER}/.stato`
 export const EXTRACTED_TEXT_FOLDER = `${OCTO_FOLDER}/testo`
 const TEXT_SUFFIX = '.md'
 
@@ -45,9 +51,43 @@ function stampLines(stamp: SourceFileStamp, extractor: string): string[] {
   ]
 }
 
-/** Whether a text already written was made from this very file by this extractor. */
+const SECOND_MS = 1000
+
+/**
+ * Whether two dates of a file are the same date: equal, or one of them is the other as a folder
+ * kept in step between computers gives it to a copy, to the whole second and without the
+ * fraction the first disk kept. Two dates that both keep their fraction are two writings.
+ */
+function sameModified(written: number, now: number): boolean {
+  if (written === now) return true
+  const toTheSecond = written % SECOND_MS === 0 || now % SECOND_MS === 0
+  return toTheSecond && Math.abs(written - now) < SECOND_MS
+}
+
+const MODIFIED_LINE = /^origine-modificata: (".*")$/m
+
+/** The date a text says its original had; null when the text does not say one. */
+function modifiedIn(text: string): number | null {
+  const line = MODIFIED_LINE.exec(text)?.[1]
+  if (line === undefined) return null
+  try {
+    const at = Date.parse(String(JSON.parse(line)))
+    return Number.isNaN(at) ? null : at
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether a text already written was made from this very file by this extractor: the same path,
+ * the same size, the same extractor, and a date that is the same but for what a copy loses.
+ */
 export function isCurrentText(text: string, stamp: SourceFileStamp, extractor: string): boolean {
-  return text.includes(`${stampLines(stamp, extractor).join('\n')}\n`)
+  const [path, , size, by] = stampLines(stamp, extractor)
+  const written = modifiedIn(text)
+  if (written === null) return false
+  const sameFile = [path, size, by].every((line) => text.includes(`${line}\n`))
+  return sameFile && sameModified(written, Date.parse(stamp.modifiedAt))
 }
 
 function headingOf(locator: Locator): string | null {

@@ -6,6 +6,7 @@ import type {
   FeedingStep,
   FeedView,
   MailSourceView,
+  ReadingView,
   SessionView,
   TodayView,
 } from '@octo/application'
@@ -100,18 +101,30 @@ const documentsRun: SourceRun = {
   error: null,
 }
 
+/** The documents as a folder nobody else opens shows them. */
+const documentsView = (state: SourceState): ReadingView => ({
+  state,
+  readBy: null,
+  readingBy: null,
+})
+
 const feedView = (feed: FeedName): FeedView => ({
   feed,
   config: null,
   suggestedFolder: `Fonti/${feed}`,
   hasSecret: false,
   state: { cursor: null, lastRun: null },
+  readBy: null,
+  readingBy: null,
 })
 
 const mailView: MailSourceView = {
   config: null,
   suggestedFolder: 'Posta',
   state: { cursor: null, lastRun: null },
+  readBy: null,
+  readingBy: null,
+  readableHere: true,
 }
 
 const signedIn: SessionView = {
@@ -164,6 +177,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     addProject: vi.fn(async () => ok<Project | null>(boreale)),
     removeProject: vi.fn(async () => ok(null)),
     restoreProject: vi.fn(async () => ok(boreale)),
+    relocateProject: vi.fn(async () => ok<Project | null>(null)),
     listQuestions: vi.fn(async () => ok<QuestionRecord[]>([])),
     ask: vi.fn(async () => ok(answered)),
     cancelAsk: vi.fn(async () => ok(null)),
@@ -179,6 +193,9 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
         suggestedRoot: null,
         targetFolder: '_octo/riunioni',
         state: { cursor: null, lastRun: null },
+        readBy: null,
+        readingBy: null,
+        readableHere: true,
       }),
     ),
     saveMeetingsSource: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
@@ -306,6 +323,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     session: vi.fn(async () => ok(signedIn)),
     signIn: vi.fn(async () => ok(signedIn)),
     cancelSignIn: vi.fn(async () => ok(null)),
+    configureSignIn: vi.fn(async () => ok(signedIn)),
     signOut: vi.fn(async () => ok({ identity: null, configured: true })),
     todayView: vi.fn(async () => ok(emptyToday)),
     markTodaySeen: vi.fn(async () => ok(null)),
@@ -342,7 +360,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     feed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
     saveFeed: vi.fn(async (_projectId: string, feed: FeedName) => ok(feedView(feed))),
     syncFeed: vi.fn(async () => ok(documentsRun)),
-    documentsState: vi.fn(async () => ok<SourceState>({ cursor: null, lastRun: null })),
+    documentsState: vi.fn(async () => ok(documentsView({ cursor: null, lastRun: null }))),
     convertDocuments: vi.fn(async () => ok(documentsRun)),
     onSourcesChanged: () => () => {},
     ...overrides,
@@ -576,6 +594,35 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(await screen.findByRole('region', { name: messages.guideTitle })).toBeTruthy()
+  })
+
+  it('points a project at the folder it was moved to, keeping it the same project', async () => {
+    const moved = { ...boreale, folder: '/OneDrive/Boreale' }
+    const { api } = fakeApi({
+      listProjects: async () => ok([aurora, boreale]),
+      relocateProject: vi
+        .fn<OctoApi['relocateProject']>()
+        .mockResolvedValueOnce(ok(null))
+        .mockResolvedValueOnce({ ok: false, code: 'project_already_added' })
+        .mockResolvedValue(ok(moved)),
+    })
+    render(<App api={api} />)
+    const dialog = await openManage()
+    const relocate = () =>
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: messages.manage.relocateOf('Boreale') }),
+      )
+
+    // The PM closes the dialog of the system: nothing changes.
+    relocate()
+    await waitFor(() => expect(api.relocateProject).toHaveBeenCalledWith(boreale.id))
+    expect(within(dialog).getByText(boreale.folder)).toBeTruthy()
+
+    relocate()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+
+    relocate()
+    expect(await within(dialog).findByText('/OneDrive/Boreale')).toBeTruthy()
   })
 
   it('takes a project off only after a confirmation, and puts it back', async () => {
@@ -960,8 +1007,8 @@ describe('documents of a project', () => {
   it('shows when they were last converted and converts them on request', async () => {
     const state = vi
       .fn<OctoApi['documentsState']>()
-      .mockResolvedValueOnce(ok({ cursor: null, lastRun: null }))
-      .mockResolvedValue(ok({ cursor: documentsRun.at, lastRun: documentsRun }))
+      .mockResolvedValueOnce(ok(documentsView({ cursor: null, lastRun: null })))
+      .mockResolvedValue(ok(documentsView({ cursor: documentsRun.at, lastRun: documentsRun })))
     const { api } = fakeApi({ documentsState: state })
     render(<App api={api} />)
     fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
@@ -973,10 +1020,24 @@ describe('documents of a project', () => {
     expect(api.convertDocuments).toHaveBeenCalledWith('p-1')
   })
 
+  it('says who converted them from another computer, and who is converting now', async () => {
+    const giovanni = { name: 'Giovanni', computer: 'mac-di-giovanni' }
+    const state = { cursor: null, lastRun: { ...documentsRun, by: giovanni } }
+    const { api } = fakeApi({
+      documentsState: async () => ok({ state, readBy: giovanni, readingBy: giovanni }),
+    })
+    render(<App api={api} />)
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sourcesTab }))
+
+    const who = messages.elsewhere.who(giovanni)
+    expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
+    expect(screen.getByText(messages.elsewhere.reading(who))).toBeTruthy()
+  })
+
   it('explains a conversion that failed or could not start', async () => {
     const failed = { ...documentsRun, error: 'source_config_invalid' as const }
     const { api } = fakeApi({
-      documentsState: async () => ok({ cursor: null, lastRun: failed }),
+      documentsState: async () => ok(documentsView({ cursor: null, lastRun: failed })),
       convertDocuments: async () => ({ ok: false, code: 'source_busy' }),
     })
     render(<App api={api} />)

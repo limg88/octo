@@ -13,6 +13,8 @@ import {
   memorySourceSettings,
   memorySourceStates,
   memoryWriter,
+  PAOLA_AT_HER_MAC,
+  readingsOf,
 } from './fakes.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -54,12 +56,14 @@ function setup(mails: FakeArchivedMail[] | Error, initial: MailSourceConfig | nu
   const writer = memoryWriter()
   const states = memorySourceStates()
   let now = NOW
+  const clock = { now: () => now }
   const sources = createSources({
     settings: memorySourceSettings({ ...NO_SOURCES, mail: initial }),
     states,
+    readings: readingsOf(states, clock),
     archive,
     writer,
-    clock: { now: () => now },
+    clock,
   })
   return { sources, archive, writer, states, setNow: (next: Date) => (now = next) }
 }
@@ -82,7 +86,13 @@ describe('reading the mail of a project', () => {
 
     const run = await sources.syncMail(project)
 
-    expect(run).toEqual({ at: NOW.toISOString(), written: 1, unchanged: 0, error: null })
+    expect(run).toEqual({
+      at: NOW.toISOString(),
+      written: 1,
+      unchanged: 0,
+      error: null,
+      by: PAOLA_AT_HER_MAC,
+    })
     expect(archive.windows[0]).toEqual({ from: new Date('2026-11-01T00:00:00Z'), to: NOW })
     expect([...writer.files.keys()]).toEqual([
       expect.stringMatching(/^Posta\/2026-11\/2026-11-11_/),

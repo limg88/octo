@@ -268,6 +268,15 @@ export function App({ api, notify = systemNotify }: Props) {
     setRemoved(project)
   }
 
+  async function relocateProject(project: Project) {
+    setError(null)
+    const result = await api.relocateProject(project.id)
+    if (!result.ok) return setError(result.code)
+    const moved = result.value
+    if (moved === null) return
+    setProjects((previous) => previous.map((other) => (other.id === moved.id ? moved : other)))
+  }
+
   async function putBack(project: Project) {
     setError(null)
     const result = await api.restoreProject(project.id)
@@ -490,6 +499,7 @@ export function App({ api, notify = systemNotify }: Props) {
           error={error}
           onClose={closeDialog}
           onRemove={(project) => void removeProject(project)}
+          onRelocate={(project) => void relocateProject(project)}
           onSaveBackup={() => void saveBackup()}
           onRestoreBackup={() => void restoreBackup()}
         />

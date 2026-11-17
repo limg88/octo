@@ -16,12 +16,18 @@ const empty: MeetingsSourceView = {
   suggestedRoot: '~/Documents/Verbale',
   targetFolder: '_octo/riunioni',
   state: { cursor: null, lastRun: null },
+  readBy: null,
+  readingBy: null,
+  readableHere: true,
 }
 const linked: MeetingsSourceView = {
   config: { root: '~/Documents/Verbale', since: '2026-11-10' },
   suggestedRoot: null,
   targetFolder: '_octo/riunioni',
   state: { cursor: run.at, lastRun: run },
+  readBy: null,
+  readingBy: null,
+  readableHere: true,
 }
 
 type MeetingsApi = Pick<
@@ -99,6 +105,20 @@ describe('MeetingsSection', () => {
 
     await waitFor(() => expect(rootField().value).toBe('/Volumes/Riunioni'))
     expect(save.disabled).toBe(false)
+  })
+
+  it('says whose meetings these are on a computer that has no folder of Verbale', async () => {
+    const giovanni = { name: 'Giovanni', computer: 'mac-di-giovanni' }
+    const elsewhere = { ...linked, readBy: giovanni, readableHere: false }
+    const { api } = fakeApi({ meetingsSource: vi.fn(async () => ok(elsewhere)) })
+    show(api, false)
+
+    const who = messages.elsewhere.who(giovanni)
+    expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
+    expect(screen.getByText(messages.elsewhere.noMeetings)).toBeTruthy()
+    // Nothing to read from here: no way to ask for it.
+    const ask = screen.queryAllByRole<HTMLButtonElement>('button', { name: messages.meetingsSync })
+    expect(ask.every((button) => button.disabled)).toBe(true)
   })
 
   it('says when it was last read, reads again on request and follows a periodic reading', async () => {

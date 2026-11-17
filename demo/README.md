@@ -49,3 +49,6 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 
 `pnpm e2e:cruscotto` segue i passi delle demo 34 e 35 nella finestra vera, con l'Azure DevOps finto già collegato e la lettura periodica ogni 5 secondi.
 | 41 | Previsionale delle sole commesse del progetto: costi e ricavi calcolati da NetSuite e tariffe (a giornate, a corpo, canone), correzioni del PM, Excel facoltativo | `bash demo/41-previsionale-commesse/run.sh` | [COPIONE](41-previsionale-commesse/COPIONE.md) |
+| 42 | Cartella condivisa: due Octo sulla stessa cartella, un lettore alla volta, chi arriva dopo prosegue, ciò che è personale resta fuori dalla cartella, «Cambia cartella» | `bash demo/42-cartella-condivisa/run.sh` | [COPIONE](42-cartella-condivisa/COPIONE.md) |
+
+`pnpm e2e:condivisa` segue i passi della demo 42 in due finestre vere aperte sulla stessa cartella, ognuna con la sua cartella dei dati, la sua persona e il suo nome di computer.
