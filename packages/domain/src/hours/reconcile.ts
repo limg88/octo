@@ -93,11 +93,18 @@ export function reconcileHours(
     noTimesheet: new Set(settings.noTimesheetExpected.map(personKey)),
   }
   const afterCutoff = (entry: HoursEntry) => settings.cutoff !== '' && entry.day > settings.cutoff
+  // How the timesheets write each person, in any month: a tracker often writes a user name, and
+  // who has no timesheet in the period yet is still called by name and surname.
+  const written = new Map<string, string>()
+  for (const entry of timesheet) {
+    const key = personKey(entry.person)
+    if (!written.has(key)) written.set(key, entry.person)
+  }
   const people = new Map<string, Person>()
   const personOf = (key: string, name: string): Person => {
     const known = people.get(key)
     if (known) return known
-    const added = { name, timesheet: 0, worklog: 0 }
+    const added = { name: written.get(key) ?? name, timesheet: 0, worklog: 0 }
     people.set(key, added)
     return added
   }

@@ -10,7 +10,7 @@ type Props = { api: Pick<OctoApi, 'team' | 'saveTeam'>; project: Project }
 
 const text = messages.team
 
-type PersonKey = 'name' | 'role' | 'side' | 'allocation' | 'from' | 'to' | 'note'
+type PersonKey = 'name' | 'role' | 'side' | 'allocation' | 'capDays' | 'from' | 'to' | 'note'
 type PeriodKey = 'name' | 'from' | 'to'
 const SIDES: TeamPerson['side'][] = ['supplier', 'client']
 
@@ -25,6 +25,7 @@ const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
     options: SIDES.map((side) => ({ value: side, label: text.sides[side] })),
   },
   { key: 'allocation', label: text.columns.allocation, kind: 'amount', width: '110px' },
+  { key: 'capDays', label: text.columns.capDays, kind: 'amount', width: '110px' },
   { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
   { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
   { key: 'note', label: text.columns.note, width: 'minmax(130px, 1fr)' },
@@ -36,6 +37,12 @@ const PERIOD_COLUMNS: RowsColumn<PeriodKey>[] = [
 ]
 
 /** Nothing typed, or a share of time: more than nothing and at most all of it. */
+/** Nothing typed is no cap; anything else must be a number of days greater than nothing. */
+function capRight(typed: string): boolean {
+  const days = amountOf(typed)
+  return typed.trim() === '' || (days !== null && days > 0)
+}
+
 function allocationRight(typed: string): boolean {
   if (typed.trim() === '') return true
   const value = amountOf(typed)
@@ -57,7 +64,11 @@ export function TeamSection({ api, project }: Props) {
   const show = useCallback((team: ProjectTeam) => {
     setPeople(
       orOneRow(
-        team.people.map((person) => ({ ...person, allocation: amountText(person.allocation) })),
+        team.people.map(({ capDays, ...person }) => ({
+          ...person,
+          allocation: amountText(person.allocation),
+          capDays: amountText(capDays ?? null),
+        })),
         PERSON_COLUMNS,
       ),
     )
@@ -85,6 +96,7 @@ export function TeamSection({ api, project }: Props) {
         return [
           ...(row.name.trim() === '' ? [text.personWrong(index + 1)] : []),
           ...(allocationRight(row.allocation) ? [] : [text.allocationWrong(index + 1)]),
+          ...(capRight(row.capDays) ? [] : [text.capWrong(index + 1)]),
         ]
       }),
       periods: periods.flatMap((row, index) =>
@@ -107,6 +119,8 @@ export function TeamSection({ api, project }: Props) {
           to: row.to,
           allocation: amountOf(row.allocation),
           note: row.note.trim(),
+          // Written only when there is one: a person without a cap is kept as before.
+          ...(amountOf(row.capDays) === null ? {} : { capDays: amountOf(row.capDays) }),
         })),
       periods: periods
         .filter((row) => !blankRow(row))

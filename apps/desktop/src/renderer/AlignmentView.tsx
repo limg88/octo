@@ -302,6 +302,15 @@ function Result({
           alignment.missing.length,
         )}
       </p>
+      {view.stateMismatches.map((mismatch) => (
+        <p key={`${mismatch.group} ${mismatch.state}`} className="warning">
+          {text.stateMismatch(
+            mismatch.state,
+            mismatch.group,
+            text.phaseNames[mismatch.dashboardPhase],
+          )}
+        </p>
+      ))}
       {alignment.adds ? (
         <p className="badge badge-ok">{text.adds}</p>
       ) : (

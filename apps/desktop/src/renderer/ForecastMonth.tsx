@@ -40,6 +40,17 @@ type Props = {
   onOpenSection?: ((section: Section) => void) | undefined
 }
 
+/** What makes the revenue, the costs or the margin of a row lower or higher than the true ones. */
+const INCOMPLETE_KINDS: ReadonlySet<ForecastGap['kind']> = new Set([
+  'no_cost',
+  'no_rate',
+  'no_external_rate',
+  'no_ordered',
+  'no_budget_costs',
+  'no_fee_months',
+  'unread_months',
+])
+
 type ExternalKey = 'name' | 'hours'
 const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
   { key: 'name', label: text.columns.name },
@@ -47,13 +58,14 @@ const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
 ]
 
 /** How many columns Octo fills and how many the PM does: the two groups of the heading. */
-const COMPUTED_COLUMNS = 7
+const COMPUTED_COLUMNS = 9
 const OWN_COLUMNS = 3
 /**
  * Each column as wide as its heading on one line: the room the note left goes to them, and a
  * page narrower than their sum scrolls the table sideways.
  */
-const CODE_WIDTH = '112px'
+const CODE_WIDTH = '190px'
+const ORDERED_WIDTH = '104px'
 const FIGURE_WIDTH = { internal: '104px', external: '104px', revenue: '92px', margin: '118px' }
 const QUANTITY_WIDTH = '100px'
 const INPUT_WIDTH = '116px'
@@ -210,6 +222,12 @@ export function ForecastMonth({
               {text.projectName(row.description, text.kinds[row.revenueKind])}
             </span>
           </span>
+          {row.description !== '' && <span className="hint code-name">{row.description}</span>}
+          {incomplete.has(row.code) && (
+            <span className="pill pill-late" title={text.incompleteHint}>
+              {text.incomplete}
+            </span>
+          )}
           <button
             type="button"
             className="quiet cell-button"
@@ -223,6 +241,14 @@ export function ForecastMonth({
       ),
       sort: (row) => row.code,
       text: (row) => `${row.code} ${row.description}`,
+    },
+    {
+      key: 'ordered',
+      label: text.columnOrdered,
+      kind: 'number',
+      width: ORDERED_WIDTH,
+      cell: (row) => (row.ordered === null ? text.none : text.money(row.ordered)),
+      sort: (row) => row.ordered,
     },
     figure(
       'internal',
@@ -245,16 +271,22 @@ export function ForecastMonth({
       (row) => row.values.revenue,
       text.money,
     ),
+    // Days sold and progress of a fixed price are two things: a column each, never one for both.
     {
-      key: 'quantity',
-      label: text.columnQuantity,
+      key: 'days',
+      label: text.columnDays,
       kind: 'number',
       width: QUANTITY_WIDTH,
-      cell: ({ values }) =>
-        values.quantityIsShare
-          ? text.share(values.quantity)
-          : text.daysWithUnit(text.days(values.quantity)),
-      sort: (row) => row.values.quantity,
+      cell: ({ values }) => (values.quantityIsShare ? text.none : text.days(values.quantity)),
+      sort: (row) => (row.values.quantityIsShare ? null : row.values.quantity),
+    },
+    {
+      key: 'progress',
+      label: text.columnProgress,
+      kind: 'number',
+      width: QUANTITY_WIDTH,
+      cell: ({ values }) => (values.quantityIsShare ? text.share(values.quantity) : text.none),
+      sort: (row) => (row.values.quantityIsShare ? row.values.quantity : null),
     },
     figure(
       'marginMonth',
@@ -334,6 +366,23 @@ export function ForecastMonth({
     },
   ]
 
+  // A row whose figures miss something says so itself: the list of what is missing is below.
+  const incomplete = new Set(
+    view.forecast.gaps.filter((gap) => INCOMPLETE_KINDS.has(gap.kind)).map((gap) => gap.code),
+  )
+  const sum = (of: (row: ForecastRow) => number): number =>
+    rows.reduce((total, row) => total + of(row), 0)
+  const revenue = sum((row) => row.values.revenue)
+  const costs = sum((row) => row.values.internalCosts + row.values.externalCosts)
+  const totals = {
+    ordered: rows.some((row) => row.ordered !== null) ? sum((row) => row.ordered ?? 0) : null,
+    internal: sum((row) => row.values.internalCosts),
+    external: sum((row) => row.values.externalCosts),
+    revenue,
+    days: sum((row) => (row.values.quantityIsShare ? 0 : row.values.quantity)),
+    margin: revenue === 0 ? null : (revenue - costs) / revenue,
+  }
+
   const gaps = (
     <Gaps
       view={view}
@@ -372,6 +421,25 @@ export function ForecastMonth({
             columns={columns}
             rows={rows}
             rowKey={(row) => row.code}
+            footer={
+              rows.length > 1 ? (
+                <tr>
+                  <th scope="row">{text.totalRow}</th>
+                  <td className="number">
+                    {totals.ordered === null ? text.none : text.money(totals.ordered)}
+                  </td>
+                  <td className="number">{text.money(totals.internal)}</td>
+                  <td className="number">{text.money(totals.external)}</td>
+                  <td className="number">{text.money(totals.revenue)}</td>
+                  <td className="number">
+                    {totals.days === 0 ? text.none : text.days(totals.days)}
+                  </td>
+                  <td />
+                  <td className="number">{text.share(totals.margin)}</td>
+                  <td colSpan={OWN_COLUMNS + 1} />
+                </tr>
+              ) : undefined
+            }
             detail={(row) => (
               <>
                 {row.note !== '' && (
@@ -537,6 +605,8 @@ function gapText(gap: ForecastGap): string {
       return text.gap.no_budget_costs(gap.code)
     case 'no_fee_months':
       return text.gap.no_fee_months(gap.code)
+    case 'unread_months':
+      return text.gap.unread_months(gap.code, gap.months.join(', '))
   }
 }
 
@@ -554,8 +624,20 @@ function Gaps({
   onOpenCode: (code: string) => void
   onOpenSection?: ((section: Section) => void) | undefined
 }) {
-  const { gaps, notApprovedHours, otherCodes } = view.forecast
+  const { gaps, notApprovedHours, otherCodes, unreadMonths, orphanCodes } = view.forecast
+  // The rates a new code can take from the one before, code by code: one press for all of them.
+  const proposals = new Map<string, Array<{ person: string; code: string; ratePerDay: number }>>()
+  for (const gap of gaps) {
+    if (gap.kind !== 'no_rate' || gap.proposed === null) continue
+    const from = gap.proposed.code
+    proposals.set(`${gap.code} ${from}`, [
+      ...(proposals.get(`${gap.code} ${from}`) ?? []),
+      { person: gap.person, code: gap.code, ratePerDay: gap.proposed.ratePerDay },
+    ])
+  }
   const notes = [
+    ...(orphanCodes.length > 0 ? [text.orphanCodes(orphanCodes.join(', '))] : []),
+    ...(unreadMonths.length > 0 ? [text.unreadMonths(unreadMonths.join(', '))] : []),
     ...(notApprovedHours > 0 ? [text.notApproved(text.hours(notApprovedHours))] : []),
     ...(otherCodes.length > 0 ? [text.otherCodes(otherCodes.join(', '))] : []),
   ]
@@ -567,6 +649,22 @@ function Gaps({
       ) : (
         <>
           <p className="hint">{text.gapsIntro}</p>
+          {proposals.size > 0 && (
+            <div className="actions">
+              {[...proposals.entries()].map(([key, rates]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    void onSaveSettings({ ...settings, rates: [...settings.rates, ...rates] })
+                  }
+                >
+                  {text.copyRates(rates.length, key.split(' ')[1] ?? '', key.split(' ')[0] ?? '')}
+                </button>
+              ))}
+              <span className="hint">{text.copyRatesHint}</span>
+            </div>
+          )}
           <ul className="missing gaps">
             {gaps.map((gap) => (
               <li key={gapText(gap)}>
@@ -608,6 +706,13 @@ function Remedy({
   const [cost, setCost] = useState('')
   const [refused, setRefused] = useState(false)
   if (gap.kind === 'no_ordered' || gap.kind === 'no_fee_months') return null
+  if (gap.kind === 'unread_months') {
+    return onOpenSection ? (
+      <button type="button" className="quiet" onClick={() => onOpenSection('hours')}>
+        {messages.openSection(messages.hoursTab)}
+      </button>
+    ) : null
+  }
   if (gap.kind === 'no_total_costs' || gap.kind === 'no_budget_costs') {
     return (
       <button type="button" className="quiet" onClick={() => onOpenCode(gap.code)}>
@@ -624,6 +729,7 @@ function Remedy({
   }
   const external = gap.kind === 'no_external_rate'
   const { person, code } = gap
+  const proposed = gap.kind === 'no_rate' ? gap.proposed : null
   const who = text.remedy.of(person, code)
 
   function save() {
@@ -672,6 +778,21 @@ function Remedy({
       <button type="button" aria-label={`${text.remedy.save}: ${who}`} onClick={save}>
         {text.remedy.save}
       </button>
+      {proposed && (
+        <button
+          type="button"
+          className="quiet"
+          aria-label={`${text.proposedRate(text.money(proposed.ratePerDay), proposed.code)}: ${who}`}
+          onClick={() =>
+            void onSaveSettings({
+              ...settings,
+              rates: [...settings.rates, { person, code, ratePerDay: proposed.ratePerDay }],
+            })
+          }
+        >
+          {text.proposedRate(text.money(proposed.ratePerDay), proposed.code)}
+        </button>
+      )}
       {refused && (
         <span className="field-problems" role="alert">
           {messages.amountWrong}

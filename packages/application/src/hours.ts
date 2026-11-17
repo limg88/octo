@@ -13,10 +13,13 @@ import {
   parseTimesheetCosts,
   parseTimesheetExport,
   parseWorklogExport,
+  parseWorklogIssues,
   peopleAway,
   type Reconciliation,
   reconcileHours,
+  romeDateString,
   TIMESHEET_COST_FIELD,
+  type TrackerHours,
   worklogCsv,
 } from '@octo/domain'
 import { secretKey } from './feeds.ts'
@@ -63,6 +66,19 @@ const costsFile = (month: string): string => `${TIMESHEET_COSTS_FOLDER}/timeshee
 /** Months read in one go at most: a longer period is asked in pieces. */
 export const MAX_MONTHS_READ = 12
 const TIMESHEET_SOURCE = 'NetSuite'
+const TIMESHEET_FILE_MONTH = /\/timesheet_(\d{4}-\d{2})\.json$/
+const MONTH_LENGTH = 7
+
+/** When a file of timesheets Octo wrote was read from the company's system; null when not said. */
+function exportedAtOf(content: string | null): Date | null {
+  try {
+    const at: unknown = content === null ? null : JSON.parse(content).exported_at
+    const instant = typeof at === 'string' ? new Date(at) : null
+    return instant !== null && !Number.isNaN(instant.getTime()) ? instant : null
+  } catch {
+    return null
+  }
+}
 const worklogFile = (month: string): string => `${TRACKER_HOURS_FOLDER}/worklog_${month}.csv`
 
 /** Where the hours of a project seem to be kept, to propose to the PM. */
@@ -106,6 +122,17 @@ export type Hours = {
    * where they are. For what else is computed from the same hours.
    */
   timesheet(project: Project): Promise<HoursEntry[] | null>
+  /**
+   * The months whose timesheets Octo read from the company's system and holds whole: read after
+   * the month ended, or today. Null when the PM keeps the files by hand: which months they cover
+   * cannot be told.
+   */
+  timesheetMonths(project: Project): Promise<string[] | null>
+  /**
+   * The hours logged on the tracker with the item each is on, from every export the project
+   * holds; none when the PM has not said where they are or the files name no item.
+   */
+  trackerHours(project: Project): Promise<TrackerHours[]>
 }
 
 const TIMESHEET_EXTENSION = 'json'
@@ -222,6 +249,30 @@ export function createHours(deps: HoursDeps): Hours {
           ? { ...row, cost: costs.get(row.id) ?? null }
           : row,
       )
+    },
+
+    async trackerHours(project) {
+      const settings = await deps.settings.load(project.folder)
+      if (settings.worklogPath === '') return []
+      const files = await filesAt(project, settings.worklogPath, WORKLOG_EXTENSION)
+      return read(project, files, parseWorklogIssues, [])
+    },
+
+    async timesheetMonths(project) {
+      const settings = await deps.settings.load(project.folder)
+      if (settings.timesheetPath !== NETSUITE_TIMESHEET_FOLDER) return null
+      const today = romeDateString(deps.clock.now())
+      const months: string[] = []
+      for (const path of await deps.files.under(project.folder, NETSUITE_TIMESHEET_FOLDER)) {
+        const month = TIMESHEET_FILE_MONTH.exec(`/${path}`)?.[1]
+        if (month === undefined) continue
+        const at = exportedAtOf(await deps.files.readText(project.folder, path))
+        if (at === null) continue
+        // A month read while it ran misses the hours written since, unless it was read today.
+        const day = romeDateString(at)
+        if (day.slice(0, MONTH_LENGTH) > month || day === today) months.push(month)
+      }
+      return months.sort()
     },
 
     async saveSettings(project, settings) {

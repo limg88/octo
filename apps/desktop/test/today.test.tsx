@@ -1359,7 +1359,7 @@ describe('the page of the day', () => {
       words({ kind: 'source', source: 'Jira', reason: 'error', days: 0, error: null }).detail,
     ).toBe('')
     expect(words({ kind: 'tracker_old', days: 1 }).title).toBe(
-      'Il tracker del cliente è di 1 giorno fa',
+      'I dati del tracker sono di 1 giorno fa',
     )
     expect(
       words({
@@ -1383,7 +1383,7 @@ describe('the page of the day', () => {
         month: '2026-10',
         gaps: [
           { kind: 'no_cost', code: 'PRJ1', person: 'Rossi', hours: 1 },
-          { kind: 'no_rate', code: 'PRJ1', person: 'Costa Elena', hours: 1 },
+          { kind: 'no_rate', code: 'PRJ1', person: 'Costa Elena', hours: 1, proposed: null },
           { kind: 'no_external_rate', code: 'PRJ1', person: 'Esterno', hours: 1 },
           { kind: 'no_total_costs', code: 'PRJ2' },
           { kind: 'no_ordered', code: 'PRJ3' },
@@ -1471,9 +1471,23 @@ describe('the page of the day', () => {
       start: '2026-11-13T14:00:00.000Z',
       minutes: 30,
       days: 3,
+      elsewhere: null,
     })
     expect(signalText(waiting).title).toBe('«Allineamento» è registrata ma non ha un progetto')
     expect(signalText(waiting).detail).toContain('venerdì 13 novembre, 30 minuti')
+    expect(signalText(waiting).detail).toContain('se è di questo, assegnala')
+    // The people of the meeting are of another project: the PM is told before assigning it here.
+    const others = item('k', 'waiting', {
+      kind: 'meeting_unassigned',
+      id: 'm-2',
+      title: 'Daily',
+      start: '2026-11-13T14:00:00.000Z',
+      minutes: 15,
+      days: 3,
+      elsewhere: 'Borea',
+    })
+    expect(signalText(others).detail).toContain('i partecipanti sono persone del progetto «Borea»')
+    expect(signalText(others).detail).not.toContain('se è di questo, assegnala')
     expect(ageText(waiting)).toBe('da 3 giorni')
     expect(
       words({ kind: 'risk', id: 'r', title: 'Consegna stretta', since: '2026-11-16' }).detail,
@@ -1944,6 +1958,7 @@ describe('the day as a list with its detail', () => {
         start: '2026-11-13T14:00:00.000Z',
         minutes: 30,
         days: 3,
+        elsewhere: null,
       },
       { target: 'sources' },
     )

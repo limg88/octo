@@ -3,6 +3,7 @@ import {
   cleanMeetingsSource,
   DomainError,
   isDomainError,
+  likelierProject,
   MEETING_META_FILE,
   MEETING_TEXT_FILES,
   MEETINGS_FOLDER,
@@ -16,6 +17,7 @@ import {
   meetingOwner,
   meetingsReadingNote,
   type Project,
+  type ProjectTeam,
   parseMailDocument,
   parseMeetingMeta,
   projectKeywords,
@@ -49,6 +51,16 @@ export type MeetingsDeps = {
   files: Pick<ProjectFiles, 'under' | 'readText' | 'remove'>
   writer: Pick<MemoryWriter, 'write'>
   clock: Clock
+  /** The people of a project: a meeting whose people are of another project is said so. */
+  team?: (project: Project) => Promise<ProjectTeam>
+  /** What else of a project came from a meeting, to take away with it: its open points. */
+  forget?: (project: Project, meeting: { id: string; folder: string }) => Promise<unknown>
+}
+
+/** A finished meeting no project could be told for, with the project its people point to. */
+export type UnassignedMeeting = RecordedMeeting & {
+  /** The name of the other project whose team its participants are of; null when none stands out. */
+  elsewhere: string | null
 }
 
 /** What the Sources page shows for the meetings of a project. */
@@ -83,9 +95,16 @@ export type Meetings = {
   /** The meetings the project holds, the newest first. */
   imported(project: Project): Promise<StoredMeeting[]>
   /** The finished meetings of the folder that no project could be told for. */
-  unassigned(project: Project): Promise<RecordedMeeting[]>
+  unassigned(project: Project): Promise<UnassignedMeeting[]>
   /** Takes into the project a meeting that had none, because the PM says so. */
   assign(project: Project, meetingId: string): Promise<void>
+  /** The other projects of who uses Octo: where a meeting held here can be moved to. */
+  destinations(project: Project): Promise<Array<Pick<Project, 'id' | 'name'>>>
+  /**
+   * Takes a meeting away from the project, with the open points that came from it: to another
+   * project, which holds it from then on, or to none (`null`). The project never takes it again.
+   */
+  move(project: Project, meetingId: string, targetProjectId: string | null): Promise<void>
 }
 
 type Complete = Extract<MeetingReading, { status: 'complete' }>
@@ -135,14 +154,18 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
   const sameRoot = (a: string, b: string): boolean =>
     deps.exports.portable(a) === deps.exports.portable(b)
 
-  async function sharing(project: Project, root: string): Promise<Project[]> {
-    const others: Project[] = []
+  type Sharing = { project: Project; released: ReadonlySet<string> }
+
+  async function sharing(project: Project, own: MeetingsSourceConfig): Promise<Sharing[]> {
+    const others: Sharing[] = []
     for (const other of await deps.projects()) {
       if (other.id === project.id) continue
       const config = await configOf(other).catch(() => null)
-      if (config && sameRoot(config.root, root)) others.push(other)
+      if (config && sameRoot(config.root, own.root)) {
+        others.push({ project: other, released: new Set(config.released) })
+      }
     }
-    return [project, ...others]
+    return [{ project, released: new Set(own.released) }, ...others]
   }
 
   async function candidateOf(project: Project): Promise<MeetingCandidate> {
@@ -163,10 +186,40 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     }
   }
 
+  /** The people of this project and of the others, as their teams name the supplier's and the client's. */
+  async function teamsOf(
+    project: Project,
+  ): Promise<Array<{ id: string; name: string; people: string[] }>> {
+    if (!deps.team) return []
+    const teams = []
+    for (const other of await deps.projects()) {
+      const team = await deps.team(other.id === project.id ? project : other).catch(() => null)
+      teams.push({
+        id: other.id,
+        name: other.name,
+        people: team?.people.map((person) => person.name) ?? [],
+      })
+    }
+    return teams
+  }
+
+  /** Writes among the settings of a project that a meeting is, or is no longer, taken away from it. */
+  async function release(project: Project, meetingId: string, away: boolean): Promise<void> {
+    const current = await deps.settings.load(project.folder)
+    if (!current.meetings) return
+    const before = current.meetings.released ?? []
+    if (before.includes(meetingId) === away) return
+    const released = away ? [...before, meetingId] : before.filter((id) => id !== meetingId)
+    const meetings = cleanMeetingsSource({ ...current.meetings, released })
+    await deps.settings.save(project.folder, { ...current, meetings })
+  }
+
   /** Every folder of the export root, told apart: of this project, of none, or left out. */
   async function scan(project: Project, config: MeetingsSourceConfig): Promise<Scan> {
     const readings = await deps.exports.list(config.root)
-    const projects = await sharing(project, config.root)
+    const shared = await sharing(project, config)
+    const projects = shared.map((entry) => entry.project)
+    const released = new Map(shared.map((entry) => [entry.project.id, entry.released]))
     // A meeting a project already holds stays there, whatever the rules would say today.
     const holders = new Map<string, { projectId: string; folder: string }>()
     for (const holder of projects) {
@@ -188,7 +241,11 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       if (!holder) {
         candidates ??= await Promise.all(projects.map(candidateOf))
         const notes = (await deps.exports.read(config.root, reading.folder, 'notes.md')) ?? ''
-        owner = meetingOwner(reading.meeting, notes, candidates)
+        // A project that gave the meeting away takes no part in telling whose it is.
+        const willing = candidates.filter(
+          (candidate) => !released.get(candidate.projectId)?.has(reading.meeting.id),
+        )
+        owner = meetingOwner(reading.meeting, notes, willing)
       }
       if (owner === null) found.unassigned.push(reading)
       if (owner !== project.id) continue
@@ -264,8 +321,13 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
 
     async save(project, config) {
       const current = await deps.settings.load(project.folder)
+      // What the PM took away stays taken away when the folder or the first day change.
+      const released = config?.released ?? current.meetings?.released
       const meetings = config
-        ? { ...cleanMeetingsSource(config), root: deps.exports.portable(config.root.trim()) }
+        ? {
+            ...cleanMeetingsSource({ ...config, released }),
+            root: deps.exports.portable(config.root.trim()),
+          }
         : null
       await deps.settings.save(project.folder, { ...current, meetings })
       return view(project)
@@ -278,7 +340,20 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const config = await configOf(project)
       if (!config) return []
       try {
-        return (await scan(project, config)).unassigned.map((reading) => reading.meeting)
+        const { unassigned } = await scan(project, config)
+        if (unassigned.length === 0) return []
+        const teams = await teamsOf(project)
+        return unassigned.map(({ meeting }) => {
+          const likelier = likelierProject(
+            meeting.participants,
+            project.id,
+            teams.map(({ id, people }) => ({ projectId: id, people })),
+          )
+          return {
+            ...meeting,
+            elsewhere: teams.find((team) => team.id === likelier)?.name ?? null,
+          }
+        })
       } catch (error) {
         // A folder that cannot be read now is said by the source itself, not here.
         if (!isDomainError(error)) throw error
@@ -296,6 +371,39 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const outcome = await importOne(project, config, { reading, folder })
       // Exported again this very moment: the PM tries again, nothing was written.
       if (outcome === 'changing') throw new DomainError('source_busy', SOURCE)
+      // A meeting once taken away and now wanted back is of the project again.
+      if (config.released?.includes(meetingId)) await release(project, meetingId, false)
+    },
+
+    async destinations(project) {
+      return (await deps.projects())
+        .filter((other) => other.id !== project.id)
+        .map(({ id, name }) => ({ id, name }))
+    },
+
+    async move(project, meetingId, targetProjectId) {
+      const meeting = (await imported(project)).find((held) => held.id === meetingId)
+      if (!meeting) throw new DomainError('meeting_not_found', meetingId)
+      const target =
+        targetProjectId === null
+          ? null
+          : (await deps.projects()).find((other) => other.id === targetProjectId)
+      if (target === undefined || target?.id === project.id) {
+        throw new DomainError('meeting_not_found', targetProjectId ?? meetingId)
+      }
+      const paths = await deps.files.under(project.folder, meeting.folder)
+      if (target) {
+        // Written there first: a failure half way leaves the meeting where it was.
+        for (const path of paths) {
+          const text = await deps.files.readText(project.folder, path)
+          if (text !== null) await deps.writer.write(target.folder, path, text)
+        }
+        await release(target, meetingId, false)
+      }
+      // Said before the files go: the next reading must not take the meeting back.
+      await release(project, meetingId, true)
+      for (const path of paths) await deps.files.remove(project.folder, path)
+      await deps.forget?.(project, { id: meeting.id, folder: meeting.folder })
     },
   }
 }

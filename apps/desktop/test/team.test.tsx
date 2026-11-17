@@ -130,6 +130,34 @@ describe('the section of people and calendar', () => {
     })
   })
 
+  it('keeps the most days a person is to spend on the project, when the PM writes them', async () => {
+    const api = {
+      team: vi.fn(async () =>
+        ok({
+          ...team,
+          people: team.people.map((entry, n) => (n === 0 ? { ...entry, capDays: 8 } : entry)),
+        }),
+      ),
+      saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
+    }
+    render(<TeamSection api={api} project={project} />)
+    await screen.findByRole('group', { name: text.people })
+    expect(cell(text.personN(1), columns.capDays).value).toBe('8')
+    expect(cell(text.personN(2), columns.capDays).value).toBe('')
+    set(text.personN(2), columns.capDays, 'tanti')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(await screen.findByText(text.capWrong(2))).toBeTruthy()
+    expect(api.saveTeam).not.toHaveBeenCalled()
+    set(text.personN(1), columns.capDays, '1,5')
+    set(text.personN(2), columns.capDays, '')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() => expect(api.saveTeam).toHaveBeenCalled())
+    const saved = api.saveTeam.mock.calls[0]?.[1]
+    expect(saved?.people[0]).toMatchObject({ capDays: 1.5 })
+    // Who has no cap is kept as before: no field for it.
+    expect(saved?.people[1]).not.toHaveProperty('capDays')
+  })
+
   it('says why it cannot read or save', async () => {
     const failing = { ok: false as const, code: 'team_invalid' as const }
     const { unmount } = render(

@@ -1,3 +1,4 @@
+import { personKey } from '../hours/model.ts'
 import { phraseIn } from '../mail/match.ts'
 import { occurrenceOn } from '../mail/recurrence.ts'
 import { romeDateString } from '../rome-time.ts'
@@ -64,4 +65,38 @@ export function meetingOwner(
     candidate.keywords.some((keyword) => phraseIn(text, keyword)),
   )
   return named.length === 1 ? (named[0]?.projectId ?? null) : null
+}
+
+/** The people who work on a project, as its team names them. */
+export type MeetingTeam = { projectId: string; people: readonly string[] }
+
+const ADDRESS = /<[^>]*>/g
+
+/** How many of the people of a meeting are on the team of a project. */
+function peopleShared(participants: readonly string[], team: MeetingTeam): number {
+  const known = new Set(team.people.map(personKey).filter((key) => key !== ''))
+  const present = new Set(participants.map((name) => personKey(name.replace(ADDRESS, ''))))
+  return [...present].filter((key) => known.has(key)).length
+}
+
+/**
+ * The other project a meeting looks to be of, by who took part: the only one whose team has more
+ * of its participants than the team of this project. Null when this project has as many, or two
+ * others have the most. It is a warning for the PM, never a way to give a meeting away.
+ */
+export function likelierProject(
+  participants: readonly string[],
+  projectId: string,
+  teams: readonly MeetingTeam[],
+): string | null {
+  const own = teams.find((team) => team.projectId === projectId)
+  const mine = own ? peopleShared(participants, own) : 0
+  const others = teams
+    .filter((team) => team.projectId !== projectId)
+    .map((team) => ({ projectId: team.projectId, shared: peopleShared(participants, team) }))
+    .filter((other) => other.shared > mine)
+    .sort((a, b) => b.shared - a.shared)
+  const [best, next] = others
+  if (best === undefined || (next !== undefined && next.shared === best.shared)) return null
+  return best.projectId
 }

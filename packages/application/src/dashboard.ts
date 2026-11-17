@@ -1,4 +1,5 @@
 import {
+  type Activities,
   assignedToOwnPeople,
   awaitingAnswer,
   type BugDashboard,
@@ -7,6 +8,7 @@ import {
   cleanDashboardSettings,
   currentSprint,
   type DashboardSettings,
+  DEFAULT_HOURS_PER_DAY,
   type DecisionRow,
   DomainError,
   decisionRows,
@@ -23,6 +25,7 @@ import {
   type ProjectTeam,
   parseTrackerExport,
   parseTrackerHistory,
+  personKey,
   phaseOf,
   type RequirementRow,
   romeDateString,
@@ -34,11 +37,15 @@ import {
   sprintProgress,
   TRACKER_SUMMARY_PATH,
   type TrackerData,
+  type TrackerHours,
   type TrackerKind,
   type TrendGranularity,
+  teamCaps,
   tellsSides,
+  trackerActivities,
   trackerOfExport,
   trackerSummary,
+  trackerTypes,
   unclearRequirements,
   type WaitingRow,
 } from '@octo/domain'
@@ -61,6 +68,17 @@ export type DashboardDeps = {
   writer?: MemoryWriter
   /** With the sources, an item read from the tracker has an address there. */
   sources?: Pick<SourceSettings, 'load'>
+  /** The hours logged on the tracker, item by item: what each activity took. */
+  worklog?: (project: Project) => Promise<TrackerHours[]>
+}
+
+/** The parts of the dashboard that have something to show for the tracker as it was read. */
+export type DashboardParts = {
+  sprint: boolean
+  bugs: boolean
+  trend: boolean
+  /** A tracker with no bugs and no sprints is a register of activities, and is shown as one. */
+  activities: boolean
 }
 
 /** The period of the trend as the interface asks for it: two days and the size of a step. */
@@ -97,6 +115,11 @@ export type DashboardView = {
   comparison: SprintComparisonRow[]
   /** What the PM decided on single items, the latest first. */
   decisions: DecisionRow[]
+  /** Every type the items of the tracker have, with how many: what bugs and stories are chosen among. */
+  types: Array<{ type: string; count: number }>
+  parts: DashboardParts
+  /** Every item in scope with its hours and its last comment. */
+  activities: Activities
 }
 
 export type Dashboard = {
@@ -199,6 +222,13 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
         ? null
         : await deps.exports.readJson(project.folder, settings.historyPath).catch(() => null)
     const history = rawHistory === null ? null : parseTrackerHistory(rawHistory)
+    // Jira has no field for the acceptance criteria: a reading of it that left the field empty
+    // says nothing is known, not that the criteria are missing.
+    if (trackerOfExport(settings.exportPath) === 'jira') {
+      parsed.items = parsed.items.map((item) =>
+        item.acceptanceCriteria === '' ? { ...item, acceptanceCriteria: null } : item,
+      )
+    }
     // The items of other people are left out before anything is counted: no number sees them.
     const items = settings.ownPeopleOnly ? assignedToOwnPeople(parsed.items, team) : parsed.items
     return { data: { ...parsed, items, history }, everyone: { ...parsed, history } }
@@ -220,7 +250,7 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
           await deps.writer.write(
             project.folder,
             TRACKER_SUMMARY_PATH,
-            trackerSummary(reading.data, clean),
+            trackerSummary(reading.data, clean, trackerOfExport(clean.exportPath)),
           )
         }
       }
@@ -248,11 +278,33 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
       const shown = sprints.find((name) => sprint !== null && sameSprint(name, sprint)) ?? running
       // Days in a state are counted up to the reading of the tracker: later nothing is known.
       const asOf = data.exportedAt === null ? now : new Date(data.exportedAt)
+      const scoped = data.items.filter((item) => inScope(item.tags, settings))
+      const hasBugs = scoped.some((item) => isOfType(item, settings.bugTypes))
+      const requirements = unclearRequirements(data, settings, upcoming)
+      const hasSprints = sprints.length > 0
+      const register = scoped.length > 0 && !hasBugs && !hasSprints
+      const worklog = deps.worklog ? await deps.worklog(project).catch(() => []) : []
       return {
         exportedAt: data.exportedAt,
         age: exportAge(data.exportedAt, now),
         bugs: bugDashboard(data, settings, parsedRange, asOf),
-        requirements: unclearRequirements(data, settings, upcoming),
+        requirements,
+        types: trackerTypes(everyone),
+        parts: {
+          // In a register of activities a story is a line of work, not a requirement to refine.
+          sprint: hasSprints || (requirements.length > 0 && !register),
+          bugs: hasBugs,
+          trend: hasBugs,
+          activities: register,
+        },
+        activities: trackerActivities(
+          data,
+          settings,
+          worklog,
+          new Map(
+            teamCaps(team).map((cap) => [personKey(cap.person), cap.days * DEFAULT_HOURS_PER_DAY]),
+          ),
+        ),
         states: statesOf(data, settings),
         periods: periodsOf(data, settings),
         tags: [...new Set(data.items.flatMap((item) => item.tags))].sort((a, b) =>

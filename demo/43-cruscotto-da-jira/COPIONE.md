@@ -47,5 +47,5 @@ Durata: 3 minuti. Mostra che il cruscotto non ha bisogno di Azure DevOps: se il 
 - Octo legge soltanto: le issue dei progetti scelti, i loro cambi e i commenti. Non scrive mai su Jira.
 
 ## Che cosa non fa ancora
-- Jira non ha un periodo di pianificazione (PI): quel filtro resta vuoto. Lo sprint è quello attivo della issue.
-- I criteri di accettazione non hanno un campo standard in Jira: i segnali che li guardano non scattano.
+- Jira non ha un periodo di pianificazione (PI): la colonna «Periodo» non viene mostrata. Lo sprint è quello attivo della issue.
+- I criteri di accettazione non hanno un campo in Jira: il segnale «Criteri di accettazione assenti» non scatta (prima della verifica del 17/11/2026 scattava su ogni storia; vedi demo 49).

@@ -14,7 +14,13 @@ import {
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { DASHBOARD_TABS, type DashboardFocus, NO_DASHBOARD_FOCUS } from './context.ts'
+import {
+  DASHBOARD_TABS,
+  type DashboardFocus,
+  type DashboardTab,
+  NO_DASHBOARD_FOCUS,
+} from './context.ts'
+import { DashboardActivities } from './DashboardActivities.tsx'
 import { DashboardBugs } from './DashboardBugs.tsx'
 import { TrackerContext } from './DashboardParts.tsx'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
@@ -344,6 +350,14 @@ export function DashboardView({
     )
   }
 
+  // Only the parts the tracker has something for; nothing is hidden while nothing is in scope.
+  const withData = DASHBOARD_TABS.filter((tab) => view?.parts[tab])
+  const shownTabs: readonly DashboardTab[] =
+    withData.length > 0 ? withData : DASHBOARD_TABS.filter((tab) => tab !== 'activities')
+  const hiddenTabs = DASHBOARD_TABS.filter((tab) => !shownTabs.includes(tab))
+  // The part the PM was on, or the first that is there when that one has nothing to show.
+  const shownTab = shownTabs.includes(focus.tab) ? focus.tab : (shownTabs[0] ?? focus.tab)
+
   return (
     <TrackerContext.Provider value={tracker}>
       <div className="dashboard">
@@ -435,20 +449,28 @@ export function DashboardView({
         {view && (
           <>
             <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
-              {DASHBOARD_TABS.map((tab) => (
+              {shownTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   role="tab"
-                  aria-selected={focus.tab === tab}
-                  className={focus.tab === tab ? 'tab tab-selected' : 'tab'}
+                  aria-selected={shownTab === tab}
+                  className={shownTab === tab ? 'tab tab-selected' : 'tab'}
                   onClick={() => setFocus({ ...focus, tab })}
                 >
                   {text.tabs[tab]}
                 </button>
               ))}
             </div>
-            {focus.tab === 'bugs' && (
+            {hiddenTabs.length > 0 && view.parts.activities && (
+              <p className="hint">
+                {text.hiddenTabs(hiddenTabs.map((tab) => text.tabs[tab]).join(', '))}
+              </p>
+            )}
+            {shownTab === 'activities' && (
+              <DashboardActivities view={view} onOpenItem={view.linked ? openItem : undefined} />
+            )}
+            {shownTab === 'bugs' && (
               <DashboardBugs
                 view={view}
                 stuckDays={settings.stuckDays}
@@ -466,7 +488,7 @@ export function DashboardView({
                 onReminder={(id) => api.draftReminder(project.id, id)}
               />
             )}
-            {focus.tab === 'sprint' && (
+            {shownTab === 'sprint' && (
               <DashboardSprint
                 view={view}
                 periodsByHand={settings.requirementPeriods.length > 0}
@@ -494,7 +516,7 @@ export function DashboardView({
                 onOpenItem={view.linked ? openItem : undefined}
               />
             )}
-            {focus.tab === 'trend' && (
+            {shownTab === 'trend' && (
               <DashboardTrend
                 view={view}
                 range={wholeDays(range)}

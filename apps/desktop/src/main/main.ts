@@ -23,6 +23,7 @@ import {
   createOpenPoints,
   createPreferences,
   createProgress,
+  createProjectShapes,
   createProjects,
   createReadings,
   createRisks,
@@ -493,6 +494,9 @@ function start(seatEnv: Record<string, string | undefined>): void {
     files,
     writer,
     clock,
+    // Both are wired below: a meeting is moved long after the composition is done.
+    team: (project) => team.get(project),
+    forget: (project, meeting) => points.forget(project, meeting),
   })
   const devWarehouse =
     process.env[DEV_WAREHOUSE_VARIABLE] === '1'
@@ -597,6 +601,8 @@ function start(seatEnv: Record<string, string | undefined>): void {
     writer,
     team: (project) => team.get(project),
     sources: settings,
+    // Wired below: the hours of the tracker are read when the dashboard is asked for.
+    worklog: (project) => hours.trackerHours(project),
   })
   const trackerSnapshots = createTrackerSnapshots({
     settings: dashboardSettings,
@@ -617,8 +623,9 @@ function start(seatEnv: Record<string, string | undefined>): void {
     models: chosenModels,
     liveSources,
   })
+  const alignmentSettings = createFsAlignmentSettings()
   const alignments = createAlignments({
-    settings: createFsAlignmentSettings(),
+    settings: alignmentSettings,
     dashboard: dashboardSettings,
     exports: trackerExports,
     sources: settings,
@@ -626,8 +633,15 @@ function start(seatEnv: Record<string, string | undefined>): void {
     writer,
     team: (project) => team.get(project),
   })
+  const forecastSettings = createFsForecastSettings()
+  const shapes = createProjectShapes({
+    sources: settings,
+    dashboard: dashboardSettings,
+    alignment: alignmentSettings,
+    forecast: forecastSettings,
+  })
   const forecasts = createForecasts({
-    settings: createFsForecastSettings(),
+    settings: forecastSettings,
     files,
     sheets,
     timesheet: (project) => hours.timesheet(project),
@@ -636,6 +650,11 @@ function start(seatEnv: Record<string, string | undefined>): void {
     secrets,
     orders: createWarehouseOrdersReader({ owner, ...devWarehouse }),
     writer,
+    readMonths: (project) => hours.timesheetMonths(project),
+    readTimesheets: (project, period) => hours.readTimesheets(project, period),
+    clock,
+    worklog: (project) => hours.trackerHours(project),
+    team: (project) => team.get(project),
   })
   const judge = createClaudeTodayJudge(claude)
   const risks = createRisks({
@@ -699,6 +718,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     alignments,
     hours,
     forecasts,
+    shapes,
     progress: createProgress({
       settings: createFsProgressSettings(),
       files,

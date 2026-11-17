@@ -20,7 +20,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
    Dimostra: senza accesso Octo non si apre; la password non passa mai da Octo; chi è entrato lo dice l'organizzazione, non un campo scritto a mano.
 
 2. **Leggi le fonti.** Premi «Leggi ora».
-   Atteso: sotto il titolo compare a quando risale ogni fonte («Posta: …», «Tracker del cliente: … di cinque giorni fa»). In cima, su fondo giallo: «Il tracker del cliente è di 5 giorni fa. Bug e requisiti qui sotto sono a quella data.»
+   Atteso: sotto il titolo compare a quando risale ogni fonte («Posta: …», «Tracker del cliente: … di cinque giorni fa»). In cima, su fondo giallo: «I dati del tracker sono di 5 giorni fa. Bug e requisiti qui sotto sono a quella data.»
    Dimostra: la pagina dice sempre a quando risale ciò che mostra, e un dato vecchio è la prima cosa che si legge.
 
 3. **Guarda «Adesso» e «Da fare oggi».**

@@ -11,12 +11,14 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { dateText, messages } from './messages.ts'
+import { ProgressFixedPrice } from './ProgressFixedPrice.tsx'
 import { ProgressInvoices } from './ProgressInvoices.tsx'
 import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
 import { ProgressShares } from './ProgressShares.tsx'
 import { problemText, warningRequest, warningText } from './progress-words.ts'
 import { useSavedNote } from './SavedNote.tsx'
+import type { Section } from './sections.ts'
 
 type ProgressApi = Pick<
   OctoApi,
@@ -28,9 +30,19 @@ type ProgressApi = Pick<
   | 'registerProgressInvoices'
   | 'openEvidence'
   | 'chooseProjectPath'
+  | 'forecastLifetime'
 >
 
-type Props = { api: ProgressApi; project: Project }
+type Props = {
+  api: ProgressApi
+  project: Project
+  /**
+   * True for a project sold only at a fixed price: until the PM sets a form of the client, its
+   * progress is what the company's system says of its invoices.
+   */
+  fixedPrice?: boolean
+  onOpenSection?: ((section: Section) => void) | undefined
+}
 
 const text = messages.progress
 /** Rounding leaves less than this on a request that the form can show. */
@@ -45,7 +57,7 @@ const ready = (settings: ProgressSettings): boolean =>
   settings.modelPath !== '' && settings.form.table !== null && settings.positions.length > 0
 
 /** The requests to have a share of the order recognised, on the form of the client. */
-export function ProgressView({ api, project }: Props) {
+export function ProgressView({ api, project, fixedPrice = false, onOpenSection }: Props) {
   const [settings, setSettings] = useState<ProgressSettings | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
   const [view, setView] = useState<View | null>(null)
@@ -113,6 +125,17 @@ export function ProgressView({ api, project }: Props) {
 
   if (settings === null) {
     return error ? <Failure code={error} /> : <p className="progress">{text.loading}</p>
+  }
+
+  if (fixedPrice && !ready(settings) && panel.kind !== 'setup') {
+    return (
+      <ProgressFixedPrice
+        api={api}
+        project={project}
+        onOpenSection={onOpenSection}
+        onUseForm={() => setPanel({ kind: 'setup' })}
+      />
+    )
   }
 
   if (!ready(settings) || panel.kind === 'setup') {

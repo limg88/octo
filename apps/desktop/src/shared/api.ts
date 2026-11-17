@@ -41,6 +41,7 @@ import type {
   ForecastSettings,
   HoursPeriod,
   HoursSettings,
+  Lifetime,
   MailPreview,
   MailSourceConfig,
   MailTurn,
@@ -51,6 +52,7 @@ import type {
   Preferences,
   ProgressSettings,
   Project,
+  ProjectShape,
   ProjectTeam,
   QuestionRecord,
   RestoreOutcome,
@@ -94,6 +96,8 @@ export const CHANNELS = {
   meetingsChooseRoot: 'sources:meetings:choose-root',
   meetingsImported: 'sources:meetings:imported',
   meetingsAssign: 'sources:meetings:assign',
+  meetingsDestinations: 'sources:meetings:destinations',
+  meetingsMove: 'sources:meetings:move',
   feedChoices: 'sources:feed:choices',
   feedingStatus: 'feeding:status',
   feedingFill: 'feeding:fill',
@@ -142,6 +146,8 @@ export const CHANNELS = {
   forecastView: 'forecast:view',
   forecastCompile: 'forecast:compile',
   forecastOrdersRead: 'forecast:orders-read',
+  forecastLifetime: 'forecast:lifetime',
+  projectShape: 'projects:shape',
   progressSettingsGet: 'progress:settings:get',
   progressSettingsSave: 'progress:settings:save',
   progressCandidates: 'progress:candidates',
@@ -278,6 +284,17 @@ export type OctoApi = {
   importedMeetings(projectId: string): Promise<Result<StoredMeeting[]>>
   /** Takes into the project a recorded meeting that had none; gives the page of the day back. */
   assignMeeting(projectId: string, meetingId: string): Promise<Result<TodayView>>
+  /** The other projects a meeting held here can be moved to. */
+  meetingDestinations(projectId: string): Promise<Result<Array<{ id: string; name: string }>>>
+  /**
+   * Takes a meeting away from the project with the open points that came from it: to another
+   * project, or to none (`null`). Gives back the meetings the project still holds.
+   */
+  moveMeeting(
+    projectId: string,
+    meetingId: string,
+    targetProjectId: string | null,
+  ): Promise<Result<StoredMeeting[]>>
   /** Which sources of the project are set up. */
   feedingStatus(projectId: string): Promise<Result<FeedingStatus>>
   /** Feeds the project from everything set up, one source after the other. */
@@ -404,6 +421,10 @@ export type OctoApi = {
   compileForecast(projectId: string, month: string): Promise<Result<ForecastFile>>
   /** Reads name and ordered amount of the project codes from the company's system. */
   readForecastOrders(projectId: string): Promise<Result<ForecastOrdersRun>>
+  /** What the project is like: which sections have something to work on. */
+  projectShape(projectId: string): Promise<Result<ProjectShape>>
+  /** Every project code of the project over its whole life, up to the month that runs. */
+  forecastLifetime(projectId: string): Promise<Result<Lifetime[]>>
   progressSettings(projectId: string): Promise<Result<ProgressSettings>>
   saveProgressSettings(
     projectId: string,

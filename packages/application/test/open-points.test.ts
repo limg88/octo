@@ -88,4 +88,44 @@ describe('the register of the open points of a project', () => {
     const kept = await points.keep(project, { ...settled, closedDay: '2026-11-16' })
     expect((await points.register(project)).closedDay).toBe(kept.closedDay)
   })
+
+  it('takes out what came from a meeting that is no longer of the project, writing only then', async () => {
+    const { points, writer, saves } = setup()
+    const folder = '_octo/riunioni/2026-11-17_daily_0825f680'
+    const kept = await points.keep(project, {
+      ...NO_OPEN_POINTS,
+      readMeetings: ['m-daily'],
+      points: [
+        {
+          id: 'p-1',
+          title: 'Certificati',
+          owner: '',
+          openedOn: '2026-11-17',
+          due: null,
+          state: 'open',
+          origin: 'claude',
+          source: { path: `${folder}/notes.md`, quote: 'certificati', verified: true },
+          signalKey: null,
+          signalKind: null,
+          meeting: null,
+          closedOn: null,
+          closedBy: null,
+          closing: null,
+          history: [],
+          check: null,
+        },
+      ],
+    })
+    expect(writer.files.get(OPEN_POINTS_FILE)).toContain('Certificati')
+    const before = saves()
+    // Another meeting: nothing is written.
+    expect(await points.forget(project, { id: 'm-altra', folder: '_octo/riunioni/altra' })).toBe(
+      kept,
+    )
+    expect(saves()).toBe(before)
+    const cleaned = await points.forget(project, { id: 'm-daily', folder })
+    expect(cleaned).toMatchObject({ points: [], readMeetings: [] })
+    expect(saves()).toBe(before + 1)
+    expect(writer.files.get(OPEN_POINTS_FILE)).not.toContain('Certificati')
+  })
 })

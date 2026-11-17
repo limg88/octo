@@ -9,7 +9,7 @@ import {
   sameSprint,
 } from '@octo/domain'
 import { useState } from 'react'
-import { Figure, OpenItem, useOpenInTracker } from './DashboardParts.tsx'
+import { Figure, OpenItem, useHasPeriods, useOpenInTracker } from './DashboardParts.tsx'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { dateText, messages } from './messages.ts'
 
@@ -291,7 +291,8 @@ function RequirementTable({
   onRemoveSignal: (id: string, signal: string) => void
   onOpenItem: ((id: string) => void) | undefined
 }) {
-  const columns: DataColumn<RequirementRow>[] = [
+  const hasPeriods = useHasPeriods()
+  const allColumns: DataColumn<RequirementRow>[] = [
     {
       key: 'id',
       label: text.columnId,
@@ -374,6 +375,8 @@ function RequirementTable({
       ),
     },
   ]
+  // A tracker without planning periods has no column for them: it would be empty on every row.
+  const columns = allColumns.filter((column) => hasPeriods || column.key !== 'period')
   return (
     <DataTable label={text.columnSignals} columns={columns} rows={rows} rowKey={(row) => row.id} />
   )

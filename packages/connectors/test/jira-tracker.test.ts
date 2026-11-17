@@ -6,6 +6,7 @@ import {
   historyOf,
   type JiraTrackerSnapshot,
   stateChangeOf,
+  statusIdOf,
   trackerItemOf,
 } from '../src/jira/tracker.ts'
 import { createConnectorReader } from '../src/reader.ts'
@@ -86,7 +87,8 @@ describe('an issue as an item of the tracker snapshot', () => {
       sprint: 'Sprint 28',
       parent: 'AUR-9',
       description: 'Il login impiega dieci secondi.',
-      acceptance_criteria: '',
+      // Jira has no field for them: null, where an empty text would say they are missing.
+      acceptance_criteria: null,
       // A comment without a date is not one the dashboard can order.
       discussion: [
         { by: 'Carla Bianchi', date: '2026-11-03T09:00:00.000Z', text: 'Quando lo rilasciate?' },
@@ -172,6 +174,65 @@ describe('the changelog of an issue', () => {
         ['2026-10-06T09:00:00.000Z', 'Squadra; Urgente'],
       ],
     })
+  })
+
+  it('calls every state as the issues call it, by the id Jira gives the state', () => {
+    // The changelog writes the states in the language of the site, with their ids beside.
+    const page = changelogPageOf({
+      values: [
+        {
+          created: '2026-10-05T09:00:00.000+0000',
+          items: [
+            {
+              field: 'status',
+              from: '10000',
+              fromString: 'To Do',
+              to: '3',
+              toString: 'In Progress',
+            },
+          ],
+        },
+        {
+          created: '2026-10-09T09:00:00.000+0000',
+          items: [
+            {
+              field: 'status',
+              from: '3',
+              fromString: 'In Progress',
+              to: '10002',
+              toString: 'Done',
+            },
+          ],
+        },
+      ],
+    })
+    expect(page.states[0]).toEqual({
+      at: '2026-10-05T09:00:00.000Z',
+      from: 'To Do',
+      to: 'In Progress',
+      fromId: '10000',
+      toId: '3',
+    })
+    const item = trackerItemOf(issue({ status: 'Completata' }), null)
+    // The issues read carry «Da completare» and «Completata»; nobody is «In Progress» now.
+    const names = new Map([
+      ['10000', 'Da completare'],
+      ['10002', 'Completata'],
+    ])
+    expect(historyOf(item, page, names).states.map(([, state]) => state)).toEqual([
+      'Da completare',
+      'In Progress',
+      'Completata',
+    ])
+    // Without the names, the changelog is told as it is written.
+    expect(historyOf(item, page).states.map(([, state]) => state)).toEqual([
+      'To Do',
+      'In Progress',
+      'Done',
+    ])
+    expect(statusIdOf({ fields: { status: { id: '10002', name: 'Completata' } } })).toBe('10002')
+    expect(statusIdOf({ fields: {} })).toBeNull()
+    expect(statusIdOf(null)).toBeNull()
   })
 
   it('takes what the issue has now for one that never changed', () => {

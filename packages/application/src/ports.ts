@@ -424,6 +424,11 @@ export type ProjectOrder = {
   ordered: number | null
   /** How it is sold, as its sales orders tell it; null when they do not tell. */
   kind: ForecastKind | null
+  /** The month of its first sales order, `YYYY-MM`; null when no order tells it. */
+  startMonth: string | null
+  /** What was invoiced and what was recognised as revenue so far; null when not told. */
+  invoiced: number | null
+  recognized: number | null
 }
 
 /**

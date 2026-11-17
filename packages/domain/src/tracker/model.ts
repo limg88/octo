@@ -22,6 +22,20 @@ export function trackerOfExport(exportPath: string): TrackerKind | null {
   return TRACKER_KINDS.find((kind) => TRACKER_PATHS[kind].snapshot === exportPath) ?? null
 }
 
+/** How a tracker is named among the sources of a project when nothing tells which one it is. */
+export const CLIENT_TRACKER_NAME = 'Tracker del cliente'
+/**
+ * The name of each tracker among the sources. Azure DevOps is the client's in the projects Octo
+ * knows; a Jira may be the supplier's own register, and is called by its name.
+ */
+export const TRACKER_SOURCE_NAMES: Readonly<Record<TrackerKind, string>> = {
+  ado: CLIENT_TRACKER_NAME,
+  // Not «Jira» alone: that is how the reading of its issues is already named among the sources.
+  jira: 'Tracker (Jira)',
+}
+export const trackerSourceName = (kind: TrackerKind | null | undefined): string =>
+  (kind ? TRACKER_SOURCE_NAMES[kind] : undefined) ?? CLIENT_TRACKER_NAME
+
 /** The id of an item as its tracker writes it: a number on Azure DevOps, a key on Jira. */
 const TRACKER_ITEM_ID: Readonly<Record<TrackerKind, RegExp>> = {
   ado: /^\d+$/,
@@ -53,7 +67,8 @@ export type TrackerItem = {
   parentId: string | null
   environment: string | null
   description: string
-  acceptanceCriteria: string
+  /** Null when the tracker has no field for them: nothing can then be said to be missing. */
+  acceptanceCriteria: string | null
   comments: TrackerComment[]
 }
 

@@ -7,6 +7,7 @@ import {
   checkUnrecorded,
   type DayClosingResult,
   type DayMeeting,
+  forgetMeeting,
   MAX_OPEN_POINTS,
   MAX_POINT_HISTORY,
   meetingEnd,
@@ -522,5 +523,104 @@ describe('what the meetings of a day do to the register', () => {
     // Recorded: there is something to read, nobody is asked.
     const recording = [{ started: '2026-11-16T09:01:00.000Z', minutes: 50 }]
     expect(checkUnrecorded(register, [sal], recording, day)).toBe(register)
+  })
+})
+
+describe('a meeting that turns out to be of another project', () => {
+  const FOLDER = '_octo/riunioni/2026-11-17_daily_0825f680'
+  const inside = (quote: string) => ({ path: `${FOLDER}/notes.md`, quote, verified: true })
+  const elsewhere = {
+    path: '_octo/riunioni/2026-11-16_sal_d5361486/notes.md',
+    quote: 'altro',
+    verified: true,
+  }
+
+  it('takes away its points, opens again what its words closed, and forgets it was read', () => {
+    let register = NO_OPEN_POINTS
+    register = addOpenPoint(
+      register,
+      { title: 'Viking', origin: 'claude', source: inside('viking') },
+      TODAY,
+    )
+    register = addOpenPoint(
+      register,
+      { title: 'Certificati', origin: 'claude', source: inside('tui') },
+      TODAY,
+    )
+    register = addOpenPoint(
+      register,
+      { title: 'Di un’altra riunione', origin: 'claude', source: elsewhere },
+      TODAY,
+    )
+    register = byHand(register, 'Chiuso da quella riunione')
+    register = byHand(register, 'Solo annotato')
+    register = byHand(register, 'Mai toccato')
+    const closedId = idOf(register, 'Chiuso da quella riunione')
+    const notedId = idOf(register, 'Solo annotato')
+    register = {
+      ...register,
+      readMeetings: ['m-daily', 'm-sal'],
+      points: register.points.map((point) =>
+        point.id === closedId
+          ? {
+              ...point,
+              state: 'resolved' as const,
+              closedOn: '2026-11-17',
+              closedBy: 'claude' as const,
+              closing: inside('fatto'),
+              history: [{ day: '2026-11-17', text: 'Fatto', source: inside('fatto') }],
+            }
+          : point.id === notedId
+            ? {
+                ...point,
+                history: [
+                  { day: '2026-11-16', text: 'Detto al SAL', source: elsewhere },
+                  { day: '2026-11-17', text: 'Detto alla daily', source: inside('detto') },
+                ],
+              }
+            : point,
+      ),
+    }
+
+    const cleaned = forgetMeeting(register, 'm-daily', FOLDER)
+
+    expect(cleaned.points.map((point) => point.title)).toEqual([
+      'Di un’altra riunione',
+      'Chiuso da quella riunione',
+      'Solo annotato',
+      'Mai toccato',
+    ])
+    expect(cleaned.points.find((point) => point.id === closedId)).toMatchObject({
+      state: 'open',
+      closedOn: null,
+      closedBy: null,
+      closing: null,
+      history: [],
+    })
+    expect(cleaned.points.find((point) => point.id === notedId)?.history).toEqual([
+      { day: '2026-11-16', text: 'Detto al SAL', source: elsewhere },
+    ])
+    expect(cleaned.readMeetings).toEqual(['m-sal'])
+    // The point nothing touched is the very same object: nothing is rewritten for no reason.
+    expect(cleaned.points.at(-1)).toBe(register.points.at(-1))
+  })
+
+  it('is the same register when it holds nothing of the meeting', () => {
+    const register = byHand(NO_OPEN_POINTS, 'Un punto')
+    expect(forgetMeeting(register, 'm-daily', FOLDER)).toBe(register)
+    // A folder whose name only starts alike is another meeting.
+    const near = addOpenPoint(
+      register,
+      {
+        title: 'Vicino',
+        origin: 'claude',
+        source: { ...inside('x'), path: `${FOLDER}-bis/notes.md` },
+      },
+      TODAY,
+    )
+    expect(forgetMeeting(near, 'm-daily', FOLDER)).toBe(near)
+    // Read and with no point: only the list of the meetings read changes.
+    const read = { ...register, readMeetings: ['m-daily'] }
+    expect(forgetMeeting(read, 'm-daily', FOLDER)).toEqual({ ...register, readMeetings: [] })
   })
 })

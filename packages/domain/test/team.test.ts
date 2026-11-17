@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignedToOwnPeople,
+  capDaysOf,
   cleanTeam,
   NO_TEAM,
   ownPeopleKeys,
@@ -11,6 +12,7 @@ import {
   starterFiles,
   TEAM_FILE,
   type TeamPerson,
+  teamCaps,
   teamMarkdown,
 } from '../src/index.ts'
 
@@ -117,6 +119,44 @@ describe('the people and the calendar of a project', () => {
     const empty = teamMarkdown(NO_TEAM)
     expect(empty).toContain('# Persone e calendario del progetto')
     expect(empty).not.toContain('##')
+  })
+})
+
+describe('the most days a person is to spend on a project', () => {
+  it('is the one written for the person, else the one the role says in words', () => {
+    expect(capDaysOf(person('A', { capDays: 8 }))).toBe(8)
+    expect(capDaysOf(person('A', { role: 'Analista (8 gg)' }))).toBe(8)
+    expect(capDaysOf(person('A', { role: 'PM, 1,5 giorni' }))).toBe(1.5)
+    expect(capDaysOf(person('A', { role: 'Architect 2 days', capDays: 3 }))).toBe(3)
+    // A role that names no days, a cap of nothing or of nonsense: no cap.
+    for (const none of [
+      person('A', { role: 'Sviluppatore senior' }),
+      person('A', { role: 'ggg' }),
+      person('A', { capDays: 0 }),
+      person('A', { capDays: Number.NaN }),
+      person('A', { capDays: null }),
+    ]) {
+      expect(capDaysOf(none)).toBeNull()
+    }
+  })
+
+  it('is kept tidy with the person, written in the text of the project, and told of the supplier only', () => {
+    const team = cleanTeam({
+      people: [
+        person('Anna Rossi', { capDays: 2 }),
+        person('Luca Bianchi', { role: 'Analista 8 gg' }),
+        person('Ugo Neri', { capDays: -1 }),
+        person('Carla Verdi', { side: 'client', capDays: 5 }),
+      ],
+      periods: [],
+    })
+    expect(team.people.map((entry) => entry.capDays)).toEqual([2, undefined, undefined, 5])
+    expect(teamCaps(team)).toEqual([
+      { person: 'Anna Rossi', days: 2 },
+      { person: 'Luca Bianchi', days: 8 },
+    ])
+    expect(teamMarkdown(team)).toContain('- **Anna Rossi**, tetto di 2 giorni')
+    expect(teamMarkdown(team)).not.toContain('Ugo Neri**, tetto')
   })
 })
 

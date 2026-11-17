@@ -45,7 +45,7 @@ function unclearIn(item: TrackerItem): RequirementRow['unclear'] {
   const text = plain(
     [
       item.description,
-      item.acceptanceCriteria,
+      item.acceptanceCriteria ?? '',
       ...item.comments.map((comment) => comment.text),
     ].join(' '),
   )
@@ -60,7 +60,13 @@ function signalsOf(item: TrackerItem, unclear: RequirementRow['unclear']): Requi
   const name = stateName(item.state)
   const signals: RequirementSignal[] = []
   if (NOT_REFINED.test(name)) signals.push('S1')
-  if (plain(item.acceptanceCriteria).length < MIN_ACCEPTANCE_CHARS) signals.push('S2')
+  // A tracker without the field cannot be asked for it: the signal would be on every story.
+  if (
+    item.acceptanceCriteria !== null &&
+    plain(item.acceptanceCriteria).length < MIN_ACCEPTANCE_CHARS
+  ) {
+    signals.push('S2')
+  }
   if (plain(item.description).length < MIN_DESCRIPTION_CHARS) signals.push('S3')
   if (WAITING.test(name)) signals.push('S4')
   if (unclear) signals.push('S5')

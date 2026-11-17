@@ -626,7 +626,7 @@ describe('the page of the day', () => {
       },
       alignments: {
         settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
-        view: async () => ({ alignment, exportedAt: null, tickets: 8 }),
+        view: async () => ({ alignment, stateMismatches: [], exportedAt: null, tickets: 8 }),
       },
       deliverables: { list: async () => [draft] },
       // The sprint ends tomorrow: what the trackers do not agree on is due.
@@ -704,6 +704,7 @@ describe('the page of the day', () => {
         settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
         view: async () => ({
           alignment: alignment as unknown as Alignment,
+          stateMismatches: [],
           exportedAt: null,
           tickets: 1,
         }),

@@ -1,3 +1,6 @@
+import type { Lifetime, LifetimeLine } from '@octo/domain'
+import { messages } from './messages.ts'
+
 const THOUSANDS = /^\d{1,3}(\.\d{3})+$/
 
 /**
@@ -25,3 +28,84 @@ export function amountField(typed: string): AmountRead {
 /** An amount back in the form it is typed in; empty for none. */
 export const amountText = (value: number | null): string =>
   value === null ? '' : String(value).replace('.', ',')
+
+/** Where a line of the life of a code comes from, with the months it stands for when an estimate. */
+export function lifetimeSourceText(line: Pick<LifetimeLine, 'source' | 'months'>): string {
+  const source = messages.forecast.lifetime.sources[line.source]
+  return line.months.length === 0 ? source : `${source} (${line.months.join(', ')})`
+}
+
+const COLUMN_GAP = 2
+
+/** Rows of text as a table for a mail in plain text: each column as wide as its widest cell. */
+function aligned(rows: readonly string[][]): string[] {
+  const widths = rows[0]?.map((_, column) =>
+    Math.max(...rows.map((row) => row[column]?.length ?? 0)),
+  )
+  return rows.map((row) =>
+    row
+      .map((cell, column) =>
+        column === 0
+          ? cell.padEnd((widths?.[column] ?? 0) + COLUMN_GAP)
+          : cell.padStart((widths?.[column] ?? 0) + COLUMN_GAP),
+      )
+      .join('')
+      .trimEnd(),
+  )
+}
+
+/**
+ * A project code over its whole life as a text to paste in a mail: the figures of the page, with
+ * what they miss said in so many words. Nothing that is not on the page.
+ */
+export function lifetimeMail(life: Lifetime): string {
+  const text = messages.forecast.lifetime
+  const { money, share, hours } = messages.forecast
+  const amount = (value: number | null): string => (value === null ? '—' : money(value))
+  const ofOrder = (value: number | null): string =>
+    value === null
+      ? '—'
+      : life.ordered
+        ? `${money(value)} (${share(value / life.ordered)})`
+        : money(value)
+  const table = aligned([
+    [text.person, text.hours, text.cost],
+    ...life.lines.map((line) => [
+      // An estimate is said on its own line: a mail is read without the page beside it.
+      line.source === 'estimate' ? `${line.person} (${text.estimateMark})` : line.person,
+      hours(line.hours),
+      amount(line.cost),
+    ]),
+    [text.total, hours(life.hours), money(life.costs)],
+  ])
+  const missing = life.lines.filter((line) => line.cost === null).map((line) => line.person)
+  return [
+    life.description === '' ? life.code : `${life.code} · ${life.description}`,
+    text.through(life.through),
+    '',
+    `${text.ordered}: ${amount(life.ordered)}`,
+    `${text.invoiced}: ${ofOrder(life.invoiced)}`,
+    `${text.recognized}: ${ofOrder(life.recognized)}`,
+    '',
+    ...table,
+    '',
+    `${text.marginToDate}: ${share(life.marginToDate)}`,
+    ...(life.budgetCosts === null
+      ? []
+      : [
+          `${text.budgetCosts}: ${money(life.budgetCosts)} · ${text.progress(share(life.progress))}`,
+        ]),
+    ...(life.marginAtEnd === null
+      ? []
+      : [
+          `${text.marginAtEnd}: ${share(life.marginAtEnd)} · ${text.onCosts(money(life.expectedCosts ?? 0))}`,
+        ]),
+    ...(life.estimatedHours > 0
+      ? ['', text.estimated(hours(life.estimatedHours), money(life.estimatedCosts))]
+      : []),
+    ...(missing.length > 0 ? ['', text.withoutCost(missing.join(', '))] : []),
+    ...(life.unreadMonths.length > 0
+      ? ['', messages.forecast.unreadMonths(life.unreadMonths.join(', '))]
+      : []),
+  ].join('\n')
+}

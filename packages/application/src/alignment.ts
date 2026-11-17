@@ -12,6 +12,8 @@ import {
   type Project,
   type ProjectTeam,
   parseTrackerExport,
+  type StateMismatch,
+  stateMismatches,
 } from '@octo/domain'
 import type {
   AlignmentSettingsStore,
@@ -41,6 +43,8 @@ export const ALIGNMENT_FOLDER = `${OCTO_FOLDER}/allineamento`
 
 export type AlignmentView = {
   alignment: Alignment
+  /** The states the alignment and the dashboard read in two different ways. */
+  stateMismatches: StateMismatch[]
   /** When the client's tracker was read; null when the export does not say. */
   exportedAt: string | null
   /** How many tickets were read, in any sprint. */
@@ -165,8 +169,10 @@ export function createAlignments(deps: AlignmentDeps): Alignments {
 
     async view(project) {
       const { settings, parsed, items, tickets } = await load(project)
+      const dashboard = await deps.dashboard.load(project.folder)
       return {
         alignment: alignTrackers(items, tickets, settings),
+        stateMismatches: stateMismatches(settings, dashboard),
         exportedAt: parsed.exportedAt,
         tickets: tickets.length,
       }

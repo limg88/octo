@@ -335,11 +335,49 @@ export interface DwsiProjectOrder {
   ordered: number | null
   /** What the lines sell, each item once, by name: it tells how the project is sold. */
   items: string[]
+  /** The day of its first sales order, `YYYY-MM-DD`; null with no order that carries a date. */
+  firstOrderDay: string | null
+  /**
+   * What was invoiced so far: the amount billed the last period of its backlog says, else the
+   * share of each order line that was invoiced; null when neither tells.
+   */
+  invoiced: number | null
+  /** The revenue recognised so far, as the last period of its backlog says; null without one. */
+  recognized: number | null
+}
+
+const ORDER_DAY = /^\d{4}-\d{2}-\d{2}/
+
+/**
+ * What the lines of the sales orders say was invoiced, as an amount. A line carries the quantity
+ * invoiced, not an amount: 0,3 of a quantity of 1 is 30% of the amount of the line. A line whose
+ * quantities do not make a share between nothing and the whole tells nothing.
+ */
+function invoicedOf(lines: ReadonlyArray<Record<string, unknown>>): number | null {
+  const amounts = lines.flatMap((line) => {
+    const [amount, quantity, invoiced] = [line.amount, line.quantity, line.invoiced].map((value) =>
+      value === null || value === '' ? Number.NaN : Number(value),
+    ) as [number, number, number]
+    const share = invoiced / quantity
+    return Number.isFinite(amount) && share >= 0 && share <= 1 ? [amount * share] : []
+  })
+  return amounts.length === 0 ? null : amounts.reduce((sum, amount) => sum + amount, 0)
 }
 
 const viewNamed = (name: string): DwsiView => DWSI_VIEWS.find((v) => v.name === name) as DwsiView
 const PROJECT_VIEW = viewNamed('v_project')
 const ORDERS_VIEW = viewNamed('v_sales_order_all')
+const BACKLOG_VIEW = viewNamed('v_backlog_all')
+
+/** The sum of the values of a column that are numbers; null when no row carries one. */
+function sumOf(rows: ReadonlyArray<Record<string, unknown>>, column: string): number | null {
+  const amounts = rows
+    .map((row) => row[column])
+    .filter((amount): amount is number | string => amount !== null && amount !== '')
+    .map(Number)
+    .filter(Number.isFinite)
+  return amounts.length === 0 ? null : amounts.reduce((sum, amount) => sum + amount, 0)
+}
 
 export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiConnector {
   const open = options.open ?? openDwsiSession
@@ -451,16 +489,21 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
           const items = lines.flatMap((line) =>
             typeof line.item === 'string' && line.item.trim() !== '' ? [line.item.trim()] : [],
           )
-          const amounts = lines
-            .map((line) => line.amount)
-            .filter((amount): amount is number | string => amount !== null && amount !== '')
-            .map(Number)
-            .filter(Number.isFinite)
+          const backlog = (await readView(session, BACKLOG_VIEW, code)).sort((a, b) =>
+            String(a.backlogrefperiod ?? '').localeCompare(String(b.backlogrefperiod ?? '')),
+          )
+          const last = backlog.at(-1)
+          const days = lines
+            .flatMap((line) => ORDER_DAY.exec(String(line.salesorderdate ?? ''))?.[0] ?? [])
+            .sort()
           all.push({
             projectid: code,
             name: typeof project?.name === 'string' ? project.name.trim() : '',
-            ordered: amounts.length === 0 ? null : amounts.reduce((sum, amount) => sum + amount, 0),
+            ordered: sumOf(lines, 'amount'),
             items: [...new Set(items)].sort(),
+            firstOrderDay: days[0] ?? null,
+            invoiced: (last ? sumOf([last], 'amountbilled') : null) ?? invoicedOf(lines),
+            recognized: last ? sumOf([last], 'amountrecognized') : null,
           })
         }
         return all

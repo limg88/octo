@@ -105,6 +105,23 @@ describe('writing while another program holds the file', () => {
     await files.remove(folder, 'a.md')
     expect(await readdir(folder)).toEqual([])
   })
+
+  it('takes away the folder its last file leaves empty, and no other', async () => {
+    const folder = await newFolder()
+    const files = createFsProjectFiles()
+    await mkdir(join(folder, 'riunioni', 'daily'), { recursive: true })
+    await writeFile(join(folder, 'riunioni', 'daily', 'notes.md'), 'x')
+    await writeFile(join(folder, 'riunioni', 'daily', 'transcript.md'), 'y')
+    await writeFile(join(folder, 'riunioni', '_lettura.md'), 'z')
+    await files.remove(folder, 'riunioni/daily/notes.md')
+    // Another file is still there: the folder stays.
+    expect(await readdir(join(folder, 'riunioni', 'daily'))).toEqual(['transcript.md'])
+    await files.remove(folder, 'riunioni/daily/transcript.md')
+    // The folder of the meeting goes with its last file; the one above holds something else.
+    expect(await readdir(join(folder, 'riunioni'))).toEqual(['_lettura.md'])
+    await files.remove(folder, 'riunioni/_lettura.md')
+    expect(await readdir(folder)).toEqual([])
+  })
 })
 
 describe('what the folder of a project knows of its readings', () => {

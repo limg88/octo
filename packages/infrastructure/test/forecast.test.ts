@@ -203,7 +203,15 @@ describe('the settings of the forecast on disk', () => {
   it('keep how each code is sold, and read a code with costs at budget as a fixed price', async () => {
     const store = createFsForecastSettings()
     const projects = {
-      P1: { kind: 'fee' as const, description: 'Canone', ordered: 22500, feeMonths: 12 },
+      P1: {
+        kind: 'fee' as const,
+        description: 'Canone',
+        ordered: 22500,
+        feeMonths: 12,
+        startMonth: null,
+        invoiced: null,
+        recognized: null,
+      },
     }
     await store.save(folder, { ...DEFAULT_FORECAST_SETTINGS, projects })
     expect((await store.load(folder)).projects).toEqual(projects)
@@ -218,8 +226,24 @@ describe('the settings of the forecast on disk', () => {
       }),
     )
     expect((await store.load(folder)).projects).toEqual({
-      P1: { kind: 'fixed_price', description: '', ordered: null, feeMonths: null },
-      P2: { kind: 'time_material', description: '', ordered: 5000, feeMonths: null },
+      P1: {
+        kind: 'fixed_price',
+        description: '',
+        ordered: null,
+        feeMonths: null,
+        startMonth: null,
+        invoiced: null,
+        recognized: null,
+      },
+      P2: {
+        kind: 'time_material',
+        description: '',
+        ordered: 5000,
+        feeMonths: null,
+        startMonth: null,
+        invoiced: null,
+        recognized: null,
+      },
     })
   })
 

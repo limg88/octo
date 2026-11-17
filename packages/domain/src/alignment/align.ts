@@ -1,3 +1,4 @@
+import { type DashboardSettings, type Phase, phaseOf } from '../tracker/model.ts'
 import type { AlignItem, AlignmentSettings, AlignTicket } from './model.ts'
 
 /** A client's item with the tickets that stand for it. */
@@ -315,4 +316,35 @@ export function missingTicketsCsv(
     settings.sprint,
   ])
   return `${[CSV_HEADER, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`
+}
+
+/** A state of the client's tracker the alignment and the dashboard read in two different ways. */
+export type StateMismatch = {
+  state: string
+  group: string
+  groupPhase: Phase
+  dashboardPhase: Phase
+}
+
+/**
+ * The states the PM put in a group of the alignment whose name says a phase (closed, in
+ * verification…) that is not the one the dashboard reads the state as: the two sections would
+ * count the same sprint differently. A group whose name says no phase is compared with nothing.
+ */
+export function stateMismatches(
+  settings: Pick<AlignmentSettings, 'stateGroups'>,
+  dashboard: Pick<DashboardSettings, 'phases'>,
+): StateMismatch[] {
+  const NO_HAND_MAPPING = { phases: {} }
+  return settings.stateGroups.flatMap((group) => {
+    const groupPhase = phaseOf(group.name, NO_HAND_MAPPING)
+    // «Work» is also what an unknown name falls into: only a name that says a phase counts.
+    if (groupPhase === 'work') return []
+    return group.item.flatMap((state) => {
+      const dashboardPhase = phaseOf(state, dashboard)
+      return dashboardPhase === groupPhase
+        ? []
+        : [{ state, group: group.name, groupPhase, dashboardPhase }]
+    })
+  })
 }

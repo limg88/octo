@@ -245,6 +245,13 @@ const view: View = {
       text: null,
     },
   ],
+  types: [
+    { type: 'Bug', count: 30 },
+    { type: 'User Story', count: 12 },
+    { type: 'Task', count: 4 },
+  ],
+  parts: { sprint: true, bugs: true, trend: true, activities: false },
+  activities: { rows: [], people: [], hours: 0, otherHours: 0 },
 }
 
 type Api = Pick<
@@ -317,6 +324,10 @@ describe('dashboard', () => {
     expect(api.dashboardView).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)), null)
     openTab(text.tabs.trend)
     expect(screen.getByText(text.days(12))).toBeTruthy()
+    // A median with decimals is written the Italian way: a comma, not a point.
+    expect(text.days(14.7)).toBe('14,7 gg')
+    expect(text.flowBefore(9.5)).toBe('periodo prima: 9,5 gg')
+    expect(text.days(null)).toBe('—')
     expect(screen.getAllByText(text.days(null)).length).toBeGreaterThan(0)
     expect(screen.getByRole('img', { name: text.trendTitle })).toBeTruthy()
     // The stretch before, beside the median of the period.
@@ -1045,5 +1056,179 @@ describe('the tracker read again by itself', () => {
     await waitFor(() => expect(api.dashboardView).toHaveBeenCalledTimes(2))
     shown.unmount()
     expect(stop).toHaveBeenCalled()
+  })
+})
+
+describe('a tracker kept as a register of activities', () => {
+  const comment = (at: string, said: string) => ({ by: 'Luca Bianchi', at, text: said })
+  const register: View = {
+    ...view,
+    tracker: 'jira',
+    linked: true,
+    types: [
+      { type: 'Task', count: 3 },
+      { type: 'Story', count: 2 },
+    ],
+    parts: { sprint: false, bugs: false, trend: false, activities: true },
+    activities: {
+      rows: [
+        {
+          id: 'AUR-3',
+          type: 'Task',
+          title: 'Analisi dei processi',
+          state: 'In corso',
+          phase: 'work',
+          assignee: 'Luca Bianchi',
+          hours: 25.5,
+          comments: [
+            comment('2026-06-20T08:00:00Z', 'Inviata la <b>bozza</b> al cliente'),
+            comment('2026-06-10T08:00:00Z', 'Prima bozza'),
+          ],
+        },
+        {
+          id: 'AUR-1',
+          type: 'Story',
+          title: 'Gestione progetto',
+          state: 'In corso',
+          phase: 'work',
+          assignee: null,
+          hours: 8,
+          comments: [],
+        },
+      ],
+      people: [
+        { person: 'Luca Bianchi', hours: 25.5, capHours: null },
+        { person: 'Anna Rossi', hours: 8, capHours: null },
+      ],
+      hours: 33.5,
+      otherHours: 2,
+    },
+  }
+  const words = text.activities
+
+  it('shows the activities with hours and diary, and none of the parts that have no data', async () => {
+    const api = fakeApi({ dashboardView: vi.fn(async () => ok(register)) })
+    render(<DashboardView api={api} project={project} now={now} />)
+    const table = await screen.findByRole('table', { name: words.title })
+    // Only the part that has something: the others are said to be hidden, and why.
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([text.tabs.activities])
+    expect(
+      screen.getByText(
+        text.hiddenTabs([text.tabs.sprint, text.tabs.bugs, text.tabs.trend].join(', ')),
+      ),
+    ).toBeTruthy()
+    const [, first, second, total] = within(table).getAllByRole('row')
+    expect(first?.textContent).toContain('AUR-3')
+    expect(first?.textContent).toContain('25,5')
+    expect(first?.textContent).toContain('«Inviata la bozza al cliente»')
+    expect(second?.textContent).toContain(text.unassigned)
+    expect(second?.textContent).toContain(words.noComment)
+    expect(total?.textContent).toBe(`${words.total}33,5`)
+    expect(screen.getByText(words.otherHours('2'))).toBeTruthy()
+    const people = screen.getByRole('table', { name: words.people })
+    expect(
+      within(people)
+        .getAllByRole('row')
+        .map((row) => row.textContent),
+    ).toEqual([`${words.columnPerson}${words.columnHours}`, 'Luca Bianchi25,5', 'Anna Rossi8'])
+
+    // The comments of an activity are its diary: opened and closed from its row.
+    fireEvent.click(screen.getByRole('button', { name: words.open('AUR-3') }))
+    const diary = screen.getByRole('list', { name: words.diary('AUR-3', 2) })
+    expect(
+      within(diary)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining('Inviata la  bozza  al cliente'),
+      expect.stringContaining('Prima bozza'),
+    ])
+    fireEvent.click(screen.getByRole('button', { name: words.close('AUR-3') }))
+    expect(screen.queryByRole('list', { name: words.diary('AUR-3', 2) })).toBeNull()
+
+    // An item opens where Jira keeps it.
+    fireEvent.click(within(table).getByRole('button', { name: 'AUR-1' }))
+    expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', 'AUR-1')
+  })
+
+  it('puts the hours of each person beside the most they are to spend, when the team says it', async () => {
+    const capped: View = {
+      ...register,
+      activities: {
+        ...register.activities,
+        people: [
+          { person: 'Luca Bianchi', hours: 25.5, capHours: 64 },
+          { person: 'Anna Rossi', hours: 20, capHours: 16 },
+          { person: 'Ugo Neri', hours: 1, capHours: null },
+        ],
+      },
+    }
+    render(
+      <DashboardView
+        api={fakeApi({ dashboardView: vi.fn(async () => ok(capped)) })}
+        project={project}
+        now={now}
+      />,
+    )
+    const people = await screen.findByRole('table', { name: words.people })
+    expect(
+      within(people)
+        .getAllByRole('row')
+        .map((row) => row.textContent),
+    ).toEqual([
+      `${words.columnPerson}${words.columnHours}${words.columnCap}`,
+      `Luca Bianchi25,5${words.cap('64', '8', '40%')}`,
+      `Anna Rossi20${words.cap('16', '2', '125%')} ${words.overCap}`,
+      `Ugo Neri1${words.noCap}`,
+    ])
+  })
+
+  it('says when no hours were read, and offers the types the tracker has to choose from', async () => {
+    const noHours: View = {
+      ...register,
+      linked: false,
+      activities: { ...register.activities, people: [], hours: 0, otherHours: 0 },
+    }
+    const api = fakeApi({ dashboardView: vi.fn(async () => ok(noHours)) })
+    render(<DashboardView api={api} project={project} now={now} />)
+    expect(await screen.findByText(words.noHours)).toBeTruthy()
+    // Without an address on the tracker the id is a text, not a button.
+    expect(screen.queryByRole('button', { name: 'AUR-1' })).toBeNull()
+    expect(screen.getByText(text.typesHint('Task (3), Story (2)'))).toBeTruthy()
+    // The types read are ticked, not typed: a Task can be counted as a story.
+    const stories = screen.getByRole('group', { name: text.storyTypes })
+    fireEvent.click(within(stories).getByLabelText('Task'))
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() =>
+      expect(api.saveDashboardSettings).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({ storyTypes: [...configured.storyTypes, 'Task'] }),
+      ),
+    )
+  })
+
+  it('calls by the name of Jira what orders the bugs, and shows no column of periods', async () => {
+    const onJira: View = { ...view, tracker: 'jira' }
+    const api = fakeApi({ dashboardView: vi.fn(async () => ok(onJira)) })
+    render(<DashboardView api={api} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      text.tabs.sprint,
+      text.tabs.bugs,
+      text.tabs.trend,
+    ])
+    expect(screen.getByRole('option', { name: text.severityNames.jira })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: text.severityNames.ado })).toBeNull()
+    openTab(text.tabs.sprint)
+    expect(screen.queryByRole('columnheader', { name: new RegExp(text.columnPeriod) })).toBeNull()
+    cleanup()
+    // On Azure DevOps both stay as they were.
+    render(<DashboardView api={fakeApi()} project={project} now={now} />)
+    await screen.findByRole('region', { name: text.qualityTitle })
+    expect(screen.getByRole('option', { name: text.severityNames.ado })).toBeTruthy()
+    openTab(text.tabs.sprint)
+    expect(
+      screen.getAllByRole('columnheader', { name: new RegExp(text.columnPeriod) }).length,
+    ).toBeGreaterThan(0)
   })
 })

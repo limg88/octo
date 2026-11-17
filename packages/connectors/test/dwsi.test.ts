@@ -972,9 +972,41 @@ describe('a DWSI sync', () => {
     const orders = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
     // The ordered amount is the sum of the lines of the sales orders; none, it is not known.
     expect(orders).toEqual([
-      { projectid: 'PRJ000101', name: 'Apollo', ordered: 98000, items: ['Servizi'] },
-      { projectid: 'PRJ000202', name: 'Borea', ordered: null, items: [] },
+      {
+        projectid: 'PRJ000101',
+        name: 'Apollo',
+        ordered: 98000,
+        items: ['Servizi'],
+        firstOrderDay: '2026-01-10',
+        invoiced: 45000,
+        recognized: 41000,
+      },
+      {
+        projectid: 'PRJ000202',
+        name: 'Borea',
+        ordered: null,
+        items: [],
+        firstOrderDay: null,
+        invoiced: null,
+        recognized: null,
+      },
     ])
+    // A line of an order carries the quantity invoiced, not an amount: 0,3 of 1 is 30% of the
+    // line. With no backlog to say what was billed, the amount invoiced is told by the lines.
+    await fake.exec(`
+      INSERT INTO dwsi.base_sales_order VALUES
+        ('SO-90', 1, '2026-08-07', 'Pending Billing', 'PROG-CORPO', 1, 7500, 0.3, 'PRJ000202', 'F', 'x'),
+        ('SO-90', 2, '2026-08-07', 'Pending Billing', 'PROG-CORPO', 2, 1000, 2, 'PRJ000202', 'F', 'x'),
+        ('SO-90', 3, '2026-08-07', 'Pending Billing', 'PROG-CORPO', 1, 500, 45000, 'PRJ000202', 'F', 'x'),
+        ('SO-90', 4, '2026-08-07', 'Pending Billing', 'PROG-CORPO', 0, 500, NULL, 'PRJ000202', 'F', 'x');
+    `)
+    try {
+      const [, borea] = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
+      // 30% of 7.500 and the whole of 1.000; a line that tells no share adds nothing.
+      expect(borea).toMatchObject({ ordered: 9500, invoiced: 3250, recognized: null })
+    } finally {
+      await fake.exec(`DELETE FROM dwsi.base_sales_order WHERE salesorderid = 'SO-90'`)
+    }
     const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })
     expect((await dwsiConnector.orders(asLuca([APOLLO, BOREA]))).map((o) => o.projectid)).toEqual([
       'PRJ000202',

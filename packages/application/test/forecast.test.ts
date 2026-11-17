@@ -1,11 +1,13 @@
 import {
   DEFAULT_FORECAST_SETTINGS,
+  DomainError,
   type ForecastSettings,
   type HoursEntry,
   NO_FORECAST_PROJECT,
   NO_SOURCES,
   type Project,
   type SheetGrid,
+  type TrackerHours,
   type WarehouseFeedConfig,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
@@ -79,6 +81,14 @@ function setup(
     orders?: ProjectOrder[]
     linked?: boolean
     secret?: boolean
+    /** The months of timesheets held whole, and what a reading of the missing ones does. */
+    readMonths?: string[] | null
+    readTimesheets?: (period: { from: string; to: string }) => Promise<void>
+    today?: string
+    /** The hours logged on the tracker, or how reading them fails. */
+    worklog?: TrackerHours[] | Error
+    /** The caps in days of the people of the project, by name. */
+    caps?: Record<string, number>
   } = {},
 ) {
   let saved: ForecastSettings = { ...DEFAULT_FORECAST_SETTINGS, ...initial }
@@ -133,6 +143,40 @@ function setup(
     secrets,
     orders: { read: async () => options.orders ?? [] },
     writer,
+    ...(options.readMonths === undefined
+      ? {}
+      : { readMonths: async () => options.readMonths ?? null }),
+    ...(options.readTimesheets === undefined
+      ? {}
+      : { readTimesheets: async (_project, period) => options.readTimesheets?.(period) }),
+    ...(options.today === undefined
+      ? {}
+      : { clock: { now: () => new Date(`${options.today}T10:00:00.000Z`) } }),
+    ...(options.caps === undefined
+      ? {}
+      : {
+          team: async () => ({
+            people: Object.entries(options.caps ?? {}).map(([name, capDays]) => ({
+              name,
+              role: '',
+              side: 'supplier' as const,
+              from: '',
+              to: '',
+              allocation: null,
+              note: '',
+              capDays,
+            })),
+            periods: [],
+          }),
+        }),
+    ...(options.worklog === undefined
+      ? {}
+      : {
+          worklog: async () => {
+            if (options.worklog instanceof Error) throw options.worklog
+            return options.worklog ?? []
+          },
+        }),
   })
   return { forecasts, filled, written, saved: () => saved }
 }
@@ -226,15 +270,40 @@ describe('the monthly forecast', () => {
       {
         orders: [
           // The orders say «by the day», but the PM already said how this code is sold.
-          { code: 'p1', description: 'Canone 2026', ordered: 22500, kind: 'time_material' },
-          { code: 'P2', description: 'Senza ordini', ordered: null, kind: null },
+          {
+            code: 'p1',
+            description: 'Canone 2026',
+            ordered: 22500,
+            kind: 'time_material',
+            startMonth: '2026-02',
+            invoiced: 6750,
+            recognized: 15750,
+          },
+          {
+            code: 'P2',
+            description: 'Senza ordini',
+            ordered: null,
+            kind: null,
+            startMonth: null,
+            invoiced: null,
+            recognized: null,
+          },
         ],
       },
     )
     const run = await forecasts.readOrders(project)
     expect(run.codes).toEqual(['P1', 'P2'])
     expect(saved().projects).toEqual({
-      P1: { kind: 'fee', description: 'Canone 2026', ordered: 22500, feeMonths: 12 },
+      P1: {
+        kind: 'fee',
+        description: 'Canone 2026',
+        ordered: 22500,
+        feeMonths: 12,
+        startMonth: '2026-02',
+        // What was invoiced and recognised is taken at every reading, as the ordered amount is.
+        invoiced: 6750,
+        recognized: 15750,
+      },
       P2: { ...NO_FORECAST_PROJECT, description: 'Senza ordini' },
     })
     expect(run.settings).toEqual(saved())
@@ -247,12 +316,30 @@ describe('the monthly forecast', () => {
       {},
       {
         codes: ['P1'],
-        orders: [{ code: 'P1', description: 'Assessment', ordered: 7500, kind: 'fixed_price' }],
+        orders: [
+          {
+            code: 'P1',
+            description: 'Assessment',
+            ordered: 7500,
+            kind: 'fixed_price',
+            startMonth: '2026-04',
+            invoiced: null,
+            recognized: null,
+          },
+        ],
       },
     )
     await forecasts.readOrders(project)
     expect(saved().projects).toEqual({
-      P1: { kind: 'fixed_price', description: 'Assessment', ordered: 7500, feeMonths: null },
+      P1: {
+        kind: 'fixed_price',
+        description: 'Assessment',
+        ordered: 7500,
+        feeMonths: null,
+        startMonth: '2026-04',
+        invoiced: null,
+        recognized: null,
+      },
     })
     // Sold at a fixed price, with nothing more written: it asks the costs at budget, no rate.
     const { forecast } = await forecasts.view(project, '2026-06')
@@ -266,6 +353,309 @@ describe('the monthly forecast', () => {
     })
     await forecasts.readOrders(project)
     expect(saved().projects.P1?.kind).toBe('time_material')
+  })
+
+  it('reads by itself the months of timesheets a fixed price misses, and says so when it cannot', async () => {
+    const worked = (id: string, day: string, hoursWorked: number, cost: number): HoursEntry => ({
+      person: 'Rossi Mario',
+      day,
+      hours: hoursWorked,
+      project: 'P1',
+      approved: true,
+      id,
+      cost,
+    })
+    const september = worked('9', '2026-09-15', 34, 850)
+    const october = worked('10', '2026-10-06', 21.5, 537.5)
+    const fixed: Partial<ForecastSettings> = {
+      projects: {
+        P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price', ordered: 7500, startMonth: '2026-09' },
+      },
+      months: {
+        '2026-10': {
+          P1: {
+            externals: [],
+            toInvoice: null,
+            revenue: null,
+            budgetCosts: 4000,
+            totalCosts: null,
+            totalCostsBeforeMonth: false,
+            note: '',
+          },
+        },
+      },
+    }
+    const asked: Array<{ from: string; to: string }> = []
+    const options: NonNullable<Parameters<typeof setup>[1]> = {
+      codes: ['P1'],
+      timesheet: [october],
+      readMonths: ['2026-10'],
+      today: '2026-11-17',
+      readTimesheets: async (period) => {
+        asked.push(period)
+        options.timesheet = [september, october]
+        options.readMonths = ['2026-09', '2026-10']
+      },
+    }
+    const { forecast } = await setup(fixed, options).forecasts.view(project, '2026-10')
+    // September was asked to the company's system, a whole month, and its costs count.
+    expect(asked).toEqual([{ from: '2026-09-01', to: '2026-09-30' }])
+    expect(forecast.unreadMonths).toEqual([])
+    expect(forecast.rows[0]?.values.quantity).toBeCloseTo(0.346875)
+
+    // Two openings of the page at once make one reading, and both see what it brought.
+    asked.length = 0
+    options.timesheet = [october]
+    options.readMonths = ['2026-10']
+    const twice = setup(fixed, options).forecasts
+    const both = await Promise.all([twice.view(project, '2026-10'), twice.view(project, '2026-10')])
+    expect(asked).toHaveLength(1)
+    expect(both.map((view) => view.forecast.unreadMonths)).toEqual([[], []])
+
+    // No credential here: the forecast is the one of the months on disk, and it says what misses.
+    const failing = setup(fixed, {
+      codes: ['P1'],
+      timesheet: [october],
+      readMonths: ['2026-10'],
+      today: '2026-11-17',
+      readTimesheets: async () => {
+        throw new DomainError('secret_missing')
+      },
+    })
+    const partial = (await failing.forecasts.view(project, '2026-10')).forecast
+    expect(partial.unreadMonths).toEqual(['2026-09'])
+    expect(partial.rows[0]?.values.quantity).toBeCloseTo(0.134375)
+    expect(partial.gaps).toContainEqual({ kind: 'unread_months', code: 'P1', months: ['2026-09'] })
+
+    // Nobody to ask: the same warning. A failure that is not of the source is not swallowed.
+    const alone = setup(fixed, { codes: ['P1'], timesheet: [october], readMonths: ['2026-10'] })
+    expect((await alone.forecasts.view(project, '2026-10')).forecast.unreadMonths).toEqual([
+      '2026-09',
+    ])
+    const broken = setup(fixed, {
+      codes: ['P1'],
+      timesheet: [october],
+      readMonths: [],
+      readTimesheets: async () => {
+        throw new Error('disk full')
+      },
+    })
+    await expect(broken.forecasts.view(project, '2026-10')).rejects.toThrow('disk full')
+  })
+
+  it('asks no timesheets of the months to come, and a long stretch a year at a time', async () => {
+    const asked: Array<{ from: string; to: string }> = []
+    const since = (startMonth: string): Partial<ForecastSettings> => ({
+      projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price', startMonth } },
+    })
+    const options = {
+      codes: ['P1'],
+      timesheet: [],
+      today: '2026-11-17',
+      readTimesheets: async (period: { from: string; to: string }) => {
+        asked.push(period)
+      },
+    }
+    const ahead = setup(since('2026-09'), {
+      ...options,
+      readMonths: ['2026-09', '2026-10', '2026-11'],
+    })
+    expect((await ahead.forecasts.view(project, '2026-12')).forecast.unreadMonths).toEqual([])
+    expect(asked).toEqual([])
+
+    const long = setup(since('2025-01'), { ...options, readMonths: [] })
+    await long.forecasts.view(project, '2026-03')
+    expect(asked).toEqual([
+      { from: '2025-01-01', to: '2025-12-31' },
+      { from: '2026-01-01', to: '2026-03-31' },
+    ])
+    // Files kept by hand: nothing can be said to miss, nothing is asked.
+    asked.length = 0
+    const byHand = setup(since('2025-01'), { ...options, readMonths: null })
+    expect((await byHand.forecasts.view(project, '2026-03')).forecast.unreadMonths).toEqual([])
+    expect(asked).toEqual([])
+  })
+
+  it('tells a code over its whole life, reading by itself the months it misses', async () => {
+    const worked = (
+      id: string,
+      person: string,
+      day: string,
+      h: number,
+      cost: number,
+    ): HoursEntry => ({
+      person,
+      day,
+      hours: h,
+      project: 'P1',
+      approved: true,
+      id,
+      cost,
+    })
+    const september = worked('9', 'Rossi Mario', '2026-09-15', 34, 1700)
+    const october = worked('10', 'Bianchi Luca', '2026-10-06', 21.5, 990)
+    const fixed: Partial<ForecastSettings> = {
+      projects: {
+        P1: {
+          ...NO_FORECAST_PROJECT,
+          kind: 'fixed_price',
+          ordered: 7500,
+          startMonth: '2026-09',
+          invoiced: 2250,
+          recognized: 5250,
+        },
+      },
+    }
+    const asked: Array<{ from: string; to: string }> = []
+    const options: NonNullable<Parameters<typeof setup>[1]> = {
+      codes: ['p1 ', 'P1'],
+      timesheet: [october],
+      readMonths: ['2026-10', '2026-11'],
+      today: '2026-11-17',
+      readTimesheets: async (period) => {
+        asked.push(period)
+        options.timesheet = [september, october]
+        options.readMonths = ['2026-09', '2026-10', '2026-11']
+      },
+    }
+    const [lifetime, ...others] = await setup(fixed, options).forecasts.lifetime(project)
+    expect(others).toEqual([])
+    expect(asked).toEqual([{ from: '2026-09-01', to: '2026-09-30' }])
+    expect(lifetime).toMatchObject({
+      code: 'P1',
+      through: '2026-11',
+      hours: 55.5,
+      costs: 2690,
+      invoiced: 2250,
+      recognized: 5250,
+      unreadMonths: [],
+    })
+    expect(lifetime?.lines.map((line) => line.person)).toEqual(['Bianchi Luca', 'Rossi Mario'])
+
+    // Opened while the month is being read: it waits for that reading, then asks what it lacks.
+    asked.length = 0
+    const read = new Set(['2026-10'])
+    const busy: NonNullable<Parameters<typeof setup>[1]> = {
+      codes: ['P1'],
+      timesheet: [september, october],
+      readMonths: [...read],
+      today: '2026-11-17',
+      readTimesheets: async (period) => {
+        asked.push(period)
+        read.add(period.from.slice(0, 7))
+        busy.readMonths = [...read]
+      },
+      // What NetSuite says today of the invoices and of the revenue replaces what was kept.
+      orders: [
+        {
+          code: 'P1',
+          description: 'Assessment',
+          ordered: 7500,
+          kind: 'fixed_price',
+          startMonth: '2026-08',
+          invoiced: 7500,
+          recognized: 6000,
+        },
+      ],
+    }
+    const together = setup(fixed, busy).forecasts
+    const [month, lives] = await Promise.all([
+      together.view(project, '2026-10'),
+      together.lifetime(project),
+    ])
+    expect(asked).toEqual([
+      { from: '2026-09-01', to: '2026-09-30' },
+      { from: '2026-11-01', to: '2026-11-30' },
+    ])
+    expect(month.forecast.unreadMonths).toEqual([])
+    expect(lives[0]).toMatchObject({ unreadMonths: [], invoiced: 7500, recognized: 6000 })
+
+    // NetSuite cannot be asked: the life of the code is told with what is there, and says so.
+    const alone = setup(fixed, { codes: ['P1'], timesheet: [october], readMonths: ['2026-10'] })
+    const [partial] = await alone.forecasts.lifetime(project)
+    expect(partial?.unreadMonths).toContain('2026-09')
+    expect(partial?.costs).toBe(990)
+    const unlinked = setup(fixed, { codes: ['P1'], timesheet: [october], linked: false })
+    expect((await unlinked.forecasts.lifetime(project))[0]).toMatchObject({ invoiced: 2250 })
+    await expect(
+      setup(fixed, { timesheet: null }).forecasts.lifetime(project),
+    ).rejects.toMatchObject({ code: 'forecast_timesheet_not_set' })
+  })
+
+  it('counts the hours of the tracker only when the project has one code they can be of', async () => {
+    const october: HoursEntry = {
+      person: 'Bianchi Luca',
+      day: '2026-10-06',
+      hours: 10,
+      project: 'P1',
+      approved: true,
+      id: '1',
+      cost: 460,
+    }
+    const worklog: TrackerHours[] = [
+      { issue: 'AUR-3', person: 'Luca Bianchi', day: '2026-11-03', hours: 4.5 },
+      { issue: 'AUR-1', person: 'Sara Verdi', day: '2026-10-20', hours: 5 },
+    ]
+    const settings: Partial<ForecastSettings> = {
+      projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price', ordered: 7500 } },
+      hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }],
+    }
+    const one = setup(settings, {
+      codes: ['P1'],
+      timesheet: [october],
+      worklog,
+      today: '2026-11-17',
+    })
+    const [life] = await one.forecasts.lifetime(project)
+    expect(life?.lines.map((line) => [line.person, line.source, line.cost])).toEqual([
+      ['Bianchi Luca', 'timesheet', 460],
+      ['Sara Verdi', 'no_timesheet', 350],
+      ['Bianchi Luca', 'estimate', 207],
+    ])
+    const month = await one.forecasts.view(project, '2026-10')
+    expect(month.forecast.rows[0]?.values.externalCosts).toBe(350)
+
+    // The caps of the people propose the costs at budget: 8 days of Luca at 46 an hour.
+    const capped = setup(settings, {
+      codes: ['P1'],
+      timesheet: [october],
+      caps: { 'Luca Bianchi': 8, 'Ugo Neri': 3 },
+    })
+    expect((await capped.forecasts.lifetime(project))[0]?.proposedBudget).toEqual({
+      costs: 2944,
+      people: [{ person: 'Luca Bianchi', days: 8, costPerHour: 46 }],
+      withoutCost: ['Ugo Neri'],
+    })
+    const cappedTwo = setup(settings, {
+      codes: ['P1', 'P2'],
+      timesheet: [october],
+      caps: { 'Luca Bianchi': 8 },
+    })
+    expect((await cappedTwo.forecasts.lifetime(project))[0]?.proposedBudget).toBeNull()
+
+    // Two codes: the tracker does not say which the hours are of, and they are of neither.
+    const two = setup(settings, {
+      codes: ['P1', 'P2'],
+      timesheet: [october],
+      worklog,
+      today: '2026-11-17',
+    })
+    const lives = await two.forecasts.lifetime(project)
+    expect(lives.flatMap((entry) => entry.lines.map((line) => line.source))).toEqual(['timesheet'])
+    // Hours that cannot be read leave the forecast as the timesheets tell it.
+    const failing = setup(settings, {
+      codes: ['P1'],
+      timesheet: [october],
+      worklog: new DomainError('hours_settings_invalid'),
+      today: '2026-11-17',
+    })
+    expect((await failing.forecasts.lifetime(project))[0]?.estimatedHours).toBe(0)
+    const broken = setup(settings, {
+      codes: ['P1'],
+      timesheet: [october],
+      worklog: new Error('disk'),
+    })
+    await expect(broken.forecasts.view(project, '2026-10')).rejects.toThrow('disk')
   })
 
   it('says what is missing before computing', async () => {

@@ -7,7 +7,7 @@ export const unassignedMeetingKey = (id: string): string => `meeting-unassigned:
 
 /** The recorded meetings no project could be told for: they wait for the PM to place them. */
 export function unassignedMeetingItems(
-  meetings: readonly RecordedMeeting[],
+  meetings: ReadonlyArray<RecordedMeeting & { elsewhere?: string | null }>,
   now: Date,
 ): TodayItem[] {
   return meetings.map((meeting): TodayItem => {
@@ -22,6 +22,7 @@ export function unassignedMeetingItems(
         start: meeting.started,
         minutes: meetingMinutes(meeting),
         days,
+        elsewhere: meeting.elsewhere ?? null,
       },
       weight: days,
       target: 'sources',

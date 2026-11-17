@@ -14,6 +14,11 @@ export type TeamPerson = {
   to: string
   /** The share of their time given to the project, in percent; null: not said. */
   allocation: number | null
+  /**
+   * The most days the person is to spend on the project, as it was sold or planned; null or
+   * absent: not said. The costs at budget of a fixed price are proposed from these.
+   */
+  capDays?: number | null | undefined
   /** How to write to them, what they want to read first, what never to tell them. */
   note: string
 }
@@ -38,6 +43,34 @@ export const FULL_ALLOCATION = 100
 const allocationOf = (value: number | null): number | null =>
   value !== null && Number.isFinite(value) && value > 0 && value <= FULL_ALLOCATION ? value : null
 
+const capOf = (value: number | null | undefined): number | null =>
+  value != null && Number.isFinite(value) && value > 0 ? value : null
+
+/** Days written in a role, as PMs do while there is no field for them: «Analista (8 gg)». */
+const DAYS_IN_ROLE = /(\d+(?:[.,]\d+)?)\s*(?:gg|giorn\w*|days?)\b/i
+
+/**
+ * The most days a person is to spend on the project: as written in its own field, else as the
+ * role says in words («8 gg», «1,5 giorni»); null when neither says.
+ */
+export function capDaysOf(person: Pick<TeamPerson, 'role' | 'capDays'>): number | null {
+  const written = capOf(person.capDays)
+  if (written !== null) return written
+  const inRole = DAYS_IN_ROLE.exec(person.role)?.[1]
+  return inRole === undefined ? null : capOf(Number(inRole.replace(',', '.')))
+}
+
+/** The most days a person is to spend on the project. */
+export type PersonCap = { person: string; days: number }
+
+/** The caps of the supplier's people who have one: what the project was planned to take. */
+export function teamCaps(team: ProjectTeam): PersonCap[] {
+  return team.people.flatMap((person) => {
+    const days = person.side === 'supplier' ? capDaysOf(person) : null
+    return days === null ? [] : [{ person: person.name, days }]
+  })
+}
+
 /** The people and the calendar as the PM typed them, made tidy: one entry per person and per name. */
 export function cleanTeam(team: ProjectTeam): ProjectTeam {
   const people = new Map<string, TeamPerson>()
@@ -52,6 +85,7 @@ export function cleanTeam(team: ProjectTeam): ProjectTeam {
       to: day(person.to),
       allocation: allocationOf(person.allocation),
       note: person.note.trim(),
+      ...(capOf(person.capDays) === null ? {} : { capDays: capOf(person.capDays) }),
     })
   }
   const periods = new Map<string, TeamPeriod>()
@@ -127,8 +161,12 @@ function personLine(person: TeamPerson): string {
     person.allocation === null
       ? ''
       : `, al ${person.allocation.toLocaleString('it-IT')}% del suo tempo`
+  const cap =
+    capOf(person.capDays) === null
+      ? ''
+      : `, tetto di ${(person.capDays ?? 0).toLocaleString('it-IT')} giorni`
   const note = person.note === '' ? '' : `\n  - Come scrivergli o scriverle: ${person.note}`
-  return `- **${person.name}**${role}${allocation}${stay}${note}`
+  return `- **${person.name}**${role}${allocation}${cap}${stay}${note}`
 }
 
 /**

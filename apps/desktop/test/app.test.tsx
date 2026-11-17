@@ -203,6 +203,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     chooseMeetingsRoot: vi.fn(async () => ok(null)),
     importedMeetings: vi.fn(async () => ok([])),
     assignMeeting: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
+    meetingDestinations: vi.fn(async () => ok([])),
+    moveMeeting: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),
     saveMailSource: vi.fn(async () => ok(mailView)),
     syncMail: vi.fn(async () =>
       ok({ at: '2026-11-14T10:00:00.000Z', written: 0, unchanged: 0, error: null }),
@@ -285,6 +287,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       ok: false as const,
       code: 'forecast_model_not_set' as const,
     })),
+    forecastLifetime: vi.fn(async () => ok([])),
+    projectShape: vi.fn(async () => ok({ twoTrackers: true, fixedPriceOnly: false })),
     readForecastOrders: vi.fn(async () => ({
       ok: false as const,
       code: 'source_not_configured' as const,
@@ -917,6 +921,23 @@ describe('project tabs', () => {
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
   })
 
+  it('offers no alignment to a project with one tracker, and tells a fixed price by its invoices', async () => {
+    const { api } = fakeApi({
+      projectShape: vi.fn(async () => ok({ twoTrackers: false, fixedPriceOnly: true })),
+    })
+    render(<App api={api} />)
+    await screen.findByRole('heading', { name: 'Aurora' })
+    // Nothing to align: the section and its group are not in the sidebar.
+    await waitFor(() =>
+      expect(screen.queryByRole('tab', { name: messages.alignmentTab })).toBeNull(),
+    )
+    expect(screen.queryByRole('tablist', { name: messages.nav.sprint })).toBeNull()
+    expect(screen.getByRole('tab', { name: messages.progressTab })).toBeTruthy()
+    // Sold at a fixed price only: «Avanzamento» is what NetSuite says, no form of the client.
+    fireEvent.click(screen.getByRole('tab', { name: messages.progressTab }))
+    expect(await screen.findByText(messages.progress.fixedPrice.intro)).toBeTruthy()
+  })
+
   it('groups the sections in the sidebar and moves among them with the arrows', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)
@@ -938,6 +959,7 @@ describe('project tabs', () => {
     ])
     expect(group(messages.nav.sprint)).toEqual([messages.alignmentTab])
     expect(group(messages.nav.project)).toEqual([messages.sourcesTab])
+    expect(api.projectShape).toHaveBeenCalledWith('p-1')
 
     // The settings have tabs of their own: the section in use is the one of the sidebar.
     const selected = () =>

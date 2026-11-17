@@ -207,4 +207,22 @@ describe('the requirements checked', () => {
     const byHand = { ...settings, requirementPeriods: ['P1'] }
     expect(ids(unclearRequirements(data(items), byHand, 'Sprint 13'))).toEqual(['1'])
   })
+
+  it('do not miss acceptance criteria on a tracker that has no field for them', () => {
+    const described =
+      'Una descrizione abbastanza lunga da dire che cosa va fatto, per chi e perché serve.'
+    const without = story({
+      id: '7',
+      state: 'To Do',
+      description: described,
+      acceptanceCriteria: '',
+    })
+    const noField = { ...without, id: '8', acceptanceCriteria: null }
+    const rows = unclearRequirements(data([without, noField]), settings)
+    // The field is there and empty: a signal. The field does not exist: nothing to say.
+    expect(rows.map((row) => [row.id, row.signals])).toEqual([['7', ['S2']]])
+    // What else is written still counts: a point to be settled in the description is a signal.
+    const unclear = { ...noField, description: `${described} Il formato è da definire.` }
+    expect(unclearRequirements(data([unclear]), settings)[0]?.signals).toEqual(['S5'])
+  })
 })

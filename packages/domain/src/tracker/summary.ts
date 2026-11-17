@@ -3,10 +3,13 @@ import {
   type DashboardSettings,
   inScope,
   isOfType,
+  isOpenPhase,
   PHASES,
   type Phase,
   phaseOf,
   type TrackerItem,
+  type TrackerKind,
+  trackerSourceName,
 } from './model.ts'
 
 /** Where the counts of the tracker, computed by the code, are kept as a text answers may cite. */
@@ -54,7 +57,7 @@ function byTag(items: readonly TrackerItem[], settings: DashboardSettings): stri
   const tags = new Map<string, { items: number; openBugs: number; stories: number }>()
   for (const item of items) {
     const bug = isOfType(item, settings.bugTypes)
-    const open = bug && phaseOf(item.state, settings) !== 'closed'
+    const open = bug && isOpenPhase(phaseOf(item.state, settings))
     for (const tag of new Set(item.tags)) {
       const counted = tags.get(tag) ?? { items: 0, openBugs: 0, stories: 0 }
       counted.items += 1
@@ -87,6 +90,8 @@ const tagTable = (rows: readonly string[]): string[] =>
 export function trackerSummary(
   data: { exportedAt: string | null; items: readonly TrackerItem[] },
   settings: DashboardSettings,
+  /** The tracker the reading is of, when Octo read it by itself: it is then called by its name. */
+  tracker: TrackerKind | null = null,
 ): string {
   const scoped = data.items.filter((item) => inScope(item.tags, settings))
   const bugs = scoped.filter((item) => isOfType(item, settings.bugTypes))
@@ -96,14 +101,17 @@ export function trackerSummary(
     const phase = phaseOf(bug.state, settings)
     phases.set(phase, (phases.get(phase) ?? 0) + 1)
   }
-  const open = bugs.length - (phases.get('closed') ?? 0)
+  const open = PHASES.filter(isOpenPhase).reduce(
+    (total, phase) => total + (phases.get(phase) ?? 0),
+    0,
+  )
   const tagged =
     settings.tags.length > 0 ? `elementi con tag ${settings.tags.join(', ')}` : 'tutti gli elementi'
   const perimeter = settings.ownPeopleOnly
     ? `${tagged}, assegnati alle persone del fornitore`
     : tagged
   return [
-    '# Tracker del cliente: riepilogo in numeri',
+    `# ${trackerSourceName(tracker)}: riepilogo in numeri`,
     '',
     'Scritto da Octo contando la lettura del tracker: i numeri non sono stime. Si aggiorna a ogni lettura del tracker e quando cambiano le impostazioni del cruscotto.',
     '',
@@ -114,7 +122,7 @@ export function trackerSummary(
     '## Bug',
     '',
     `- Bug nel perimetro: ${bugs.length}`,
-    `- Bug aperti: ${open}`,
+    `- Bug aperti (in lavorazione o in verifica): ${open}`,
     ...PHASES.map((phase) => `- Bug ${PHASE_LABEL[phase]}: ${phases.get(phase) ?? 0}`),
     '',
     '### Bug per sprint e stato',

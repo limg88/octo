@@ -56,7 +56,8 @@ function itemOf(value: unknown): TrackerItem | null {
     parentId: textOrNull(value.parent),
     environment: textOrNull(value.environment_bug),
     description: text(value.description),
-    acceptanceCriteria: text(value.acceptance_criteria),
+    // An export that says `null` comes from a tracker without the field; one that says nothing does not tell.
+    acceptanceCriteria: value.acceptance_criteria === null ? null : text(value.acceptance_criteria),
     comments: commentsOf(value.discussion),
   }
 }

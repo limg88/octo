@@ -307,6 +307,42 @@ export type DayClosingResult = {
   points: readonly ProposedPoint[]
 }
 
+/**
+ * The register as if a recorded meeting had never been of the project: the points opened from
+ * its files go, those its words closed are open again, what it said of the others is taken off,
+ * and it is no longer among the meetings read. The same register when it holds nothing of it.
+ */
+export function forgetMeeting(
+  register: OpenPointRegister,
+  meetingId: string,
+  folder: string,
+): OpenPointRegister {
+  const inside = (source: RiskSource | null): boolean =>
+    source?.path.startsWith(`${folder}/`) ?? false
+  let changed = register.readMeetings.includes(meetingId)
+  const points = register.points.flatMap((point): OpenPoint[] => {
+    if (inside(point.source)) {
+      changed = true
+      return []
+    }
+    const history = point.history.filter((note) => !inside(note.source))
+    const reopened = inside(point.closing)
+    if (!reopened && history.length === point.history.length) return [point]
+    changed = true
+    return [
+      reopened
+        ? { ...point, history, state: 'open', closedOn: null, closedBy: null, closing: null }
+        : { ...point, history },
+    ]
+  })
+  if (!changed) return register
+  return {
+    ...register,
+    points,
+    readMeetings: register.readMeetings.filter((id) => id !== meetingId),
+  }
+}
+
 /** Recorded meetings remembered as read at most: the oldest go first. */
 export const MAX_READ_MEETINGS = 500
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   beforeFirstDay,
   cleanMeetingsSource,
+  likelierProject,
   MEETINGS_FOLDER,
   type MeetingCandidate,
   type MeetingReading,
@@ -150,6 +151,14 @@ describe('the folder Verbale exports to', () => {
       since: '2026-11-16',
     })
     expect(cleanMeetingsSource({ root: 'C:\\Verbale', since: null }).root).toBe('C:\\Verbale')
+    // The meetings taken away from the project are kept, each once; none, nothing is written.
+    expect(
+      cleanMeetingsSource({ root: '/v', since: null, released: [' m-1 ', 'm-1', '', 'm-2'] }),
+    ).toEqual({ root: '/v', since: null, released: ['m-1', 'm-2'] })
+    expect(cleanMeetingsSource({ root: '/v', since: null, released: [] })).toEqual({
+      root: '/v',
+      since: null,
+    })
     for (const root of ['', 'Verbale', '../Verbale', '~altro/Verbale']) {
       expect(() => cleanMeetingsSource({ root, since: null })).toThrow('source_config_invalid')
     }
@@ -332,10 +341,41 @@ describe('a recorded meeting without a project on the page of the day', () => {
         start: kickoff.started,
         minutes: 45,
         days: 2,
+        elsewhere: null,
       },
       weight: 2,
       target: 'sources',
       asOf: null,
     })
+    // The project its people point to goes with it, for the PM to read before assigning it.
+    const [told] = unassignedMeetingItems(
+      [{ ...kickoff, elsewhere: 'Borea' }],
+      new Date('2026-11-12T10:00:00.000Z'),
+    )
+    expect(told?.facts).toMatchObject({ kind: 'meeting_unassigned', elsewhere: 'Borea' })
+  })
+})
+
+describe('the project the people of a meeting point to', () => {
+  const teams = [
+    { projectId: 'p-a', people: ['Rossi Mario', 'Anna Bianchi', 'Luca Verdi'] },
+    { projectId: 'p-b', people: ['Carla Neri', 'Luca Verdi'] },
+    { projectId: 'p-c', people: [] },
+  ]
+  const people = ['Mario Rossi <mario@example.test>', 'BIANCHI, Anna', 'Ospite Esterno']
+
+  it('is the only other project with more of them than this one', () => {
+    expect(likelierProject(people, 'p-b', teams)).toBe('p-a')
+    expect(likelierProject(people, 'p-c', teams)).toBe('p-a')
+    // This project has as many, or more: nothing to say.
+    expect(likelierProject(people, 'p-a', teams)).toBeNull()
+    expect(likelierProject(['Luca Verdi'], 'p-a', teams)).toBeNull()
+  })
+
+  it('is none when nobody is known, two others have as many, or the project has no team', () => {
+    expect(likelierProject(['Ospite Esterno'], 'p-b', teams)).toBeNull()
+    expect(likelierProject([], 'p-b', teams)).toBeNull()
+    expect(likelierProject(['Luca Verdi'], 'p-c', teams)).toBeNull()
+    expect(likelierProject(people, 'p-altro', teams)).toBe('p-a')
   })
 })

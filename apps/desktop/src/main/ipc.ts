@@ -19,6 +19,7 @@ import type {
   Models,
   OpenPoints,
   Progress,
+  ProjectShapes,
   Projects,
   QuestionLog,
   Risks,
@@ -74,6 +75,7 @@ export type IpcDeps = {
   dashboardAdvice: DashboardAdvice
   hours: Hours
   forecasts: Forecasts
+  shapes: ProjectShapes
   progress: Progress
   updates: Updates
   /** The version Octo was updated to since it last ran, where that costs it its permissions. */
@@ -148,6 +150,9 @@ const meetingsSaveInput = byProject.extend({
     .nullable(),
 })
 const meetingAssignInput = byProject.extend({ meetingId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const meetingMoveInput = meetingAssignInput.extend({
+  targetProjectId: z.string().min(1).max(MAX_RULE_LENGTH).nullable(),
+})
 
 const MAX_SECRET_LENGTH = 4000
 const rule = z.string().max(MAX_RULE_LENGTH)
@@ -275,6 +280,9 @@ const forecastSettingsInput = byProject.extend({
           description: z.string().max(MAX_INPUT_LENGTH),
           ordered: money,
           feeMonths: z.number().nullable(),
+          startMonth: rule.nullable(),
+          invoiced: money,
+          recognized: money,
         }),
       )
       .refine((projects) => Object.keys(projects).length <= MAX_RULES),
@@ -285,6 +293,7 @@ const forecastSettingsInput = byProject.extend({
     externals: z
       .array(z.object({ name: rule, code: rule, costPerDay: z.number(), ratePerDay: z.number() }))
       .max(MAX_RULES),
+    hourlyCosts: z.array(z.object({ person: rule, costPerHour: z.number() })).max(MAX_RULES),
     months: z
       .record(
         rule,
@@ -370,6 +379,7 @@ const teamInput = byProject.extend({
           to: rule,
           allocation: z.number().positive().max(FULL_ALLOCATION).nullable(),
           note: z.string().max(MAX_INPUT_LENGTH),
+          capDays: z.number().positive().nullable().optional(),
         }),
       )
       .max(MAX_RULES),
@@ -798,6 +808,18 @@ export function registerIpc(deps: IpcDeps): void {
     return deps.today.view(project)
   })
 
+  handle(CHANNELS.meetingsDestinations, byProject, async ({ projectId }) =>
+    deps.meetings.destinations(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.meetingsMove, meetingMoveInput, async (input) => {
+    const project = await deps.projects.get(input.projectId)
+    await deps.meetings.move(project, input.meetingId, input.targetProjectId)
+    sourcesChanged(input.projectId)
+    if (input.targetProjectId !== null) sourcesChanged(input.targetProjectId)
+    return deps.meetings.imported(project)
+  })
+
   handle(CHANNELS.feedingStatus, byProject, async ({ projectId }) =>
     deps.feeding.status(await deps.projects.get(projectId)),
   )
@@ -1060,6 +1082,14 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.forecastCompile, forecastMonthInput, async (input) =>
     deps.forecasts.compile(await deps.projects.get(input.projectId), input.month),
+  )
+
+  handle(CHANNELS.projectShape, byProject, async ({ projectId }) =>
+    deps.shapes.of(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.forecastLifetime, byProject, async ({ projectId }) =>
+    deps.forecasts.lifetime(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>

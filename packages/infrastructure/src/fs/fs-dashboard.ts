@@ -145,6 +145,9 @@ const forecastSchema = z.object({
         description: z.string().default(''),
         ordered: amount,
         feeMonths: amount,
+        startMonth: z.string().nullable().default(null),
+        invoiced: amount,
+        recognized: amount,
       }),
     )
     .default({}),
@@ -168,6 +171,7 @@ const forecastSchema = z.object({
       }),
     )
     .default([]),
+  hourlyCosts: z.array(z.object({ person: z.string(), costPerHour: z.number() })).default([]),
   months: z.record(z.string(), z.record(z.string(), forecastRowSchema)).default({}),
 })
 
@@ -208,6 +212,7 @@ function forecastSettingsOf(kept: z.infer<typeof forecastSchema>): ForecastSetti
       rate.ratePerDay === null ? [] : [{ ...rate, ratePerDay: rate.ratePerDay }],
     ),
     externals,
+    hourlyCosts: kept.hourlyCosts,
     months,
   }
 }
@@ -321,6 +326,7 @@ const teamSchema = z.object({
         to: z.string().default(''),
         allocation: z.number().nullable().default(null),
         note: z.string().default(''),
+        capDays: z.number().nullable().optional(),
       }),
     )
     .default([]),

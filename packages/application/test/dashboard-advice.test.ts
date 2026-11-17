@@ -90,6 +90,9 @@ const view: DashboardView = {
   },
   comparison: [],
   decisions: [],
+  types: [],
+  parts: { sprint: true, bugs: true, trend: true, activities: false },
+  activities: { rows: [], people: [], hours: 0, otherHours: 0 },
 }
 
 function setup(advisor: Partial<TrackerAdvisor>, shown: DashboardView = view) {

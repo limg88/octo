@@ -425,6 +425,15 @@ describe('tracker export', () => {
     expect(parseTrackerExport([])).toBeNull()
     expect(parseTrackerExport({ items: 'no' })).toBeNull()
     expect(parseTrackerExport({ items: [] })).toEqual({ exportedAt: null, items: [] })
+    // `null` says the tracker has no field for the acceptance criteria; nothing said, an empty one.
+    const told = parseTrackerExport({
+      items: [
+        { id: 1, created_date: '2026-06-01T08:00:00Z', acceptance_criteria: null },
+        { id: 2, created_date: '2026-06-01T08:00:00Z' },
+        { id: 3, created_date: '2026-06-01T08:00:00Z', acceptance_criteria: 'Dato che…' },
+      ],
+    })
+    expect(told?.items.map((item) => item.acceptanceCriteria)).toEqual([null, '', 'Dato che…'])
   })
 
   it('reads the history of states and tags, in order of time', () => {

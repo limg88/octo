@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  budgetFromCaps,
   cleanForecastSettings,
   compileForecast,
+  compileLifetime,
   DEFAULT_FORECAST_SETTINGS,
   type ForecastExternalRate,
   type ForecastModel,
@@ -9,13 +11,17 @@ import {
   type ForecastRate,
   type ForecastRowInputs,
   type ForecastSettings,
+  type ForecastWorklog,
   forecastFormulaAt,
   forecastKindOfItems,
+  forecastMonthsBetween,
   type HoursEntry,
+  hourlyCostsOf,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
   readForecastModel,
   type SheetGrid,
+  unreadForecastMonths,
 } from '../src/index.ts'
 
 const HEADINGS = [
@@ -192,9 +198,9 @@ describe('compiling the forecast', () => {
     expect(row?.note).toContain('timesheet approvati: 36 h = 4,5 gg')
     expect(row?.note).toContain('fuori dai costi: Verdi Luca')
     expect(forecast.gaps).toEqual([
-      { kind: 'no_rate', code: 'P1', person: 'Bianchi Anna', hours: 16 },
+      { kind: 'no_rate', code: 'P1', person: 'Bianchi Anna', hours: 16, proposed: null },
       { kind: 'no_cost', code: 'P1', person: 'Verdi Luca', hours: 8 },
-      { kind: 'no_rate', code: 'P1', person: 'Verdi Luca', hours: 8 },
+      { kind: 'no_rate', code: 'P1', person: 'Verdi Luca', hours: 8, proposed: null },
       { kind: 'no_total_costs', code: 'P1' },
     ])
     expect(forecast.notApprovedHours).toBe(8)
@@ -341,6 +347,68 @@ describe('compiling the forecast', () => {
     expect(capped?.values.revenue).toBeCloseTo(50000)
   })
 
+  it('says which months of timesheets a fixed price misses instead of counting them as zero', () => {
+    // The work began in September (34 h); only October (21,5 h) was read from the company's system.
+    const september = entry('Rossi Mario', '2026-09-15', 34)
+    const october = entry('Rossi Mario', '2026-10-06', 21.5)
+    const fixed = {
+      P1: project({ kind: 'fixed_price', ordered: 7500, startMonth: '2026-09' }),
+    }
+    const settings: ForecastSettings = {
+      ...settingsWith({}, [], [], fixed),
+      months: { '2026-10': { P1: { ...NO_ROW_INPUTS, budgetCosts: 4000 } } },
+    }
+    const compile = (rows: HoursEntry[], month: string, read: string[] | null) =>
+      compileForecast(['P1'], rows, settings, month, undefined, read)
+
+    // Everything read: 850 of September and 537,50 of October over 4.000 at budget.
+    const whole = compile([september, october], '2026-10', ['2026-09', '2026-10'])
+    expect(whole.rows[0]?.values.quantity).toBeCloseTo(0.346875)
+    expect(whole.unreadMonths).toEqual([])
+    expect(whole.gaps).toEqual([{ kind: 'no_total_costs', code: 'P1' }])
+
+    // September not read: the progress is lower than the true one, and the forecast says why.
+    const partial = compile([october], '2026-10', ['2026-10'])
+    expect(partial.rows[0]?.values.quantity).toBeCloseTo(0.134375)
+    expect(partial.unreadMonths).toEqual(['2026-09'])
+    expect(partial.gaps).toContainEqual({ kind: 'unread_months', code: 'P1', months: ['2026-09'] })
+    expect(partial.rows[0]?.note).toContain('timesheet non letti, costi incompleti: 2026-09')
+
+    // The month nobody read is not a month with no activity.
+    const unreadMonth = compile([october], '2026-09', ['2026-10'])
+    expect(unreadMonth.rows[0]?.note).not.toContain('nessuna attività nel mese')
+    expect(unreadMonth.unreadMonths).toEqual(['2026-09'])
+    // A month read with no hours is: nothing was worked.
+    const idle = compile([october], '2026-09', ['2026-09', '2026-10'])
+    expect(idle.rows[0]?.note).toContain('nessuna attività nel mese')
+
+    // Files kept by hand: which months were read cannot be told, nothing is said to miss.
+    expect(compile([october], '2026-10', null).unreadMonths).toEqual([])
+  })
+
+  it('needs of a code sold by days its own month only, and lists the months between two', () => {
+    expect(unreadForecastMonths(null, '2026-10', ['2026-09'])).toEqual(['2026-10'])
+    expect(unreadForecastMonths('2026-11', '2026-10', [])).toEqual(['2026-10'])
+    expect(unreadForecastMonths('2025-11', '2026-02', ['2025-12'])).toEqual([
+      '2025-11',
+      '2026-01',
+      '2026-02',
+    ])
+    expect(forecastMonthsBetween('2026-03', '2026-02')).toEqual([])
+    expect(forecastMonthsBetween('marzo', '2026-02')).toEqual([])
+    // Days sold: the start of the code changes nothing, the month of the forecast is what counts.
+    const days = { P1: project({ ordered: 1000, startMonth: '2026-01' }) }
+    const forecast = compileForecast(
+      ['P1'],
+      [],
+      settingsWith({}, [], [], days),
+      '2026-06',
+      undefined,
+      ['2026-06'],
+    )
+    expect(forecast.unreadMonths).toEqual([])
+  })
+
   it('spreads a fee in equal monthly parts, whatever was worked', () => {
     const fees = {
       P1: project({ kind: 'fee', ordered: 22500, feeMonths: 12 }),
@@ -377,6 +445,7 @@ describe('compiling the forecast', () => {
       code: 'P1',
       person: 'ROSSI Mario Luigi',
       hours: 12,
+      proposed: null,
     })
   })
 })
@@ -395,13 +464,14 @@ describe('rates by project code and externals', () => {
     const forecast = compileForecast(CODES, hours, settingsWith({}, rates), '2026-06')
     expect(forecast.rows[0]?.cells.revenue).toMatchObject({ formula: '1*400', value: 400 })
     expect(forecast.rows[1]?.cells.revenue).toMatchObject({ formula: '1*630', value: 630 })
-    // A rate written for another code only is not this person's rate here.
+    // A rate written for another code only is not this person's rate here: it is proposed.
     const onlyP2 = settingsWith({}, [{ person: 'Rossi Mario', code: 'P2', ratePerDay: 630 }])
     expect(compileForecast(CODES, hours, onlyP2, '2026-06').gaps).toContainEqual({
       kind: 'no_rate',
       code: 'P1',
       person: 'Rossi Mario',
       hours: 8,
+      proposed: { code: 'P2', ratePerDay: 630 },
     })
   })
 
@@ -472,8 +542,24 @@ describe('the settings of the forecast', () => {
     const clean = cleanForecastSettings({
       modelPath: '  modello.xlsx ',
       projects: {
-        ' p1 ': { kind: 'fee', description: ' Canone ', ordered: -1, feeMonths: 1.5 },
-        P2: { kind: 'fixed_price', description: '', ordered: 5000, feeMonths: 12 },
+        ' p1 ': {
+          kind: 'fee',
+          description: ' Canone ',
+          ordered: -1,
+          feeMonths: 1.5,
+          startMonth: 'settembre',
+          invoiced: null,
+          recognized: null,
+        },
+        P2: {
+          kind: 'fixed_price',
+          description: '',
+          ordered: 5000,
+          feeMonths: 12,
+          startMonth: ' 2026-09 ',
+          invoiced: null,
+          recognized: null,
+        },
         ' ': NO_FORECAST_PROJECT,
         P3: { ...NO_FORECAST_PROJECT, kind: 'altro' as ForecastProject['kind'] },
       },
@@ -492,6 +578,12 @@ describe('the settings of the forecast', () => {
         { name: 'Blu', code: '', costPerDay: 300, ratePerDay: 500 },
         { name: '', code: 'P1', costPerDay: 300, ratePerDay: 500 },
         { name: 'Neg', code: 'P1', costPerDay: -3, ratePerDay: 500 },
+      ],
+      hourlyCosts: [
+        { person: ' Verdi Sara ', costPerHour: 60 },
+        { person: 'Sara Verdi', costPerHour: 70 },
+        { person: 'Zero', costPerHour: 0 },
+        { person: '', costPerHour: 50 },
       ],
       months: {
         '2026-06': {
@@ -515,8 +607,24 @@ describe('the settings of the forecast', () => {
     expect(clean).toEqual({
       modelPath: 'modello.xlsx',
       projects: {
-        P1: { kind: 'fee', description: 'Canone', ordered: null, feeMonths: null },
-        P2: { kind: 'fixed_price', description: '', ordered: 5000, feeMonths: 12 },
+        P1: {
+          kind: 'fee',
+          description: 'Canone',
+          ordered: null,
+          feeMonths: null,
+          startMonth: null,
+          invoiced: null,
+          recognized: null,
+        },
+        P2: {
+          kind: 'fixed_price',
+          description: '',
+          ordered: 5000,
+          feeMonths: 12,
+          startMonth: '2026-09',
+          invoiced: null,
+          recognized: null,
+        },
         P3: NO_FORECAST_PROJECT,
       },
       hoursPerDay: 8,
@@ -525,6 +633,8 @@ describe('the settings of the forecast', () => {
         { person: 'Mario Rossi', code: 'P2', ratePerDay: 630 },
       ],
       externals: [{ name: 'Blu', code: 'P1', costPerDay: 310, ratePerDay: 500 }],
+      // One cost per person, the last written; a cost of nothing is not one.
+      hourlyCosts: [{ person: 'Sara Verdi', costPerHour: 70 }],
       months: {
         '2026-06': {
           P1: {
@@ -538,5 +648,331 @@ describe('the settings of the forecast', () => {
     expect(
       cleanForecastSettings({ ...DEFAULT_FORECAST_SETTINGS, hoursPerDay: 7.5 }).hoursPerDay,
     ).toBe(7.5)
+  })
+})
+
+describe('a project code over its whole life', () => {
+  // The sheet a PM keeps by hand for a fixed price: 68 hours, 7.500 ordered, 30% invoiced.
+  const rows = [
+    entry('Rossi Anna', '2026-09-10', 20, 'P1', true, 1000),
+    entry('Rossi Anna', '2026-10-05', 14, 'P1', true, 700),
+    entry('Bianchi Luca', '2026-10-06', 21.5, 'P1', true, 990),
+    entry('Bianchi Luca', '2026-11-03', 4.5, 'P1', true, 207),
+    // Left out: not approved, of another code, after the month asked, without a cost.
+    entry('Bianchi Luca', '2026-11-04', 3, 'P1', false, 138),
+    entry('Bianchi Luca', '2026-10-07', 8, 'P2', true, 368),
+    entry('Rossi Anna', '2026-12-01', 8, 'P1', true, 400),
+    entry('Neri Ugo', '2026-10-08', 2, 'P1', true, null),
+  ]
+  const settings: ForecastSettings = {
+    ...DEFAULT_FORECAST_SETTINGS,
+    projects: {
+      P1: project({
+        kind: 'fixed_price',
+        description: 'Assessment Aurora',
+        ordered: 7500,
+        startMonth: '2026-09',
+        invoiced: 2250,
+        recognized: 5250,
+      }),
+    },
+    externals: [{ name: 'Verdi Sara', code: 'P1', costPerDay: 560, ratePerDay: 0 }],
+    months: {
+      '2026-09': { P1: { ...NO_ROW_INPUTS, budgetCosts: 4000 } },
+      '2026-10': {
+        P1: { ...NO_ROW_INPUTS, budgetCosts: 4800, externals: [{ name: 'Verdi Sara', hours: 8 }] },
+      },
+      '2026-11': { P1: { ...NO_ROW_INPUTS, externals: [{ name: 'Studio Blu', hours: 4 }] } },
+      '2026-12': { P1: { ...NO_ROW_INPUTS, budgetCosts: 1 } },
+    },
+  }
+
+  it('lists who worked how much and at what cost, with the margins a PM computes by hand', () => {
+    const life = compileLifetime(' p1 ', rows, settings, '2026-11', [
+      '2026-09',
+      '2026-10',
+      '2026-11',
+    ])
+    expect(life.lines).toEqual([
+      { person: 'Bianchi Luca', hours: 26, cost: 1197, source: 'timesheet', months: [] },
+      { person: 'Neri Ugo', hours: 2, cost: null, source: 'timesheet', months: [] },
+      { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
+      // Who has no timesheet, as the PM declared them; without a cost written, hours only.
+      { person: 'Studio Blu', hours: 4, cost: null, source: 'declared', months: [] },
+      { person: 'Verdi Sara', hours: 8, cost: 560, source: 'declared', months: [] },
+    ])
+    expect(life).toMatchObject({
+      code: 'P1',
+      description: 'Assessment Aurora',
+      kind: 'fixed_price',
+      through: '2026-11',
+      ordered: 7500,
+      invoiced: 2250,
+      recognized: 5250,
+      hours: 74,
+      costs: 3457,
+      budgetCosts: 4800,
+      expectedCosts: 4800,
+      notApprovedHours: 3,
+      unreadMonths: [],
+    })
+    expect(life.marginToDate).toBeCloseTo((7500 - 3457) / 7500)
+    expect(life.progress).toBeCloseTo(3457 / 4800)
+    expect(life.marginAtEnd).toBeCloseTo((7500 - 4800) / 7500)
+  })
+
+  it('takes the costs the PM expects when written, never less than what was spent', () => {
+    const expected = (totalCosts: number): ForecastSettings => ({
+      ...settings,
+      months: { ...settings.months, '2026-11': { P1: { ...NO_ROW_INPUTS, totalCosts } } },
+    })
+    const months = ['2026-09', '2026-10', '2026-11']
+    const planned = compileLifetime('P1', rows, expected(5000), '2026-11', months)
+    expect(planned.expectedCosts).toBe(5000)
+    expect(planned.marginAtEnd).toBeCloseTo(2500 / 7500)
+    // Already spent more than expected: the margin at the end is the one of today.
+    const overrun = compileLifetime('P1', rows, expected(1000), '2026-11', months)
+    expect(overrun.marginAtEnd).toBeCloseTo(overrun.marginToDate ?? 0)
+    expect(
+      compileLifetime('P1', rows, { ...settings, months: {} }, '2026-11', months),
+    ).toMatchObject({ budgetCosts: null, progress: null, expectedCosts: null, marginAtEnd: null })
+    // Costs beyond the budget stop at the whole.
+    const small = {
+      ...settings,
+      months: { '2026-09': { P1: { ...NO_ROW_INPUTS, budgetCosts: 100 } } },
+    }
+    expect(compileLifetime('P1', rows, small, '2026-11', months).progress).toBe(1)
+  })
+
+  it('says the months it misses, and leaves the margins empty for a code nothing is known of', () => {
+    expect(compileLifetime('P1', rows, settings, '2026-11', ['2026-10']).unreadMonths).toEqual([
+      '2026-09',
+      '2026-11',
+    ])
+    const unknown = compileLifetime('P9', rows, settings, '2026-11')
+    expect(unknown).toMatchObject({
+      code: 'P9',
+      kind: 'time_material',
+      lines: [],
+      hours: 0,
+      costs: 0,
+      ordered: null,
+      marginToDate: null,
+      invoiced: null,
+      recognized: null,
+      unreadMonths: [],
+    })
+  })
+})
+
+describe('hours the timesheets do not hold', () => {
+  // The sheet of the PM: 55,5 h in the timesheets of September and October, 4,5 h of November
+  // logged on the tracker and not yet in the company's system, 8 h of who has no timesheet.
+  const rows = [
+    entry('Rossi Anna', '2026-09-10', 34, 'P1', true, 1700),
+    entry('Bianchi Luca', '2026-09-12', 10, 'P1', true, 400),
+    entry('Bianchi Luca', '2026-10-06', 11.5, 'P1', true, 529),
+    // Another code: it tells what an hour costs, not what was worked here.
+    entry('Costa Elena', '2026-10-06', 8, 'P9', true, 480),
+  ]
+  const logged = (person: string, day: string, hours: number) => ({
+    issue: 'AUR-3',
+    person,
+    day,
+    hours,
+  })
+  const worklog: ForecastWorklog = {
+    code: 'P1',
+    entries: [
+      // September and October are in the timesheets: what was logged then is not counted again.
+      logged('Luca Bianchi', '2026-10-06', 11.5),
+      logged('luca.bianchi', '2026-11-03', 4.5),
+      logged('Elena Costa', '2026-11-04', 2),
+      logged('Ugo Neri', '2026-11-05', 1),
+      // No timesheet at all: every month counts, at the cost the PM wrote.
+      logged('Sara Verdi', '2026-10-20', 5),
+      logged('Sara Verdi', '2026-11-06', 3),
+      logged('Sara Verdi', '2026-12-01', 9),
+    ],
+  }
+  const settings: ForecastSettings = {
+    ...DEFAULT_FORECAST_SETTINGS,
+    projects: { P1: project({ kind: 'fixed_price', ordered: 7500, startMonth: '2026-09' }) },
+    hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }],
+    months: { '2026-09': { P1: { ...NO_ROW_INPUTS, budgetCosts: 4000 } } },
+  }
+  const READ = ['2026-09', '2026-10', '2026-11']
+
+  it('tells what an hour of each person costs by their last month of timesheets', () => {
+    const costs = hourlyCostsOf([
+      ...rows,
+      entry('Bianchi Luca', '2026-10-07', 8, 'P1', false, 999),
+      entry('Bianchi Luca', '2026-10-08', 0, 'P1', true, 5),
+      entry('Neri Ugo', '2026-10-08', 2, 'P1', true, null),
+    ])
+    expect(costs.get('anna rossi')).toBe(50)
+    // October, not September: 529 over 11,5 hours.
+    expect(costs.get('bianchi luca')).toBe(46)
+    expect(costs.get('costa elena')).toBe(60)
+    expect(costs.has('neri ugo')).toBe(false)
+  })
+
+  it('estimates the months not yet in the timesheets from the tracker, and says it is an estimate', () => {
+    const life = compileLifetime('P1', rows, settings, '2026-11', READ, worklog)
+    expect(life.lines).toEqual([
+      { person: 'Bianchi Luca', hours: 21.5, cost: 929, source: 'timesheet', months: [] },
+      { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
+      // Who has no timesheet: October and November, not December which is still to come.
+      { person: 'Sara Verdi', hours: 8, cost: 560, source: 'no_timesheet', months: [] },
+      // November only, at the cost of an hour of the last timesheet of each.
+      // Called as the timesheets call them, whatever user name the tracker writes.
+      { person: 'Bianchi Luca', hours: 4.5, cost: 207, source: 'estimate', months: ['2026-11'] },
+      { person: 'Costa Elena', hours: 2, cost: 120, source: 'estimate', months: ['2026-11'] },
+      // Never in a timesheet and no cost written: the hours are there, the cost is not.
+      { person: 'Ugo Neri', hours: 1, cost: null, source: 'estimate', months: ['2026-11'] },
+    ])
+    expect(life).toMatchObject({ hours: 71, costs: 3516, estimatedHours: 7.5, estimatedCosts: 327 })
+    expect(life.marginToDate).toBeCloseTo((7500 - 3516) / 7500)
+  })
+
+  it('counts nothing from the tracker when its hours are of another code, or of none', () => {
+    for (const code of ['P9', null]) {
+      const life = compileLifetime('P1', rows, settings, '2026-11', READ, { ...worklog, code })
+      expect(life.lines.map((line) => line.source)).toEqual(['timesheet', 'timesheet'])
+      expect(life).toMatchObject({ estimatedHours: 0, estimatedCosts: 0, costs: 2629 })
+    }
+    expect(compileLifetime('P1', rows, settings, '2026-11', READ).estimatedHours).toBe(0)
+    // Who the PM said has no timesheet and has one after all is counted by the timesheet only.
+    const both = { ...settings, hourlyCosts: [{ person: 'Rossi Anna', costPerHour: 99 }] }
+    const anna = { code: 'P1', entries: [logged('Anna Rossi', '2026-09-10', 34)] }
+    expect(compileLifetime('P1', rows, both, '2026-11', READ, anna).costs).toBe(2629)
+  })
+
+  it('counts in a month, beside the externals, who has no timesheet by the hours logged', () => {
+    const month = (at: string) =>
+      compileForecast(['P1'], rows, settings, at, undefined, READ, worklog).rows[0]
+    const october = month('2026-10')
+    // 5 hours at 70; the estimates of the months to come are never in a month.
+    expect(october?.values).toMatchObject({ internalCosts: 529, externalCosts: 350 })
+    expect(october?.cells.externalCosts).toEqual({ kind: 'formula', formula: '5*70', value: 350 })
+    expect(october?.note).toContain('Sara Verdi: 5 h dal tracker, senza timesheet, a costo orario')
+    // The progress counts them in the months before too: (2.100 + 529 + 350) over 4.000.
+    expect(october?.values.quantity).toBeCloseTo(2979 / 4000)
+    const november = month('2026-11')
+    expect(november?.values).toMatchObject({ internalCosts: 0, externalCosts: 210 })
+    // Worked, though no timesheet says so.
+    expect(november?.note).not.toContain('nessuna attività nel mese')
+    expect(november?.values.quantity).toBeCloseTo(3189 / 4000)
+    const without = compileForecast(['P1'], rows, settings, '2026-10', undefined, READ).rows[0]
+    expect(without?.values.externalCosts).toBe(0)
+  })
+})
+
+describe('the costs at budget the caps of the people propose', () => {
+  // Three people with a cap in days: 2, 8 and 1,5. An hour of theirs costs 50, 46 and 70.
+  const rows = [
+    entry('Rossi Anna', '2026-09-10', 34, 'P1', true, 1700),
+    entry('Bianchi Luca', '2026-10-06', 11.5, 'P1', true, 529),
+  ]
+  const settings: ForecastSettings = {
+    ...DEFAULT_FORECAST_SETTINGS,
+    projects: { P1: project({ kind: 'fixed_price', ordered: 7500 }) },
+    hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }],
+  }
+  const caps = [
+    { person: 'Anna Rossi', days: 2 },
+    { person: 'Luca Bianchi', days: 8 },
+    { person: 'Sara Verdi', days: 1.5 },
+  ]
+
+  it('are the days of each cap at what an hour of the person costs', () => {
+    const proposal = budgetFromCaps(caps, rows, settings)
+    // 2 × 8 × 50 + 8 × 8 × 46 + 1,5 × 8 × 70.
+    expect(proposal).toEqual({
+      costs: 800 + 2944 + 840,
+      people: [
+        { person: 'Anna Rossi', days: 2, costPerHour: 50 },
+        { person: 'Luca Bianchi', days: 8, costPerHour: 46 },
+        { person: 'Sara Verdi', days: 1.5, costPerHour: 70 },
+      ],
+      withoutCost: [],
+    })
+    // A day of other hours changes the proposal with it.
+    expect(budgetFromCaps(caps, rows, { ...settings, hoursPerDay: 7.5 })?.costs).toBeCloseTo(
+      (800 + 2944 + 840) * (7.5 / 8),
+    )
+  })
+
+  it('leave out who has no cost of an hour, and say nothing when nobody has one or a cap', () => {
+    const partial = budgetFromCaps([...caps, { person: 'Ugo Neri', days: 3 }], rows, settings)
+    expect(partial?.withoutCost).toEqual(['Ugo Neri'])
+    expect(partial?.costs).toBe(4584)
+    expect(budgetFromCaps([], rows, settings)).toBeNull()
+    expect(budgetFromCaps([{ person: 'Ugo Neri', days: 3 }], rows, settings)).toBeNull()
+  })
+
+  it('go with the life of the code, beside the costs at budget the PM wrote', () => {
+    const life = compileLifetime('P1', rows, settings, '2026-11', null, undefined, caps)
+    expect(life.proposedBudget?.costs).toBe(4584)
+    expect(life.budgetCosts).toBeNull()
+    expect(compileLifetime('P1', rows, settings, '2026-11').proposedBudget).toBeNull()
+  })
+})
+
+describe('a new code of a project that sells days', () => {
+  // The same people move from one code to the next: the new one has no rate yet.
+  const rows = [
+    entry('Rossi Mario', '2026-10-05', 16, 'PI7'),
+    entry('Bianchi Anna', '2026-10-05', 8, 'PI7'),
+    entry('Neri Ugo', '2026-10-05', 8, 'PI7'),
+    entry('Rossi Mario', '2026-10-06', 8, 'PI6'),
+  ]
+  const settings: ForecastSettings = {
+    ...DEFAULT_FORECAST_SETTINGS,
+    rates: [
+      { person: 'Rossi Mario', code: 'PI5', ratePerDay: 370 },
+      { person: 'Mario Rossi', code: 'PI6', ratePerDay: 400 },
+      { person: 'Bianchi Anna', code: 'PI5', ratePerDay: 430 },
+    ],
+    months: {
+      '2026-10': {
+        PI6: { ...NO_ROW_INPUTS, note: 'ultimo mese' },
+        ' old1 ': { ...NO_ROW_INPUTS, externals: [{ name: 'Studio Blu', hours: 174 }] },
+      },
+      '2026-09': { OLD2: { ...NO_ROW_INPUTS, toInvoice: 100 } },
+    },
+  }
+
+  it('is proposed, for each person without a rate, the rate of the code written last', () => {
+    const forecast = compileForecast(['PI6', 'PI7'], rows, settings, '2026-10')
+    expect(forecast.gaps.filter((gap) => gap.kind === 'no_rate')).toEqual([
+      {
+        kind: 'no_rate',
+        code: 'PI7',
+        person: 'Bianchi Anna',
+        hours: 8,
+        proposed: { code: 'PI5', ratePerDay: 430 },
+      },
+      // Nobody ever wrote a rate for this person: nothing to propose.
+      { kind: 'no_rate', code: 'PI7', person: 'Neri Ugo', hours: 8, proposed: null },
+      // Two codes before: the one written last, whatever the order of the name.
+      {
+        kind: 'no_rate',
+        code: 'PI7',
+        person: 'Rossi Mario',
+        hours: 16,
+        proposed: { code: 'PI6', ratePerDay: 400 },
+      },
+    ])
+    // A proposal is not a rate: the revenue of the new code stays out until the PM takes it.
+    expect(forecast.rows.find((row) => row.code === 'PI7')?.values.revenue).toBe(0)
+  })
+
+  it('says which codes hold data of the month and are not of the project', () => {
+    expect(compileForecast(['PI6', 'PI7'], rows, settings, '2026-10').orphanCodes).toEqual(['OLD1'])
+    // Another month, other data; a code of the project is never an orphan.
+    expect(compileForecast(['PI6', 'PI7'], rows, settings, '2026-09').orphanCodes).toEqual(['OLD2'])
+    expect(compileForecast(['PI6', 'old1'], rows, settings, '2026-10').orphanCodes).toEqual([])
+    expect(compileForecast(['PI6'], rows, settings, '2026-08').orphanCodes).toEqual([])
   })
 })

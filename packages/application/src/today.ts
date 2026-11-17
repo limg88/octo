@@ -73,6 +73,7 @@ import {
   type TodaySettings,
   todayCount,
   trackerAgeItems,
+  trackerSourceName,
   unassignedMeetingItems,
   type WeekView,
   weekItems,
@@ -427,7 +428,7 @@ export function createToday(deps: TodayDeps): Today {
       Promise.resolve(sourceItems(sources, now)),
       attempt(async () => {
         const { settings: dashboard, view } = await tracker(project, now)
-        freshness.push({ source: 'Tracker del cliente', readAt: view.exportedAt })
+        freshness.push({ source: trackerSourceName(view.tracker), readAt: view.exportedAt })
         return [
           ...trackerAgeItems(view.exportedAt, view.age, now),
           ...bugItems(view.bugs.open, dashboard.stuckDays, view.exportedAt),

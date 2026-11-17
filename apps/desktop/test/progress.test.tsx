@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import type { ProgressView as View } from '@octo/application'
-import { DEFAULT_PROGRESS_SETTINGS, type ProgressSettings, type Project } from '@octo/domain'
+import {
+  DEFAULT_PROGRESS_SETTINGS,
+  type Lifetime,
+  type ProgressSettings,
+  type Project,
+} from '@octo/domain'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { messages } from '../src/renderer/messages.ts'
@@ -79,11 +84,13 @@ type Api = Pick<
   | 'compileProgress'
   | 'registerProgressInvoices'
   | 'openEvidence'
+  | 'forecastLifetime'
 >
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
     chooseProjectPath: vi.fn(async () => ok<string | null>('scelto/qui')),
+    forecastLifetime: vi.fn(async () => ok<Lifetime[]>([])),
     progressSettings: vi.fn(async () => ok(configured)),
     saveProgressSettings: vi.fn(async (_id: string, settings: ProgressSettings) => ok(settings)),
     progressCandidates: vi.fn(async () => ok(['Moduli/Richiesta SAL.xlsx'])),
@@ -571,5 +578,90 @@ describe('the settings of the order and of the form', () => {
       press(words.register)
       expect((await screen.findByRole('alert')).textContent).toMatch(/non sono valide/)
     })
+  })
+})
+
+describe('the progress of a project sold at a fixed price', () => {
+  const words = messages.progress.fixedPrice
+  const code = (more: Partial<Lifetime>): Lifetime => ({
+    code: 'AUR-01',
+    description: 'Assessment Aurora',
+    kind: 'fixed_price',
+    through: '2026-11',
+    ordered: 7500,
+    invoiced: 2250,
+    recognized: 5250,
+    lines: [],
+    hours: 0,
+    costs: 0,
+    estimatedHours: 0,
+    estimatedCosts: 0,
+    marginToDate: null,
+    budgetCosts: null,
+    proposedBudget: null,
+    progress: null,
+    expectedCosts: null,
+    marginAtEnd: null,
+    notApprovedHours: 0,
+    unreadMonths: [],
+    ...more,
+  })
+  const unset = { progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)) }
+
+  it('is what NetSuite says of its invoices, with no form of the client asked for', async () => {
+    const onOpenSection = vi.fn()
+    const api = fakeApi({
+      ...unset,
+      forecastLifetime: vi.fn(async () =>
+        ok([
+          code({}),
+          code({ code: 'AUR-02', description: '', invoiced: null, recognized: null }),
+          // A code sold by the day is not told here.
+          code({ code: 'AUR-03', kind: 'time_material' }),
+        ]),
+      ),
+    })
+    render(<ProgressView api={api} project={project} fixedPrice onOpenSection={onOpenSection} />)
+    const table = await screen.findByRole('table', { name: words.title })
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .map((row) => row.textContent),
+    ).toEqual([
+      `${words.code}${words.ordered}${words.invoiced}${words.toInvoice}${words.recognized}`,
+      // The advance invoiced, what is left to invoice, the revenue recognised.
+      'AUR-01Assessment Aurora7.500,002.250,00 (30%)5.250,00 (70%)5.250,00 (70%)',
+      `AUR-027.500,00${words.unknown}${words.unknown}${words.unknown}`,
+    ])
+    expect(screen.getByText(words.intro)).toBeTruthy()
+    expect(screen.getByText(words.notRead)).toBeTruthy()
+    // Nothing of the form of the client: neither its model nor the positions of the order.
+    expect(screen.queryByText(text.setup.firstTime)).toBeNull()
+    fireEvent.click(
+      screen.getByRole('button', { name: messages.openSection(messages.forecastTab) }),
+    )
+    expect(onOpenSection).toHaveBeenCalledWith('forecast')
+    // A fixed price that has a form to fill all the same gets to it with one press.
+    fireEvent.click(screen.getByRole('button', { name: words.useForm }))
+    expect(await screen.findByText(text.setup.firstTime)).toBeTruthy()
+  })
+
+  it('says why NetSuite could not be asked, and leaves the form to who already set it', async () => {
+    const failing = fakeApi({
+      ...unset,
+      forecastLifetime: vi.fn(async () => ({
+        ok: false as const,
+        code: 'forecast_timesheet_not_set' as const,
+      })),
+    })
+    render(<ProgressView api={failing} project={project} fixedPrice />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/timesheet/i)
+    cleanup()
+    // The form of the client is set: the page is the one of the requests, as before.
+    const api = fakeApi()
+    render(<ProgressView api={api} project={project} fixedPrice />)
+    await screen.findAllByText(/SAL|Richiest/i)
+    expect(api.forecastLifetime).not.toHaveBeenCalled()
+    expect(screen.queryByRole('table', { name: words.title })).toBeNull()
   })
 })

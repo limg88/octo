@@ -1,5 +1,6 @@
 import type { AgentProgress, TodayView as View } from '@octo/application'
 import {
+  CLIENT_TRACKER_NAME,
   type HiddenItem,
   isToDo,
   type MailTurn,
@@ -10,6 +11,7 @@ import {
   type TodayKind,
   type TodayMark,
   type TodayTarget,
+  TRACKER_SOURCE_NAMES,
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi, TodayDecisionChoice } from '../shared/api.ts'
@@ -107,8 +109,11 @@ const SECTION_OF: Partial<Record<TodayTarget, Section>> = {
   deliverables: 'deliverables',
 }
 
-/** The tracker of the client as the page names it among its sources. */
-const TRACKER_SOURCE = 'Tracker del cliente'
+/** The names the tracker may have among the sources of the page, whichever it is. */
+const TRACKER_SOURCES: readonly string[] = [
+  CLIENT_TRACKER_NAME,
+  ...Object.values(TRACKER_SOURCE_NAMES),
+]
 
 /** What the PM just decided of a signal, while it can still be taken back. */
 type Decided = { key: string; title: string; state: Exclude<TodayDecisionChoice, 'open'> }
@@ -497,7 +502,7 @@ export function TodayView({
       item.facts.kind === 'source'
         ? [item.facts.source]
         : item.facts.kind === 'tracker_old'
-          ? [TRACKER_SOURCE]
+          ? TRACKER_SOURCES
           : [],
     ),
   )

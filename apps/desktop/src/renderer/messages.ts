@@ -384,7 +384,7 @@ export const messages = {
     },
     kinds: {
       source: 'Fonti',
-      tracker_old: 'Tracker del cliente',
+      tracker_old: 'Tracker',
       mail_reply: 'Mail a cui rispondere',
       mail_follow: 'Mail da seguire',
       mail_waiting: 'In attesa di altri',
@@ -676,6 +676,7 @@ export const messages = {
       role: 'Ruolo',
       side: 'Parte',
       allocation: 'Allocazione %',
+      capDays: 'Tetto (giorni)',
       from: 'Dal',
       to: 'Al',
       note: 'Come scrivergli',
@@ -688,6 +689,8 @@ export const messages = {
     addPerson: 'Aggiungi una persona',
     addPeriod: 'Aggiungi un periodo',
     personWrong: (n: number) => `Persona ${n}: manca il nome.`,
+    capWrong: (n: number) =>
+      `Persona ${n}: il tetto è un numero di giorni maggiore di zero, per esempio 8 o 1,5.`,
     allocationWrong: (n: number) =>
       `Persona ${n}: l’allocazione è una percentuale, più di 0 e al massimo 100.`,
     periodWrong: (n: number) => `Periodo ${n}: servono il nome e le due date.`,
@@ -793,6 +796,14 @@ export const messages = {
     summary: (total: number, linked: number, needsUpdate: number, missing: number) =>
       `${total} voci del cliente nello sprint: ${linked} con il ticket nello sprint, ${needsUpdate} con il ticket altrove, ${missing} senza ticket.`,
     adds: 'Quadratura: ogni voce è in una sola delle tre liste.',
+    stateMismatch: (state: string, group: string, dashboardPhase: string) =>
+      `Lo stato «${state}» è nel gruppo «${group}» dell’allineamento, ma il cruscotto lo legge «${dashboardPhase}»: le due sezioni possono dare conti diversi dello stesso sprint. Per farle coincidere cambia la fase dello stato in «Cruscotto» → «Impostazioni del cruscotto» → «Come leggo gli stati dei bug», oppure il gruppo qui sotto.`,
+    phaseNames: {
+      work: 'in lavorazione',
+      verify: 'in verifica',
+      validated: 'validato',
+      closed: 'chiuso',
+    },
     doesNotAdd: 'Le tre liste non sommano al totale: non usare questi numeri e segnalalo.',
     data: (exported: string, tickets: number) =>
       `Tracker del cliente letto il ${exported}; ${tickets} ticket letti dal tuo tracker.`,
@@ -832,6 +843,21 @@ export const messages = {
   },
   progressTab: 'Avanzamento',
   progress: {
+    fixedPrice: {
+      title: 'Fatturato delle commesse a corpo',
+      loading: 'Leggo ordinato e fatture da NetSuite…',
+      intro:
+        'Questo progetto è venduto a corpo: non ha un modulo del cliente da compilare né posizioni d’ordine da ripartire. L’avanzamento della fatturazione è quello che dice NetSuite: quanto è stato ordinato, quanto fatturato (l’acconto, poi il saldo) e quanto resta. Margini e avanzamento dei costi sono in «Previsionale» → «Commessa».',
+      code: 'Commessa',
+      ordered: 'Ordinato',
+      invoiced: 'Fatturato',
+      toInvoice: 'Da fatturare',
+      recognized: 'Ricavi riconosciuti',
+      unknown: '—',
+      notRead:
+        'Dove c’è «—» NetSuite non ha ancora detto niente: collega NetSuite in «Impostazioni», oppure la commessa non ha ancora fatture.',
+      useForm: 'Ho un modulo del cliente da compilare',
+    },
     invoices: {
       title: 'Che cosa risulta su NetSuite',
       billedTotal: 'Fatturato su NetSuite',
@@ -1011,21 +1037,28 @@ export const messages = {
     },
     cell: (column: string, row: number) => `${column}, riga ${row}`,
     removeRow: (row: number) => `Togli la riga ${row}`,
-    add: { rate: 'Aggiungi una tariffa', external: 'Aggiungi un esterno' },
+    add: {
+      rate: 'Aggiungi una tariffa',
+      external: 'Aggiungi un esterno',
+      hourlyCost: 'Aggiungi una persona',
+    },
     wrong: {
       rate: (n: number) => `Tariffa ${n}: servono la persona e una tariffa scritta in cifre.`,
       external: (n: number) =>
         `Esterno ${n}: servono nome, commessa, costo e tariffa scritti in cifre.`,
+      hourlyCost: (n: number) =>
+        `Persona ${n}: servono il nome e un costo orario maggiore di zero, scritto in cifre.`,
       hours: (n: number) => `Riga ${n}: servono il nome e le ore scritte in cifre.`,
       project: (code: string) =>
-        `${code}: l’ordinato va scritto in cifre e i mesi del canone come numero intero.`,
+        `${code}: l’ordinato va scritto in cifre, i mesi del canone come numero intero e l’inizio come anno e mese (2026-09).`,
     },
     projects: 'Commesse del progetto',
     projectsHint:
-      'Una riga per ogni codice NetSuite che in «Ore» hai indicato come di questo progetto. Il tipo dice come nascono i ricavi: a giornate (giorni per tariffa), a corpo (avanzamento sull’ordinato) o a canone (ordinato in rate mensili uguali). L’ordinato arriva da NetSuite e puoi correggerlo.',
+      'Una riga per ogni codice NetSuite che in «Ore» hai indicato come di questo progetto. Il tipo dice come nascono i ricavi: a giornate (giorni per tariffa), a corpo (avanzamento sull’ordinato) o a canone (ordinato in rate mensili uguali). L’ordinato arriva da NetSuite e puoi correggerlo. L’inizio è il mese del primo ordine: per una commessa a corpo Octo legge i timesheet da lì in poi; correggilo se il lavoro è cominciato prima.',
     columnKind: 'Tipo',
     columnOrdered: 'Ordinato',
     columnFeeMonths: 'Mesi del canone',
+    columnStartMonth: 'Inizio (anno-mese)',
     kinds: { time_material: 'A giornate (T&M)', fixed_price: 'A corpo', fee: 'Canone' },
     readOrders: 'Leggi ordinato da NetSuite',
     readingOrders: 'Leggo gli ordini…',
@@ -1050,6 +1083,10 @@ export const messages = {
       'Le persone e il costo delle loro ore arrivano dai timesheet di NetSuite: qui scrivi solo a quanto vendi una giornata. Senza commessa la tariffa vale ovunque; quella scritta per una commessa vince. Chi ha ore e nessuna tariffa compare fra i dati che mancano.',
     noRatesNeeded:
       'Nessuna commessa di questo progetto è venduta a giornate: le tariffe al giorno non servono. I ricavi vengono dall’ordinato.',
+    hourlyCosts: 'Persone senza timesheet, a costo orario',
+    hourlyCostsHint:
+      'Chi lavora sulla commessa e non compila il timesheet in NetSuite, ma registra le ore sul tracker: scrivi il nome come sul tracker e quanto costa una sua ora. Octo conta le ore lette in «Ore» per quel costo, nel mese e nella scheda «Commessa». Vale quando il progetto ha una sola commessa: il tracker non dice su quale commessa sono le ore.',
+    columnHourlyCost: 'Costo orario',
     externalRates: 'Esterni senza timesheet',
     externalRatesHint:
       'Una riga per persona e commessa. Le ore le scrivi ogni mese, nei dati del mese della commessa. Tariffe e costi restano in una cartella di Octo che non entra nelle risposte né nei deliverable.',
@@ -1060,7 +1097,13 @@ export const messages = {
     columnInternal: 'Costi interni',
     columnExternal: 'Costi esterni',
     columnRevenue: 'Ricavi',
-    columnQuantity: 'Giorni o %',
+    columnDays: 'Giorni',
+    columnProgress: 'Avanzamento',
+    totalRow: 'Totale del progetto',
+    none: '—',
+    incomplete: 'dati incompleti',
+    incompleteHint:
+      'A questa riga manca qualcosa: costi, ricavi o margini sono più bassi o più alti del vero. Che cosa manca è in «Dati che mancano», qui sotto.',
     columnMarginMonth: 'Margine mese',
     columnMarginEnd: 'Margine finale',
     columnToInvoice: 'Da fatturare',
@@ -1085,6 +1128,52 @@ export const messages = {
         ? '—'
         : `${(value * 100).toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`,
     hours: (value: number) => value.toLocaleString('it-IT', { maximumFractionDigits: 1 }),
+    parts: { month: 'Mese', lifetime: 'Commessa' },
+    partsLabel: 'Viste del previsionale',
+    lifetime: {
+      title: 'La commessa dall’inizio a oggi',
+      loading: 'Leggo la commessa…',
+      code: 'Commessa',
+      through: (month: string) =>
+        `Dall’inizio della commessa a ${month}: ore approvate dei timesheet, ore di chi non ha timesheet e, per i mesi non ancora in NetSuite, ore del tracker come stima.`,
+      ordered: 'Ordinato',
+      invoiced: 'Fatturato (NetSuite)',
+      recognized: 'Ricavi riconosciuti (NetSuite)',
+      people: 'Ore e costi per persona',
+      person: 'Persona',
+      hours: 'Ore',
+      cost: 'Costo',
+      source: 'Fonte',
+      sources: {
+        timesheet: 'timesheet',
+        declared: 'senza timesheet, dichiarate',
+        no_timesheet: 'senza timesheet, ore dal tracker',
+        estimate: 'stima: ore dal tracker, non ancora in NetSuite',
+      },
+      estimateMark: 'stima',
+      estimated: (hours: string, costs: string) =>
+        `Di cui stimati dal tracker: ${hours} ore, ${costs}. Sono le ore dei mesi il cui timesheet non è ancora in NetSuite, al costo orario dell’ultimo timesheet di ogni persona: una stima, da sostituire con il timesheet quando arriva.`,
+      total: 'Totale',
+      noLines: 'Nessuna ora sulla commessa nei timesheet letti.',
+      withoutCost: (people: string) =>
+        `Ore senza costo, fuori dal totale dei costi: ${people}. Il margine è più alto del vero.`,
+      marginToDate: 'Margine a oggi',
+      budgetCosts: 'Costi a budget',
+      noBudget: 'non scritti: avanzamento non calcolabile',
+      progress: (shareText: string) => `avanzamento ${shareText}`,
+      marginAtEnd: 'Margine a finire',
+      noExpected: 'servono i costi a budget o i costi totali previsti',
+      onCosts: (costs: string) => `su costi previsti di ${costs}`,
+      proposed: (costs: string, people: string) =>
+        `Proposta dai tetti delle persone: ${costs} (${people}).`,
+      proposedPerson: (person: string, days: string) => `${person} ${days} gg`,
+      proposedWithoutCost: (people: string) =>
+        `Fuori dalla proposta, perché non so quanto costa una loro ora: ${people}.`,
+      useProposed: 'Usa come costi a budget',
+      proposedInUse: 'Sono i costi a budget in uso.',
+      copy: 'Copia per mail',
+      copied: 'Copiato: incollalo nella mail.',
+    },
     gapsTitle: 'Dati che mancano',
     gapsIntro: 'Dove manca un dato lascio la cella vuota o fuori dal calcolo: non stimo nulla.',
     noGaps: 'Nessun dato mancante.',
@@ -1103,9 +1192,22 @@ export const messages = {
         `${code}: a corpo senza costi totali a budget, avanzamento e ricavi restano a zero`,
       no_fee_months: (code: string) =>
         `${code}: canone senza numero di mesi, i ricavi restano a zero. Scrivilo nelle impostazioni.`,
+      unread_months: (code: string, months: string) =>
+        `${code}: i timesheet di ${months} non sono stati letti da NetSuite, costi e avanzamento sono incompleti`,
     },
+    unreadMonths: (months: string) =>
+      `Timesheet non letti da NetSuite: ${months}. Octo li legge da solo quando NetSuite è collegato; qui non c’è riuscito. I numeri di questa pagina non li contano.`,
     notApproved: (hours: string) =>
       `${hours} ore del mese non ancora approvate: restano fuori dal previsionale`,
+    orphanCodes: (codes: string) =>
+      `Per ${codes} hai scritto dati di questo mese (ore di esterni, ricavi, importi), ma non è fra le commesse del progetto: non sono contati. Se è una commessa del progetto, aggiungila ai codici in «Ore»; altrimenti puoi ignorare questa riga.`,
+    proposedRate: (rate: string, code: string) => `Usa ${rate}, come su ${code}`,
+    copyRates: (count: number, from: string, to: string) =>
+      count === 1
+        ? `Su ${to} usa per 1 persona la tariffa che ha su ${from}`
+        : `Su ${to} usa per ${count} persone la tariffa che hanno su ${from}`,
+    copyRatesHint:
+      'La commessa è nuova e non ha tariffe: propongo quelle dell’ultima commessa su cui ogni persona ne ha una. Controllale: da una commessa all’altra possono cambiare.',
     otherCodes: (codes: string) =>
       `Nei timesheet del mese ci sono ore approvate su codici che non sono di questo progetto: ${codes}`,
     inputsTitle: (code: string) => `Dati del mese per ${code}`,
@@ -1313,7 +1415,8 @@ export const messages = {
     toVerify: 'Dall’apertura alla verifica',
     toValidated: 'Dalla verifica alla validazione',
     toClosed: 'Dalla validazione alla chiusura',
-    days: (value: number | null) => (value === null ? '—' : `${value} gg`),
+    days: (value: number | null) =>
+      value === null ? '—' : `${value.toLocaleString('it-IT', { maximumFractionDigits: 1 })} gg`,
     sample: (count: number) => `${count} bug`,
     openTitle: 'Bug aperti',
     noOpen: 'Nessun bug aperto nel perimetro.',
@@ -1345,7 +1448,43 @@ export const messages = {
       S5: 'Punti da chiarire nel testo',
     } as Record<string, string>,
     tabsLabel: 'Parti del cruscotto',
-    tabs: { sprint: 'Sprint', bugs: 'Bug', trend: 'Andamento' },
+    tabs: { sprint: 'Sprint', bugs: 'Bug', trend: 'Andamento', activities: 'Attività' },
+    hiddenTabs: (names: string) => `Senza dati in questo tracker, quindi non mostrate: ${names}.`,
+    /** How a tracker calls what orders its items by importance. */
+    severityNames: { ado: 'Gravità', jira: 'Priorità' },
+    bugTypes: 'Tipi che conto come bug',
+    storyTypes: 'Tipi che conto come storie',
+    typesHint: (types: string) =>
+      `Tipi letti dal tracker: ${types}. Una voce di un tipo non scelto non entra né fra i bug né fra le storie.`,
+    activities: {
+      title: 'Attività',
+      intro:
+        'Ogni voce del perimetro, di qualunque tipo, con le ore registrate sul tracker e l’ultimo commento. Le ore sono quelle lette in «Ore».',
+      columnItem: 'Voce',
+      columnTitle: 'Titolo',
+      columnState: 'Stato',
+      columnAssignee: 'Chi',
+      columnHours: 'Ore',
+      columnLast: 'Ultimo commento',
+      noComment: '—',
+      commentOf: (by: string, when: string) => `${by} · ${when}`,
+      diary: (id: string, count: number) =>
+        count === 1 ? `Diario di ${id}: 1 commento` : `Diario di ${id}: ${count} commenti`,
+      open: (id: string) => `Apri il diario di ${id}`,
+      close: (id: string) => `Chiudi il diario di ${id}`,
+      total: 'Totale',
+      people: 'Ore per persona',
+      columnPerson: 'Persona',
+      columnCap: 'Tetto',
+      cap: (hours: string, days: string, share: string) =>
+        `${hours} h (${days} gg) · usato ${share}`,
+      noCap: '—',
+      overCap: 'oltre il tetto',
+      noHours:
+        'Nessuna ora registrata sulle voci del perimetro: leggi le ore del tracker in «Ore».',
+      otherHours: (hours: string) =>
+        `${hours} ore sono su voci fuori dal perimetro o che il tracker non ha più: non sono contate qui.`,
+    },
     refreshing: (tracker: string) => `I dati hanno più di un giorno: rileggo ${tracker}…`,
     undo: 'Annulla',
     decided: 'Fatto.',
@@ -1441,7 +1580,10 @@ export const messages = {
     restore: 'Ripristina',
     removeNote: 'Togli la nota',
     itemGone: 'non più nel tracker',
-    flowBefore: (value: number | null) => (value === null ? '' : `periodo prima: ${value} gg`),
+    flowBefore: (value: number | null) =>
+      value === null
+        ? ''
+        : `periodo prima: ${value.toLocaleString('it-IT', { maximumFractionDigits: 1 })} gg`,
     commentTitle: 'Che cosa dice Claude dei numeri',
     commentIntro:
       'A richiesta. I numeri restano quelli calcolati qui: una frase con un numero diverso, o con una voce che il tracker non ha, non viene mostrata.',
@@ -1617,6 +1759,24 @@ export const messages = {
     `Le riunioni vengono scritte in ${folder}, una cartella per riunione; ciò che viene saltato è annotato in _lettura.md.`,
   meetingsSave: 'Salva',
   meetingsSaved: 'Salvato.',
+  meetingsHeld: {
+    title: 'Riunioni di questo progetto',
+    intro:
+      'Una riunione finita nel progetto sbagliato si sposta da qui. Con la riunione vanno via i punti aperti che Octo ne aveva tratto; il progetto che la riceve la rilegge alla prossima chiusura della giornata. Questo progetto non la riprenderà più da solo: per riaverla va assegnata di nuovo a mano.',
+    noProject: 'Nessun progetto',
+    targetOf: (title: string) => `Dove va «${title}»`,
+    moveOf: (title: string) => `Sposta o togli «${title}»`,
+    move: 'Sposta',
+    release: 'Togli dal progetto',
+    confirmMove: (name: string) =>
+      `La sposto a «${name}» e tolgo da qui i punti aperti che ne vengono.`,
+    confirmRelease:
+      'La tolgo da questo progetto con i punti aperti che ne vengono: torna fra le riunioni da assegnare.',
+    confirm: 'Conferma',
+    cancel: 'Annulla',
+    moved: (name: string) => `Riunione spostata a «${name}».`,
+    released: 'Riunione tolta dal progetto.',
+  },
   meetingsSync: 'Leggi ora',
   meetingsSyncing: 'Sto leggendo le riunioni…',
   meetingsNever: 'Mai lette.',

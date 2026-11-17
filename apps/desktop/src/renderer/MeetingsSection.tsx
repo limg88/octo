@@ -3,6 +3,7 @@ import type { Project } from '@octo/domain'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Elsewhere } from './Elsewhere.tsx'
+import { MeetingsHeld } from './MeetingsHeld.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
 import { SourceHeader } from './SourceHeader.tsx'
@@ -171,6 +172,7 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
           {saved && <span className="hint">{messages.meetingsSaved}</span>}
         </div>
       </form>
+      {open && linked && <MeetingsHeld api={api} project={project} />}
     </section>
   )
 }

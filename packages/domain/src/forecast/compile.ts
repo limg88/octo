@@ -7,9 +7,16 @@ import {
   type ForecastRate,
   type ForecastSettings,
   forecastCode,
+  forecastMonthsBetween,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
 } from './model.ts'
+import {
+  type ForecastWorklog,
+  NO_FORECAST_WORKLOG,
+  type NoTimesheetCost,
+  noTimesheetCosts,
+} from './worklog-costs.ts'
 
 /**
  * What goes in a cell of the model. A formula names the other cells of its row by their column
@@ -43,12 +50,21 @@ export type ForecastValues = {
 /** A missing piece the PM has to supply; nothing is ever estimated in its place. */
 export type ForecastGap =
   | { kind: 'no_cost'; code: string; person: string; hours: number }
-  | { kind: 'no_rate'; code: string; person: string; hours: number }
+  | {
+      kind: 'no_rate'
+      code: string
+      person: string
+      hours: number
+      /** The rate the person has on the code a rate was last written for: to propose, not to use. */
+      proposed: { code: string; ratePerDay: number } | null
+    }
   | { kind: 'no_external_rate'; code: string; person: string; hours: number }
   | { kind: 'no_total_costs'; code: string }
   | { kind: 'no_ordered'; code: string }
   | { kind: 'no_budget_costs'; code: string }
   | { kind: 'no_fee_months'; code: string }
+  /** Months of timesheets the figures of the code need and nobody read: its costs miss them. */
+  | { kind: 'unread_months'; code: string; months: string[] }
 
 export type ForecastRow = {
   code: string
@@ -70,6 +86,13 @@ export type Forecast = {
   notApprovedHours: number
   /** Codes with approved hours in the month that are not of the project. */
   otherCodes: string[]
+  /** The months of timesheets the forecast needs and nobody read, the oldest first. */
+  unreadMonths: string[]
+  /**
+   * Codes the PM wrote something for in this month that are not of the project: what is written
+   * there (hours of externals, revenue, an amount to invoice) is not counted anywhere.
+   */
+  orphanCodes: string[]
 }
 
 export type ForecastTexts = {
@@ -81,6 +104,8 @@ export type ForecastTexts = {
   revenueDecided: string
   left: (people: string[]) => string
   externalLeft: (people: string[]) => string
+  unread: (months: string[]) => string
+  noTimesheet: (name: string, hours: number) => string
 }
 
 const italian = (value: number, decimals: number): string =>
@@ -99,6 +124,9 @@ export const FORECAST_TEXTS: ForecastTexts = {
   fee: (months) => `canone: ordinato in ${months} rate mensili`,
   revenueDecided: 'ricavi indicati dal PM',
   left: (people) => `ore senza costo nei timesheet, fuori dai costi: ${people.join(', ')}`,
+  unread: (months) => `timesheet non letti, costi incompleti: ${months.join(', ')}`,
+  noTimesheet: (name, hours) =>
+    `${name}: ${italian(hours, 1)} h dal tracker, senza timesheet, a costo orario`,
 }
 
 const DAYS_DECIMALS = 3
@@ -157,6 +185,24 @@ function rateOf(rates: readonly ForecastRate[], person: string, code: string): F
       person,
     )
   )
+}
+
+/**
+ * The rate a person has on another code, the one written last: what a new code of the same
+ * project most likely sells the person for. Null when the person has a rate on no code.
+ */
+function rateElsewhere(
+  rates: readonly ForecastRate[],
+  person: string,
+  code: string,
+): { code: string; ratePerDay: number } | null {
+  const key = personKey(person)
+  for (const rate of [...rates].reverse()) {
+    if (rate.code !== null && rate.code !== code && personKey(rate.person) === key) {
+      return { code: rate.code, ratePerDay: rate.ratePerDay }
+    }
+  }
+  return null
 }
 
 type PersonHours = {
@@ -231,12 +277,19 @@ function budgetCostsAt(settings: ForecastSettings, code: string, month: string):
   return written.at(-1)?.[1][code]?.budgetCosts ?? null
 }
 
-/** What a code cost before a month: the approved hours with a cost, and the externals declared. */
+const costOf = (people: readonly NoTimesheetCost[]): number =>
+  people.reduce((total, person) => total + person.hours * person.costPerHour, 0)
+
+/**
+ * What a code cost before a month: the approved hours with a cost, the externals declared, and
+ * who has no timesheet by the hours logged on the tracker.
+ */
 function costsBefore(
   timesheet: readonly HoursEntry[],
   settings: ForecastSettings,
   code: string,
   month: string,
+  worklog: ForecastWorklog,
 ): number {
   const internal = timesheet
     .filter((entry) => entry.approved && entry.project === code && entry.day < `${month}-01`)
@@ -250,7 +303,8 @@ function costsBefore(
           .costs,
       0,
     )
-  return internal + external
+  const logged = costOf(noTimesheetCosts(worklog, timesheet, settings, code, (at) => at < month))
+  return internal + external + logged
 }
 
 /** The revenue of a month with how it is told: the cells, the quantity and the line of the note. */
@@ -332,10 +386,28 @@ function feeRevenue(
 }
 
 /**
+ * The months of timesheets a code needs for a month and nobody read: the month itself and, when
+ * the start of the code is known, every month since. `readMonths` null: which months were read
+ * cannot be told (the PM keeps the files by hand), so nothing is said to miss.
+ */
+export function unreadForecastMonths(
+  startMonth: string | null,
+  month: string,
+  readMonths: readonly string[] | null,
+): string[] {
+  if (readMonths === null) return []
+  const read = new Set(readMonths)
+  const needed =
+    startMonth !== null && startMonth <= month ? forecastMonthsBetween(startMonth, month) : [month]
+  return needed.filter((needed) => !read.has(needed))
+}
+
+/**
  * The monthly forecast of the project codes of a project: internal costs from the approved
  * timesheet hours, external costs from what the PM declared, revenue by how each code is sold
  * (days at a rate, progress of a fixed price, a monthly fee) unless the PM wrote it, margins as
- * formulas. What has no source is left out and listed as a gap.
+ * formulas. What has no source is left out and listed as a gap. `readMonths` are the months whose
+ * timesheets were read: a month needed and not among them is a gap, never a silent zero.
  */
 export function compileForecast(
   projectCodes: readonly string[],
@@ -343,11 +415,14 @@ export function compileForecast(
   settings: ForecastSettings,
   month: string,
   texts: ForecastTexts = FORECAST_TEXTS,
+  readMonths: readonly string[] | null = null,
+  worklog: ForecastWorklog = NO_FORECAST_WORKLOG,
 ): Forecast {
   const inMonth = timesheet.filter((entry) => entry.day.startsWith(`${month}-`))
   const codes = [...new Set(projectCodes.map(forecastCode))].filter((code) => code !== '').sort()
   const gaps: ForecastGap[] = []
   const inputs = settings.months[month] ?? {}
+  const allUnread = new Set<string>()
 
   const rows = codes.map((code): ForecastRow => {
     const input = inputs[code] ?? NO_ROW_INPUTS
@@ -380,7 +455,13 @@ export function compileForecast(
       if (!byDays) continue
       const rate = rateOf(settings.rates, person, code)
       if (rate === null) {
-        gaps.push({ kind: 'no_rate', code, person, hours: personHours })
+        gaps.push({
+          kind: 'no_rate',
+          code,
+          person,
+          hours: personHours,
+          proposed: rateElsewhere(settings.rates, person, code),
+        })
         continue
       }
       revenueTerms.push(`${literal(personDays)}*${literal(rate.ratePerDay)}`)
@@ -404,10 +485,17 @@ export function compileForecast(
       notes.push(texts.externalLeft(externals.left.map((external) => external.name)))
     }
     days += externals.days
-    const externalTerms = externals.counted.map(
-      (external) => `${literal(external.days)}*${literal(external.costPerDay)}`,
-    )
-    const monthCosts = internalCosts + externals.costs
+    // Who has no timesheet costs by the hours logged on the tracker: said beside the externals.
+    const logged = noTimesheetCosts(worklog, timesheet, settings, code, (at) => at === month)
+    for (const person of logged) notes.push(texts.noTimesheet(person.person, person.hours))
+    const externalTerms = [
+      ...externals.counted.map(
+        (external) => `${literal(external.days)}*${literal(external.costPerDay)}`,
+      ),
+      ...logged.map((person) => `${literal(person.hours)}*${literal(person.costPerHour)}`),
+    ]
+    const outsideCosts = externals.costs + costOf(logged)
+    const monthCosts = internalCosts + outsideCosts
 
     const daysQuantity = round(days, DAYS_DECIMALS)
     const told: Revenue =
@@ -416,7 +504,7 @@ export function compileForecast(
             code,
             project.ordered,
             budgetCostsAt(settings, code, month),
-            costsBefore(timesheet, settings, code, month),
+            costsBefore(timesheet, settings, code, month, worklog),
             monthCosts,
             texts,
           )
@@ -442,7 +530,7 @@ export function compileForecast(
 
     const cells: ForecastRow['cells'] = {
       internalCosts: amountCell(costTerms, internalCosts),
-      externalCosts: amountCell(externalTerms, externals.costs),
+      externalCosts: amountCell(externalTerms, outsideCosts),
       revenue: decided ? { kind: 'number', value: revenue } : told.cell,
       quantity: told.quantityCell,
     }
@@ -474,8 +562,21 @@ export function compileForecast(
     const toInvoice = input.toInvoice ?? 0
     cells.toInvoice = { kind: 'number', value: toInvoice }
     const active =
-      people.length > 0 || input.externals.length > 0 || decided || project.kind === 'fee'
-    if (!active) notes.unshift(texts.noActivity)
+      people.length > 0 ||
+      input.externals.length > 0 ||
+      logged.length > 0 ||
+      decided ||
+      project.kind === 'fee'
+    // Only what is sold by the costs so far needs the months before; every code needs its own.
+    const since = project.kind === 'fixed_price' ? project.startMonth : null
+    const unread = unreadForecastMonths(since, month, readMonths)
+    if (unread.length > 0) {
+      gaps.push({ kind: 'unread_months', code, months: unread })
+      notes.unshift(texts.unread(unread))
+      for (const missing of unread) allUnread.add(missing)
+    }
+    // A month nobody read has no hours on disk: that is not «no activity».
+    if (!active && !unread.includes(month)) notes.unshift(texts.noActivity)
     if (input.note !== '') notes.push(input.note)
     const note = notes.join(' · ')
     cells.note = { kind: 'text', value: note }
@@ -488,7 +589,7 @@ export function compileForecast(
       hours,
       values: {
         internalCosts,
-        externalCosts: externals.costs,
+        externalCosts: outsideCosts,
         revenue,
         quantity: told.quantity,
         quantityIsShare: told.quantityIsShare,
@@ -510,5 +611,16 @@ export function compileForecast(
       if (entry.approved) otherCodes.add(entry.project)
     } else if (!entry.approved) notApprovedHours += entry.hours
   }
-  return { month, rows, gaps, notApprovedHours, otherCodes: [...otherCodes].sort() }
+  return {
+    month,
+    rows,
+    gaps,
+    notApprovedHours,
+    otherCodes: [...otherCodes].sort(),
+    unreadMonths: [...allUnread].sort(),
+    orphanCodes: Object.keys(inputs)
+      .map(forecastCode)
+      .filter((code) => !ofProject.has(code))
+      .sort(),
+  }
 }

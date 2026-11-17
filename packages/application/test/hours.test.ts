@@ -383,6 +383,41 @@ describe('hours', () => {
     ])
   })
 
+  it('tells which months of timesheets it holds whole: read after their end, or today', async () => {
+    const hours = setup({ worklogPath: 'ore/jira' }, { timesheets: [] })
+    // Files kept by hand: the months they cover cannot be told.
+    expect(await hours.timesheetMonths(project)).toBeNull()
+
+    // Read on 10 July: May and June are over, July is as fresh as it can be.
+    await hours.readTimesheets(project, { from: '2026-05-01', to: '2026-07-31' })
+    expect(await hours.timesheetMonths(project)).toEqual(['2026-05', '2026-06', '2026-07'])
+
+    // A month read while it ran, on another day, misses what was written since.
+    const june = `${NETSUITE_TIMESHEET_FOLDER}/timesheet_2026-06.json`
+    hours.written.set(june, JSON.stringify({ exported_at: '2026-06-15T10:00:00.000Z', rows: [] }))
+    hours.written.set(`${NETSUITE_TIMESHEET_FOLDER}/timesheet_2026-05.json`, 'not json')
+    hours.written.set(`${NETSUITE_TIMESHEET_FOLDER}/appunti.json`, '{}')
+    hours.written.set(
+      `${NETSUITE_TIMESHEET_FOLDER}/timesheet_2026-04.json`,
+      '{"exported_at":"ieri"}',
+    )
+    expect(await hours.timesheetMonths(project)).toEqual(['2026-07'])
+  })
+
+  it('hands the hours of the tracker item by item, from the exports that name the item', async () => {
+    const hours = setup(
+      { worklogPath: 'ore/jira' },
+      { hours: [{ issue: 'AUR-3', person: 'Luca Bianchi', day: '2026-06-10', hours: 4 }] },
+    )
+    // The files kept by hand name no item: nothing to tell by item.
+    expect(await hours.trackerHours(project)).toEqual([])
+    await hours.readFromTracker(project, { from: '2026-06-01', to: '2026-06-30' })
+    expect(await hours.trackerHours(project)).toEqual([
+      { issue: 'AUR-3', person: 'Luca Bianchi', day: '2026-06-10', hours: 4 },
+    ])
+    expect(await setup().trackerHours(project)).toEqual([])
+  })
+
   it('needs the NetSuite source and its credential, a valid period, and keeps the failure code', async () => {
     await expect(
       setup({}, { configured: false }).readTimesheets(project, JUNE),

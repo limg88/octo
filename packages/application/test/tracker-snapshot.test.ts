@@ -140,7 +140,7 @@ describe('reading the tracker for the dashboard', () => {
     expect(JSON.parse(writer.files.get(TRACKER_SNAPSHOT_PATH) ?? '').items).toHaveLength(3)
     const summary = writer.files.get(TRACKER_SUMMARY_PATH) ?? ''
     expect(summary).toContain('assegnati alle persone del fornitore')
-    expect(summary).toContain('- Bug aperti: 2')
+    expect(summary).toContain('- Bug aperti (in lavorazione o in verifica): 2')
   })
 
   it('writes the tracker as the export the dashboard reads and points the dashboard at it', async () => {

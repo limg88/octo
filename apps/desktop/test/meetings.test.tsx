@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { MeetingsSourceView } from '@octo/application'
-import type { Project, SourceRun } from '@octo/domain'
+import type { Project, SourceRun, StoredMeeting } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MeetingsSection } from '../src/renderer/MeetingsSection.tsx'
@@ -37,6 +37,9 @@ type MeetingsApi = Pick<
   | 'syncMeetings'
   | 'chooseMeetingsRoot'
   | 'onSourcesChanged'
+  | 'importedMeetings'
+  | 'meetingDestinations'
+  | 'moveMeeting'
 >
 
 function fakeApi(overrides: Partial<MeetingsApi> = {}) {
@@ -46,6 +49,9 @@ function fakeApi(overrides: Partial<MeetingsApi> = {}) {
     saveMeetingsSource: vi.fn(async () => ok(linked)),
     syncMeetings: vi.fn(async () => ok(run)),
     chooseMeetingsRoot: vi.fn(async () => ok<string | null>('/Volumes/Riunioni')),
+    importedMeetings: vi.fn(async () => ok<StoredMeeting[]>([])),
+    meetingDestinations: vi.fn(async () => ok([{ id: 'p-2', name: 'Borea' }])),
+    moveMeeting: vi.fn(async () => ok<StoredMeeting[]>([])),
     onSourcesChanged: (listener) => {
       changed = listener
       return () => {}
@@ -174,5 +180,53 @@ describe('MeetingsSection', () => {
     })
     show(closed.api)
     expect(await screen.findByText(errorText('project_not_found'))).toBeTruthy()
+  })
+  it('moves a meeting held by mistake to another project, or takes it away, after asking once more', async () => {
+    const daily: StoredMeeting = {
+      id: 'm-1',
+      title: 'Daily Standup',
+      started: '2026-11-17T08:30:00.000Z',
+      minutes: 15,
+      participants: ['Mario Rossi'],
+      folder: '_octo/riunioni/2026-11-17_daily-standup_m-1',
+    }
+    const text = messages.meetingsHeld
+    const { api } = fakeApi({ importedMeetings: vi.fn(async () => ok([daily])) })
+    show(api)
+    expect(await screen.findByText(text.title)).toBeTruthy()
+    const where = screen.getByLabelText<HTMLSelectElement>(text.targetOf('Daily Standup'))
+    fireEvent.change(where, { target: { value: 'p-2' } })
+    fireEvent.click(screen.getByRole('button', { name: text.moveOf('Daily Standup') }))
+    // Nothing moves before the PM read what goes away with the meeting.
+    expect(screen.getByText(text.confirmMove('Borea'))).toBeTruthy()
+    expect(api.moveMeeting).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: text.cancel }))
+    expect(screen.queryByText(text.confirmMove('Borea'))).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: text.moveOf('Daily Standup') }))
+    fireEvent.click(screen.getByRole('button', { name: text.confirm }))
+    await waitFor(() => expect(api.moveMeeting).toHaveBeenCalledWith('p-1', 'm-1', 'p-2'))
+    expect(await screen.findByText(text.moved('Borea'))).toBeTruthy()
+    expect(screen.queryByLabelText(text.targetOf('Daily Standup'))).toBeNull()
+
+    cleanup()
+    // To no project: it goes back among the meetings to assign. A failure is said.
+    const failing = fakeApi({
+      importedMeetings: vi.fn(async () => ok([daily])),
+      moveMeeting: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, code: 'meeting_not_found' })
+        .mockResolvedValueOnce(ok([])),
+    })
+    show(failing.api)
+    fireEvent.click(await screen.findByRole('button', { name: text.moveOf('Daily Standup') }))
+    expect(screen.getByText(text.confirmRelease)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.confirm }))
+    expect((await screen.findByRole('alert')).textContent).toBe(errorText('meeting_not_found'))
+    fireEvent.click(screen.getByRole('button', { name: text.moveOf('Daily Standup') }))
+    fireEvent.click(screen.getByRole('button', { name: text.confirm }))
+    await waitFor(() =>
+      expect(failing.api.moveMeeting).toHaveBeenLastCalledWith('p-1', 'm-1', null),
+    )
+    expect(await screen.findByText(text.released)).toBeTruthy()
   })
 })

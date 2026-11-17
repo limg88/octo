@@ -2,6 +2,7 @@ import {
   addOpenPoint,
   answerPointCheck,
   DomainError,
+  forgetMeeting,
   type NewOpenPoint,
   OPEN_POINTS_FILE,
   type OpenPointChange,
@@ -37,6 +38,11 @@ export type OpenPoints = {
     items: readonly TodayItem[],
     unsettled: ReadonlySet<TodayKind>,
   ): Promise<OpenPointRegister>
+  /**
+   * Takes out of the register what came from a recorded meeting that is no longer of the project;
+   * the register is written only when it held something of it.
+   */
+  forget(project: Project, meeting: { id: string; folder: string }): Promise<OpenPointRegister>
   /** Keeps a register another use case worked out, and writes it as a text of the project. */
   keep(project: Project, register: OpenPointRegister): Promise<OpenPointRegister>
 }
@@ -82,6 +88,12 @@ export function createOpenPoints(deps: OpenPointsDeps): OpenPoints {
     async confirm(project, pointId, resolved) {
       const register = await known(project, pointId)
       return keep(project, answerPointCheck(register, pointId, resolved, today()))
+    },
+
+    async forget(project, meeting) {
+      const register = await deps.store.load(project.folder)
+      const next = forgetMeeting(register, meeting.id, meeting.folder)
+      return next === register ? register : keep(project, next)
     },
 
     async settle(project, items, unsettled) {

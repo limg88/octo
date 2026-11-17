@@ -156,6 +156,8 @@ export type TodayFacts =
       start: string
       minutes: number
       days: number
+      /** The other project whose people took part, by its name; null when none stands out. */
+      elsewhere: string | null
     }
   | { kind: 'risk'; id: string; title: string; since: string }
   | { kind: 'risk_candidates'; count: number }

@@ -130,6 +130,7 @@ export function createTrackerSnapshots(deps: TrackerSnapshotsDeps): TrackerSnaps
             ? { ...parsed, items: assignedToOwnPeople(parsed.items, await deps.team(project)) }
             : parsed,
           settings,
+          source.kind,
         ),
       )
     }

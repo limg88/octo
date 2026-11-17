@@ -580,6 +580,9 @@ export function createWarehouseTimesheetReader(
   }
 }
 
+/** The characters of a day that name its month: `YYYY-MM`. */
+const MONTH_LENGTH = 7
+
 /**
  * The name, the ordered amount and the kind of sale of the project codes of a NetSuite source,
  * through the same read-only connector the feed uses and with the same credential.
@@ -596,6 +599,9 @@ export function createWarehouseOrdersReader(
           description: order.name,
           ordered: order.ordered,
           kind: forecastKindOfItems(order.items),
+          startMonth: order.firstOrderDay?.slice(0, MONTH_LENGTH) ?? null,
+          invoiced: order.invoiced,
+          recognized: order.recognized,
         }))
       } catch (error) {
         throw failure(error)

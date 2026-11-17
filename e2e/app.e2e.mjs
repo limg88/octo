@@ -799,7 +799,7 @@ try {
   // The same reading in numbers, as a text a report can cite.
   const summary16 = readFileSync(`${work}/Aurora/_octo/cruscotto/riepilogo.md`, 'utf8')
   assert.match(summary16, /- Perimetro: elementi con tag Squadra/)
-  assert.match(summary16, /- Bug aperti: 1/)
+  assert.match(summary16, /- Bug aperti \(in lavorazione o in verifica\): 1/)
   await page.screenshot({ path: `${work}/cruscotto-da-ado.png` })
   await page.getByRole('tab', { name: 'Chiedi' }).click()
 

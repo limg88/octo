@@ -3,8 +3,11 @@ import {
   MEETINGS_FOLDER,
   type MeetingReading,
   NEVER_READ,
+  NO_OPEN_POINTS,
   NO_SOURCES,
   NO_TODAY_SETTINGS,
+  type OpenPoint,
+  type OpenPointRegister,
   type Project,
   type RecordedMeeting,
   type SourcesConfig,
@@ -12,12 +15,19 @@ import {
 import { describe, expect, it } from 'vitest'
 import {
   createMeetings,
+  createOpenPoints,
   createToday,
   MEETINGS_SOURCE,
   NO_EVALUATION,
   type TodayDeps,
 } from '../src/index.ts'
-import { memorySourceStates, PAOLA_AT_HER_MAC, READ_HERE, readingsOf } from './fakes.ts'
+import {
+  memorySourceStates,
+  memoryWriter,
+  PAOLA_AT_HER_MAC,
+  READ_HERE,
+  readingsOf,
+} from './fakes.ts'
 
 const NOW = new Date('2026-11-16T09:00:00.000Z')
 const ROOT = '~/Verbale'
@@ -49,8 +59,20 @@ function setup(
     configs?: Record<string, SourcesConfig>
     /** What a folder turns out to be when it is read again after its files. */
     after?: Record<string, MeetingReading | null>
+    /** The people of each project, by its id. */
+    teams?: Record<string, string[]>
   } = {},
 ) {
+  // The open points of each project, by its folder: what came from a meeting goes away with it.
+  const registers = new Map<string, OpenPointRegister>()
+  const points = createOpenPoints({
+    store: {
+      load: async (folder) => registers.get(folder) ?? NO_OPEN_POINTS,
+      save: async (folder, register) => void registers.set(folder, register),
+    },
+    writer: memoryWriter(),
+    clock: { now: () => NOW },
+  })
   const linked: SourcesConfig = { ...NO_SOURCES, meetings: { root: ROOT, since: null } }
   const configs = new Map<string, SourcesConfig>(
     Object.entries(options.configs ?? { [aurora.folder]: linked, [borea.folder]: linked }),
@@ -103,11 +125,30 @@ function setup(
       },
     },
     clock: { now: () => NOW },
+    ...(options.teams
+      ? {
+          team: async (project: Project) => ({
+            people: (options.teams?.[project.id] ?? []).map((name) => ({
+              name,
+              role: '',
+              side: 'supplier' as const,
+              from: '',
+              to: '',
+              allocation: null,
+              note: '',
+            })),
+            periods: [],
+          }),
+        }
+      : {}),
+    forget: (project, held) => points.forget(project, held),
   })
   return {
     meetings,
     states,
     disk,
+    points,
+    configs,
     hold: () => {
       let release = () => {}
       gate = new Promise((resolve) => {
@@ -261,6 +302,146 @@ describe('the meetings of a project', () => {
       },
     })
     expect(await meetings.sync(aurora)).toMatchObject({ written: 1 })
+  })
+})
+
+describe('a meeting given to the wrong project', () => {
+  const daily = (n: number, title: string): MeetingReading => ({
+    folder: `export-${n}`,
+    status: 'complete',
+    meeting: {
+      ...meeting(n, title),
+      participants: ['Mario Rossi <mario@example.test>', 'Bianchi Anna', 'Ospite Esterno'],
+    },
+  })
+  const dailies = [daily(7, 'Daily Standup Cliente'), daily(8, 'Daily Standup Interna')]
+  const teams = { [aurora.id]: ['Rossi Mario', 'Anna Bianchi'], [borea.id]: ['Carla Neri'] }
+  const POINTS_PER_MEETING = 12
+  const pointOf = (folder: string, index: number): OpenPoint => ({
+    id: `${folder}-${index}`,
+    title: `Punto ${index}`,
+    owner: '',
+    openedOn: '2026-11-17',
+    due: null,
+    state: 'open',
+    origin: 'claude',
+    source: { path: `${folder}/notes.md`, quote: `frase ${index}`, verified: true },
+    signalKey: null,
+    signalKind: null,
+    meeting: null,
+    closedOn: null,
+    closedBy: null,
+    closing: null,
+    history: [],
+    check: null,
+  })
+
+  it('says whose people took part before it is assigned by hand', async () => {
+    const { meetings } = setup({ readings: dailies, teams })
+    // Nothing ties the two dailies to a project: they wait in both. Their people are of Aurora.
+    expect((await meetings.unassigned(borea)).map((held) => held.elsewhere)).toEqual([
+      'Aurora',
+      'Aurora',
+    ])
+    expect((await meetings.unassigned(aurora)).map((held) => held.elsewhere)).toEqual([null, null])
+    // Without the teams nothing is said.
+    const bare = setup({ readings: dailies })
+    expect((await bare.meetings.unassigned(borea)).map((held) => held.elsewhere)).toEqual([
+      null,
+      null,
+    ])
+  })
+
+  it('moves to its project with the open points that came from it, and is not taken back', async () => {
+    const { meetings, points, disk, configs } = setup({ readings: dailies, teams })
+    const ids = dailies.flatMap((reading) =>
+      reading.status === 'complete' ? [reading.meeting.id] : [],
+    )
+    // The mistake: both dailies of Aurora are assigned to Borea, and Claude reads 24 points there.
+    for (const id of ids) await meetings.assign(borea, id)
+    const held = await meetings.imported(borea)
+    expect(held).toHaveLength(2)
+    await points.keep(borea, {
+      ...NO_OPEN_POINTS,
+      points: held.flatMap(({ folder }) =>
+        Array.from({ length: POINTS_PER_MEETING }, (_, index) => pointOf(folder, index)),
+      ),
+      readMeetings: ids,
+    })
+    expect((await points.register(borea)).points).toHaveLength(24)
+    expect(await meetings.imported(aurora)).toEqual([])
+
+    for (const id of ids) await meetings.move(borea, id, aurora.id)
+
+    // Borea holds neither the meetings nor a point of theirs; Aurora holds the meetings whole.
+    expect(await meetings.imported(borea)).toEqual([])
+    expect(await points.register(borea)).toMatchObject({ points: [], readMeetings: [] })
+    const moved = await meetings.imported(aurora)
+    expect(moved.map((stored) => stored.id).sort()).toEqual([...ids].sort())
+    expect(moved.map((stored) => stored.folder).sort()).toEqual(
+      held.map((stored) => stored.folder).sort(),
+    )
+    const folder = moved[0]?.folder ?? ''
+    expect(disk.get(`${aurora.folder}:${folder}/transcript.md`)).toContain('# export-')
+    const stillInBorea = [...disk.keys()].filter((key) =>
+      key.startsWith(`${borea.folder}:${MEETINGS_FOLDER}/2026-`),
+    )
+    expect(stillInBorea).toEqual([])
+    // The next readings change nothing: Aurora keeps them, Borea does not take them back.
+    expect(configs.get(borea.folder)?.meetings?.released).toEqual(ids)
+    expect(await meetings.sync(borea)).toMatchObject({ written: 0, error: null })
+    expect(await meetings.imported(borea)).toEqual([])
+    expect(await meetings.unassigned(borea)).toEqual([])
+    expect(await meetings.imported(aurora)).toHaveLength(2)
+    // Saving the folder of Verbale again does not forget what was taken away.
+    await meetings.save(borea, { root: ROOT, since: '2026-11-01' })
+    expect(configs.get(borea.folder)?.meetings).toEqual({
+      root: ROOT,
+      since: '2026-11-01',
+      released: ids,
+    })
+  })
+
+  it('takes a meeting away to no project, and takes it back when the PM assigns it again', async () => {
+    const named = complete(3, 'Kick-off Aurora')
+    const { meetings, configs } = setup({ readings: [named], teams })
+    const id = named.status === 'complete' ? named.meeting.id : ''
+    // The title names Aurora: the reading gives it to Aurora by itself.
+    await meetings.sync(aurora)
+    expect(await meetings.imported(aurora)).toHaveLength(1)
+
+    await meetings.move(aurora, id, null)
+    expect(await meetings.imported(aurora)).toEqual([])
+    // The words still name Aurora, but Aurora gave it away: no reading takes it back.
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 0 })
+    expect(await meetings.imported(aurora)).toEqual([])
+    // It waits among the meetings to assign, here and in the projects that read the same folder.
+    expect((await meetings.unassigned(borea)).map((held) => held.id)).toEqual([id])
+    expect((await meetings.unassigned(aurora)).map((held) => held.id)).toEqual([id])
+
+    await meetings.assign(aurora, id)
+    expect(await meetings.imported(aurora)).toHaveLength(1)
+    expect(configs.get(aurora.folder)?.meetings).toEqual({ root: ROOT, since: null })
+  })
+
+  it('refuses a meeting the project does not hold and a project that is not another one', async () => {
+    const { meetings } = setup({ readings: dailies })
+    const [first] = dailies
+    const id = first?.status === 'complete' ? first.meeting.id : ''
+    await expect(meetings.move(borea, id, aurora.id)).rejects.toMatchObject({
+      code: 'meeting_not_found',
+    })
+    await meetings.assign(borea, id)
+    for (const target of [borea.id, 'p-nessuno']) {
+      await expect(meetings.move(borea, id, target)).rejects.toMatchObject({
+        code: 'meeting_not_found',
+      })
+    }
+    expect(await meetings.imported(borea)).toHaveLength(1)
+    expect(await meetings.destinations(borea)).toEqual([
+      { id: aurora.id, name: 'Aurora' },
+      { id: lost.id, name: 'Persa' },
+    ])
   })
 })
 

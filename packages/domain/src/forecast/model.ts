@@ -18,6 +18,15 @@ export type ForecastExternalRate = {
   ratePerDay: number
 }
 
+/**
+ * Someone who works on the project and has no timesheet on its code: what an hour of theirs
+ * costs. Their hours are those they log on the tracker.
+ */
+export type ForecastHourlyCost = {
+  person: string
+  costPerHour: number
+}
+
 /** The hours an external worked on a project code in a month, as they declared them. */
 export type ForecastExternal = {
   name: string
@@ -60,6 +69,15 @@ export type ForecastProject = {
   ordered: number | null
   /** A fee: the months the order is spread over. */
   feeMonths: number | null
+  /**
+   * The month the work on the code began (`YYYY-MM`); null while it is not known. From it on,
+   * every month of timesheets is needed to tell what the code cost so far.
+   */
+  startMonth: string | null
+  /** What was invoiced to the client so far, as the company's system says; null: not read. */
+  invoiced: number | null
+  /** The revenue the company's system recognised so far; null: not read. */
+  recognized: number | null
 }
 
 /**
@@ -92,6 +110,9 @@ export const NO_FORECAST_PROJECT: ForecastProject = {
   description: '',
   ordered: null,
   feeMonths: null,
+  startMonth: null,
+  invoiced: null,
+  recognized: null,
 }
 
 /** How a PM fills the monthly forecast the administration asks for. */
@@ -103,6 +124,8 @@ export type ForecastSettings = {
   hoursPerDay: number
   rates: ForecastRate[]
   externals: ForecastExternalRate[]
+  /** Who has no timesheet and logs on the tracker, with the cost of an hour. */
+  hourlyCosts: ForecastHourlyCost[]
   /** Month (`YYYY-MM`), then project code. */
   months: Record<string, Record<string, ForecastRowInputs>>
 }
@@ -115,6 +138,7 @@ export const DEFAULT_FORECAST_SETTINGS: ForecastSettings = {
   hoursPerDay: DEFAULT_HOURS_PER_DAY,
   rates: [],
   externals: [],
+  hourlyCosts: [],
   months: {},
 }
 
@@ -133,6 +157,26 @@ const MAX_HOURS_PER_DAY = 24
 
 const amount = (value: number | null): number | null =>
   value !== null && Number.isFinite(value) && value >= 0 ? value : null
+
+const monthOrNull = (value: string | null | undefined): string | null => {
+  const month = value?.trim() ?? ''
+  return FORECAST_MONTH.test(month) ? month : null
+}
+
+const MONTHS_IN_YEAR = 12
+
+/** Every month from one to another, both included, as `YYYY-MM`; none when the first is later. */
+export function forecastMonthsBetween(from: string, to: string): string[] {
+  if (!FORECAST_MONTH.test(from) || !FORECAST_MONTH.test(to)) return []
+  const index = (month: string): number =>
+    Number(month.slice(0, 4)) * MONTHS_IN_YEAR + Number(month.slice(5)) - 1
+  const months: string[] = []
+  for (let at = index(from); at <= index(to); at += 1) {
+    const year = Math.floor(at / MONTHS_IN_YEAR)
+    months.push(`${year}-${String((at % MONTHS_IN_YEAR) + 1).padStart(2, '0')}`)
+  }
+  return months
+}
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0
 
@@ -183,6 +227,12 @@ export function cleanForecastSettings(settings: ForecastSettings): ForecastSetti
     if (name === '' || code === '' || !valid) continue
     externals.set(`${name}|${code}`, { ...external, name: external.name.trim(), code })
   }
+  const hourlyCosts = new Map<string, ForecastHourlyCost>()
+  for (const entry of settings.hourlyCosts ?? []) {
+    const person = personKey(entry.person)
+    if (person === '' || !positive(entry.costPerHour)) continue
+    hourlyCosts.set(person, { person: entry.person.trim(), costPerHour: entry.costPerHour })
+  }
   const months: ForecastSettings['months'] = {}
   for (const [month, rows] of Object.entries(settings.months)) {
     if (!FORECAST_MONTH.test(month)) continue
@@ -202,6 +252,9 @@ export function cleanForecastSettings(settings: ForecastSettings): ForecastSetti
       ordered: amount(project.ordered),
       feeMonths:
         feeMonths !== null && Number.isInteger(feeMonths) && feeMonths > 0 ? feeMonths : null,
+      startMonth: monthOrNull(project.startMonth),
+      invoiced: amount(project.invoiced ?? null),
+      recognized: amount(project.recognized ?? null),
     }
   }
   const hours = settings.hoursPerDay
@@ -211,6 +264,7 @@ export function cleanForecastSettings(settings: ForecastSettings): ForecastSetti
     hoursPerDay: positive(hours) && hours <= MAX_HOURS_PER_DAY ? hours : DEFAULT_HOURS_PER_DAY,
     rates: [...rates.values()],
     externals: [...externals.values()],
+    hourlyCosts: [...hourlyCosts.values()],
     months,
   }
 }

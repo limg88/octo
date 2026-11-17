@@ -3431,3 +3431,52 @@ span.marker-warning {
   gap: 4px;
   max-width: 720px;
 }
+
+/* The figures of a project code over its whole life: a name and its value on each line. */
+.lifetime-figures {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 12px 0;
+}
+
+.lifetime-figures dt {
+  font-weight: 500;
+}
+
+.lifetime-figures dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The meetings a project holds, each with where it can go. */
+.held-meetings {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.held-meetings li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The comments of an activity, the newest first. */
+.activity-diary {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  white-space: pre-wrap;
+}
+
+/* The name of a project code under its code, in a row of the forecast. */
+.code-name {
+  display: block;
+  white-space: normal;
+}

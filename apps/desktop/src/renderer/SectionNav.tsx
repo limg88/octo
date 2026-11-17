@@ -6,6 +6,8 @@ type Props = {
   onSelect: (section: Section) => void
   /** How many things wait in a section, said beside its name; nothing is said of zero. */
   counts?: Partial<Record<Section, { count: number; label: string }>>
+  /** The sections this project has no use for: they are not listed. */
+  hidden?: readonly Section[]
 }
 
 /** Where the arrow keys go from a section: the one before or after it, round the list. */
@@ -15,12 +17,13 @@ const STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 }
  * The sections of a project in the sidebar, grouped by how often they are used. One list for the
  * keyboard: the arrows move through all of it, whatever the group.
  */
-export function SectionNav({ current, onSelect, counts = {} }: Props) {
+export function SectionNav({ current, onSelect, counts = {}, hidden = [] }: Props) {
+  const shown = SECTIONS.filter((section) => !hidden.includes(section))
   function onKey(event: KeyboardEvent<HTMLButtonElement>, section: Section) {
     const step = STEPS[event.key]
     if (step === undefined) return
     event.preventDefault()
-    const next = SECTIONS[(SECTIONS.indexOf(section) + step + SECTIONS.length) % SECTIONS.length]
+    const next = shown[(shown.indexOf(section) + step + shown.length) % shown.length]
     if (next === undefined) return
     onSelect(next)
     document.getElementById(tabId(next))?.focus()
@@ -28,7 +31,9 @@ export function SectionNav({ current, onSelect, counts = {} }: Props) {
 
   return (
     <div className="section-nav">
-      {SECTION_GROUPS.map((group) => (
+      {SECTION_GROUPS.filter((group) =>
+        group.sections.some((section) => shown.includes(section)),
+      ).map((group) => (
         <div
           key={group.title}
           className="section-group"
@@ -39,26 +44,28 @@ export function SectionNav({ current, onSelect, counts = {} }: Props) {
           <span className="section-group-title" aria-hidden="true">
             {group.title}
           </span>
-          {group.sections.map((section) => (
-            <button
-              key={section}
-              id={tabId(section)}
-              type="button"
-              role="tab"
-              aria-selected={current === section}
-              tabIndex={current === section ? 0 : -1}
-              className={current === section ? 'nav-item nav-item-selected' : 'nav-item'}
-              onClick={() => onSelect(section)}
-              onKeyDown={(event) => onKey(event, section)}
-            >
-              {SECTION_LABELS[section]}
-              {(counts[section]?.count ?? 0) > 0 && (
-                <span className="nav-count" title={counts[section]?.label}>
-                  {counts[section]?.count}
-                </span>
-              )}
-            </button>
-          ))}
+          {group.sections
+            .filter((section) => shown.includes(section))
+            .map((section) => (
+              <button
+                key={section}
+                id={tabId(section)}
+                type="button"
+                role="tab"
+                aria-selected={current === section}
+                tabIndex={current === section ? 0 : -1}
+                className={current === section ? 'nav-item nav-item-selected' : 'nav-item'}
+                onClick={() => onSelect(section)}
+                onKeyDown={(event) => onKey(event, section)}
+              >
+                {SECTION_LABELS[section]}
+                {(counts[section]?.count ?? 0) > 0 && (
+                  <span className="nav-count" title={counts[section]?.label}>
+                    {counts[section]?.count}
+                  </span>
+                )}
+              </button>
+            ))}
         </div>
       ))}
     </div>

@@ -5,7 +5,7 @@ export const BUG_FILTERS = ['open', 'work', 'verify', 'stuck', 'validated'] as c
 export type BugFilter = (typeof BUG_FILTERS)[number]
 
 /** The parts the dashboard is read in. */
-export const DASHBOARD_TABS = ['sprint', 'bugs', 'trend'] as const
+export const DASHBOARD_TABS = ['sprint', 'bugs', 'trend', 'activities'] as const
 export type DashboardTab = (typeof DASHBOARD_TABS)[number]
 
 /** What the PM was looking at in the dashboard, kept while they go to another section and back. */

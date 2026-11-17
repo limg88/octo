@@ -8,6 +8,7 @@ import {
   DEFAULT_ALIGNMENT_SETTINGS,
   missingTicketsCsv,
   referencedIds,
+  stateMismatches,
 } from '../src/index.ts'
 
 const item = (id: string, title: string, over: Partial<AlignItem> = {}): AlignItem => ({
@@ -214,5 +215,26 @@ describe('the settings of the alignment', () => {
       stateGroups: [{ name: 'in corso', item: ['In Progress'], ticket: ['In corso'] }],
       typeMap: [{ item: 'User Story', ticket: 'Story' }],
     })
+  })
+})
+
+describe('a state the alignment and the dashboard read in two ways', () => {
+  const groups = [
+    { name: 'Chiuso', item: ['Closed', 'Demo'], ticket: ['Done'] },
+    { name: 'In verifica', item: ['Ready for Test'], ticket: ['In test'] },
+    // A name that says no phase is compared with nothing.
+    { name: 'Gruppo A', item: ['Closed'], ticket: ['Done'] },
+  ]
+
+  it('is told with the group it is in and the phase the dashboard gives it', () => {
+    // «Demo» is closed for the alignment and waiting to be verified for the dashboard.
+    expect(stateMismatches({ stateGroups: groups }, { phases: {} })).toEqual([
+      { state: 'Demo', group: 'Chiuso', groupPhase: 'closed', dashboardPhase: 'verify' },
+    ])
+  })
+
+  it('goes away when the PM tells the dashboard the same, or there are no groups', () => {
+    expect(stateMismatches({ stateGroups: groups }, { phases: { Demo: 'closed' } })).toEqual([])
+    expect(stateMismatches({ stateGroups: [] }, { phases: {} })).toEqual([])
   })
 })

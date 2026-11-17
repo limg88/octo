@@ -1,16 +1,20 @@
 import type { ForecastFile, ForecastView as View } from '@octo/application'
 import {
   FORECAST_KINDS,
+  FORECAST_MONTH,
   type ForecastKind,
   type ForecastProject,
   type ForecastSettings,
+  type Lifetime,
   NO_FORECAST_PROJECT,
+  NO_ROW_INPUTS,
   type Project,
 } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
+import { ForecastLifetime } from './ForecastLifetime.tsx'
 import { ForecastMonth } from './ForecastMonth.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
@@ -28,6 +32,7 @@ type ForecastApi = Pick<
   | 'forecastView'
   | 'compileForecast'
   | 'readForecastOrders'
+  | 'forecastLifetime'
   | 'openEvidence'
   | 'chooseProjectPath'
 >
@@ -42,6 +47,16 @@ type Props = {
 }
 
 const text = messages.forecast
+
+/** The two ways of reading the forecast: a month of every code, or a code over its whole life. */
+const FORECAST_PARTS = ['month', 'lifetime'] as const
+type ForecastPart = (typeof FORECAST_PARTS)[number]
+
+/** A project sold only at a fixed price is read by its whole life first. */
+function firstPart(settings: ForecastSettings): ForecastPart {
+  const kinds = Object.values(settings.projects).map((project) => project.kind)
+  return kinds.length > 0 && kinds.every((kind) => kind === 'fixed_price') ? 'lifetime' : 'month'
+}
 
 /** The month before a day: the last one whose hours can be complete. */
 export function previousMonthOf(today: Date): string {
@@ -63,6 +78,8 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   const [compiling, setCompiling] = useState(false)
   const [file, setFile] = useState<ForecastFile | null>(null)
   const [readingOrders, setReadingOrders] = useState(false)
+  const [part, setPart] = useState<ForecastPart>('month')
+  const [saves, setSaves] = useState(0)
 
   /** The forecast of a month; the project codes it holds, or null when it could not be computed. */
   async function loadView(wanted: string): Promise<string[] | null> {
@@ -84,7 +101,14 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
    * or does not answer changes nothing: the PM can still ask with the button, and is told why.
    */
   async function learnNewCodes(known: ForecastSettings, codes: readonly string[]) {
-    if (codes.every((code) => known.projects[code] !== undefined)) return
+    // A fixed price whose start is not known is asked too: its months before are needed.
+    const learned = (code: string): boolean => {
+      const project = known.projects[code]
+      return (
+        project !== undefined && (project.kind !== 'fixed_price' || project.startMonth !== null)
+      )
+    }
+    if (codes.every(learned)) return
     const result = await api.readForecastOrders(project.id)
     if (!result.ok) return
     setSettings(result.value.settings)
@@ -100,6 +124,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     void api.forecastSettings(project.id).then(async (result) => {
       if (!result.ok) return setError(result.code)
       setSettings(result.value)
+      setPart(firstPart(result.value))
       if (result.value.modelPath === '') {
         const found = await api.forecastCandidates(project.id)
         if (found.ok) setCandidates(found.value)
@@ -116,7 +141,30 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
     savedNote.saved()
+    setSaves((count) => count + 1)
     await loadView(month)
+  }
+
+  /**
+   * The costs at budget the caps of the people propose, kept because the PM said so: from the
+   * month the code began when none was ever written, so every month since counts on them; else
+   * from the month that runs, as a budget seen again.
+   */
+  async function useBudget(life: Lifetime, costs: number) {
+    if (settings === null) return
+    const start = settings.projects[life.code]?.startMonth ?? null
+    const at = life.budgetCosts === null && start !== null ? start : life.through
+    const rows = settings.months[at] ?? {}
+    await save({
+      ...settings,
+      months: {
+        ...settings.months,
+        [at]: {
+          ...rows,
+          [life.code]: { ...(rows[life.code] ?? NO_ROW_INPUTS), budgetCosts: costs },
+        },
+      },
+    })
   }
 
   /** Name and ordered amount of the project codes, as the company's system has them now. */
@@ -180,55 +228,81 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
         />
       </details>
       <p className="badge badge-warning">{text.internal}</p>
-      <div className="range-fields">
-        <MonthField
-          label={text.month}
-          value={month}
-          onChange={(value) => {
-            setMonth(value)
-            void loadView(value)
-          }}
-        />
-        {view && view.forecast.rows.length > 0 && settings.modelPath !== '' && (
+      <div className="dashboard-tabs" role="tablist" aria-label={text.partsLabel}>
+        {FORECAST_PARTS.map((name) => (
           <button
+            key={name}
             type="button"
-            className="primary"
-            disabled={compiling}
-            onClick={() => void compile()}
+            role="tab"
+            aria-selected={part === name}
+            className={part === name ? 'tab tab-selected' : 'tab'}
+            onClick={() => setPart(name)}
           >
-            {text.compile}
+            {text.parts[name]}
           </button>
-        )}
+        ))}
       </div>
-      {compiling && (
-        <p className="progress" role="status">
-          {text.compiling}
-        </p>
-      )}
-      {file && (
-        <p className="badge badge-ok">
-          {text.compiled(file.path)}{' '}
-          <button
-            type="button"
-            className="quiet"
-            onClick={() => void api.openEvidence(project.id, file.path)}
-          >
-            {text.open}
-          </button>
-          {file.notInModel.length > 0 && <> {text.notInModel(file.notInModel.join(', '))}</>}
-        </p>
-      )}
-      {view && (
-        <ForecastMonth
-          view={view}
-          settings={settings}
-          month={month}
-          onSaveMonth={(inputs) =>
-            save({ ...settings, months: { ...settings.months, [month]: inputs } })
-          }
-          onSaveSettings={save}
+      {part === 'lifetime' ? (
+        <ForecastLifetime
+          api={api}
+          project={project}
           onOpenSection={onOpenSection}
+          onUseBudget={useBudget}
+          version={saves}
         />
+      ) : (
+        <>
+          <div className="range-fields">
+            <MonthField
+              label={text.month}
+              value={month}
+              onChange={(value) => {
+                setMonth(value)
+                void loadView(value)
+              }}
+            />
+            {view && view.forecast.rows.length > 0 && settings.modelPath !== '' && (
+              <button
+                type="button"
+                className="primary"
+                disabled={compiling}
+                onClick={() => void compile()}
+              >
+                {text.compile}
+              </button>
+            )}
+          </div>
+          {compiling && (
+            <p className="progress" role="status">
+              {text.compiling}
+            </p>
+          )}
+          {file && (
+            <p className="badge badge-ok">
+              {text.compiled(file.path)}{' '}
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => void api.openEvidence(project.id, file.path)}
+              >
+                {text.open}
+              </button>
+              {file.notInModel.length > 0 && <> {text.notInModel(file.notInModel.join(', '))}</>}
+            </p>
+          )}
+          {view && (
+            <ForecastMonth
+              view={view}
+              settings={settings}
+              month={month}
+              onSaveMonth={(inputs) =>
+                save({ ...settings, months: { ...settings.months, [month]: inputs } })
+              }
+              onSaveSettings={save}
+              onOpenSection={onOpenSection}
+            />
+          )}
+        </>
       )}
     </div>
   )
@@ -260,13 +334,33 @@ const EXTERNAL_RATE_COLUMNS: RowsColumn<ExternalRateKey>[] = [
   { key: 'rate', label: text.columns.rate, kind: 'amount', width: '140px' },
 ]
 
-type ProjectDraft = { kind: ForecastKind; description: string; ordered: string; feeMonths: string }
+type HourlyCostKey = 'person' | 'hourly'
+const HOURLY_COST_COLUMNS: RowsColumn<HourlyCostKey>[] = [
+  { key: 'person', label: text.columns.person },
+  { key: 'hourly', label: text.columnHourlyCost, kind: 'amount', width: '160px' },
+]
+const HOURLY_COST_LABELS: Record<HourlyCostKey, string> = {
+  person: text.columns.person,
+  hourly: text.columnHourlyCost,
+}
+
+type ProjectDraft = {
+  kind: ForecastKind
+  description: string
+  ordered: string
+  feeMonths: string
+  startMonth: string
+  /** Read from the company's system and never typed: kept as they are through a save. */
+  invoiced: number | null
+  recognized: number | null
+}
 type SettingsDraft = {
   modelPath: string
   projects: Record<string, ProjectDraft>
   hoursPerDay: string
   rates: Row<RateKey>[]
   externals: Row<ExternalRateKey>[]
+  hourlyCosts: Row<HourlyCostKey>[]
 }
 
 const projectDraft = (project: ForecastProject): ProjectDraft => ({
@@ -274,9 +368,14 @@ const projectDraft = (project: ForecastProject): ProjectDraft => ({
   description: project.description,
   ordered: amountText(project.ordered),
   feeMonths: project.feeMonths === null ? '' : String(project.feeMonths),
+  startMonth: project.startMonth ?? '',
+  invoiced: project.invoiced,
+  recognized: project.recognized,
 })
 const NO_PROJECT_DRAFT = projectDraft(NO_FORECAST_PROJECT)
 const isMonths = (typed: string): boolean => typed.trim() === '' || /^[1-9]\d*$/.test(typed.trim())
+const isStartMonth = (typed: string): boolean =>
+  typed.trim() === '' || FORECAST_MONTH.test(typed.trim())
 
 const settingsDraft = (settings: ForecastSettings): SettingsDraft => ({
   modelPath: settings.modelPath,
@@ -301,6 +400,13 @@ const settingsDraft = (settings: ForecastSettings): SettingsDraft => ({
     })),
     EXTERNAL_RATE_COLUMNS,
   ),
+  hourlyCosts: orOneRow(
+    settings.hourlyCosts.map((entry) => ({
+      person: entry.person,
+      hourly: amountText(entry.costPerHour),
+    })),
+    HOURLY_COST_COLUMNS,
+  ),
 })
 
 function SettingsForm({
@@ -322,6 +428,7 @@ function SettingsForm({
     projects: string[]
     rates: string[]
     externals: string[]
+    hourlyCosts: string[]
   } | null>(null)
   const projectOf = (code: string): ProjectDraft => draft.projects[code] ?? NO_PROJECT_DRAFT
   const changeProject = (code: string, part: Partial<ProjectDraft>) =>
@@ -345,8 +452,10 @@ function SettingsForm({
   function submit() {
     const found = {
       projects: codes.flatMap((code) => {
-        const { ordered, feeMonths } = projectOf(code)
-        return amountField(ordered).wrong || !isMonths(feeMonths) ? [text.wrong.project(code)] : []
+        const { ordered, feeMonths, startMonth } = projectOf(code)
+        return amountField(ordered).wrong || !isMonths(feeMonths) || !isStartMonth(startMonth)
+          ? [text.wrong.project(code)]
+          : []
       }),
       rates: wrongRows(
         draft.rates,
@@ -358,10 +467,13 @@ function SettingsForm({
         (row) => filled(row.name, row.code) && isAmount(row.cost) && isAmount(row.rate),
         text.wrong.external,
       ),
+      hourlyCosts: wrongRows(
+        draft.hourlyCosts,
+        (row) => filled(row.person) && (amountOf(row.hourly) ?? 0) > 0,
+        text.wrong.hourlyCost,
+      ),
     }
-    if (found.projects.length + found.rates.length + found.externals.length > 0) {
-      return setProblems(found)
-    }
+    if (Object.values(found).some((lines) => lines.length > 0)) return setProblems(found)
     setProblems(null)
     void onSave({
       ...settings,
@@ -374,6 +486,9 @@ function SettingsForm({
             description: project.description,
             ordered: amountOf(project.ordered),
             feeMonths: project.feeMonths.trim() === '' ? null : Number(project.feeMonths),
+            startMonth: project.startMonth.trim() === '' ? null : project.startMonth.trim(),
+            invoiced: project.invoiced,
+            recognized: project.recognized,
           },
         ]),
       ),
@@ -393,6 +508,9 @@ function SettingsForm({
           costPerDay: amountOf(row.cost) ?? 0,
           ratePerDay: amountOf(row.rate) ?? 0,
         })),
+      hourlyCosts: draft.hourlyCosts
+        .filter((row) => !blankRow(row))
+        .map((row) => ({ person: row.person.trim(), costPerHour: amountOf(row.hourly) ?? 0 })),
     })
   }
 
@@ -416,6 +534,7 @@ function SettingsForm({
                   <th scope="col">{text.columnKind}</th>
                   <th scope="col">{text.columnOrdered}</th>
                   <th scope="col">{text.columnFeeMonths}</th>
+                  <th scope="col">{text.columnStartMonth}</th>
                 </tr>
               </thead>
               <tbody>
@@ -461,6 +580,18 @@ function SettingsForm({
                         disabled={projectOf(code).kind !== 'fee'}
                         value={projectOf(code).feeMonths}
                         onChange={(event) => changeProject(code, { feeMonths: event.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="amount"
+                        placeholder="2026-09"
+                        aria-label={text.forCode(text.columnStartMonth, code)}
+                        value={projectOf(code).startMonth}
+                        onChange={(event) =>
+                          changeProject(code, { startMonth: event.target.value })
+                        }
                       />
                     </td>
                   </tr>
@@ -519,6 +650,18 @@ function SettingsForm({
         removeLabel={text.removeRow}
       />
       <FieldProblems lines={problems?.externals ?? []} />
+      <h4>{text.hourlyCosts}</h4>
+      <p className="hint">{text.hourlyCostsHint}</p>
+      <RowsField
+        label={text.hourlyCosts}
+        columns={HOURLY_COST_COLUMNS}
+        rows={draft.hourlyCosts}
+        onChange={(hourlyCosts) => setDraft((current) => ({ ...current, hourlyCosts }))}
+        addLabel={text.add.hourlyCost}
+        cellLabel={(column, row) => text.cell(HOURLY_COST_LABELS[column], row)}
+        removeLabel={text.removeRow}
+      />
+      <FieldProblems lines={problems?.hourlyCosts ?? []} />
       <div className="actions">
         <button type="submit">{text.save}</button>
         {problems && <NotSaved text={messages.notSaved} />}

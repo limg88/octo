@@ -43,6 +43,10 @@ const api: OctoApi = {
   importedMeetings: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsImported, { projectId }),
   assignMeeting: (projectId, meetingId) =>
     ipcRenderer.invoke(CHANNELS.meetingsAssign, { projectId, meetingId }),
+  meetingDestinations: (projectId) =>
+    ipcRenderer.invoke(CHANNELS.meetingsDestinations, { projectId }),
+  moveMeeting: (projectId, meetingId, targetProjectId) =>
+    ipcRenderer.invoke(CHANNELS.meetingsMove, { projectId, meetingId, targetProjectId }),
   fill: (projectId) => ipcRenderer.invoke(CHANNELS.feedingFill, { projectId }),
   onFeedingStep: (listener) => {
     const handler = (_event: unknown, projectId: string, step: FeedingStep) =>
@@ -107,6 +111,8 @@ const api: OctoApi = {
   compileForecast: (projectId, month) =>
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
   readForecastOrders: (projectId) => ipcRenderer.invoke(CHANNELS.forecastOrdersRead, { projectId }),
+  forecastLifetime: (projectId) => ipcRenderer.invoke(CHANNELS.forecastLifetime, { projectId }),
+  projectShape: (projectId) => ipcRenderer.invoke(CHANNELS.projectShape, { projectId }),
   progressSettings: (projectId) => ipcRenderer.invoke(CHANNELS.progressSettingsGet, { projectId }),
   saveProgressSettings: (projectId, settings) =>
     ipcRenderer.invoke(CHANNELS.progressSettingsSave, { projectId, settings }),

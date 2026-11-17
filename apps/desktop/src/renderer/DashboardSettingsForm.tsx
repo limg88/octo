@@ -47,6 +47,7 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
     setDraft((current) => ({ ...current, ...part(current) }))
   const change = (part: Partial<DashboardSettings>) => update(() => part)
   const verifyStates = view?.states.filter((entry) => entry.phase === 'verify') ?? []
+  const typesRead = view?.types.map((entry) => entry.type) ?? []
 
   async function submit() {
     setSaving(true)
@@ -86,6 +87,23 @@ export function DashboardSettingsForm({ settings, candidates, view, onSave, onCh
         chosen={draft.tags}
         onChange={(tags) => change({ tags })}
       />
+      <KnownList
+        label={text.bugTypes}
+        known={typesRead}
+        chosen={draft.bugTypes}
+        onChange={(bugTypes) => change({ bugTypes })}
+      />
+      <KnownList
+        label={text.storyTypes}
+        known={typesRead}
+        chosen={draft.storyTypes}
+        onChange={(storyTypes) => change({ storyTypes })}
+      />
+      {view && view.types.length > 0 && (
+        <p className="hint">
+          {text.typesHint(view.types.map(({ type, count }) => `${type} (${count})`).join(', '))}
+        </p>
+      )}
       <label className="check">
         <input
           type="checkbox"

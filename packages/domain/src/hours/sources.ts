@@ -144,6 +144,13 @@ function columnOf(header: readonly string[], names: RegExp): number {
  * English or Italian; null when the file has not the three of them.
  */
 export function parseWorklogExport(content: string): HoursEntry[] | null {
+  return worklogRows(content)?.map((row) => row.entry) ?? null
+}
+
+const ISSUE_COLUMN = /^(issue ?key|issue|key|chiave|ticket)$/i
+
+/** The rows of a worklog export that are a logging, each with the item it names, if any. */
+function worklogRows(content: string): Array<{ entry: HoursEntry; issue: string }> | null {
   const [header, ...rows] = parseSeparated(content)
   if (!header) return null
   // `Full name` is preferred to `User`, which is often an account id.
@@ -153,16 +160,37 @@ export function parseWorklogExport(content: string): HoursEntry[] | null {
   const day = columnOf(header, COLUMNS.day)
   const hours = columnOf(header, COLUMNS.hours)
   const seconds = columnOf(header, COLUMNS.seconds)
+  const issue = columnOf(header, ISSUE_COLUMN)
   if (person === undefined || day < 0 || (hours < 0 && seconds < 0)) return null
-  return rows.flatMap((cells): HoursEntry[] => {
+  return rows.flatMap((cells) => {
     const name = text(cells[person])
     const date = dayOf(cells[day])
     const inSeconds = amountOf(cells[seconds])
     const amount =
       hours >= 0 ? amountOf(cells[hours]) : inSeconds === null ? null : inSeconds / SECONDS_PER_HOUR
     if (name === '' || date === null || amount === null) return []
-    return [{ person: name, day: date, hours: amount, project: null, approved: true, id: null }]
+    const entry: HoursEntry = {
+      person: name,
+      day: date,
+      hours: amount,
+      project: null,
+      approved: true,
+      id: null,
+    }
+    return [{ entry, issue: issue < 0 ? '' : text(cells[issue]) }]
   })
+}
+
+/**
+ * The hours of a worklog export with the item each was logged on: a logging that names no item
+ * is left out. Null when the file is not a worklog export.
+ */
+export function parseWorklogIssues(content: string): TrackerHours[] | null {
+  const rows = worklogRows(content)
+  if (rows === null) return null
+  return rows.flatMap(({ entry, issue }) =>
+    issue === '' ? [] : [{ person: entry.person, day: entry.day, hours: entry.hours, issue }],
+  )
 }
 
 /** Hours read from the tracker itself, before they are written as an export of the project. */

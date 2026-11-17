@@ -1,5 +1,5 @@
-import { readdir, readFile, realpath, stat } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { readdir, readFile, realpath, rmdir, stat } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { ProjectFiles } from '@octo/application'
 import { DomainError, EXTRACTED_TEXT_FOLDER, type SourceFileStamp } from '@octo/domain'
 import { isMissing, removeFile } from './json-file.ts'
@@ -11,6 +11,20 @@ const HIDDEN_PREFIX = '.'
 const OFFICE_LOCK_PREFIX = '~$'
 
 const portable = (path: string): string => path.split(sep).join('/')
+
+/** Error codes of a folder that cannot be taken away because it is not empty, or is in use. */
+const KEPT_FOLDER_CODES = new Set(['ENOTEMPTY', 'EEXIST', 'EBUSY', 'EPERM', 'ENOENT'])
+
+/** Takes away the folder a removed file left empty; never the folder of the project itself. */
+async function removeIfEmpty(folder: string, projectRoot: string): Promise<void> {
+  if (folder === projectRoot) return
+  try {
+    await rmdir(folder)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? ''
+    if (!KEPT_FOLDER_CODES.has(code)) throw error
+  }
+}
 
 /** The real path of a place inside the project; a path or a link leading outside is refused. */
 export async function realPathInside(projectFolder: string, relativePath: string): Promise<string> {
@@ -78,7 +92,9 @@ export function createFsProjectFiles(): ProjectFiles {
     },
     async remove(projectFolder, relativePath) {
       try {
-        await removeFile(await realPathInside(projectFolder, relativePath))
+        const file = await realPathInside(projectFolder, relativePath)
+        await removeFile(file)
+        await removeIfEmpty(dirname(file), await realpath(projectFolder))
       } catch (error) {
         // Already gone: another computer that shares the folder removed it first.
         if (!isMissing(error)) throw error

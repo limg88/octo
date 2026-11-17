@@ -12,6 +12,7 @@ import {
   parseTimesheetCosts,
   parseTimesheetExport,
   parseWorklogExport,
+  parseWorklogIssues,
   personKey,
   reconcileHours,
   worklogCsv,
@@ -145,6 +146,22 @@ describe('reconciliation of hours', () => {
     expect(result.excluded.partialTimesheetHours).toBe(8)
     expect(result.excluded.partialWorklogHours).toBe(8)
     expect(result.tieOut).toEqual({ approvedHours: 36, accountedHours: 36, ok: true })
+  })
+
+  it('calls by name and surname who logged on the tracker and has no timesheet in the period yet', () => {
+    // November: the tracker has the hours, the company's system gets them when the month closes.
+    const timesheet = [entry('Bianchi Luca', '2026-10-06', 8)]
+    const worklog = [
+      entry('luca.bianchi', '2026-11-03', 4.5, { project: null }),
+      entry('ugo.neri', '2026-11-03', 2, { project: null }),
+    ]
+    const november = { from: '2026-11-01', to: '2026-11-30' }
+    const rows = reconcileHours(timesheet, worklog, settings, november).rows
+    // Known from an earlier timesheet: its spelling. Never seen in one: as the tracker writes it.
+    expect(rows.map((row) => [row.person, row.worklogHours])).toEqual([
+      ['Bianchi Luca', 4.5],
+      ['ugo.neri', 2],
+    ])
   })
 
   it('says when the same hours of a person appear on two project codes', () => {
@@ -287,6 +304,25 @@ describe('sources of hours', () => {
     expect(parseWorklogExport('Utente;Data;Secondi\nMario Rossi;03/06/2026;')).toEqual([])
     expect(parseWorklogExport('a,b\n1,2')).toBeNull()
     expect(parseWorklogExport('')).toBeNull()
+  })
+
+  it('keeps the item each logging is on, for what is told item by item', () => {
+    const tempo =
+      'Issue Key,Hours,Work date,Full name\nA-1,"1,5",2026-06-03,Mario Rossi\nA-2,x,2026-06-03,Anna Bianchi\n,2,2026-06-04,Mario Rossi\nA-1,2,2026-06-05,Mario Rossi'
+    expect(parseWorklogIssues(tempo)).toEqual([
+      { issue: 'A-1', person: 'Mario Rossi', day: '2026-06-03', hours: 1.5 },
+      { issue: 'A-1', person: 'Mario Rossi', day: '2026-06-05', hours: 2 },
+    ])
+    // What Octo writes of the hours it read is read back the same.
+    const written = worklogCsv([
+      { issue: 'A-7', person: 'Mario Rossi', day: '2026-06-03', hours: 4 },
+    ])
+    expect(parseWorklogIssues(written)).toEqual([
+      { issue: 'A-7', person: 'Mario Rossi', day: '2026-06-03', hours: 4 },
+    ])
+    // An export that names no item tells no hours by item; one that is not an export, nothing.
+    expect(parseWorklogIssues('Utente;Data;Ore\nMario Rossi;03/06/2026;4')).toEqual([])
+    expect(parseWorklogIssues('a,b\n1,2')).toBeNull()
   })
 
   it('names the months a period touches', () => {

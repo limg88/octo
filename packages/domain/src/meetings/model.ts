@@ -13,6 +13,11 @@ export type MeetingsSourceConfig = {
    * recorded before the project was linked is seldom of the project.
    */
   since: string | null
+  /**
+   * The meetings the PM took away from the project, by their id: the project never takes them
+   * again, whatever its invitations and its words say.
+   */
+  released?: string[] | undefined
 }
 
 /** Where Octo keeps the meetings of a project, one folder each. */
@@ -180,7 +185,10 @@ export function cleanMeetingsSource(config: MeetingsSourceConfig): MeetingsSourc
   if (!ABSOLUTE_ROOT.test(root)) throw new DomainError('source_config_invalid', `root: ${root}`)
   const since = config.since?.trim() || null
   if (since !== null) startOfDay(since)
-  return { root, since }
+  const released = [...new Set((config.released ?? []).map((id) => id.trim()))].filter(
+    (id) => id !== '',
+  )
+  return released.length > 0 ? { root, since, released } : { root, since }
 }
 
 const FOLDER_DAY = /^(\d{4}-\d{2}-\d{2})_/

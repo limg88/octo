@@ -11,6 +11,12 @@ export const TrackerContext = createContext<TrackerKind>('ado')
 export const useOpenInTracker = (): string =>
   text.openInTracker(text.trackerNames[useContext(TrackerContext)])
 
+/** How the tracker of the dashboard calls what orders its items by importance. */
+export const useSeverityName = (): string => text.severityNames[useContext(TrackerContext)]
+
+/** Whether the tracker of the dashboard plans by periods: Jira has sprints only. */
+export const useHasPeriods = (): boolean => useContext(TrackerContext) !== 'jira'
+
 export function Figure({
   label,
   value,

@@ -18,7 +18,7 @@ import {
 import { type FormEvent, useState } from 'react'
 import type { Result } from '../shared/api.ts'
 import { BUG_FILTERS, type BugFilter, type DashboardFocus } from './context.ts'
-import { OpenItem, plain } from './DashboardParts.tsx'
+import { OpenItem, plain, useSeverityName } from './DashboardParts.tsx'
 import { Waiting } from './DashboardWaiting.tsx'
 import { dateText, messages } from './messages.ts'
 import { useSelection } from './use-selection.ts'
@@ -74,6 +74,9 @@ export function DashboardBugs({
   onOpenItem,
   onReminder,
 }: Props) {
+  const severityName = useSeverityName()
+  const facetName = (facet: BugFacet): string =>
+    facet === 'severity' ? severityName : text.facetNames[facet]
   const counted = rowsOf(view, focus.filter)
   const rows = filterBugs(counted, focus.query)
   const breakdowns = bugBreakdowns(counted)
@@ -153,7 +156,7 @@ export function DashboardBugs({
                         type="button"
                         className={chosen ? 'breakdown-row breakdown-chosen' : 'breakdown-row'}
                         aria-pressed={chosen}
-                        aria-label={text.filterBy(text.facetNames[facet], valueName(entry.value))}
+                        aria-label={text.filterBy(facetName(facet), valueName(entry.value))}
                         onClick={() => ask({ [facet]: chosen ? null : entry.value })}
                       >
                         <span className="breakdown-value">{valueName(entry.value)}</span>
@@ -185,7 +188,7 @@ export function DashboardBugs({
           >
             {BUG_ORDERS.map((order) => (
               <option key={order} value={order}>
-                {text.orders[order]}
+                {order === 'severity' ? severityName : text.orders[order]}
               </option>
             ))}
           </select>
@@ -196,7 +199,7 @@ export function DashboardBugs({
               {text.activeFilters}: {text.shown(rows.length, counted.length)}
             </span>
             {activeFacets(focus.query).map((facet: BugFacet) => {
-              const name = `${text.facetNames[facet]}: ${valueName(focus.query[facet] ?? NOT_STATED)}`
+              const name = `${facetName(facet)}: ${valueName(focus.query[facet] ?? NOT_STATED)}`
               return (
                 <button
                   key={facet}
@@ -286,6 +289,7 @@ function BugDetail({
   onNote: (id: string, note: string) => void
   onOpenItem: ((id: string) => void) | undefined
 }) {
+  const severityName = useSeverityName()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const submit = (event: FormEvent) => {
@@ -310,7 +314,7 @@ function BugDetail({
           {row.stuck && <span className="status status-warning">{text.stuckBadge}</span>}
           {' · '}
           {text.created} {dateText(row.createdAt)}
-          {row.severity && ` · ${text.severity}: ${row.severity}`}
+          {row.severity && ` · ${severityName}: ${row.severity}`}
           {row.environment && ` · ${text.environment}: ${row.environment}`}
         </p>
         {row.note && (

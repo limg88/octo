@@ -55,6 +55,7 @@ const configured: AlignmentSettings = { ...DEFAULT_ALIGNMENT_SETTINGS, sprint: '
 const view: View = {
   exportedAt: '2026-11-13T08:00:00Z',
   tickets: 42,
+  stateMismatches: [],
   alignment: {
     total: 6,
     linked: [
@@ -138,6 +139,20 @@ describe('the alignment', () => {
     expect(section(text.suggestionsTitle).getByText('87% (media)')).toBeTruthy()
     expect(section(text.suggestionsTitle).getByText(text.suggestionsIntro)).toBeTruthy()
     expect(section(text.unreferencedTitle).getByText('Riunione')).toBeTruthy()
+  })
+
+  it('says which states the dashboard reads in another way, and how to make the two agree', async () => {
+    const mismatched: View = {
+      ...view,
+      stateMismatches: [
+        { state: 'Demo', group: 'Chiuso', groupPhase: 'closed', dashboardPhase: 'verify' },
+      ],
+    }
+    const api = fakeApi({ alignmentView: vi.fn(async () => ok(mismatched)) })
+    render(<AlignmentView api={api} project={project} />)
+    expect(
+      await screen.findByText(text.stateMismatch('Demo', 'Chiuso', text.phaseNames.verify)),
+    ).toBeTruthy()
   })
 
   it('warns when the lists do not add up, and says so for empty lists', async () => {

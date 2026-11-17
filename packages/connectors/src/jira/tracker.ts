@@ -35,7 +35,8 @@ export interface JiraTrackerItem {
   sprint: string | null
   parent: string | null
   description: string
-  acceptance_criteria: string
+  /** Jira has no field for them: null says so, where an empty text would say they are missing. */
+  acceptance_criteria: null
   discussion: AdoTrackerComment[]
 }
 
@@ -73,7 +74,7 @@ export function trackerItemOf(issue: Issue, stateChangedAt: string | null): Jira
     sprint: issue.sprint,
     parent: issue.parentKey,
     description: issue.description ?? '',
-    acceptance_criteria: '',
+    acceptance_criteria: null,
     discussion: issue.comments.flatMap((comment) =>
       comment.createdAt === null
         ? []
@@ -88,8 +89,17 @@ export function trackerItemOf(issue: Issue, stateChangedAt: string | null): Jira
   }
 }
 
-/** A change of one field: what it was and what it became, as texts. */
-type FieldChange = { at: string; from: string; to: string }
+/**
+ * A change of one field: what it was and what it became, as texts; for a state, also the ids
+ * Jira gives the two states, which do not change with the language the names are written in.
+ */
+type FieldChange = { at: string; from: string; to: string; fromId?: string; toId?: string }
+
+/** The id Jira gives the state an issue of a search answer is in; null when not said. */
+export function statusIdOf(raw: unknown): string | null {
+  const status = isRecord(raw) && isRecord(raw.fields) ? raw.fields.status : null
+  return isRecord(status) ? text(status.id) : null
+}
 
 /** The labels of a change, which Jira writes with spaces between, as the tags of the dashboard. */
 const tagsText = (labels: string): string =>
@@ -122,7 +132,11 @@ export function changelogPageOf(json: unknown): ChangelogPage {
     for (const item of change.items) {
       if (!isRecord(item)) continue
       const values = { at, from: text(item.fromString) ?? '', to: text(item.toString) ?? '' }
-      if (item.field === STATUS_FIELD) page.states.push(values)
+      if (item.field === STATUS_FIELD) {
+        const fromId = text(item.from)
+        const toId = text(item.to)
+        page.states.push({ ...values, ...(fromId ? { fromId } : {}), ...(toId ? { toId } : {}) })
+      }
       if (item.field === LABELS_FIELD) page.tags.push(values)
     }
   }
@@ -134,13 +148,23 @@ const byInstant = (a: FieldChange, b: FieldChange): number => Date.parse(a.at) -
 /**
  * What an issue went through, from the changes of its changelog. The changelog tells the changes
  * only: the state the issue was born in is what its first change left, or the state it has now
- * when it never changed. The same holds for its labels.
+ * when it never changed. The same holds for its labels. The changelog names a state in the
+ * language of the site and an issue in the language of who reads: with `stateNames`, the names
+ * the issues carry by the id of the state, every state of the history is called as the issues
+ * call it, and a state never appears under two names.
  */
 export function historyOf(
   item: JiraTrackerItem,
   changes: Pick<ChangelogPage, 'states' | 'tags'>,
+  stateNames: ReadonlyMap<string, string> = new Map(),
 ): AdoTrackerHistory {
-  const states = [...changes.states].sort(byInstant)
+  const named = (id: string | undefined, name: string): string =>
+    (id === undefined ? undefined : stateNames.get(id)) ?? name
+  const states = [...changes.states].sort(byInstant).map((change) => ({
+    ...change,
+    from: named(change.fromId, change.from),
+    to: named(change.toId, change.to),
+  }))
   const tags = [...changes.tags].sort(byInstant)
   const history: AdoTrackerHistory = { created: item.created_date, states: [], tags: [] }
   if (item.created_date !== null) {

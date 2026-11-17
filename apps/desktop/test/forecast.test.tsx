@@ -3,6 +3,7 @@ import type { ForecastView as View } from '@octo/application'
 import {
   DEFAULT_FORECAST_SETTINGS,
   type ForecastSettings,
+  type Lifetime,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
   type Project,
@@ -10,7 +11,7 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForecastView, previousMonthOf } from '../src/renderer/ForecastView.tsx'
-import { amountField, amountOf, amountText } from '../src/renderer/forecast-text.ts'
+import { amountField, amountOf, amountText, lifetimeMail } from '../src/renderer/forecast-text.ts'
 import { messages } from '../src/renderer/messages.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
@@ -64,12 +65,15 @@ const view: View = {
     ],
     gaps: [
       { kind: 'no_cost', code: 'P1', person: 'Verdi Luca', hours: 8 },
-      { kind: 'no_rate', code: 'P1', person: 'Bianchi Anna', hours: 16.5 },
+      { kind: 'no_rate', code: 'P1', person: 'Bianchi Anna', hours: 16.5, proposed: null },
       { kind: 'no_total_costs', code: 'P1' },
       { kind: 'no_ordered', code: 'P2' },
+      { kind: 'unread_months', code: 'P2', months: ['2026-04', '2026-05'] },
     ],
     notApprovedHours: 8,
     otherCodes: ['P7', 'P8'],
+    unreadMonths: ['2026-04', '2026-05'],
+    orphanCodes: [],
   },
 }
 
@@ -82,6 +86,7 @@ type Api = Pick<
   | 'forecastView'
   | 'compileForecast'
   | 'readForecastOrders'
+  | 'forecastLifetime'
   | 'openEvidence'
 >
 
@@ -97,6 +102,7 @@ function fakeApi(overrides: Partial<Api> = {}) {
     ),
     // NetSuite is not linked: what Octo asks by itself for a code it does not know changes nothing.
     readForecastOrders: vi.fn(async () => UNLINKED),
+    forecastLifetime: vi.fn(async () => ok<Lifetime[]>([])),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
@@ -140,9 +146,34 @@ describe('the forecast', () => {
     expect((await screen.findAllByText('P1')).length).toBeGreaterThan(0)
     expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-06')
     expect(screen.getAllByText('3.200,00')).toHaveLength(2)
-    expect(screen.getByText('18,5 gg')).toBeTruthy()
-    expect(screen.getByText('12,5%')).toBeTruthy()
-    expect(screen.getAllByText('38,28%')).toHaveLength(2)
+    // Days sold and progress of a fixed price each in its own column: the other stays empty.
+    const table = screen.getByRole('table', { name: text.monthData })
+    const cellsOf = (code: string) =>
+      within(within(table).getByRole('row', { name: new RegExp(`^${code}`) }))
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    expect(cellsOf('P1').slice(1, 7)).toEqual([
+      '100.000,00',
+      '3.200,00',
+      '750,00',
+      '6.400,00',
+      '18,5',
+      '—',
+    ])
+    expect(cellsOf('P2').slice(5, 7)).toEqual(['—', '12,5%'])
+    // The name of the code is in the row, not only under the pointer.
+    expect(within(table).getAllByText('Sviluppo').length).toBeGreaterThan(0)
+    expect(within(table).getAllByText('A corpo').length).toBeGreaterThan(0)
+    // A row whose figures miss something says so itself; both rows here do.
+    expect(within(table).getAllByText(text.incomplete)).toHaveLength(2)
+    // The project as a whole: ordered, costs, revenue, days, and the margin of the month on them.
+    const total = within(table).getByRole('row', { name: new RegExp(`^${text.totalRow}`) })
+    expect(
+      within(total)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+        .slice(0, 7),
+    ).toEqual(['150.000,00', '6.400,00', '1.500,00', '12.800,00', '18,5', '', '38,28%'])
     expect(screen.getByText('40%')).toBeTruthy()
     expect(screen.getByText(text.gap.no_cost('P1', 'Verdi Luca', '8'))).toBeTruthy()
     expect(screen.getByText(text.gap.no_rate('P1', 'Bianchi Anna', '16,5'))).toBeTruthy()
@@ -150,13 +181,47 @@ describe('the forecast', () => {
     expect(screen.getByText(text.gap.no_ordered('P2'))).toBeTruthy()
     expect(screen.getByText(text.notApproved('8'))).toBeTruthy()
     expect(screen.getByText(text.otherCodes('P7, P8'))).toBeTruthy()
+    // The months of timesheets nobody read are said on the page and on the code they belong to.
+    expect(screen.getByText(text.unreadMonths('2026-04, 2026-05'))).toBeTruthy()
+    expect(screen.getByText(text.gap.unread_months('P2', '2026-04, 2026-05'))).toBeTruthy()
     expect(screen.getByText(text.internal)).toBeTruthy()
+  })
+
+  it('shows no total for a single code, and no mark on a row that misses nothing', async () => {
+    const single: View = {
+      ...view,
+      forecast: {
+        ...view.forecast,
+        rows: [{ ...(view.forecast.rows[0] as View['forecast']['rows'][number]), ordered: null }],
+        gaps: [{ kind: 'no_total_costs', code: 'P1' }],
+        unreadMonths: [],
+      },
+    }
+    render(
+      <ForecastView
+        api={fakeApi({ forecastView: vi.fn(async () => ok(single)) })}
+        project={project}
+        now={now}
+      />,
+    )
+    const table = await screen.findByRole('table', { name: text.monthData })
+    expect(within(table).queryByText(text.totalRow)).toBeNull()
+    // The margin at the end that is missing does not make the figures of the month wrong.
+    expect(within(table).queryByText(text.incomplete)).toBeNull()
+    expect(within(table).getAllByText(text.none).length).toBeGreaterThan(1)
   })
 
   it('says when nothing is missing and when the model lists no code', async () => {
     const empty: View = {
       ...view,
-      forecast: { ...view.forecast, rows: [], gaps: [], notApprovedHours: 0, otherCodes: [] },
+      forecast: {
+        ...view.forecast,
+        rows: [],
+        gaps: [],
+        notApprovedHours: 0,
+        otherCodes: [],
+        unreadMonths: [],
+      },
     }
     render(
       <ForecastView
@@ -324,7 +389,7 @@ describe('the forecast', () => {
       forecast: {
         ...view.forecast,
         gaps: [
-          ...view.forecast.gaps,
+          ...view.forecast.gaps.filter((gap) => gap.kind !== 'unread_months'),
           { kind: 'no_external_rate', code: 'P2', person: 'Studio Blu', hours: 40 },
         ],
       },
@@ -428,7 +493,15 @@ describe('the forecast', () => {
         modelPath: 'amministrazione/Previsionale.xlsx',
         projects: {
           P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price' },
-          P2: { kind: 'fee', description: '', ordered: 22500, feeMonths: 12 },
+          P2: {
+            kind: 'fee',
+            description: '',
+            ordered: 22500,
+            feeMonths: 12,
+            startMonth: null,
+            invoiced: null,
+            recognized: null,
+          },
         },
         hoursPerDay: 7.5,
         rates: [
@@ -479,7 +552,16 @@ describe('the forecast', () => {
         gaps: [],
       },
     }
-    const known = { P2: { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const, ordered: 7500 } }
+    const known = {
+      P2: {
+        ...NO_FORECAST_PROJECT,
+        kind: 'fixed_price' as const,
+        ordered: 7500,
+        startMonth: '2026-04',
+        invoiced: null,
+        recognized: null,
+      },
+    }
     const api = fakeApi({
       forecastView: vi.fn(async () => ok(fixed)),
       readForecastOrders: vi.fn(async () => ordersRead(known)),
@@ -513,6 +595,99 @@ describe('the forecast', () => {
     render(<ForecastView api={settled} project={project} now={now} />)
     expect(await screen.findByText(text.noRatesNeeded)).toBeTruthy()
     expect(settled.readForecastOrders).not.toHaveBeenCalled()
+
+    cleanup()
+    // A fixed price whose start is not known: NetSuite is asked when its first order was.
+    const noStart = { P2: { ...known.P2, startMonth: null } }
+    const asking = fakeApi({
+      forecastSettings: vi.fn(async () => ok({ ...configured, projects: noStart })),
+      forecastView: vi.fn(async () => ok(fixed)),
+      readForecastOrders: vi.fn(async () => ordersRead(known)),
+    })
+    render(<ForecastView api={asking} project={project} now={now} />)
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnStartMonth, 'P2')).value,
+      ).toBe('2026-04'),
+    )
+    expect(asking.readForecastOrders).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers to a new code the rates of the code before, one by one or all at once', async () => {
+    const proposed: View = {
+      ...view,
+      forecast: {
+        ...view.forecast,
+        gaps: [
+          {
+            kind: 'no_rate',
+            code: 'PI7',
+            person: 'Rossi Mario',
+            hours: 16,
+            proposed: { code: 'PI6', ratePerDay: 400 },
+          },
+          {
+            kind: 'no_rate',
+            code: 'PI7',
+            person: 'Bianchi Anna',
+            hours: 8,
+            proposed: { code: 'PI6', ratePerDay: 420 },
+          },
+          { kind: 'no_rate', code: 'PI7', person: 'Neri Ugo', hours: 8, proposed: null },
+        ],
+        orphanCodes: ['OLD1'],
+      },
+    }
+    const api = fakeApi({ forecastView: vi.fn(async () => ok(proposed)) })
+    render(<ForecastView api={api} project={project} now={now} />)
+    // Data of the month on a code that is not of the project are said, not dropped in silence.
+    expect(await screen.findByText(text.orphanCodes('OLD1'))).toBeTruthy()
+    expect(screen.getByText(text.copyRatesHint)).toBeTruthy()
+    const one = `${text.proposedRate('420,00', 'PI6')}: ${text.remedy.of('Bianchi Anna', 'PI7')}`
+    fireEvent.click(screen.getByRole('button', { name: one }))
+    await waitFor(() =>
+      expect(api.saveForecastSettings).toHaveBeenLastCalledWith(
+        'p-1',
+        expect.objectContaining({
+          rates: [...configured.rates, { person: 'Bianchi Anna', code: 'PI7', ratePerDay: 420 }],
+        }),
+      ),
+    )
+    // Who has no rate anywhere gets no proposal: the rate is typed as before.
+    expect(screen.getAllByRole('button', { name: /^Usa .* come su PI6: / })).toHaveLength(2)
+    cleanup()
+    // All at once: every person the code before has a rate for, in one save.
+    render(<ForecastView api={api} project={project} now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.copyRates(2, 'PI6', 'PI7') }))
+    await waitFor(() =>
+      expect(api.saveForecastSettings).toHaveBeenLastCalledWith(
+        'p-1',
+        expect.objectContaining({
+          rates: [
+            ...configured.rates,
+            { person: 'Rossi Mario', code: 'PI7', ratePerDay: 400 },
+            { person: 'Bianchi Anna', code: 'PI7', ratePerDay: 420 },
+          ],
+        }),
+      ),
+    )
+  })
+
+  it('sends to the hours the PM who has months of timesheets nobody read', async () => {
+    const onOpenSection = vi.fn()
+    const unread: View = {
+      ...view,
+      forecast: {
+        ...view.forecast,
+        gaps: view.forecast.gaps.filter((gap) => gap.kind === 'unread_months'),
+      },
+    }
+    const api = fakeApi({ forecastView: vi.fn(async () => ok(unread)) })
+    render(<ForecastView api={api} project={project} now={now} onOpenSection={onOpenSection} />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: messages.openSection(messages.hoursTab) }),
+    )
+    expect(onOpenSection).toHaveBeenCalledWith('hours')
   })
 
   it('asks the costs of the whole project first for a fixed price, the externals first by the day', async () => {
@@ -598,5 +773,276 @@ describe('the forecast', () => {
       screen.queryByRole('button', { name: messages.openSection(messages.hoursTab) }),
     ).toBeNull()
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
+  })
+})
+
+describe('a project code over its whole life', () => {
+  const life: Lifetime = {
+    code: 'AUR-01',
+    description: 'Assessment Aurora',
+    kind: 'fixed_price',
+    through: '2026-11',
+    ordered: 7500,
+    invoiced: 2250,
+    recognized: 5250,
+    lines: [
+      { person: 'Bianchi Luca', hours: 26, cost: 1197, source: 'timesheet', months: [] },
+      { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
+      { person: 'Verdi Sara', hours: 8, cost: 560, source: 'declared', months: [] },
+    ],
+    hours: 68,
+    costs: 3457,
+    estimatedHours: 0,
+    estimatedCosts: 0,
+    marginToDate: (7500 - 3457) / 7500,
+    budgetCosts: 4800,
+    proposedBudget: null,
+    progress: 3457 / 4800,
+    expectedCosts: 4800,
+    marginAtEnd: 0.36,
+    notApprovedHours: 3,
+    unreadMonths: [],
+  }
+  const days: Lifetime = {
+    ...life,
+    code: 'AUR-02',
+    description: '',
+    kind: 'time_material',
+    ordered: null,
+    invoiced: null,
+    recognized: null,
+    lines: [{ person: 'Neri Ugo', hours: 2, cost: null, source: 'timesheet', months: [] }],
+    hours: 2,
+    costs: 0,
+    marginToDate: null,
+    budgetCosts: null,
+    progress: null,
+    expectedCosts: null,
+    marginAtEnd: null,
+    notApprovedHours: 0,
+    unreadMonths: ['2026-09'],
+  }
+  const fixedOnly = {
+    ...configured,
+    projects: { 'AUR-01': { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const } },
+  }
+  const words = text.lifetime
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('is what a project sold only at a fixed price opens on, as the sheet the PM keeps by hand', async () => {
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    const api = fakeApi({
+      forecastSettings: vi.fn(async () => ok(fixedOnly)),
+      forecastLifetime: vi.fn(async () => ok([life])),
+    })
+    render(<ForecastView api={api} project={project} now={now} />)
+    const table = await screen.findByRole('table', { name: words.people })
+    expect(
+      screen.getByRole('tab', { name: text.parts.lifetime }).getAttribute('aria-selected'),
+    ).toBe('true')
+    const rows = within(table)
+      .getAllByRole('row')
+      .map((row) => row.textContent)
+    expect(rows).toEqual([
+      `${words.person}${words.hours}${words.cost}${words.source}`,
+      'Bianchi Luca261.197,00timesheet',
+      'Rossi Anna341.700,00timesheet',
+      'Verdi Sara8560,00senza timesheet, dichiarate',
+      `${words.total}683.457,00`,
+    ])
+    // What NetSuite says of the invoices and of the revenue, with the share of the order.
+    expect(screen.getByText('2.250,00 (30%)')).toBeTruthy()
+    expect(screen.getByText('5.250,00 (70%)')).toBeTruthy()
+    expect(screen.getByText('53,91%')).toBeTruthy()
+    expect(screen.getByText(`4.800,00 · ${words.progress('72,02%')}`)).toBeTruthy()
+    expect(screen.getByText(`36% · ${words.onCosts('4.800,00')}`)).toBeTruthy()
+    expect(screen.getByText(text.notApproved('3'))).toBeTruthy()
+    // One code only: nothing to choose.
+    expect(screen.queryByLabelText(words.code)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: words.copy }))
+    expect(await screen.findByText(words.copied)).toBeTruthy()
+    expect(writeText).toHaveBeenCalledWith(lifetimeMail(life))
+
+    // The month is one click away, and the way back too.
+    fireEvent.click(screen.getByRole('tab', { name: text.parts.month }))
+    expect(await screen.findByText(text.groupOwn)).toBeTruthy()
+    expect(screen.queryByRole('table', { name: words.people })).toBeNull()
+  })
+
+  it('is chosen among the codes of a project sold in more ways, which opens on the month', async () => {
+    const api = fakeApi({ forecastLifetime: vi.fn(async () => ok([days, life])) })
+    render(<ForecastView api={api} project={project} now={now} />)
+    expect(await screen.findByText(text.groupOwn)).toBeTruthy()
+    expect(api.forecastLifetime).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('tab', { name: text.parts.lifetime }))
+    // The fixed price is shown first, whatever the order of the codes.
+    const chosen = await screen.findByLabelText<HTMLSelectElement>(words.code)
+    expect(chosen.value).toBe('AUR-01')
+    fireEvent.change(chosen, { target: { value: 'AUR-02' } })
+    expect(screen.getByText(text.unreadMonths('2026-09'))).toBeTruthy()
+    expect(screen.getByText(words.withoutCost('Neri Ugo'))).toBeTruthy()
+    expect(screen.getByText(words.noBudget)).toBeTruthy()
+    expect(screen.getByText(words.noExpected)).toBeTruthy()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(3)
+  })
+
+  it('marks as an estimate the hours not yet in NetSuite, on the page and in the mail', async () => {
+    const estimated: Lifetime = {
+      ...life,
+      lines: [
+        ...life.lines,
+        { person: 'Neri Ugo', hours: 8, cost: 560, source: 'no_timesheet', months: [] },
+        { person: 'Bianchi Luca', hours: 4.5, cost: 207, source: 'estimate', months: ['2026-11'] },
+      ],
+      hours: 80.5,
+      costs: 4224,
+      estimatedHours: 4.5,
+      estimatedCosts: 207,
+    }
+    const api = fakeApi({
+      forecastSettings: vi.fn(async () => ok(fixedOnly)),
+      forecastLifetime: vi.fn(async () => ok([estimated])),
+    })
+    render(<ForecastView api={api} project={project} now={now} />)
+    const table = await screen.findByRole('table', { name: words.people })
+    const rows = within(table)
+      .getAllByRole('row')
+      .map((row) => row.textContent)
+    expect(rows).toContain(`Neri Ugo8560,00${words.sources.no_timesheet}`)
+    expect(rows).toContain(`Bianchi Luca4,5207,00${words.sources.estimate} (2026-11)`)
+    expect(screen.getByText(words.estimated('4,5', '207,00'))).toBeTruthy()
+    const mail = lifetimeMail(estimated)
+    expect(mail).toMatch(new RegExp(`Bianchi Luca \\(${words.estimateMark}\\)\\s+4,5\\s+207,00`))
+    expect(mail).toContain(words.estimated('4,5', '207,00'))
+  })
+
+  it('keeps what an hour costs of who has no timesheet, written once in the settings', async () => {
+    const api = fakeApi()
+    render(<ForecastView api={api} project={project} now={now} />)
+    await screen.findByText(text.groupOwn)
+    const group = screen.getByRole('group', { name: text.hourlyCosts })
+    const [name, cost] = within(group).getAllByRole('textbox')
+    fireEvent.change(name as HTMLElement, { target: { value: ' Verdi Sara ' } })
+    fireEvent.change(cost as HTMLElement, { target: { value: 'tanto' } })
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    expect(await screen.findByText(text.wrong.hourlyCost(1))).toBeTruthy()
+    expect(api.saveForecastSettings).not.toHaveBeenCalled()
+    fireEvent.change(cost as HTMLElement, { target: { value: '70' } })
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() =>
+      expect(api.saveForecastSettings).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({ hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }] }),
+      ),
+    )
+  })
+
+  it('proposes the costs at budget from the caps of the people, and keeps them only when the PM says so', async () => {
+    const proposed: Lifetime = {
+      ...life,
+      budgetCosts: null,
+      progress: null,
+      expectedCosts: null,
+      marginAtEnd: null,
+      proposedBudget: {
+        costs: 4584,
+        people: [
+          { person: 'Anna Rossi', days: 2, costPerHour: 50 },
+          { person: 'Luca Bianchi', days: 8, costPerHour: 46 },
+          { person: 'Sara Verdi', days: 1.5, costPerHour: 70 },
+        ],
+        withoutCost: ['Ugo Neri'],
+      },
+    }
+    const started = {
+      ...configured,
+      projects: {
+        'AUR-01': { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const, startMonth: '2026-09' },
+      },
+    }
+    const api = fakeApi({
+      forecastSettings: vi.fn(async () => ok(started)),
+      forecastLifetime: vi
+        .fn()
+        .mockResolvedValueOnce(ok([proposed]))
+        .mockResolvedValue(ok([{ ...proposed, budgetCosts: 4584 }])),
+    })
+    render(<ForecastView api={api} project={project} now={now} />)
+    expect(
+      await screen.findByText(
+        new RegExp(
+          words
+            .proposed('4.584,00', 'Anna Rossi 2 gg, Luca Bianchi 8 gg, Sara Verdi 1,5 gg')
+            .replace(/[.()]/g, '\\$&'),
+        ),
+      ),
+    ).toBeTruthy()
+    expect(screen.getByText(new RegExp(words.proposedWithoutCost('Ugo Neri')))).toBeTruthy()
+    // Nothing is written until the PM presses: then from the month the code began.
+    expect(api.saveForecastSettings).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: words.useProposed }))
+    await waitFor(() =>
+      expect(api.saveForecastSettings).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({
+          months: expect.objectContaining({
+            '2026-09': { 'AUR-01': { ...NO_ROW_INPUTS, budgetCosts: 4584 } },
+          }),
+        }),
+      ),
+    )
+    // The life of the code is read again, and says the proposal is what is in use.
+    expect(await screen.findByText(new RegExp(words.proposedInUse))).toBeTruthy()
+    expect(screen.queryByRole('button', { name: words.useProposed })).toBeNull()
+    expect(api.forecastLifetime).toHaveBeenCalledTimes(2)
+  })
+
+  it('says why it cannot be told, and when the project has no code yet', async () => {
+    const failing = fakeApi({
+      forecastSettings: vi.fn(async () => ok(fixedOnly)),
+      forecastLifetime: vi.fn(async () => ({
+        ok: false as const,
+        code: 'forecast_timesheet_not_set' as const,
+      })),
+    })
+    render(<ForecastView api={failing} project={project} now={now} />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/timesheet/i)
+    cleanup()
+    const empty = fakeApi({ forecastSettings: vi.fn(async () => ok(fixedOnly)) })
+    render(<ForecastView api={empty} project={project} now={now} />)
+    expect(await screen.findByText(text.noRows)).toBeTruthy()
+  })
+
+  it('goes in a mail as plain text, with what it misses said in words', () => {
+    const mail = lifetimeMail(life)
+    expect(mail.split('\n').slice(0, 2)).toEqual([
+      'AUR-01 · Assessment Aurora',
+      words.through('2026-11'),
+    ])
+    expect(mail).toContain(`${words.invoiced}: 2.250,00 (30%)`)
+    // A table in plain text: every row as wide as the others.
+    const table = mail
+      .split('\n')
+      .filter((line) => /\d,\d\d$|Costo$/.test(line) && !line.includes(':'))
+    expect(table.map((line) => line.replace(/\s+/g, ' '))).toEqual([
+      `${words.person} ${words.hours} ${words.cost}`,
+      'Bianchi Luca 26 1.197,00',
+      'Rossi Anna 34 1.700,00',
+      'Verdi Sara 8 560,00',
+      `${words.total} 68 3.457,00`,
+    ])
+    expect(new Set(table.map((line) => line.length)).size).toBe(1)
+    expect(mail).toContain(`${words.marginToDate}: 53,91%`)
+    expect(mail).toContain(`${words.marginAtEnd}: 36% · ${words.onCosts('4.800,00')}`)
+    const bare = lifetimeMail(days)
+    expect(bare.split('\n')[0]).toBe('AUR-02')
+    expect(bare).toContain(`${words.ordered}: —`)
+    expect(bare).not.toContain(words.marginAtEnd)
+    expect(bare).toContain(words.withoutCost('Neri Ugo'))
+    expect(bare).toContain(text.unreadMonths('2026-09'))
+    // An amount invoiced with no order to compare it with is said as it is.
+    expect(lifetimeMail({ ...days, invoiced: 100 })).toContain(`${words.invoiced}: 100,00`)
   })
 })

@@ -270,6 +270,19 @@ Il primo progetto di questo tipo (un assessment a corpo, con solo Jira) ha mostr
 - **Tipo di vendita letto da NetSuite** (demo 44): la voce della riga d'ordine dice come è venduta la commessa (`PROG-CORPO` a corpo, `SERVPRO` a giornate). Vale la prima volta che Octo vede il codice; poi resta ciò che sceglie il PM. La lettura parte da sola all'apertura del Previsionale quando c'è una commessa mai vista, senza mostrare errori se NetSuite non risponde.
 - **Pagina del Previsionale secondo il tipo**: senza commesse a giornate le tariffe al giorno non vengono chieste (quelle scritte restano); per un corpo i costi a budget vengono prima delle ore degli esterni.
 - *Non fatto*: costi a budget proposti da Octo; ricavi presi da quelli riconosciuti in NetSuite; voce d'ordine del canone.
+- **Verifica sui dati reali** (17/11/2026): tre errori di correttezza e le lacune per un progetto a corpo, con il piano interventi, in [verifica-deem-petrolvalves.md](verifica-deem-petrolvalves.md).
+- **Interventi dopo la verifica** (demo 45–54), nell'ordine del piano:
+  - *Riepilogo del cruscotto* (45): i bug aperti sono lavorazione più verifica, come nella scheda «Bug».
+  - *Mesi di timesheet* (46): il previsionale legge da solo da NetSuite i mesi dall'inizio della commessa (mese del primo ordine, correggibile); quando non può, dice quali mancano. Un mese letto mentre era in corso viene riletto.
+  - *Riunioni* (47): una riunione si sposta a un altro progetto o si toglie, con i punti aperti che ne vengono; il progetto che l'ha data via non la riprende (`released` in `sources.json`); avviso quando i partecipanti sono persone di un altro progetto.
+  - *Scheda «Commessa»* (48): la commessa dall'inizio a oggi, persona per persona, con fatturato e riconosciuto da NetSuite, margine a oggi e a finire, copia per mail.
+  - *Jira registro attività* (49): scheda «Attività» con ore e diario, schede senza dati nascoste, tipi proposti dai dati, niente segnale sui criteri di accettazione dove il campo non esiste, stati con un nome solo (per id).
+  - *Ore fuori dai timesheet* (50): mese in corso stimato dal tracker per il costo orario, sempre dichiarato come stima; persone senza timesheet a costo orario. Solo con una commessa per progetto.
+  - *Costi a budget* (51): proposti dai tetti in giornate delle persone, scritti solo quando il PM lo dice.
+  - *Commessa nuova* (52): tariffe proposte dalla commessa precedente; avviso per i dati del mese su codici non più del progetto.
+  - *Pagina del mese e minori* (53): nome della commessa, ordinato, totale, «dati incompleti» sulla riga; virgola decimale, nome e cognome in «Ore», stato letto in due modi fra cruscotto e allineamento.
+  - *Sezioni per tipo di progetto* (54): «Allineamento» solo con due tracker; «Avanzamento» a corpo da ordinato e fatturato di NetSuite.
+  - *Non fatto*: l'elenco delle singole fatture in «Avanzamento» a corpo; l'attribuzione delle ore del tracker quando il progetto ha più commesse; l'assegnazione automatica di una riunione al progetto dei partecipanti (resta un avviso).
 
 ## Scelte prese durante F5
 - **Tipi di deliverable del progetto, a parole**: il PM dà un titolo, dice chi lo legge, che cosa chiedergli prima (una domanda per riga, `*` se obbligatoria), come va scritto e che cosa controllare. Octo lo aggiunge al catalogo di quel progetto e lo scrive con gli stessi tre controlli degli altri. Le istruzioni si possono incollare: è la via per portare in Octo, senza codice, le skill che oggi stanno nell'account del PM.

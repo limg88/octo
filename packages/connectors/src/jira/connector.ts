@@ -44,6 +44,7 @@ import {
   MAX_CHANGELOG_PAGES,
   STATE_CHANGE_FIELD,
   stateChangeOf,
+  statusIdOf,
   trackerItemOf,
 } from './tracker.ts'
 import {
@@ -384,10 +385,10 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
   async function trackerIssues(
     ctx: ConnectorContext<JiraConfig>,
     projects: ReadonlyMap<string, Project>,
-  ): Promise<Array<{ issue: Issue; item: JiraTrackerItem }>> {
+  ): Promise<Array<{ issue: Issue; item: JiraTrackerItem; statusId: string | null }>> {
     const jql = listJql([...projects.keys()].sort())
     const fields = [...issueFields(ctx.config), STATE_CHANGE_FIELD].join(',')
-    const found: Array<{ issue: Issue; item: JiraTrackerItem }> = []
+    const found: Array<{ issue: Issue; item: JiraTrackerItem; statusId: string | null }> = []
     let token: string | null = null
     for (let page = 0; page <= MAX_LISTED_IDS / PAGE_SIZE; page += 1) {
       const json: unknown = await getJson(
@@ -411,7 +412,11 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
         // What the system returns outside the perimeter is dropped, as in a sync.
         if (!projects.has(read.projectId)) continue
         const issue = commentsCut(read) ? await readComments(ctx, read) : read
-        found.push({ issue, item: trackerItemOf(issue, stateChangeOf(raw)) })
+        found.push({
+          issue,
+          item: trackerItemOf(issue, stateChangeOf(raw)),
+          statusId: statusIdOf(raw),
+        })
       }
       if (found.length > MAX_LISTED_IDS) throw new ConnectorError('response_too_large')
       const next = typeof json.nextPageToken === 'string' ? json.nextPageToken : ''
@@ -432,9 +437,14 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
       const read = await trackerIssues(ctx, projects)
       const wanted = new Set(detailTypes.map((type) => type.toLowerCase()))
       const detailed = read.filter(({ item }) => wanted.has(item.type.toLowerCase()))
+      // The names the issues carry, by the id of the state: one name for each state.
+      const stateNames = new Map<string, string>()
+      for (const { statusId, item } of read) {
+        if (statusId !== null && !stateNames.has(statusId)) stateNames.set(statusId, item.state)
+      }
       const history: JiraTrackerSnapshot['history'] = {}
       await inPool(detailed, TRACKER_POOL, async ({ issue, item }) => {
-        const told = historyOf(item, await changesOf(ctx, issue.id))
+        const told = historyOf(item, await changesOf(ctx, issue.id), stateNames)
         history[item.id] = told
         // The state changed when its last change says, which is finer than its category.
         item.state_change_date = told.states.at(-1)?.[0] ?? item.state_change_date

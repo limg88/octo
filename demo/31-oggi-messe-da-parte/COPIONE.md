@@ -13,7 +13,7 @@ Durata: 5 minuti. Incremento B di `docs/oggi-revisione.md`.
    ```bash
    bash demo/31-oggi-messe-da-parte/run.sh
    ```
-   Atteso: Octo si apre su «Aurora», sezione «Oggi». Premi «Leggi ora». In cima, su fondo giallo: «Il tracker del cliente è di 5 giorni fa…».
+   Atteso: Octo si apre su «Aurora», sezione «Oggi». Premi «Leggi ora». In cima, su fondo giallo: «I dati del tracker sono di 5 giorni fa…».
 
 2. **Rimanda a una data scelta.** Scegli la voce delle ore («…: le ore di 3 persone non tornano»), premi «Rimanda».
    Atteso: oltre ad «A domani», «A lunedì», «Fra una settimana» ci sono «A fine sprint (…)» con la data di domani e il campo «A una data» con «Rimanda a questa data», spento finché la data non è dopo oggi.
@@ -34,7 +34,7 @@ Durata: 5 minuti. Incremento B di `docs/oggi-revisione.md`.
    node demo/lib/fake-tracker.ts .tmp/demo-31/Aurora
    ```
    In Octo premi «Leggi ora».
-   Atteso: l'avviso giallo del tracker vecchio non c'è più e in fondo compare «Risolti da soli oggi: 1 (Tracker del cliente).»
+   Atteso: l'avviso giallo del tracker vecchio non c'è più e in fondo compare «Risolti da soli oggi: 1 (Tracker).»
    Dimostra: la pagina dice che cosa ha chiuso senza il PM. Se il PM l'aveva segnata «Fatto», quel «Fatto» viene dimenticato: se il problema si ripresenta torna come nuovo, non come «ancora aperto».
 
 6. **Un tipo silenziato si riaccende da qui.** Metti da parte tre voci dello stesso tipo, oppure apri «Impostazioni di «Oggi»» e silenzia un tipo; torna su «Oggi» e apri «Messe da parte».
