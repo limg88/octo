@@ -263,6 +263,14 @@ Sostituisce la «conseguenza accettata» del 14/11 (ognuno alimenta la propria c
 - *Verificato*: test, e il copione della demo 42 in due finestre vere sulla stessa cartella (`pnpm e2e:condivisa`), spostamento compreso. *Non verificato*: OneDrive e SharePoint veri (ritardi, copie in conflitto, file segnaposto), Windows, due persone vere. NetSuite resta di chi è PM dei codici.
 - *Non fatto*: unire le modifiche concorrenti ai registri (vince l'ultima); bozze di deliverable per persona (restano del progetto); togliere le copie in conflitto fuori dalle cartelle dei feed e dei testi estratti.
 
+## Scelte prese per un progetto senza Azure DevOps e venduto a corpo (17/11/2026)
+Il primo progetto di questo tipo (un assessment a corpo, con solo Jira) ha mostrato due buchi.
+- **Cruscotto da Jira** (demo 43): senza Azure DevOps il cruscotto legge le issue dei progetti Jira scelti, con cambi di stato e commenti, e scrive lo stesso file che scriveva per Azure DevOps (`_octo/cruscotto/jira.json`). Con entrambi collegati vale Azure DevOps, come prima. L'id di una voce è la chiave della issue; l'indirizzo sul tracker lo costruisce Octo. Gli stati italiani («Completata») sono riconosciuti.
+- **Limiti su Jira**: non c'è un periodo di pianificazione (PI) né un campo standard per i criteri di accettazione; lo sprint è quello attivo della issue.
+- **Tipo di vendita letto da NetSuite** (demo 44): la voce della riga d'ordine dice come è venduta la commessa (`PROG-CORPO` a corpo, `SERVPRO` a giornate). Vale la prima volta che Octo vede il codice; poi resta ciò che sceglie il PM. La lettura parte da sola all'apertura del Previsionale quando c'è una commessa mai vista, senza mostrare errori se NetSuite non risponde.
+- **Pagina del Previsionale secondo il tipo**: senza commesse a giornate le tariffe al giorno non vengono chieste (quelle scritte restano); per un corpo i costi a budget vengono prima delle ore degli esterni.
+- *Non fatto*: costi a budget proposti da Octo; ricavi presi da quelli riconosciuti in NetSuite; voce d'ordine del canone.
+
 ## Scelte prese durante F5
 - **Tipi di deliverable del progetto, a parole**: il PM dà un titolo, dice chi lo legge, che cosa chiedergli prima (una domanda per riga, `*` se obbligatoria), come va scritto e che cosa controllare. Octo lo aggiunge al catalogo di quel progetto e lo scrive con gli stessi tre controlli degli altri. Le istruzioni si possono incollare: è la via per portare in Octo, senza codice, le skill che oggi stanno nell'account del PM.
 - **Dove stanno**: in `_octo/.tipi/`, uno per file, nascosti alla ricerca di Claude perché sono impostazioni e non fonti. Salvare di nuovo con lo stesso titolo sostituisce.

@@ -14,6 +14,8 @@ import {
   exportAge,
   inScope,
   isOfType,
+  isTrackerItemId,
+  jiraBrowseHost,
   NO_TEAM,
   nextSprint,
   type Phase,
@@ -30,11 +32,12 @@ import {
   sprintComparison,
   sprintNames,
   sprintProgress,
-  TRACKER_SNAPSHOT_PATH,
   TRACKER_SUMMARY_PATH,
   type TrackerData,
+  type TrackerKind,
   type TrendGranularity,
   tellsSides,
+  trackerOfExport,
   trackerSummary,
   unclearRequirements,
   type WaitingRow,
@@ -56,7 +59,7 @@ export type DashboardDeps = {
   team?: (project: Project) => Promise<ProjectTeam>
   /** With a writer, the tracker in numbers is kept as a text of the project. */
   writer?: MemoryWriter
-  /** With the sources, an item read from Azure DevOps has an address there. */
+  /** With the sources, an item read from the tracker has an address there. */
   sources?: Pick<SourceSettings, 'load'>
 }
 
@@ -78,6 +81,8 @@ export type DashboardView = {
   tags: string[]
   /** Whether an item can be opened where the tracker keeps it. */
   linked: boolean
+  /** The tracker the export is Octo's own reading of; null for a file kept by hand. */
+  tracker: TrackerKind | null
   /** The bugs and the stories whose last comment asks something nobody answered. */
   waiting: WaitingRow[]
   /** Whether the team tells the supplier's people from the client's. */
@@ -101,7 +106,7 @@ export type Dashboard = {
   candidates(project: Project): Promise<ExportCandidates>
   /** `sprint`: the one to show in place of the running one. */
   view(project: Project, range: DashboardRange, sprint?: string | null): Promise<DashboardView>
-  /** Where the tracker keeps an item, when Octo read it from Azure DevOps; null otherwise. */
+  /** Where the tracker keeps an item, when Octo read it from the tracker itself; null otherwise. */
   itemUrl(project: Project, id: string): Promise<string | null>
 }
 
@@ -157,19 +162,24 @@ function periodsOf(data: TrackerData, settings: DashboardSettings): string[] {
 }
 
 const ADO_ORIGIN = 'https://dev.azure.com'
-const ITEM_ID = /^\d+$/
 
 export function createDashboard(deps: DashboardDeps): Dashboard {
-  /** The address of the work items of the project on Azure DevOps, when the export is its reading. */
+  /** The address of the items of the project on its tracker, when the export is its reading. */
   async function itemsAddress(
     project: Project,
     settings: DashboardSettings,
-  ): Promise<string | null> {
-    if (settings.exportPath !== TRACKER_SNAPSHOT_PATH || !deps.sources) return null
-    const ado = (await deps.sources.load(project.folder).catch(() => null))?.ado
+  ): Promise<{ tracker: TrackerKind; address: string } | null> {
+    const tracker = trackerOfExport(settings.exportPath)
+    if (tracker === null || !deps.sources) return null
+    const sources = await deps.sources.load(project.folder).catch(() => null)
+    if (tracker === 'jira') {
+      const site = sources?.jira ? jiraBrowseHost(sources.jira.site) : null
+      return site === null ? null : { tracker, address: `https://${site}/browse/` }
+    }
+    const ado = sources?.ado
     if (!ado || ado.organization.trim() === '' || ado.project.trim() === '') return null
     const path = [ado.organization, ado.project].map((part) => encodeURIComponent(part.trim()))
-    return `${ADO_ORIGIN}/${path.join('/')}/_workitems/edit/`
+    return { tracker, address: `${ADO_ORIGIN}/${path.join('/')}/_workitems/edit/` }
   }
 
   /** The reading of the tracker: every item of it, and those the numbers count. */
@@ -220,9 +230,9 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
     candidates: (project) => deps.exports.candidates(project.folder),
 
     async itemUrl(project, id) {
-      if (!ITEM_ID.test(id)) return null
-      const address = await itemsAddress(project, await deps.settings.load(project.folder))
-      return address === null ? null : `${address}${id}`
+      const found = await itemsAddress(project, await deps.settings.load(project.folder))
+      if (found === null || !isTrackerItemId(found.tracker, id)) return null
+      return `${found.address}${id}`
     },
 
     async view(project, range, sprint = null) {
@@ -249,6 +259,7 @@ export function createDashboard(deps: DashboardDeps): Dashboard {
           a.localeCompare(b, 'en', { numeric: true }),
         ),
         linked: (await itemsAddress(project, settings)) !== null,
+        tracker: trackerOfExport(settings.exportPath),
         // Who has to answer may be anybody: the questions are looked for in every item in scope.
         waiting: awaitingAnswer(everyone, settings, team, asOf),
         tellsSides: tellsSides(team),

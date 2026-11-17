@@ -382,6 +382,7 @@ export function ForecastMonth({
                 {open === row.code && (
                   <CodeDetails
                     code={row.code}
+                    wholeFirst={row.revenueKind === 'fixed_price'}
                     draft={draftFor(row.code)}
                     problems={problems[row.code]}
                     externalNames={settings.externals
@@ -447,12 +448,18 @@ export function ForecastMonth({
 /** What is typed less often for a code: the hours of the externals and the costs of the whole. */
 function CodeDetails({
   code,
+  wholeFirst,
   draft,
   problems,
   externalNames,
   onChange,
 }: {
   code: string
+  /**
+   * A fixed price is told by the costs of the whole project: they come before the externals,
+   * which are what is typed first for a code sold by the day.
+   */
+  wholeFirst: boolean
   draft: Draft
   problems: Problems | undefined
   /** The externals declared for this code: proposed while typing. */
@@ -474,9 +481,8 @@ function CodeDetails({
       <FieldProblems lines={problems?.amounts.includes(name) ? [messages.amountWrong] : []} />
     </>
   )
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: the fields of one code, grouped under its row.
-    <div className="settings-form" role="group" aria-label={text.inputsTitle(code)}>
+  const externals = (
+    <>
       <h4>{text.externals}</h4>
       <RowsField
         label={text.externals}
@@ -490,6 +496,10 @@ function CodeDetails({
         removeLabel={text.removeRow}
       />
       <FieldProblems lines={problems?.externals ?? []} />
+    </>
+  )
+  const whole = (
+    <>
       {amount('budgetCosts', text.budgetCosts)}
       {amount('totalCosts', text.totalCosts)}
       <label className="check">
@@ -500,6 +510,13 @@ function CodeDetails({
         />
         {text.totalCostsBeforeMonth}
       </label>
+    </>
+  )
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: the fields of one code, grouped under its row.
+    <div className="settings-form" role="group" aria-label={text.inputsTitle(code)}>
+      {wholeFirst ? whole : externals}
+      {wholeFirst ? externals : whole}
     </div>
   )
 }

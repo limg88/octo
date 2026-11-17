@@ -968,12 +968,12 @@ describe('a DWSI sync', () => {
     ).rejects.toThrow(TypeError)
   })
 
-  it('reads the name and the ordered amount of the bound projects', async () => {
+  it('reads the name, the ordered amount and the items sold of the bound projects', async () => {
     const orders = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
     // The ordered amount is the sum of the lines of the sales orders; none, it is not known.
     expect(orders).toEqual([
-      { projectid: 'PRJ000101', name: 'Apollo', ordered: 98000 },
-      { projectid: 'PRJ000202', name: 'Borea', ordered: null },
+      { projectid: 'PRJ000101', name: 'Apollo', ordered: 98000, items: ['Servizi'] },
+      { projectid: 'PRJ000202', name: 'Borea', ordered: null, items: [] },
     ])
     const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })
     expect((await dwsiConnector.orders(asLuca([APOLLO, BOREA]))).map((o) => o.projectid)).toEqual([

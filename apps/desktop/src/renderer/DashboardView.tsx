@@ -9,12 +9,14 @@ import {
   type DashboardDecisions,
   type DashboardSettings,
   type Project,
+  type TrackerKind,
   withoutTrackerDecision,
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { DASHBOARD_TABS, type DashboardFocus, NO_DASHBOARD_FOCUS } from './context.ts'
 import { DashboardBugs } from './DashboardBugs.tsx'
+import { TrackerContext } from './DashboardParts.tsx'
 import { DashboardSettingsForm } from './DashboardSettingsForm.tsx'
 import { DashboardSprint } from './DashboardSprint.tsx'
 import { DashboardTrend } from './DashboardTrend.tsx'
@@ -38,6 +40,7 @@ type DashboardApi = Pick<
   | 'commentDashboard'
   | 'draftReminder'
   | 'onSourcesChanged'
+  | 'feed'
 >
 
 type Props = {
@@ -94,6 +97,8 @@ export function DashboardView({
   const [loading, setLoading] = useState(false)
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerSnapshotRun | null>(null)
+  /** The tracker a reading would be asked of: Jira for a project without Azure DevOps. */
+  const [linkedTracker, setLinkedTracker] = useState<TrackerKind>('ado')
   /** The sprint the PM chose in place of the running one. */
   const sprint = useRef<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -135,6 +140,14 @@ export function DashboardView({
     setComment(null)
     setCommentError(null)
     setUndo(null)
+    setLinkedTracker('ado')
+    void Promise.all([api.feed(project.id, 'ado'), api.feed(project.id, 'jira')]).then(
+      ([ado, jira]) => {
+        const onlyJira =
+          ado.ok && ado.value.config === null && jira.ok && jira.value.config !== null
+        if (current && onlyJira) setLinkedTracker('jira')
+      },
+    )
     void api.dashboardSettings(project.id).then(async (result) => {
       if (!current) return
       if (!result.ok) return setError(result.code)
@@ -212,7 +225,11 @@ export function DashboardView({
     return null
   }
 
-  /** The reading was asked while Azure DevOps is not linked. */
+  /** What the texts call the tracker: the one just read, the one shown, or the one linked. */
+  const tracker = run?.tracker ?? view?.tracker ?? linkedTracker
+  const trackerName = text.trackerNames[tracker]
+
+  /** The reading was asked while no tracker is linked. */
   const [unlinked, setUnlinked] = useState(false)
 
   async function readTracker() {
@@ -235,8 +252,8 @@ export function DashboardView({
   /** How the reading asked from Azure DevOps is going, or how it went. */
   const reader = (
     <>
-      {reading && <Waiting>{text.readingTracker}</Waiting>}
-      {unlinked && <Unlinked text={text.adoUnlinked} onOpenSources={onOpenSources} />}
+      {reading && <Waiting>{text.readingTracker(trackerName)}</Waiting>}
+      {unlinked && <Unlinked text={text.trackerUnlinked} onOpenSources={onOpenSources} />}
       {run && (
         <p className="badge badge-ok">
           {text.trackerRead(run.items, run.withHistory, dateTimeText(run.at))}
@@ -251,7 +268,7 @@ export function DashboardView({
       busyLabel={messages.wait.reading}
       onClick={() => void readTracker()}
     >
-      {text.readTracker}
+      {text.readTracker(trackerName)}
     </BusyButton>
   )
 
@@ -302,9 +319,9 @@ export function DashboardView({
       <div className="dashboard">
         {error && <Failure code={error} />}
         {/* The first thing to do: Octo reads the tracker by itself. */}
-        <section aria-label={text.trackerTitle}>
-          <h3>{text.trackerTitle}</h3>
-          <p className="hint">{text.trackerIntro}</p>
+        <section aria-label={text.trackerTitle(trackerName)}>
+          <h3>{text.trackerTitle(trackerName)}</h3>
+          <p className="hint">{text.trackerIntro[tracker]}</p>
           {reader}
           <div className="actions">{readButton(true)}</div>
         </section>
@@ -313,7 +330,7 @@ export function DashboardView({
           <summary>{text.haveExport}</summary>
           <section aria-label={text.setupTitle}>
             <h3>{text.setupTitle}</h3>
-            <p className="hint">{text.setupIntro}</p>
+            <p className="hint">{text.setupIntro(trackerName)}</p>
             <DashboardSettingsForm
               settings={settings}
               candidates={candidates}
@@ -328,161 +345,170 @@ export function DashboardView({
   }
 
   return (
-    <div className="dashboard">
-      {error && <Failure code={error} />}
-      {savedNote.note}
-      <section className="dashboard-range" aria-label={text.rangeTitle}>
-        <fieldset className="chips" aria-label={text.rangeTitle}>
-          {RANGE_PRESETS.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              className={candidate === preset ? 'chip chip-selected' : 'chip'}
-              aria-pressed={candidate === preset}
-              onClick={() => choosePreset(candidate)}
-            >
-              {text.presets[candidate]}
-            </button>
-          ))}
-        </fieldset>
-        {preset === 'custom' && (
-          <div className="range-fields">
-            <label>
-              {text.from}
-              <input
-                type="date"
-                value={range.from}
-                onChange={(event) => changeRange({ from: event.target.value })}
-              />
-            </label>
-            <label>
-              {text.to}
-              <input
-                type="date"
-                value={range.to}
-                onChange={(event) => changeRange({ to: event.target.value })}
-              />
-            </label>
-            <label>
-              {text.granularity}
-              <select
-                value={range.granularity}
-                onChange={(event) =>
-                  changeRange({ granularity: event.target.value === 'month' ? 'month' : 'week' })
-                }
-              >
-                <option value="week">{text.week}</option>
-                <option value="month">{text.month}</option>
-              </select>
-            </label>
-          </div>
-        )}
-      </section>
-      {loading && <Waiting>{text.loading}</Waiting>}
-      {/* How old the data are, and the way to newer ones, side by side. */}
-      <div className="actions">
-        {view && (
-          <p className={view.age === 'fresh' ? 'badge badge-ok' : 'badge badge-warning'}>
-            {view.exportedAt
-              ? text.exportedAt(dateTimeText(view.exportedAt))
-              : text.exportedUnknown}
-            {' · '}
-            {text.age[view.age]}
-          </p>
-        )}
-        {readButton(false)}
-      </div>
-      {reader}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        <DashboardSettingsForm
-          settings={settings}
-          candidates={candidates}
-          view={view}
-          onSave={async (next) => void (await save(next))}
-          onChooseFile={chooseFile}
-        />
-      </details>
-      {refreshing && view && view.age !== 'fresh' && <Waiting>{text.refreshing}</Waiting>}
-      {undo && (
-        <p className="badge badge-ok saved-note" role="status">
-          {text.decided}{' '}
-          <button type="button" className="quiet" onClick={() => void decideAs(undo, false)}>
-            {text.undo}
-          </button>
-        </p>
-      )}
-      {view && (
-        <>
-          <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
-            {DASHBOARD_TABS.map((tab) => (
+    <TrackerContext.Provider value={tracker}>
+      <div className="dashboard">
+        {error && <Failure code={error} />}
+        {savedNote.note}
+        <section className="dashboard-range" aria-label={text.rangeTitle}>
+          <fieldset className="chips" aria-label={text.rangeTitle}>
+            {RANGE_PRESETS.map((candidate) => (
               <button
-                key={tab}
+                key={candidate}
                 type="button"
-                role="tab"
-                aria-selected={focus.tab === tab}
-                className={focus.tab === tab ? 'tab tab-selected' : 'tab'}
-                onClick={() => setFocus({ ...focus, tab })}
+                className={candidate === preset ? 'chip chip-selected' : 'chip'}
+                aria-pressed={candidate === preset}
+                onClick={() => choosePreset(candidate)}
               >
-                {text.tabs[tab]}
+                {text.presets[candidate]}
               </button>
             ))}
-          </div>
-          {focus.tab === 'bugs' && (
-            <DashboardBugs
-              view={view}
-              stuckDays={settings.stuckDays}
-              answerWorkdays={settings.answerWorkdays}
-              focus={focus}
-              onFocus={setFocus}
-              canAsk={canAsk}
-              onAsk={onAsk}
-              onNote={(id, note) =>
-                void decide({ notes: [...settings.decisions.notes, { id, at: at(), text: note }] })
-              }
-              onOpenItem={view.linked ? openItem : undefined}
-              onReminder={(id) => api.draftReminder(project.id, id)}
-            />
+          </fieldset>
+          {preset === 'custom' && (
+            <div className="range-fields">
+              <label>
+                {text.from}
+                <input
+                  type="date"
+                  value={range.from}
+                  onChange={(event) => changeRange({ from: event.target.value })}
+                />
+              </label>
+              <label>
+                {text.to}
+                <input
+                  type="date"
+                  value={range.to}
+                  onChange={(event) => changeRange({ to: event.target.value })}
+                />
+              </label>
+              <label>
+                {text.granularity}
+                <select
+                  value={range.granularity}
+                  onChange={(event) =>
+                    changeRange({ granularity: event.target.value === 'month' ? 'month' : 'week' })
+                  }
+                >
+                  <option value="week">{text.week}</option>
+                  <option value="month">{text.month}</option>
+                </select>
+              </label>
+            </div>
           )}
-          {focus.tab === 'sprint' && (
-            <DashboardSprint
-              view={view}
-              periodsByHand={settings.requirementPeriods.length > 0}
-              onSprint={(name) => {
-                sprint.current = name === '' ? null : name
-                void loadView(range)
-              }}
-              onClear={(id) =>
-                void decide({
-                  excludedRequirements: [
-                    ...settings.decisions.excludedRequirements,
-                    { id, at: at() },
-                  ],
-                })
-              }
-              onRemoveSignal={(id, signal) =>
-                void decide({
-                  removedSignals: [...settings.decisions.removedSignals, { id, signal, at: at() }],
-                })
-              }
-              onRestore={(row) => void decideAs(withoutTrackerDecision(settings.decisions, row))}
-              onOpenItem={view.linked ? openItem : undefined}
-            />
+        </section>
+        {loading && <Waiting>{text.loading}</Waiting>}
+        {/* How old the data are, and the way to newer ones, side by side. */}
+        <div className="actions">
+          {view && (
+            <p className={view.age === 'fresh' ? 'badge badge-ok' : 'badge badge-warning'}>
+              {view.exportedAt
+                ? text.exportedAt(dateTimeText(view.exportedAt))
+                : text.exportedUnknown}
+              {' · '}
+              {text.age[view.age]}
+            </p>
           )}
-          {focus.tab === 'trend' && (
-            <DashboardTrend
-              view={view}
-              range={wholeDays(range)}
-              comment={comment}
-              commenting={commenting}
-              commentError={commentError}
-              canAsk={canAsk}
-              onComment={() => void askComment()}
-              onOpenItem={view.linked ? openItem : undefined}
-            />
-          )}
-        </>
-      )}
-    </div>
+          {readButton(false)}
+        </div>
+        {reader}
+        <details className="dashboard-settings">
+          <summary>{text.settings}</summary>
+          <DashboardSettingsForm
+            settings={settings}
+            candidates={candidates}
+            view={view}
+            onSave={async (next) => void (await save(next))}
+            onChooseFile={chooseFile}
+          />
+        </details>
+        {refreshing && view && view.age !== 'fresh' && (
+          <Waiting>{text.refreshing(trackerName)}</Waiting>
+        )}
+        {undo && (
+          <p className="badge badge-ok saved-note" role="status">
+            {text.decided}{' '}
+            <button type="button" className="quiet" onClick={() => void decideAs(undo, false)}>
+              {text.undo}
+            </button>
+          </p>
+        )}
+        {view && (
+          <>
+            <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
+              {DASHBOARD_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={focus.tab === tab}
+                  className={focus.tab === tab ? 'tab tab-selected' : 'tab'}
+                  onClick={() => setFocus({ ...focus, tab })}
+                >
+                  {text.tabs[tab]}
+                </button>
+              ))}
+            </div>
+            {focus.tab === 'bugs' && (
+              <DashboardBugs
+                view={view}
+                stuckDays={settings.stuckDays}
+                answerWorkdays={settings.answerWorkdays}
+                focus={focus}
+                onFocus={setFocus}
+                canAsk={canAsk}
+                onAsk={onAsk}
+                onNote={(id, note) =>
+                  void decide({
+                    notes: [...settings.decisions.notes, { id, at: at(), text: note }],
+                  })
+                }
+                onOpenItem={view.linked ? openItem : undefined}
+                onReminder={(id) => api.draftReminder(project.id, id)}
+              />
+            )}
+            {focus.tab === 'sprint' && (
+              <DashboardSprint
+                view={view}
+                periodsByHand={settings.requirementPeriods.length > 0}
+                onSprint={(name) => {
+                  sprint.current = name === '' ? null : name
+                  void loadView(range)
+                }}
+                onClear={(id) =>
+                  void decide({
+                    excludedRequirements: [
+                      ...settings.decisions.excludedRequirements,
+                      { id, at: at() },
+                    ],
+                  })
+                }
+                onRemoveSignal={(id, signal) =>
+                  void decide({
+                    removedSignals: [
+                      ...settings.decisions.removedSignals,
+                      { id, signal, at: at() },
+                    ],
+                  })
+                }
+                onRestore={(row) => void decideAs(withoutTrackerDecision(settings.decisions, row))}
+                onOpenItem={view.linked ? openItem : undefined}
+              />
+            )}
+            {focus.tab === 'trend' && (
+              <DashboardTrend
+                view={view}
+                range={wholeDays(range)}
+                comment={comment}
+                commenting={commenting}
+                commentError={commentError}
+                canAsk={canAsk}
+                onComment={() => void askComment()}
+                onOpenItem={view.linked ? openItem : undefined}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </TrackerContext.Provider>
   )
 }

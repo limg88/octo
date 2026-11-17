@@ -4,6 +4,7 @@ import {
   NO_SOURCES,
   type Project,
   type ProjectTeam,
+  TRACKER_PATHS,
   TRACKER_SNAPSHOT_PATH,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
@@ -73,7 +74,7 @@ const TEAM: ProjectTeam = {
 
 function setup(
   initial: Partial<DashboardSettings> = {},
-  options: { team?: ProjectTeam | 'fails'; linked?: boolean } = {},
+  options: { team?: ProjectTeam | 'fails'; linked?: boolean; jiraSite?: string } = {},
 ) {
   const saved: DashboardSettings = {
     ...DEFAULT_DASHBOARD_SETTINGS,
@@ -86,7 +87,7 @@ function setup(
     readJson: async (_folder, path) => (path === saved.exportPath ? EXPORT : null),
     candidates: async () => ({ exports: [], histories: [] }),
   }
-  const { team = TEAM, linked = true } = options
+  const { team = TEAM, linked = true, jiraSite } = options
   return createDashboard({
     settings,
     exports,
@@ -106,6 +107,16 @@ function setup(
             targetFolder: 'Fonti/ADO',
           }
         : null,
+      jira:
+        jiraSite === undefined
+          ? null
+          : {
+              site: jiraSite,
+              email: 'pm@example.test',
+              projects: ['AUR'],
+              since: '2026-01-01',
+              targetFolder: 'Fonti/Jira',
+            },
     }),
   })
 }
@@ -166,12 +177,28 @@ describe('the dashboard by sprint', () => {
 describe('where the tracker keeps an item', () => {
   it('is an address on Azure DevOps, when Octo read the tracker from there', async () => {
     const dashboard = setup()
-    expect((await dashboard.view(project, RANGE)).linked).toBe(true)
+    expect(await dashboard.view(project, RANGE)).toMatchObject({ linked: true, tracker: 'ado' })
     expect(await dashboard.itemUrl(project, '9')).toBe(
       'https://dev.azure.com/contoso/Aurora%20Web/_workitems/edit/9',
     )
     // Only an id of the tracker makes an address: nothing else is put in one.
     expect(await dashboard.itemUrl(project, '9/../../x')).toBeNull()
+  })
+
+  it('is an address on Jira, when Octo read the tracker from there', async () => {
+    const onJira = { exportPath: TRACKER_PATHS.jira.snapshot }
+    const dashboard = setup(onJira, { linked: false, jiraSite: 'https://Contoso.atlassian.net/' })
+    expect(await dashboard.view(project, RANGE)).toMatchObject({ linked: true, tracker: 'jira' })
+    expect(await dashboard.itemUrl(project, 'AUR-9')).toBe(
+      'https://contoso.atlassian.net/browse/AUR-9',
+    )
+    // The id of another tracker, or anything that is not a key, makes no address.
+    expect(await dashboard.itemUrl(project, '9')).toBeNull()
+    expect(await dashboard.itemUrl(project, 'AUR-9/../x')).toBeNull()
+    // A site whose name is not one of a site is never put in an address.
+    const odd = setup(onJira, { linked: false, jiraSite: 'evil.example/x?' })
+    expect(await odd.itemUrl(project, 'AUR-9')).toBeNull()
+    expect(await setup(onJira, { linked: false }).itemUrl(project, 'AUR-9')).toBeNull()
   })
 
   it('is not known for an export kept by hand, or while Azure DevOps is not linked', async () => {

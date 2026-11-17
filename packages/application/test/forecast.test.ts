@@ -225,8 +225,9 @@ describe('the monthly forecast', () => {
       { projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fee', feeMonths: 12 } } },
       {
         orders: [
-          { code: 'p1', description: 'Canone 2026', ordered: 22500 },
-          { code: 'P2', description: 'Senza ordini', ordered: null },
+          // The orders say «by the day», but the PM already said how this code is sold.
+          { code: 'p1', description: 'Canone 2026', ordered: 22500, kind: 'time_material' },
+          { code: 'P2', description: 'Senza ordini', ordered: null, kind: null },
         ],
       },
     )
@@ -239,6 +240,32 @@ describe('the monthly forecast', () => {
     expect(run.settings).toEqual(saved())
     const view = await forecasts.view(project, '2026-06')
     expect(view.forecast.rows[0]?.values.revenue).toBe(1875)
+  })
+
+  it('takes how a code is sold from its orders the first time it reads the code', async () => {
+    const { forecasts, saved } = setup(
+      {},
+      {
+        codes: ['P1'],
+        orders: [{ code: 'P1', description: 'Assessment', ordered: 7500, kind: 'fixed_price' }],
+      },
+    )
+    await forecasts.readOrders(project)
+    expect(saved().projects).toEqual({
+      P1: { kind: 'fixed_price', description: 'Assessment', ordered: 7500, feeMonths: null },
+    })
+    // Sold at a fixed price, with nothing more written: it asks the costs at budget, no rate.
+    const { forecast } = await forecasts.view(project, '2026-06')
+    expect(forecast.rows[0]).toMatchObject({ code: 'P1', revenueKind: 'fixed_price' })
+    expect(forecast.gaps.map((gap) => gap.kind)).toEqual(['no_budget_costs', 'no_total_costs'])
+
+    // The PM corrects it, and a later reading leaves it as corrected.
+    await forecasts.saveSettings(project, {
+      ...saved(),
+      projects: { P1: { ...(saved().projects.P1 ?? NO_FORECAST_PROJECT), kind: 'time_material' } },
+    })
+    await forecasts.readOrders(project)
+    expect(saved().projects.P1?.kind).toBe('time_material')
   })
 
   it('says what is missing before computing', async () => {

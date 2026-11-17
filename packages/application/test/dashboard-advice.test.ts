@@ -29,6 +29,7 @@ const bug = (id: string, daysInState: number, stuck: boolean) => ({
 })
 
 const view: DashboardView = {
+  tracker: null,
   exportedAt: '2026-06-30T08:00:00Z',
   age: 'fresh',
   bugs: {

@@ -1,6 +1,15 @@
+import type { TrackerKind } from '@octo/domain'
+import { createContext, useContext } from 'react'
 import { messages } from './messages.ts'
 
 const text = messages.dashboard
+
+/** The tracker the dashboard is read from: what its buttons name. */
+export const TrackerContext = createContext<TrackerKind>('ado')
+
+/** How the button that opens an item on its tracker reads. */
+export const useOpenInTracker = (): string =>
+  text.openInTracker(text.trackerNames[useContext(TrackerContext)])
 
 export function Figure({
   label,
@@ -30,10 +39,11 @@ export function OpenItem({
   id: string
   onOpen: ((id: string) => void) | undefined
 }) {
+  const label = useOpenInTracker()
   if (!onOpen) return null
   return (
     <button type="button" className="quiet" onClick={() => onOpen(id)}>
-      {text.openInTracker}
+      {label}
     </button>
   )
 }

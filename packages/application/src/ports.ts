@@ -18,6 +18,7 @@ import type {
   FeedName,
   FeedStep,
   ForecastCell,
+  ForecastKind,
   ForecastSettings,
   HoursPeriod,
   HoursSettings,
@@ -421,6 +422,8 @@ export type ProjectOrder = {
   description: string
   /** The sum of the lines of its sales orders; null when it has none. */
   ordered: number | null
+  /** How it is sold, as its sales orders tell it; null when they do not tell. */
+  kind: ForecastKind | null
 }
 
 /**
@@ -451,13 +454,19 @@ export type TrackerSnapshot = {
   history: Readonly<Record<string, object>>
 }
 
+/** A tracker the dashboard can be read from, with how its source is set. */
+export type TrackerSource =
+  | { kind: 'ado'; config: AdoFeedConfig }
+  | { kind: 'jira'; config: JiraFeedConfig }
+
 /**
- * Reads every work item of an Azure DevOps source with the PM's own read-only credential, only
- * when the PM asks. Never writes to the tracker. Failures are DomainErrors with a `feed_*` code.
+ * Reads every work item of an Azure DevOps or Jira source with the PM's own read-only
+ * credential, only when the PM asks. Never writes to the tracker. Failures are DomainErrors with
+ * a `feed_*` code.
  */
 export interface TrackerSnapshotReader {
   read(
-    config: AdoFeedConfig,
+    source: TrackerSource,
     secret: string,
     /** The types whose history of states and comments are read too. */
     detailTypes: readonly string[],

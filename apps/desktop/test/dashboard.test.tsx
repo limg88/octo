@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
-import type { DashboardView as View } from '@octo/application'
-import { type DashboardSettings, DEFAULT_DASHBOARD_SETTINGS, type Project } from '@octo/domain'
+import type { FeedView, TrackerSnapshotRun, DashboardView as View } from '@octo/application'
+import {
+  type DashboardSettings,
+  DEFAULT_DASHBOARD_SETTINGS,
+  type FeedName,
+  type Project,
+} from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DashboardView } from '../src/renderer/DashboardView.tsx'
@@ -13,6 +18,27 @@ const NOW = new Date('2026-06-30T10:00:00.000Z')
 const now = () => NOW
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 const text = messages.dashboard
+const READ_ADO = text.readTracker(text.trackerNames.ado)
+const OPEN_ADO = text.openInTracker(text.trackerNames.ado)
+
+const FEED_CONFIGS = {
+  ado: { organization: 'contoso', project: 'Aurora', areas: [] },
+  jira: { site: 'contoso', email: 'pm@example.test', projects: ['AUR'] },
+}
+/** A feed of the project as «Fonti» shows it: linked, or never set. */
+const feedView = (feed: FeedName, linked: boolean): FeedView =>
+  ({
+    feed,
+    config:
+      linked && (feed === 'ado' || feed === 'jira')
+        ? { ...FEED_CONFIGS[feed], since: '2026-01-01', targetFolder: `Fonti/${feed}` }
+        : null,
+    suggestedFolder: `Fonti/${feed}`,
+    hasSecret: linked,
+    state: { cursor: null, lastRun: null },
+    readBy: null,
+    readingBy: null,
+  }) as FeedView
 
 const configured: DashboardSettings = {
   ...DEFAULT_DASHBOARD_SETTINGS,
@@ -21,6 +47,7 @@ const configured: DashboardSettings = {
 }
 
 const view: View = {
+  tracker: 'ado',
   exportedAt: '2026-06-30T08:00:00.000Z',
   age: 'fresh',
   bugs: {
@@ -233,6 +260,7 @@ type Api = Pick<
   | 'commentDashboard'
   | 'draftReminder'
   | 'onSourcesChanged'
+  | 'feed'
 >
 
 function fakeApi(overrides: Partial<Api> = {}) {
@@ -243,7 +271,12 @@ function fakeApi(overrides: Partial<Api> = {}) {
     dashboardCandidates: vi.fn(async () => ok({ exports: ['data/latest.json'], histories: [] })),
     dashboardView: vi.fn(async () => ok(view)),
     readTrackerSnapshot: vi.fn(async () =>
-      ok({ at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 }),
+      ok({
+        tracker: 'ado' as const,
+        at: '2026-06-30T09:30:00.000Z',
+        items: 4601,
+        withHistory: 677,
+      }),
     ),
     refreshTrackerSnapshot: vi.fn(async () => ok(null)),
     openTrackerItem: vi.fn(async () => ok(true)),
@@ -260,6 +293,7 @@ function fakeApi(overrides: Partial<Api> = {}) {
       ok({ id, to: 'Carla Bianchi', text: 'Buongiorno Carla,\nserve il formato.' }),
     ),
     onSourcesChanged: vi.fn(() => () => {}),
+    feed: vi.fn(async (_id: string, feed: FeedName) => ok(feedView(feed, feed === 'ado'))),
     ...overrides,
   }
   return api
@@ -301,10 +335,12 @@ describe('dashboard', () => {
       readTrackerSnapshot: vi
         .fn<Api['readTrackerSnapshot']>()
         .mockResolvedValueOnce({ ok: false, code: 'secret_missing' })
-        .mockResolvedValue(ok({ at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 })),
+        .mockResolvedValue(
+          ok({ tracker: 'ado', at: '2026-06-30T09:30:00.000Z', items: 4601, withHistory: 677 }),
+        ),
     })
     render(<DashboardView api={api} project={project} now={now} />)
-    const read = await screen.findByRole('button', { name: text.readTracker })
+    const read = await screen.findByRole('button', { name: READ_ADO })
     fireEvent.click(read)
     expect((await screen.findByRole('alert')).textContent).toMatch(/Serve la credenziale/)
     expect(api.dashboardView).not.toHaveBeenCalled()
@@ -316,7 +352,35 @@ describe('dashboard', () => {
     expect(api.readTrackerSnapshot).toHaveBeenLastCalledWith('p-1')
   })
 
-  it('says that Azure DevOps is not linked, with or without the way to the sources', async () => {
+  it('reads Jira for a project without Azure DevOps, and names it in what it offers', async () => {
+    const onJira: View = { ...view, tracker: 'jira', linked: true }
+    const api = fakeApi({
+      feed: vi.fn(async (_id: string, feed: FeedName) => ok(feedView(feed, feed === 'jira'))),
+      dashboardSettings: vi
+        .fn<Api['dashboardSettings']>()
+        .mockResolvedValueOnce(ok({ ...configured, exportPath: '' }))
+        .mockResolvedValue(ok(configured)),
+      dashboardView: vi.fn(async () => ok(onJira)),
+      readTrackerSnapshot: vi.fn(async () =>
+        ok({ tracker: 'jira' as const, at: '2026-06-30T09:30:00.000Z', items: 5, withHistory: 5 }),
+      ),
+    })
+    render(<DashboardView api={api} project={project} now={now} />)
+    const jira = text.trackerNames.jira
+    const read = await screen.findByRole('button', { name: text.readTracker(jira) })
+    expect(screen.getByRole('region', { name: text.trackerTitle(jira) })).toBeTruthy()
+    expect(screen.getByText(text.trackerIntro.jira)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: READ_ADO })).toBeNull()
+    fireEvent.click(read)
+    expect(await screen.findByText(/Lette 5 voci/)).toBeTruthy()
+    const open = await screen.findByRole('region', { name: text.qualityTitle })
+    expect(
+      within(open).getAllByRole('button', { name: text.openInTracker(jira) }).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: OPEN_ADO })).toBeNull()
+  })
+
+  it('says that no tracker is linked, with or without the way to the sources', async () => {
     const api = fakeApi({
       dashboardSettings: async () => ok({ ...configured, exportPath: '' }),
       readTrackerSnapshot: async () => ({ ok: false, code: 'source_not_configured' }),
@@ -326,15 +390,15 @@ describe('dashboard', () => {
       <DashboardView api={api} project={project} now={now} onOpenSources={onOpenSources} />,
     )
     expect(await screen.findByText(text.saveNeeds)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: text.readTracker }))
-    expect((await screen.findByRole('alert')).textContent).toContain(text.adoUnlinked)
+    fireEvent.click(screen.getByRole('button', { name: READ_ADO }))
+    expect((await screen.findByRole('alert')).textContent).toContain(text.trackerUnlinked)
     fireEvent.click(screen.getByRole('button', { name: messages.openSources }))
     expect(onOpenSources).toHaveBeenCalledTimes(1)
     view.unmount()
 
     render(<DashboardView api={api} project={project} now={now} />)
-    fireEvent.click(await screen.findByRole('button', { name: text.readTracker }))
-    expect((await screen.findByRole('alert')).textContent).toContain(text.adoUnlinked)
+    fireEvent.click(await screen.findByRole('button', { name: READ_ADO }))
+    expect((await screen.findByRole('alert')).textContent).toContain(text.trackerUnlinked)
     expect(screen.queryByRole('button', { name: messages.openSources })).toBeNull()
   })
 
@@ -343,7 +407,7 @@ describe('dashboard', () => {
     render(<DashboardView api={api} project={project} now={now} />)
     await screen.findByRole('region', { name: text.qualityTitle })
     // Newer data are one click away, without opening the settings.
-    const read = screen.getByRole('button', { name: text.readTracker })
+    const read = screen.getByRole('button', { name: READ_ADO })
     expect(read.closest('details')).toBeNull()
     fireEvent.click(read)
     await waitFor(() => expect(api.readTrackerSnapshot).toHaveBeenCalledWith('p-1'))
@@ -357,7 +421,7 @@ describe('dashboard', () => {
       dashboardCandidates: vi.fn(async () => ok({ exports: [], histories: [] })),
     })
     render(<DashboardView api={api} project={project} now={now} />)
-    const read = await screen.findByRole('button', { name: text.readTracker })
+    const read = await screen.findByRole('button', { name: READ_ADO })
     expect(read.className).toBe('primary')
     expect(screen.getByText(text.haveExport).closest('details')?.open).toBe(false)
   })
@@ -641,7 +705,7 @@ describe('the list of bugs, split and filtered', () => {
     const api = fakeApi()
     const shown = render(<DashboardView api={api} project={project} now={now} />)
     const detail = await screen.findByRole('region', { name: text.bugDetail })
-    fireEvent.click(within(detail).getByRole('button', { name: text.openInTracker }))
+    fireEvent.click(within(detail).getByRole('button', { name: OPEN_ADO }))
     expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '101')
     shown.unmount()
 
@@ -650,7 +714,7 @@ describe('the list of bugs, split and filtered', () => {
     })
     render(<DashboardView api={failing} project={project} now={now} />)
     const again = await screen.findByRole('region', { name: text.bugDetail })
-    fireEvent.click(within(again).getByRole('button', { name: text.openInTracker }))
+    fireEvent.click(within(again).getByRole('button', { name: OPEN_ADO }))
     expect(await screen.findByRole('alert')).toBeTruthy()
     cleanup()
 
@@ -663,7 +727,7 @@ describe('the list of bugs, split and filtered', () => {
     await screen.findByRole('region', { name: text.bugDetail })
     // No bug of the list states severity, environment or person: nothing to split by.
     expect(screen.queryByRole('group', { name: text.breakdownsLabel })).toBeNull()
-    expect(screen.queryByRole('button', { name: text.openInTracker })).toBeNull()
+    expect(screen.queryByRole('button', { name: OPEN_ADO })).toBeNull()
     // Without a history nothing is compared with the start of the period, and the page says so.
     expect(screen.getByText(new RegExp(text.noHistoryDelta))).toBeTruthy()
   })
@@ -687,7 +751,7 @@ describe('the items to chase', () => {
       expect(writeText).toHaveBeenCalledWith('Buongiorno Carla,\nserve il formato.'),
     )
     expect(await screen.findByText(text.copied)).toBeTruthy()
-    fireEvent.click(within(waiting).getByRole('button', { name: text.openInTracker }))
+    fireEvent.click(within(waiting).getByRole('button', { name: OPEN_ADO }))
     expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '301')
 
     fireEvent.click(screen.getByLabelText(text.onlyClient))
@@ -884,7 +948,7 @@ describe('the comment of Claude', () => {
     expect(api.commentDashboard).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)))
     expect(within(comment).getByText(text.commentDropped(1))).toBeTruthy()
     expect(within(comment).queryByText(text.commentOld)).toBeNull()
-    fireEvent.click(within(comment).getByRole('button', { name: text.openInTracker }))
+    fireEvent.click(within(comment).getByRole('button', { name: OPEN_ADO }))
     expect(api.openTrackerItem).toHaveBeenCalledWith('p-1', '101')
     expect(within(comment).getByRole('button', { name: text.commentAgain })).toBeTruthy()
 
@@ -928,9 +992,7 @@ describe('the comment of Claude', () => {
 describe('the tracker read again by itself', () => {
   it('is read on opening when its reading is old, and the page follows', async () => {
     const stale: View = { ...view, age: 'warning' }
-    let release: (
-      result: Result<{ at: string; items: number; withHistory: number } | null>,
-    ) => void = () => {}
+    let release: (result: Result<TrackerSnapshotRun | null>) => void = () => {}
     const api = fakeApi({
       dashboardView: vi
         .fn<Api['dashboardView']>()
@@ -938,17 +1000,15 @@ describe('the tracker read again by itself', () => {
         .mockResolvedValue(ok(view)),
       refreshTrackerSnapshot: vi.fn(
         () =>
-          new Promise<Result<{ at: string; items: number; withHistory: number } | null>>(
-            (resolve) => {
-              release = resolve
-            },
-          ),
+          new Promise<Result<TrackerSnapshotRun | null>>((resolve) => {
+            release = resolve
+          }),
       ),
     })
     render(<DashboardView api={api} project={project} now={now} />)
-    expect(await screen.findByText(text.refreshing)).toBeTruthy()
+    expect(await screen.findByText(text.refreshing(text.trackerNames.ado))).toBeTruthy()
     await act(async () =>
-      release(ok({ at: '2026-06-30T09:30:00.000Z', items: 12, withHistory: 3 })),
+      release(ok({ tracker: 'ado', at: '2026-06-30T09:30:00.000Z', items: 12, withHistory: 3 })),
     )
     expect(await screen.findByText(/Lette 12 voci, 3 con la cronologia/)).toBeTruthy()
     expect(await screen.findByText(new RegExp(text.age.fresh))).toBeTruthy()

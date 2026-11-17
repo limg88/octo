@@ -33,7 +33,7 @@ describe('a snapshot of Azure DevOps', () => {
     const reader = createConnectorReader({ devEndpoints: { ado: fake.server.origin } })
     const source = await reader.connect('ado', CONFIG, 'pat-ok', [PROJECT, ...areas])
     return reader.tracker(
-      { ...source, secret: 'pat-ok' },
+      { kind: 'ado', ...source, secret: 'pat-ok' },
       { detailTypes: ['bug'] },
       new AbortController().signal,
     )
@@ -150,7 +150,7 @@ describe('a snapshot of Azure DevOps', () => {
     const reader = createConnectorReader({ devEndpoints: { ado: fake.server.origin } })
     const source = await reader.connect('ado', CONFIG, 'pat-ok', [PROJECT, 'Team A'])
     const read = await reader.tracker(
-      { ...source, secret: 'pat-ok' },
+      { kind: 'ado', ...source, secret: 'pat-ok' },
       { detailTypes: [] },
       new AbortController().signal,
     )
@@ -170,7 +170,7 @@ describe('a snapshot of Azure DevOps', () => {
     const reader = createConnectorReader({ devEndpoints: { ado: fake.server.origin } })
     const source = await reader.connect('ado', CONFIG, 'pat-ok', [PROJECT])
     const read = await reader.tracker(
-      { ...source, secret: 'pat-ok' },
+      { kind: 'ado', ...source, secret: 'pat-ok' },
       { detailTypes: ['Bug'] },
       new AbortController().signal,
     )

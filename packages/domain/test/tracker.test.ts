@@ -9,11 +9,17 @@ import {
   exportAge,
   type ItemHistory,
   inScope,
+  isTrackerItemId,
+  jiraBrowseHost,
+  jiraSite,
   parseTrackerExport,
   parseTrackerHistory,
   phaseOf,
   stateName,
+  TRACKER_PATHS,
+  TRACKER_SNAPSHOT_PATH,
   type TrackerItem,
+  trackerOfExport,
   unclearRequirements,
 } from '../src/index.ts'
 
@@ -48,6 +54,35 @@ const range = (from: string, to: string, granularity: 'week' | 'month' = 'week')
   granularity,
 })
 
+describe('the trackers Octo reads by itself', () => {
+  it('keeps the reading of each in files of its own, and knows whose a file is', () => {
+    expect(TRACKER_PATHS.ado.snapshot).toBe(TRACKER_SNAPSHOT_PATH)
+    expect(TRACKER_PATHS.jira.snapshot).not.toBe(TRACKER_PATHS.ado.snapshot)
+    expect(TRACKER_PATHS.jira.history).not.toBe(TRACKER_PATHS.ado.history)
+    expect(trackerOfExport(TRACKER_PATHS.ado.snapshot)).toBe('ado')
+    expect(trackerOfExport(TRACKER_PATHS.jira.snapshot)).toBe('jira')
+    expect(trackerOfExport('raw/export.json')).toBeNull()
+    expect(trackerOfExport('')).toBeNull()
+  })
+
+  it('tells the id of an item by the tracker that wrote it', () => {
+    expect(isTrackerItemId('ado', '42')).toBe(true)
+    expect(isTrackerItemId('ado', 'AUR-42')).toBe(false)
+    expect(isTrackerItemId('jira', 'AUR-42')).toBe(true)
+    expect(isTrackerItemId('jira', 'A1_B-7')).toBe(true)
+    expect(isTrackerItemId('jira', '42')).toBe(false)
+    expect(isTrackerItemId('jira', 'AUR-42/../x')).toBe(false)
+  })
+
+  it('reaches a Jira site in a browser by its name only', () => {
+    expect(jiraSite(' https://Contoso.atlassian.net/jira/x ')).toBe('Contoso')
+    expect(jiraBrowseHost(' https://Contoso.atlassian.net/jira/x ')).toBe('contoso.atlassian.net')
+    expect(jiraBrowseHost('contoso')).toBe('contoso.atlassian.net')
+    expect(jiraBrowseHost('evil.example')).toBeNull()
+    expect(jiraBrowseHost('')).toBeNull()
+  })
+})
+
 describe('phases of a state', () => {
   it('reads the phase from the name, whatever number stands before it', () => {
     expect(stateName('07.a - Blocked')).toBe('Blocked')
@@ -58,6 +93,14 @@ describe('phases of a state', () => {
     expect(phaseOf('11 - Ready for PROD', settings)).toBe('validated')
     expect(phaseOf('12a - Released to PROD', settings)).toBe('closed')
     expect(phaseOf('Chiuso', settings)).toBe('closed')
+  })
+
+  it('reads the states of a Jira kept in Italian', () => {
+    expect(phaseOf('Da completare', settings)).toBe('work')
+    expect(phaseOf('In corso', settings)).toBe('work')
+    expect(phaseOf('IN TEST', settings)).toBe('verify')
+    expect(phaseOf('Completata', settings)).toBe('closed')
+    expect(phaseOf('Completato', settings)).toBe('closed')
   })
 
   it('keeps an unknown state as work, and obeys what the PM mapped by hand', () => {

@@ -12,6 +12,7 @@ import {
 import { backlogExport } from '../shared/export.ts'
 import { basicAuthorization, sendJson } from '../shared/http.ts'
 import { orderGuard } from '../shared/order.ts'
+import { inPool } from '../shared/pool.ts'
 import { bad, isRecord, uniquePeople } from '../shared/values.ts'
 import {
   apiUrl,
@@ -33,6 +34,18 @@ import {
   recordOf,
 } from './issues.ts'
 import { jqlSince, listJql, syncJql } from './jql.ts'
+import {
+  CHANGELOG_PAGE_SIZE,
+  type ChangelogPage,
+  changelogPageOf,
+  historyOf,
+  type JiraTrackerItem,
+  type JiraTrackerSnapshot,
+  MAX_CHANGELOG_PAGES,
+  STATE_CHANGE_FIELD,
+  stateChangeOf,
+  trackerItemOf,
+} from './tracker.ts'
 import {
   type JiraWorklog,
   MAX_WORKLOG_ISSUES,
@@ -170,7 +183,24 @@ export interface JiraConnector extends Connector<JiraConfig, JiraCursor> {
    * them its own way, and without them an issue is read with neither.
    */
   customFields(ctx: ConnectorContext<JiraConfig>): Promise<JiraCustomFields>
+  /**
+   * Every issue of the chosen projects as it is now, with the history of states and labels of
+   * the types asked. Read only when the PM asks for it.
+   */
+  tracker(
+    ctx: ConnectorContext<JiraConfig>,
+    options: JiraTrackerOptions,
+  ): Promise<JiraTrackerSnapshot>
 }
+
+/** What a snapshot of the tracker reads beyond the issues themselves. */
+export interface JiraTrackerOptions {
+  /** The issue types whose history is read too (case does not count). */
+  detailTypes: readonly string[]
+}
+
+/** Issues whose history is read at the same time. */
+const TRACKER_POOL = 4
 
 export function createJiraConnector(options: JiraConnectorOptions = {}): JiraConnector {
   const endpointOf = options.endpoint ?? publicEndpoint
@@ -322,8 +352,95 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
     throw new ConnectorError('response_too_large')
   }
 
+  /** The changes of state and of labels of an issue, page by page. */
+  async function changesOf(
+    ctx: ConnectorContext<JiraConfig>,
+    issueId: string,
+  ): Promise<Pick<ChangelogPage, 'states' | 'tags'>> {
+    const changes: Pick<ChangelogPage, 'states' | 'tags'> = { states: [], tags: [] }
+    let startAt = 0
+    for (let page = 0; page < MAX_CHANGELOG_PAGES; page += 1) {
+      const json = await getJson(
+        ctx,
+        apiUrl(
+          endpointOf(ctx.config),
+          ['issue', issueId, 'changelog'],
+          [
+            ['startAt', String(startAt)],
+            ['maxResults', String(CHANGELOG_PAGE_SIZE)],
+          ],
+        ),
+      )
+      const read = changelogPageOf(json)
+      changes.states.push(...read.states)
+      changes.tags.push(...read.tags)
+      startAt += read.read
+      if (read.read === 0 || startAt >= read.total) return changes
+    }
+    throw new ConnectorError('response_too_large')
+  }
+
+  /** Every issue of the chosen projects, by key, with what the search says of its state. */
+  async function trackerIssues(
+    ctx: ConnectorContext<JiraConfig>,
+    projects: ReadonlyMap<string, Project>,
+  ): Promise<Array<{ issue: Issue; item: JiraTrackerItem }>> {
+    const jql = listJql([...projects.keys()].sort())
+    const fields = [...issueFields(ctx.config), STATE_CHANGE_FIELD].join(',')
+    const found: Array<{ issue: Issue; item: JiraTrackerItem }> = []
+    let token: string | null = null
+    for (let page = 0; page <= MAX_LISTED_IDS / PAGE_SIZE; page += 1) {
+      const json: unknown = await getJson(
+        ctx,
+        apiUrl(
+          endpointOf(ctx.config),
+          ['search', 'jql'],
+          [
+            ['jql', jql],
+            ['fields', fields],
+            ['maxResults', String(PAGE_SIZE)],
+            ...(token !== null ? [['nextPageToken', token] as [string, string]] : []),
+          ],
+        ),
+      )
+      if (!isRecord(json) || !Array.isArray(json.issues) || json.issues.length > PAGE_SIZE) {
+        return bad()
+      }
+      for (const raw of json.issues) {
+        const read = issueOf(raw, ctx.config)
+        // What the system returns outside the perimeter is dropped, as in a sync.
+        if (!projects.has(read.projectId)) continue
+        const issue = commentsCut(read) ? await readComments(ctx, read) : read
+        found.push({ issue, item: trackerItemOf(issue, stateChangeOf(raw)) })
+      }
+      if (found.length > MAX_LISTED_IDS) throw new ConnectorError('response_too_large')
+      const next = typeof json.nextPageToken === 'string' ? json.nextPageToken : ''
+      if (json.isLast === true || (json.isLast === undefined && next === '')) return found
+      // More pages said, but no way to them: never taken as the end.
+      if (next === '') return bad()
+      token = next
+    }
+    throw new ConnectorError('response_too_large')
+  }
+
   return {
     kind: 'jira',
+
+    async tracker(ctx, { detailTypes }) {
+      const projects = await chosenProjects(ctx)
+      const asOf = ctx.now()
+      const read = await trackerIssues(ctx, projects)
+      const wanted = new Set(detailTypes.map((type) => type.toLowerCase()))
+      const detailed = read.filter(({ item }) => wanted.has(item.type.toLowerCase()))
+      const history: JiraTrackerSnapshot['history'] = {}
+      await inPool(detailed, TRACKER_POOL, async ({ issue, item }) => {
+        const told = historyOf(item, await changesOf(ctx, issue.id))
+        history[item.id] = told
+        // The state changed when its last change says, which is finer than its category.
+        item.state_change_date = told.states.at(-1)?.[0] ?? item.state_change_date
+      })
+      return { exportedAt: asOf.toISOString(), items: read.map(({ item }) => item), history }
+    },
 
     async worklogs(ctx, period) {
       const projects = await chosenProjects(ctx)

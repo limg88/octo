@@ -3,7 +3,12 @@ import { type AdoConnector, type AdoTrackerOptions, createAdoConnector } from '.
 import type { AdoTrackerSnapshot } from './ado/tracker.ts'
 import { type ConnectorDelivery, toDelivery } from './delivery.ts'
 import { ConnectorError } from './errors.ts'
-import { createJiraConnector, type JiraConnector } from './jira/connector.ts'
+import {
+  createJiraConnector,
+  type JiraConnector,
+  type JiraTrackerOptions,
+} from './jira/connector.ts'
+import type { JiraTrackerSnapshot } from './jira/tracker.ts'
 import type { JiraWorklog, WorklogPeriod } from './jira/worklogs.ts'
 import { createNetGuard } from './net-guard.ts'
 import type { AnyConnector, ConnectorContext, Json, PerimeterOption, SyncBatch } from './port.ts'
@@ -58,12 +63,15 @@ export interface ConnectorReader {
     period: WorklogPeriod,
     signal: AbortSignal,
   ): Promise<JiraWorklog[]>
-  /** Every work item of an Azure DevOps source as it is now: read only when the PM asks. */
+  /**
+   * Every work item of an Azure DevOps source, or every issue of a Jira one, as it is now: read
+   * only when the PM asks.
+   */
   tracker(
-    source: Omit<ReadableSource, 'kind'>,
-    options: AdoTrackerOptions,
+    source: ReadableSource,
+    options: AdoTrackerOptions & JiraTrackerOptions,
     signal: AbortSignal,
-  ): Promise<AdoTrackerSnapshot>
+  ): Promise<AdoTrackerSnapshot | JiraTrackerSnapshot>
 }
 
 function connectorsOf(options: ConnectorReaderOptions): Record<PullSourceKind, AnyConnector> {
@@ -236,9 +244,13 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
     },
 
     async tracker(source, options, signal) {
-      const config = connectors.ado.parseConfig(source.config)
-      return withContext('ado', { ...source, config }, signal, (connector, ctx) =>
-        (connector as unknown as AdoConnector).tracker(ctx as never, options),
+      const config = connectors[source.kind].parseConfig(source.config)
+      return withContext(
+        source.kind,
+        { ...source, config },
+        signal,
+        (connector, ctx): Promise<AdoTrackerSnapshot | JiraTrackerSnapshot> =>
+          (connector as unknown as AdoConnector | JiraConnector).tracker(ctx as never, options),
       )
     },
 

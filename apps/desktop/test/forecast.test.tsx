@@ -95,20 +95,18 @@ function fakeApi(overrides: Partial<Api> = {}) {
     compileForecast: vi.fn(async () =>
       ok({ path: '_octo/previsionale/2026-06/Previsionale.xlsx', notInModel: ['P2'] }),
     ),
-    readForecastOrders: vi.fn(async () =>
-      ok({
-        settings: {
-          ...configured,
-          projects: { P1: { ...NO_FORECAST_PROJECT, description: 'Sviluppo', ordered: 100000 } },
-        },
-        codes: ['P1'],
-      }),
-    ),
+    // NetSuite is not linked: what Octo asks by itself for a code it does not know changes nothing.
+    readForecastOrders: vi.fn(async () => UNLINKED),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
   return api
 }
+
+const UNLINKED = { ok: false as const, code: 'source_not_configured' as const }
+/** What NetSuite says of the codes of the project. */
+const ordersRead = (projects: ForecastSettings['projects']) =>
+  ok({ settings: { ...configured, projects }, codes: Object.keys(projects) })
 
 afterEach(cleanup)
 
@@ -411,7 +409,6 @@ describe('the forecast', () => {
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     expect(screen.getByText(text.wrong.project('P2'))).toBeTruthy()
     fireEvent.change(ofCode(text.columnFeeMonths, 'P2'), { target: { value: '12' } })
-    fireEvent.change(ofCode(text.columnKind, 'P1'), { target: { value: 'fixed_price' } })
 
     set(rates, text.columns.rate, 1, '400')
     fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
@@ -421,6 +418,9 @@ describe('the forecast', () => {
     fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
     fireEvent.click(rates.getByRole('button', { name: text.removeRow(3) }))
     set(externals, text.columns.cost, 1, '300')
+    // With no code sold by the day the rates are no longer asked: those written are kept.
+    fireEvent.change(ofCode(text.columnKind, 'P1'), { target: { value: 'fixed_price' } })
+    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', {
@@ -442,7 +442,15 @@ describe('the forecast', () => {
   })
 
   it('reads name and ordered amount from NetSuite, and says when it cannot', async () => {
-    const api = fakeApi()
+    const api = fakeApi({
+      readForecastOrders: vi
+        .fn<Api['readForecastOrders']>()
+        // The first time Octo asks by itself, and NetSuite does not answer: nothing is said.
+        .mockResolvedValueOnce(UNLINKED)
+        .mockResolvedValue(
+          ordersRead({ P1: { ...NO_FORECAST_PROJECT, description: 'Sviluppo', ordered: 100000 } }),
+        ),
+    })
     render(<ForecastView api={api} project={project} now={now} />)
     fireEvent.click(await screen.findByRole('button', { name: text.readOrders }))
     await waitFor(() =>
@@ -453,15 +461,74 @@ describe('the forecast', () => {
     expect(api.readForecastOrders).toHaveBeenCalledWith('p-1')
     expect(api.forecastView).toHaveBeenCalledTimes(2)
     cleanup()
-    const unlinked = fakeApi({
-      readForecastOrders: vi.fn(async () => ({
-        ok: false as const,
-        code: 'source_not_configured' as const,
-      })),
-    })
+    const unlinked = fakeApi()
     render(<ForecastView api={unlinked} project={project} now={now} />)
+    // Asked by itself, a NetSuite that is not linked is no error to show.
+    await waitFor(() => expect(unlinked.readForecastOrders).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: text.readOrders }))
     expect((await screen.findByRole('alert')).textContent).toMatch(/non è ancora configurata/)
+  })
+
+  it('learns by itself how a new code is sold, and asks no rate when nothing is sold by the day', async () => {
+    const fixed: View = {
+      ...view,
+      forecast: {
+        ...view.forecast,
+        rows: view.forecast.rows.filter((row) => row.code === 'P2'),
+        gaps: [],
+      },
+    }
+    const known = { P2: { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const, ordered: 7500 } }
+    const api = fakeApi({
+      forecastView: vi.fn(async () => ok(fixed)),
+      readForecastOrders: vi.fn(async () => ordersRead(known)),
+    })
+    render(<ForecastView api={api} project={project} now={now} />)
+    // Nobody pressed anything: the code was not in the settings, and NetSuite was asked.
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText<HTMLSelectElement>(text.forCode(text.columnKind, 'P2')).value,
+      ).toBe('fixed_price'),
+    )
+    expect(api.readForecastOrders).toHaveBeenCalledTimes(1)
+    expect(
+      screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnOrdered, 'P2')).value,
+    ).toBe('7500')
+    expect(screen.getByText(text.noRatesNeeded)).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: text.rates })).toBeNull()
+    // Sold by the day again, the rates are asked again.
+    fireEvent.change(screen.getByLabelText(text.forCode(text.columnKind, 'P2')), {
+      target: { value: 'time_material' },
+    })
+    expect(screen.getByRole('heading', { name: text.rates })).toBeTruthy()
+    expect(screen.queryByText(text.noRatesNeeded)).toBeNull()
+
+    cleanup()
+    // Every code is known already: NetSuite is not asked again.
+    const settled = fakeApi({
+      forecastSettings: vi.fn(async () => ok({ ...configured, projects: known })),
+      forecastView: vi.fn(async () => ok(fixed)),
+    })
+    render(<ForecastView api={settled} project={project} now={now} />)
+    expect(await screen.findByText(text.noRatesNeeded)).toBeTruthy()
+    expect(settled.readForecastOrders).not.toHaveBeenCalled()
+  })
+
+  it('asks the costs of the whole project first for a fixed price, the externals first by the day', async () => {
+    render(<ForecastView api={fakeApi()} project={project} now={now} />)
+    const order = async (code: string) => {
+      fireEvent.click(
+        await screen.findByRole('button', { name: text.forCode(text.moreData, code) }),
+      )
+      const group = screen.getByRole('group', { name: text.inputsTitle(code) })
+      const budget = within(group).getByLabelText(text.budgetCosts)
+      const externals = within(group).getByRole('heading', { name: text.externals })
+      // Whether the costs at budget come before the hours of the externals.
+      return Boolean(budget.compareDocumentPosition(externals) & Node.DOCUMENT_POSITION_FOLLOWING)
+    }
+    expect(await order('P2')).toBe(true)
+    expect(await order('P1')).toBe(false)
   })
 
   it('chooses the model from the dialog of the system, and says when it is elsewhere', async () => {

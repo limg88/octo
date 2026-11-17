@@ -333,6 +333,8 @@ export interface DwsiProjectOrder {
   name: string
   /** The sum of the amounts of the lines; null with no line that carries one. */
   ordered: number | null
+  /** What the lines sell, each item once, by name: it tells how the project is sold. */
+  items: string[]
 }
 
 const viewNamed = (name: string): DwsiView => DWSI_VIEWS.find((v) => v.name === name) as DwsiView
@@ -445,7 +447,11 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
         for (const code of chosen.filter((candidate) => bound.has(candidate))) {
           ctx.signal.throwIfAborted()
           const [project] = await readView(session, PROJECT_VIEW, code)
-          const amounts = (await readView(session, ORDERS_VIEW, code))
+          const lines = await readView(session, ORDERS_VIEW, code)
+          const items = lines.flatMap((line) =>
+            typeof line.item === 'string' && line.item.trim() !== '' ? [line.item.trim()] : [],
+          )
+          const amounts = lines
             .map((line) => line.amount)
             .filter((amount): amount is number | string => amount !== null && amount !== '')
             .map(Number)
@@ -454,6 +460,7 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
             projectid: code,
             name: typeof project?.name === 'string' ? project.name.trim() : '',
             ordered: amounts.length === 0 ? null : amounts.reduce((sum, amount) => sum + amount, 0),
+            items: [...new Set(items)].sort(),
           })
         }
         return all

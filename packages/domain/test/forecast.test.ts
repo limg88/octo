@@ -10,6 +10,7 @@ import {
   type ForecastRowInputs,
   type ForecastSettings,
   forecastFormulaAt,
+  forecastKindOfItems,
   type HoursEntry,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
@@ -447,6 +448,22 @@ describe('rates by project code and externals', () => {
       person: 'Blu',
       hours: 16,
     })
+  })
+})
+
+describe('how a project is sold, by the items of its orders', () => {
+  it('knows the item of a fixed price and the one of the days sold', () => {
+    expect(forecastKindOfItems(['PROG-CORPO'])).toBe('fixed_price')
+    expect(forecastKindOfItems([' prog-corpo ', 'PROG-CORPO'])).toBe('fixed_price')
+    expect(forecastKindOfItems(['SERVPRO'])).toBe('time_material')
+    // An item that says nothing does not hide the one that does.
+    expect(forecastKindOfItems(['Trasferta', 'SERVPRO'])).toBe('time_material')
+  })
+
+  it('says nothing when the orders do not tell, or tell two things', () => {
+    expect(forecastKindOfItems([])).toBeNull()
+    expect(forecastKindOfItems(['Servizi'])).toBeNull()
+    expect(forecastKindOfItems(['PROG-CORPO', 'SERVPRO'])).toBeNull()
   })
 })
 

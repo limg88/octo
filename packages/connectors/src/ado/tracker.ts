@@ -3,6 +3,8 @@ import { cutToCharacters } from '../shared/text.ts'
 import { bad, isRecord, num, text } from '../shared/values.ts'
 import { MAX_DESCRIPTION } from './items.ts'
 
+export { inPool } from '../shared/pool.ts'
+
 /** The fields read of every work item for a snapshot of the tracker: nothing else is asked. */
 export const TRACKER_FIELDS = [
   'System.Id',
@@ -166,21 +168,4 @@ export function commentsOf(json: unknown): AdoTrackerComment[] {
       ? []
       : [{ by: nameOf(comment.createdBy) ?? '', date, text: plain(comment.text) }]
   })
-}
-
-/** Runs `work` on every entry, a few at a time, and stops at the first failure. */
-export async function inPool<T>(
-  entries: readonly T[],
-  size: number,
-  work: (entry: T) => Promise<void>,
-): Promise<void> {
-  let next = 0
-  const worker = async (): Promise<void> => {
-    while (next < entries.length) {
-      const entry = entries[next] as T
-      next += 1
-      await work(entry)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(size, entries.length) }, worker))
 }

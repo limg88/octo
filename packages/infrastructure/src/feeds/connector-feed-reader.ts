@@ -34,7 +34,9 @@ import {
   type FeedFile,
   type FeedName,
   type FeedStep,
+  forecastKindOfItems,
   type JiraFeedConfig,
+  jiraSite,
   MAX_ITEMS_PER_DELIVERY,
   type PullSourceKind,
   recordBody,
@@ -97,14 +99,7 @@ function failure(error: unknown): unknown {
   return new DomainError(FAILURES[error.code] ?? 'feed_failed', detail)
 }
 
-/** `contoso` from `contoso`, `contoso.atlassian.net` or `https://contoso.atlassian.net/`. */
-export function jiraSite(site: string): string {
-  return site
-    .trim()
-    .replace(/^https?:\/\//i, '')
-    .replace(/\/.*$/, '')
-    .replace(/\.atlassian\.net$/i, '')
-}
+export { jiraSite }
 
 /**
  * The cursor a connector would have saved after reading everything before a day: the next
@@ -537,20 +532,24 @@ export function createJiraHoursReader(options: ConnectorFeedOptions = {}): Track
 }
 
 /**
- * Azure DevOps as it is now, through the same read-only connector the feed uses and with the same
- * credential: every work item of the project and areas of the source, with the history and the
- * comments of the types asked.
+ * Azure DevOps or Jira as it is now, through the same read-only connector the feed uses and with
+ * the same credential: every work item of the project and areas of the source (every issue of the
+ * projects, on Jira), with the history and the comments of the types asked.
  */
-export function createAdoTrackerReader(options: ConnectorFeedOptions = {}): TrackerSnapshotReader {
+export function createTrackerReader(options: ConnectorFeedOptions = {}): TrackerSnapshotReader {
   const trackers = createConnectorReader(
     options.devEndpoints ? { devEndpoints: options.devEndpoints } : {},
   )
   return {
-    async read(config, secret, detailTypes, signal) {
+    async read(tracker, secret, detailTypes, signal) {
       try {
-        const { config: raw, scope } = trackerOf.ado(config)
-        const source = await trackers.connect('ado', raw, secret, scope)
-        return await trackers.tracker({ ...source, secret }, { detailTypes }, signal)
+        const {
+          kind,
+          config: raw,
+          scope,
+        } = tracker.kind === 'ado' ? trackerOf.ado(tracker.config) : trackerOf.jira(tracker.config)
+        const source = await trackers.connect(kind, raw, secret, scope)
+        return await trackers.tracker({ kind, ...source, secret }, { detailTypes }, signal)
       } catch (error) {
         throw failure(error)
       }
@@ -582,8 +581,8 @@ export function createWarehouseTimesheetReader(
 }
 
 /**
- * The name and the ordered amount of the project codes of a NetSuite source, through the same
- * read-only connector the feed uses and with the same credential.
+ * The name, the ordered amount and the kind of sale of the project codes of a NetSuite source,
+ * through the same read-only connector the feed uses and with the same credential.
  */
 export function createWarehouseOrdersReader(
   options: ConnectorFeedOptions = {},
@@ -596,6 +595,7 @@ export function createWarehouseOrdersReader(
           code: order.projectid,
           description: order.name,
           ordered: order.ordered,
+          kind: forecastKindOfItems(order.items),
         }))
       } catch (error) {
         throw failure(error)

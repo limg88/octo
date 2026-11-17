@@ -62,6 +62,30 @@ export type ForecastProject = {
   feeMonths: number | null
 }
 
+/**
+ * The items of the company's system whose sale is of one kind: a line of a sales order names one
+ * of them. An item not listed here says nothing about how the project is sold.
+ */
+const KIND_OF_ORDER_ITEM: Readonly<Record<string, ForecastKind>> = {
+  'PROG-CORPO': 'fixed_price',
+  SERVPRO: 'time_material',
+}
+
+/**
+ * How a project is sold, as the items of its sales orders tell it; null when they tell nothing,
+ * or more than one thing.
+ */
+export function forecastKindOfItems(items: readonly string[]): ForecastKind | null {
+  const kinds = new Set(
+    items.flatMap((item) => {
+      const kind = KIND_OF_ORDER_ITEM[item.trim().toUpperCase()]
+      return kind === undefined ? [] : [kind]
+    }),
+  )
+  const [only] = [...kinds]
+  return kinds.size === 1 && only !== undefined ? only : null
+}
+
 export const DEFAULT_FEE_MONTHS = 12
 export const NO_FORECAST_PROJECT: ForecastProject = {
   kind: 'time_material',

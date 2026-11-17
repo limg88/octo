@@ -21,16 +21,21 @@ import {
   startFakeConfluence,
 } from '../../connectors/test/support/fake-confluence.ts'
 import { type FakeDwsi, startFakeDwsi } from '../../connectors/test/support/fake-dwsi.ts'
-import { type FakeJira, jiraIssue, startFakeJira } from '../../connectors/test/support/fake-jira.ts'
+import {
+  type FakeJira,
+  jiraChange,
+  jiraIssue,
+  startFakeJira,
+} from '../../connectors/test/support/fake-jira.ts'
 import {
   type ConnectorFeedOptions,
-  createAdoTrackerReader,
   createConnectorFeedReader,
   createFsFeedIndexes,
   createFsMemoryWriter,
   createFsProjectFiles,
   createFsSourceSettings,
   createJiraHoursReader,
+  createTrackerReader,
   createWarehouseTimesheetReader,
   jiraSite,
 } from '../src/index.ts'
@@ -143,10 +148,10 @@ describe('Azure DevOps as files of the project', () => {
       createdAt: '2026-09-01T08:00:00Z',
     })
     await start([bug, old])
-    const reader = createAdoTrackerReader({ devEndpoints: { ado: fake.server.origin } })
+    const reader = createTrackerReader({ devEndpoints: { ado: fake.server.origin } })
     const signal = new AbortController().signal
 
-    const snapshot = await reader.read(config, PAT, ['Bug'], signal)
+    const snapshot = await reader.read({ kind: 'ado', config }, PAT, ['Bug'], signal)
 
     // Whatever its change date: a snapshot is the whole tracker, not what changed since a day.
     const parsed = parseTrackerExport({ exported_at: snapshot.exportedAt, items: snapshot.items })
@@ -158,7 +163,9 @@ describe('Azure DevOps as files of the project', () => {
     const history = parseTrackerHistory({ bugs: snapshot.history })
     expect(history?.get('7')?.states).toEqual([{ at: '2026-10-01T08:00:00Z', state: 'New' }])
     expect(history?.has('8')).toBe(false)
-    await expect(reader.read(config, 'wrong', ['Bug'], signal)).rejects.toMatchObject({
+    await expect(
+      reader.read({ kind: 'ado', config }, 'wrong', ['Bug'], signal),
+    ).rejects.toMatchObject({
       code: 'feed_credential_refused',
     })
   })
@@ -341,6 +348,51 @@ describe('Jira as files of the project', () => {
     expect(issue).toBeDefined()
     expect(files.some((name) => name.startsWith('zef-'))).toBe(false)
     expect(await text(`Fonti/Jira/${issue}`)).toContain('Bug sul login')
+  })
+
+  it('reads Jira as it is now, in the shape of the export the dashboard reads', async () => {
+    fake = await startFakeJira({
+      email: config.email,
+      token: PAT,
+      projects: [aurora, zefiro],
+      issues: [
+        jiraIssue(1, 'AUR-1', aurora, {
+          type: 'Bug',
+          status: 'In corso',
+          labels: ['Squadra'],
+          created: '2026-10-01T08:00:00.000+0000',
+          updated: '2026-11-04T10:00:00.000+0000',
+          changelog: [
+            jiraChange('2026-10-05T09:00:00.000+0000', {
+              field: 'status',
+              from: 'Da completare',
+              to: 'In corso',
+            }),
+          ],
+        }),
+        jiraIssue(2, 'ZEF-1', zefiro, { updated: '2026-11-04T10:00:00.000+0000' }),
+      ],
+    })
+    const reader = createTrackerReader({ devEndpoints: { jira: fake.server.origin } })
+    const signal = new AbortController().signal
+
+    const snapshot = await reader.read({ kind: 'jira', config }, PAT, ['Bug'], signal)
+
+    const parsed = parseTrackerExport({ exported_at: snapshot.exportedAt, items: snapshot.items })
+    expect(parsed?.items.map((entry) => [entry.id, entry.type, entry.state])).toEqual([
+      ['AUR-1', 'Bug', 'In corso'],
+    ])
+    expect(parsed?.items[0]).toMatchObject({
+      tags: ['Squadra'],
+      createdAt: '2026-10-01T08:00:00.000Z',
+    })
+    expect(parseTrackerHistory({ bugs: snapshot.history })?.get('AUR-1')?.states).toEqual([
+      { at: '2026-10-01T08:00:00.000Z', state: 'Da completare' },
+      { at: '2026-10-05T09:00:00.000Z', state: 'In corso' },
+    ])
+    await expect(
+      reader.read({ kind: 'jira', config }, 'wrong', ['Bug'], signal),
+    ).rejects.toMatchObject({ code: 'feed_credential_refused' })
   })
 
   it('reads the hours logged on the issues of the projects named, when asked', async () => {

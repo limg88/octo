@@ -2,9 +2,11 @@ import {
   type AdoFeedConfig,
   type DashboardSettings,
   DEFAULT_DASHBOARD_SETTINGS,
+  type JiraFeedConfig,
   NO_SOURCES,
   type Project,
   TRACKER_HISTORY_PATH,
+  TRACKER_PATHS,
   TRACKER_SNAPSHOT_PATH,
   TRACKER_SUMMARY_PATH,
 } from '@octo/domain'
@@ -14,6 +16,7 @@ import {
   type DashboardSettingsStore,
   type TrackerSnapshot,
   type TrackerSnapshotReader,
+  type TrackerSource,
 } from '../src/index.ts'
 import { memorySourceSettings, memoryVault, memoryWriter } from './fakes.ts'
 
@@ -24,6 +27,13 @@ const config: AdoFeedConfig = {
   areas: ['Team A'],
   since: '2026-11-01',
   targetFolder: 'Fonti/ADO',
+}
+const jiraConfig: JiraFeedConfig = {
+  site: 'contoso',
+  email: 'pm@example.com',
+  projects: ['AUR'],
+  since: '2026-11-01',
+  targetFolder: 'Fonti/Jira',
 }
 const SNAPSHOT: TrackerSnapshot = {
   exportedAt: '2026-11-15T07:00:00.000Z',
@@ -38,6 +48,7 @@ function setup(
   ado: AdoFeedConfig | null = config,
   reader?: TrackerSnapshotReader,
   ownPeople?: string[],
+  jira: JiraFeedConfig | null = null,
 ) {
   let saved: DashboardSettings = {
     ...DEFAULT_DASHBOARD_SETTINGS,
@@ -52,10 +63,10 @@ function setup(
       saved = next
     },
   }
-  const asked: Array<{ config: AdoFeedConfig; secret: string; types: readonly string[] }> = []
+  const asked: Array<{ source: TrackerSource; secret: string; types: readonly string[] }> = []
   const tracker: TrackerSnapshotReader = reader ?? {
     read: async (given, secret, types) => {
-      asked.push({ config: given, secret, types })
+      asked.push({ source: given, secret, types })
       return SNAPSHOT
     },
   }
@@ -71,7 +82,7 @@ function setup(
     },
     clock: { now: () => clock.now },
     settings,
-    sources: memorySourceSettings({ ...NO_SOURCES, ado }),
+    sources: memorySourceSettings({ ...NO_SOURCES, ado, jira }),
     secrets,
     tracker,
     writer,
@@ -137,6 +148,7 @@ describe('reading the tracker for the dashboard', () => {
     secrets.all.set('p-1/ado', 'pat')
 
     expect(await snapshots.read(project)).toEqual({
+      tracker: 'ado',
       at: '2026-11-15T07:00:00.000Z',
       items: 2,
       withHistory: 1,
@@ -144,7 +156,11 @@ describe('reading the tracker for the dashboard', () => {
 
     // The source of «Fonti» and its credential; bugs and stories are read with their history.
     expect(asked).toEqual([
-      { config, secret: 'pat', types: ['Bug', 'Defect', 'User Story', 'Story'] },
+      {
+        source: { kind: 'ado', config },
+        secret: 'pat',
+        types: ['Bug', 'Defect', 'User Story', 'Story'],
+      },
     ])
     expect(JSON.parse(writer.files.get(TRACKER_SNAPSHOT_PATH) ?? '')).toEqual({
       exported_at: SNAPSHOT.exportedAt,
@@ -166,7 +182,42 @@ describe('reading the tracker for the dashboard', () => {
     })
   })
 
-  it('needs the Azure DevOps source and its credential, and changes nothing without them', async () => {
+  it('reads Jira for a project without Azure DevOps, in files of its own', async () => {
+    const { snapshots, writer, secrets, asked, settings } = setup(
+      null,
+      undefined,
+      undefined,
+      jiraConfig,
+    )
+    secrets.all.set('p-1/jira', 'token')
+
+    expect(await snapshots.read(project)).toMatchObject({ tracker: 'jira', items: 2 })
+
+    expect(asked).toEqual([
+      {
+        source: { kind: 'jira', config: jiraConfig },
+        secret: 'token',
+        types: ['Bug', 'Defect', 'User Story', 'Story'],
+      },
+    ])
+    expect(JSON.parse(writer.files.get(TRACKER_PATHS.jira.snapshot) ?? '').items).toHaveLength(2)
+    expect(writer.files.has(TRACKER_PATHS.jira.history)).toBe(true)
+    expect(writer.files.has(TRACKER_SNAPSHOT_PATH)).toBe(false)
+    expect(settings()).toMatchObject({
+      exportPath: TRACKER_PATHS.jira.snapshot,
+      historyPath: TRACKER_PATHS.jira.history,
+    })
+  })
+
+  it('reads Azure DevOps when the project has both trackers', async () => {
+    const { snapshots, secrets, asked } = setup(config, undefined, undefined, jiraConfig)
+    secrets.all.set('p-1/ado', 'pat')
+    secrets.all.set('p-1/jira', 'token')
+    expect(await snapshots.read(project)).toMatchObject({ tracker: 'ado' })
+    expect(asked.map(({ source }) => source.kind)).toEqual(['ado'])
+  })
+
+  it('needs a tracker source and its credential, and changes nothing without them', async () => {
     const none = setup(null)
     await expect(none.snapshots.read(project)).rejects.toMatchObject({
       code: 'source_not_configured',
@@ -228,6 +279,16 @@ describe('reading the tracker again by itself', () => {
     expect(await snapshots.refresh(project)).toMatchObject({ items: 2 })
     writer.files.set(TRACKER_SNAPSHOT_PATH, JSON.stringify({ items: [] }))
     expect(await snapshots.refresh(project)).toMatchObject({ items: 2 })
+  })
+
+  it('reads Jira again by itself, and leaves alone the reading of a tracker no longer linked', async () => {
+    const onJira = setup(null, undefined, undefined, jiraConfig)
+    onJira.secrets.all.set('p-1/jira', 'token')
+    onJira.pointAt(TRACKER_PATHS.jira.snapshot)
+    expect(await onJira.snapshots.refresh(project)).toMatchObject({ tracker: 'jira', items: 2 })
+    // The dashboard still shows what was read from Azure DevOps, which the project no longer has.
+    onJira.pointAt(TRACKER_SNAPSHOT_PATH)
+    expect(await onJira.snapshots.refresh(project)).toBeNull()
   })
 
   it('does nothing without the source, without its credential, or while a reading runs', async () => {

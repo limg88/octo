@@ -35,6 +35,8 @@ export interface FakeIssue {
   key: string
   /** Every field the issue has, worklog and time tracking included: the fake gives the asked ones. */
   fields: Record<string, unknown>
+  /** The changes of the issue, oldest first, as its changelog gives them. */
+  changelog?: unknown[]
 }
 
 export interface FakeJiraOptions {
@@ -48,6 +50,8 @@ export interface FakeJiraOptions {
   projectPageSize?: number
   /** Worklogs per page of an issue, whatever is asked. */
   worklogPageSize?: number
+  /** Changes per page of an issue, whatever is asked. */
+  changelogPageSize?: number
 }
 
 export interface FakeJira {
@@ -323,6 +327,29 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
       json(res, 200, { startAt: 0, maxResults: max, total: all.length, comments: page })
       return
     }
+    const changelogPath = new RegExp(`^${API}/issue/(\\d+)/changelog$`).exec(path)
+    if (changelogPath) {
+      const issue = options.issues.find((i) => i.id === changelogPath[1])
+      if (!issue) {
+        json(res, 404, { errorMessages: ['Issue does not exist.'] })
+        return
+      }
+      const all = issue.changelog ?? []
+      const startAt = Number(url.searchParams.get('startAt') ?? '0')
+      const size = Math.min(
+        Number(url.searchParams.get('maxResults') ?? '100'),
+        options.changelogPageSize ?? 100,
+      )
+      const values = all.slice(startAt, startAt + size)
+      json(res, 200, {
+        startAt,
+        maxResults: size,
+        total: all.length,
+        isLast: startAt + size >= all.length,
+        values,
+      })
+      return
+    }
     const worklogPath = new RegExp(`^${API}/issue/(\\d+)/worklog$`).exec(path)
     if (worklogPath) {
       const issue = options.issues.find((i) => i.id === worklogPath[1])
@@ -360,6 +387,27 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
     }
   })
   return fake
+}
+
+/** A change of an issue as its changelog returns it: the fields that changed at one instant. */
+export function jiraChange(
+  created: string,
+  ...items: Array<{ field: string; from: string | null; to: string | null }>
+): unknown {
+  return {
+    id: String(Date.parse(created)),
+    author: { accountId: '5b10ac8d82e05b22cc7d4ef5', displayName: 'Mario Rossi' },
+    created,
+    items: items.map(({ field, from, to }) => ({
+      field,
+      fieldtype: 'jira',
+      fieldId: field,
+      from: null,
+      fromString: from,
+      to: null,
+      toString: to,
+    })),
+  }
 }
 
 /** An ADF document of paragraphs of plain text. */
@@ -410,12 +458,17 @@ export function jiraIssue(
     due: string
     description: unknown
     comments: unknown[]
+    /** When the issue last changed category of states. */
+    stateChanged: string
+    changelog: unknown[]
   }>,
 ): FakeIssue {
   return {
     id: String(id),
     key,
+    ...(fields.changelog !== undefined ? { changelog: fields.changelog } : {}),
     fields: {
+      statuscategorychangedate: fields.stateChanged ?? null,
       summary: fields.summary ?? `Storia ${key}`,
       issuetype: { id: '10001', name: fields.type ?? 'Story', subtask: false },
       status: {

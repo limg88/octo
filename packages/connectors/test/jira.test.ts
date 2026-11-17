@@ -200,7 +200,7 @@ describe('the Jira configuration', () => {
     ).toBe(true)
   })
 
-  it('reads only: GET on the account, the projects, the fields, the search, the comments and the worklogs of an issue', () => {
+  it('reads only: GET on the account, the projects, the fields, the search, the comments, the worklogs and the changes of an issue', () => {
     const shown = connector
       .rules(connector.parseConfig(valid))
       .map((r) => `${r.method} ${r.path.map((p) => (p === 'segment' ? '*' : p.literal)).join('/')}`)
@@ -212,6 +212,7 @@ describe('the Jira configuration', () => {
         'GET rest/api/3/search/jql',
         'GET rest/api/3/issue/*/comment',
         'GET rest/api/3/issue/*/worklog',
+        'GET rest/api/3/issue/*/changelog',
       ].sort(),
     )
   })

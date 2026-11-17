@@ -9,7 +9,7 @@ import {
   sameSprint,
 } from '@octo/domain'
 import { useState } from 'react'
-import { Figure, OpenItem } from './DashboardParts.tsx'
+import { Figure, OpenItem, useOpenInTracker } from './DashboardParts.tsx'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { dateText, messages } from './messages.ts'
 
@@ -179,6 +179,7 @@ function SprintTable({
   rows: readonly SprintRow[]
   onOpenItem: ((id: string) => void) | undefined
 }) {
+  const openLabel = useOpenInTracker()
   const columns: DataColumn<SprintRow>[] = [
     {
       key: 'id',
@@ -224,7 +225,7 @@ function SprintTable({
           {
             key: 'open',
             label: '',
-            name: text.openInTracker,
+            name: openLabel,
             kind: 'actions' as const,
             width: '170px',
             cell: (row: SprintRow) => <OpenItem id={row.id} onOpen={onOpenItem} />,

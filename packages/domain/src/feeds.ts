@@ -27,6 +27,23 @@ export type JiraFeedConfig = FeedBase & {
   projects: string[]
 }
 
+/** `contoso` from `contoso`, `contoso.atlassian.net` or `https://contoso.atlassian.net/`. */
+export function jiraSite(site: string): string {
+  return site
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/\.atlassian\.net$/i, '')
+}
+
+const JIRA_SITE_NAME = /^[a-z0-9][a-z0-9-]*$/i
+
+/** The host a Jira site is reached at in a browser; null when its name is not one of a site. */
+export function jiraBrowseHost(site: string): string | null {
+  const name = jiraSite(site)
+  return JIRA_SITE_NAME.test(name) ? `${name.toLowerCase()}.atlassian.net` : null
+}
+
 export type ConfluenceFeedConfig = FeedBase & {
   /** `contoso` or `contoso.atlassian.net`: the same site as Jira. */
   site: string

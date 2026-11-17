@@ -4,6 +4,33 @@ import { OCTO_FOLDER } from '../extracted-document.ts'
 export const TRACKER_SNAPSHOT_PATH = `${OCTO_FOLDER}/cruscotto/azure-devops.json`
 export const TRACKER_HISTORY_PATH = `${OCTO_FOLDER}/cruscotto/azure-devops-cronologia.json`
 
+/** The trackers Octo reads by itself for the dashboard, in the order they are looked for. */
+export const TRACKER_KINDS = ['ado', 'jira'] as const
+export type TrackerKind = (typeof TRACKER_KINDS)[number]
+
+/** Where the reading of each tracker is kept: one never overwrites the other. */
+export const TRACKER_PATHS: Readonly<Record<TrackerKind, { snapshot: string; history: string }>> = {
+  ado: { snapshot: TRACKER_SNAPSHOT_PATH, history: TRACKER_HISTORY_PATH },
+  jira: {
+    snapshot: `${OCTO_FOLDER}/cruscotto/jira.json`,
+    history: `${OCTO_FOLDER}/cruscotto/jira-cronologia.json`,
+  },
+}
+
+/** The tracker an export is Octo's own reading of; null for a file the PM keeps by hand. */
+export function trackerOfExport(exportPath: string): TrackerKind | null {
+  return TRACKER_KINDS.find((kind) => TRACKER_PATHS[kind].snapshot === exportPath) ?? null
+}
+
+/** The id of an item as its tracker writes it: a number on Azure DevOps, a key on Jira. */
+const TRACKER_ITEM_ID: Readonly<Record<TrackerKind, RegExp>> = {
+  ado: /^\d+$/,
+  jira: /^[A-Z][A-Z0-9_]*-\d+$/,
+}
+
+export const isTrackerItemId = (kind: TrackerKind, id: string): boolean =>
+  TRACKER_ITEM_ID[kind].test(id)
+
 /** One comment of a work item, as the tracker keeps it. */
 export type TrackerComment = { by: string; at: string; text: string }
 
@@ -117,7 +144,8 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
 
 /** A leading order number some trackers put before the state: `04 - In Progress`. */
 const STATE_PREFIX = /^\s*[0-9]+[a-z.]*\s*-\s*/i
-const CLOSED = /\b(closed|done|removed|released|cancell?ed|chius[oa]|rimoss[oa]|annullat[oa])\b/i
+const CLOSED =
+  /\b(closed|done|removed|released|cancell?ed|chius[oa]|rimoss[oa]|annullat[oa]|completat[oa])\b/i
 const VALIDATED = /\b(validated|ready for prod|approved|validat[oa]|approvat[oa])\b/i
 const VERIFY =
   /\b(resolved|ready for test|in test(ing)?|test (passed|failed|blocked)|qao test passed|review|demo|developed|verifica|risolt[oa])\b/i

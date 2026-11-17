@@ -64,15 +64,31 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   const [file, setFile] = useState<ForecastFile | null>(null)
   const [readingOrders, setReadingOrders] = useState(false)
 
-  async function loadView(wanted: string) {
+  /** The forecast of a month; the project codes it holds, or null when it could not be computed. */
+  async function loadView(wanted: string): Promise<string[] | null> {
     setError(null)
     setFile(null)
     const result = await api.forecastView(project.id, wanted)
-    if (result.ok) setView(result.value)
-    else {
-      setView(null)
-      setError(result.code)
+    if (result.ok) {
+      setView(result.value)
+      return result.value.forecast.rows.map((row) => row.code)
     }
+    setView(null)
+    setError(result.code)
+    return null
+  }
+
+  /**
+   * A project code the settings know nothing of is asked to the company's system, once and
+   * without a word: its name, what was ordered and how it is sold. A system that is not linked
+   * or does not answer changes nothing: the PM can still ask with the button, and is told why.
+   */
+  async function learnNewCodes(known: ForecastSettings, codes: readonly string[]) {
+    if (codes.every((code) => known.projects[code] !== undefined)) return
+    const result = await api.readForecastOrders(project.id)
+    if (!result.ok) return
+    setSettings(result.value.settings)
+    await loadView(month)
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new project starts from its settings; the month is followed by its own handler.
@@ -88,7 +104,8 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
         const found = await api.forecastCandidates(project.id)
         if (found.ok) setCandidates(found.value)
       }
-      await loadView(month)
+      const codes = await loadView(month)
+      if (codes !== null) await learnNewCodes(result.value, codes)
     })
   }, [api, project.id])
 
@@ -318,6 +335,10 @@ function SettingsForm({
     const proposed = candidates.length === 1 ? (candidates[0] ?? '') : ''
     setDraft({ ...saved, modelPath: saved.modelPath || proposed })
   }, [settings, candidates])
+  // The rates of the people tell the revenue of what is sold by the day only: with no such code
+  // they are not asked. Those already written stay, and are saved as they are.
+  const byTheDay =
+    codes.length === 0 || codes.some((code) => projectOf(code).kind === 'time_material')
   const withCodes = <Key extends string>(columns: RowsColumn<Key>[]): RowsColumn<Key>[] =>
     columns.map((column) => (column.key === 'code' ? { ...column, suggestions: codes } : column))
 
@@ -468,18 +489,24 @@ function SettingsForm({
           }}
         />
       </label>
-      <h4>{text.rates}</h4>
-      <p className="hint">{text.ratesHint}</p>
-      <RowsField
-        label={text.rates}
-        columns={withCodes(RATE_COLUMNS)}
-        rows={draft.rates}
-        onChange={(rates) => setDraft((current) => ({ ...current, rates }))}
-        addLabel={text.add.rate}
-        cellLabel={(column, row) => text.cell(RATE_LABELS[column], row)}
-        removeLabel={text.removeRow}
-      />
-      <FieldProblems lines={problems?.rates ?? []} />
+      {byTheDay ? (
+        <>
+          <h4>{text.rates}</h4>
+          <p className="hint">{text.ratesHint}</p>
+          <RowsField
+            label={text.rates}
+            columns={withCodes(RATE_COLUMNS)}
+            rows={draft.rates}
+            onChange={(rates) => setDraft((current) => ({ ...current, rates }))}
+            addLabel={text.add.rate}
+            cellLabel={(column, row) => text.cell(RATE_LABELS[column], row)}
+            removeLabel={text.removeRow}
+          />
+          <FieldProblems lines={problems?.rates ?? []} />
+        </>
+      ) : (
+        <p className="hint">{text.noRatesNeeded}</p>
+      )}
       <h4>{text.externalRates}</h4>
       <p className="hint">{text.externalRatesHint}</p>
       <RowsField

@@ -55,7 +55,6 @@ import {
   sameFolder,
 } from '@octo/domain'
 import {
-  createAdoTrackerReader,
   createAppleMailArchive,
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
@@ -102,6 +101,7 @@ import {
   createSignInConfig,
   createSignInSetupStore,
   createSplitSourceSettings,
+  createTrackerReader,
   createUpdateApplier,
   createWarehouseOrdersReader,
   createWarehouseTimesheetReader,
@@ -173,6 +173,11 @@ const trackerRefreshMs = devSync ? 0 : TRACKER_REFRESH_MS
 const DEV_JIRA_VARIABLE = 'OCTO_DEV_JIRA_URL'
 const DEV_CONFLUENCE_VARIABLE = 'OCTO_DEV_CONFLUENCE_URL'
 const DEV_ADO_VARIABLE = 'OCTO_DEV_ADO_URL'
+/**
+ * Demos and tests only: the NetSuite warehouse is a fake one on this computer, whatever host its
+ * source names. Never set for real use: no real warehouse would be reached.
+ */
+const DEV_WAREHOUSE_VARIABLE = 'OCTO_DEV_WAREHOUSE_LOOPBACK'
 /**
  * Demos and tests only: credentials kept without the system's store, so a run needs no keychain.
  * Never set for real use: the file would hold the credentials in clear.
@@ -489,6 +494,13 @@ function start(seatEnv: Record<string, string | undefined>): void {
     writer,
     clock,
   })
+  const devWarehouse =
+    process.env[DEV_WAREHOUSE_VARIABLE] === '1'
+      ? {
+          allowLoopback: true,
+          resolveHost: async () => [{ address: '127.0.0.1', family: 4 as const }],
+        }
+      : {}
   const devEndpoints = {
     jira: process.env[DEV_JIRA_VARIABLE],
     ado: process.env[DEV_ADO_VARIABLE],
@@ -500,7 +512,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     readings,
     indexes,
     secrets,
-    reader: createConnectorFeedReader({ devEndpoints, owner }),
+    reader: createConnectorFeedReader({ devEndpoints, owner, ...devWarehouse }),
     writer,
     files,
     clock,
@@ -538,7 +550,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     sources: settings,
     secrets,
     tracker: createJiraHoursReader({ devEndpoints }),
-    timesheets: createWarehouseTimesheetReader({ owner }),
+    timesheets: createWarehouseTimesheetReader({ owner, ...devWarehouse }),
     writer,
     clock,
     team: (project) => team.get(project),
@@ -590,7 +602,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     settings: dashboardSettings,
     sources: settings,
     secrets,
-    tracker: createAdoTrackerReader({ devEndpoints }),
+    tracker: createTrackerReader({ devEndpoints }),
     writer,
     team: (project) => team.get(project),
     exports: trackerExports,
@@ -622,7 +634,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     codes: async (project) => (await hoursSettings.load(project.folder)).projects,
     sources: settings,
     secrets,
-    orders: createWarehouseOrdersReader({ owner }),
+    orders: createWarehouseOrdersReader({ owner, ...devWarehouse }),
     writer,
   })
   const judge = createClaudeTodayJudge(claude)

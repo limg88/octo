@@ -64,7 +64,8 @@ export type Forecasts = {
   compile(project: Project, month: string): Promise<ForecastFile>
   /**
    * Reads from the company's system the name and the ordered amount of the project codes and
-   * keeps them in the settings; how each code is sold stays as the PM set it.
+   * keeps them in the settings. How a code is sold is taken from its sales orders the first
+   * time the code is read; afterwards it stays as the PM set it.
    */
   readOrders(project: Project): Promise<ForecastOrdersRun>
 }
@@ -175,8 +176,13 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
       const projects = { ...settings.projects }
       for (const order of orders) {
         const code = forecastCode(order.code)
+        // A code never read before is sold as its orders say; a known one as the PM left it.
+        const known = projects[code] ?? {
+          ...NO_FORECAST_PROJECT,
+          kind: order.kind ?? NO_FORECAST_PROJECT.kind,
+        }
         projects[code] = {
-          ...(projects[code] ?? NO_FORECAST_PROJECT),
+          ...known,
           description: order.description,
           ordered: order.ordered,
         }

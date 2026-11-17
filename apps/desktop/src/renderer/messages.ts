@@ -1029,7 +1029,8 @@ export const messages = {
     kinds: { time_material: 'A giornate (T&M)', fixed_price: 'A corpo', fee: 'Canone' },
     readOrders: 'Leggi ordinato da NetSuite',
     readingOrders: 'Leggo gli ordini…',
-    readOrdersHint: 'Nome e ordinato di ogni commessa: la somma delle righe dei suoi ordini.',
+    readOrdersHint:
+      'Nome e ordinato di ogni commessa: la somma delle righe dei suoi ordini. Per una commessa nuova anche il tipo di vendita, dalla voce dell’ordine; poi resta quello che scegli tu.',
     notInModel: (codes: string) => `Il modello non ha una riga per: ${codes}.`,
     monthData: 'Dati del mese',
     moreData: 'Altri dati',
@@ -1047,6 +1048,8 @@ export const messages = {
     rates: 'Tariffe al giorno',
     ratesHint:
       'Le persone e il costo delle loro ore arrivano dai timesheet di NetSuite: qui scrivi solo a quanto vendi una giornata. Senza commessa la tariffa vale ovunque; quella scritta per una commessa vince. Chi ha ore e nessuna tariffa compare fra i dati che mancano.',
+    noRatesNeeded:
+      'Nessuna commessa di questo progetto è venduta a giornate: le tariffe al giorno non servono. I ricavi vengono dall’ordinato.',
     externalRates: 'Esterni senza timesheet',
     externalRatesHint:
       'Una riga per persona e commessa. Le ore le scrivi ogni mese, nei dati del mese della commessa. Tariffe e costi restano in una cartella di Octo che non entra nelle risposte né nei deliverable.',
@@ -1244,17 +1247,20 @@ export const messages = {
       `Bug ${id} «${title}», nello stato «${state}»${days === null ? '' : ` da ${days} giorni`}: che cosa lo blocca, chi deve muoversi e qual è il prossimo passo? Cita le fonti.`,
     haveExport: 'Ho già un file di esportazione',
     trendNumbers: 'Mostra i numeri',
-    adoUnlinked:
-      'Azure DevOps non è collegato a questo progetto: collegalo in «Impostazioni», poi torna qui a leggere.',
+    trackerNames: { ado: 'Azure DevOps', jira: 'Jira' },
+    trackerUnlinked:
+      'Né Azure DevOps né Jira sono collegati a questo progetto: collegane uno in «Impostazioni», poi torna qui a leggere.',
     saveNeeds: 'Per salvare indica il file dell’esportazione.',
     setupTitle: 'Da dove leggo bug e requisiti',
-    setupIntro:
-      'Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da Azure DevOps qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.',
-    trackerTitle: 'Leggi da Azure DevOps',
-    trackerIntro:
-      'Leggo adesso le voci del progetto e delle aree indicati in «Impostazioni», con il tuo token personale di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
-    readTracker: 'Leggi da Azure DevOps',
-    readingTracker: 'Sto leggendo Azure DevOps…',
+    setupIntro: (tracker: string) =>
+      `Il cruscotto si calcola da un’esportazione del tracker tenuta nella cartella del progetto: la leggo io da ${tracker} qui sotto, oppure indichi un file che hai già. Non scrivo mai nel tracker.`,
+    trackerTitle: (tracker: string) => `Leggi da ${tracker}`,
+    trackerIntro: {
+      ado: 'Leggo adesso le voci del progetto e delle aree indicati in «Impostazioni», con il tuo token personale di sola lettura, e per i bug anche i cambi di stato e i commenti. Li tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
+      jira: 'Azure DevOps non è collegato a questo progetto: leggo da Jira le issue dei progetti indicati in «Impostazioni», con il tuo token personale di sola lettura, e per bug e storie anche i cambi di stato e i commenti. Le tengo in un file del progetto e il cruscotto si calcola da lì. Può volerci qualche minuto.',
+    },
+    readTracker: (tracker: string) => `Leggi da ${tracker}`,
+    readingTracker: (tracker: string) => `Sto leggendo ${tracker}…`,
     trackerRead: (items: number, withHistory: number, when: string) =>
       `Lette ${items} voci, ${withHistory} con la cronologia, alle ${when}`,
     exportPath: 'File dell’esportazione',
@@ -1340,7 +1346,7 @@ export const messages = {
     } as Record<string, string>,
     tabsLabel: 'Parti del cruscotto',
     tabs: { sprint: 'Sprint', bugs: 'Bug', trend: 'Andamento' },
-    refreshing: 'I dati hanno più di un giorno: rileggo Azure DevOps…',
+    refreshing: (tracker: string) => `I dati hanno più di un giorno: rileggo ${tracker}…`,
     undo: 'Annulla',
     decided: 'Fatto.',
     sinceStart: (delta: number) =>
@@ -1362,7 +1368,7 @@ export const messages = {
     removeFilter: (name: string) => `Togli il filtro ${name}`,
     clearFilters: 'Togli i filtri',
     shown: (shown: number, of: number) => `${shown} di ${of}`,
-    openInTracker: 'Apri su Azure DevOps',
+    openInTracker: (tracker: string) => `Apri su ${tracker}`,
     notLinked: 'Questa voce non ha un indirizzo sul tracker.',
     waitingTitle: (count: number) => `Da sollecitare: ${count}`,
     waitingIntro: (days: number) =>
