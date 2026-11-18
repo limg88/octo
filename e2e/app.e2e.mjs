@@ -91,7 +91,7 @@ try {
   const nav21 = (group) => page.getByRole('tablist', { name: group }).getByRole('tab')
   assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
   // «Ore» and «Previsionale» are parts of «Commessa», the summary of the money of the project.
-  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Commessa', 'Avanzamento'])
+  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Commessa'])
   // A source is read from its row when closed, from its form when open (demo 56).
   const READ_NOW = /^(Leggi ora|Leggi con le impostazioni salvate)$/
   const openSheetPart = async (name) => {
@@ -262,7 +262,7 @@ try {
 
   // Demo 05: one button reads everything that is linked.
   await guide.getByText(/^2 su 6 collegati/).waitFor({ timeout: TIMEOUT_MS })
-  await guide.getByRole('button', { name: 'Riempi la memoria ora' }).click()
+  await guide.getByRole('button', { name: 'Leggi tutte le fonti' }).click()
   await guide.getByText('Fatto. Ora puoi fare domande').waitFor({ timeout: TIMEOUT_MS })
   for (const source of ['Posta', 'Azure DevOps', 'Documenti']) {
     await guide.getByText(new RegExp(`^${source}: \\d+ nuovi o aggiornati`)).waitFor()
@@ -497,7 +497,8 @@ try {
   // The costs come from the rows of the timesheets: nobody typed them.
   await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('27.200,00').waitFor()
-  // How a row was computed is said under it, across the table.
+  // How a row was computed is said under it, across the table, when the row is opened.
+  await page.getByRole('button', { name: 'Calcolo e dettagli, PRJ000303', exact: true }).click()
   await page
     .locator('table.data tbody tr:has-text("PRJ000303") + tr.row-details')
     .getByText('canone: ordinato in 12 rate mensili')
@@ -519,17 +520,22 @@ try {
   const inputs202 = page.getByRole('group', { name: 'Dati del mese per PRJ000202' })
   await cell(inputs202, 'Nome, riga 1').fill('Studio Blu')
   await cell(inputs202, 'Ore, riga 1').fill('40')
-  await inputs202.getByLabel(/^A corpo/).fill('20000')
+  await inputs202.getByLabel(/^Costi totali a budget/).fill('20000')
   await page.getByRole('button', { name: 'Salva i dati del mese' }).click()
-  // What the external costs and is sold for is typed where it is said to be missing: the
-  // settings of the forecast hold no rates any more, they are of the budget of the code.
+  // What the external costs and is sold for is typed where it is said to be missing.
   const blu = 'Studio Blu su PRJ000202'
   await page.getByLabel(`Costo al giorno, ${blu}`, { exact: true }).fill('300')
   await page.getByLabel(`Tariffa al giorno, ${blu}`, { exact: true }).fill('500')
   await page.getByRole('button', { name: `Salva: ${blu}`, exact: true }).click()
   await forecastRow('PRJ000202').getByText('7,5%', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000202').getByText('3.000,00').waitFor()
-  await page.getByRole('button', { name: 'Compila il modello' }).click()
+  // The model of the administration found in the folder is proposed: saving the settings takes it.
+  await page.getByText('Impostazioni del previsionale').first().click()
+  await page
+    .locator('.dashboard-settings > form')
+    .getByRole('button', { name: 'Salva', exact: true })
+    .click()
+  await page.getByRole('button', { name: 'Compila il modello Excel' }).click()
   await page
     .getByText(/^Modello compilato in _octo\/previsionale\//)
     .waitFor({ timeout: TIMEOUT_MS })
@@ -549,64 +555,6 @@ try {
   await page.getByRole('table', { name: 'Ore e costi per persona' }).waitFor()
   await page.getByText('Documento interno: costi e margini non vanno al cliente.').waitFor()
   await page.screenshot({ path: `${work}/commessa.png`, fullPage: true })
-
-  // Demo 10: progress requests on the form of the client.
-  execFileSync('node', [`${root}demo/lib/fake-progress.ts`, `${work}/Aurora`])
-  const formFile = `${work}/Aurora/Moduli/Richiesta stato avanzamento.xlsx`
-  const formBefore = readFileSync(formFile)
-  await page.getByRole('tab', { name: 'Avanzamento' }).click()
-  // The form of the client and the map of its cells were set once: only the order is to type.
-  const setup10 = page.getByRole('form', { name: 'Impostazioni dell’ordine e del modulo' })
-  await setup10.waitFor({ timeout: TIMEOUT_MS })
-  await setup10.getByLabel(/^Numero dell’ordine/).fill('ORD-2026-077')
-  await setup10.getByLabel(/^Totale dell’ordine/).fill('340.000')
-  const positions10 = [
-    ['00001', '100.000'],
-    ['00002', '60.000'],
-    ['00003', '142.000'],
-    ['00004', '38.000'],
-  ]
-  for (const [index, [code, amount]] of positions10.entries()) {
-    if (index > 0) await setup10.getByRole('button', { name: 'Aggiungi una posizione' }).click()
-    await setup10.getByLabel(`Codice della posizione ${index + 1}`).fill(code)
-    await setup10.getByLabel(`Importo della posizione ${index + 1}`).fill(amount)
-  }
-  await setup10.getByText('Le posizioni sommano 340.000,00.').waitFor()
-  await setup10.getByRole('button', { name: 'Salva', exact: true }).click()
-  const newRequest10 = async (n) => {
-    await page.getByRole('button', { name: 'Nuova richiesta' }).click()
-    return page.getByRole('form', { name: `Nuova richiesta (la numero ${n})` })
-  }
-  const request10 = (n) => page.getByRole('region', { name: `Richiesta ${n}`, exact: true })
-  const first10 = await newRequest10(1)
-  await first10.getByLabel('Dal', { exact: true }).fill('2026-03-01')
-  await first10.getByLabel('Al', { exact: true }).fill('2026-03-31')
-  await first10.getByLabel('Importo della richiesta').fill('289.540')
-  await first10.getByLabel('Fattura di riferimento').fill('Fattura n. 101 del 31/03/2026')
-  // The shares are shown while the request is typed, before anything is saved.
-  await first10.getByText('91,23%').first().waitFor({ timeout: TIMEOUT_MS })
-  await page.screenshot({ path: `${work}/avanzamento-richiesta.png` })
-  await first10.getByRole('button', { name: 'Salva e compila il modulo' }).click()
-  await page
-    .getByText(/^Modulo compilato in _octo\/avanzamento\/Richiesta stato avanzamento - 1\.xlsx/)
-    .waitFor({ timeout: TIMEOUT_MS })
-  const second10 = await newRequest10(2)
-  assert.equal(await second10.getByLabel('Dal', { exact: true }).inputValue(), '2026-03-31')
-  await second10.getByLabel('Al', { exact: true }).fill('2026-04-30')
-  await second10.getByRole('button', { name: 'Tutto ciò che resta: 50.460,00' }).click()
-  await second10.getByLabel('Fattura di riferimento').fill('Fattura da emettere il 30/04/2026')
-  await second10.getByText(/^Raggiunge il totale dell’ordine/).waitFor()
-  await second10.getByRole('button', { name: 'Salva senza compilare' }).click()
-  await request10(2)
-    .getByText(/^Raggiunge il totale dell’ordine/)
-    .waitFor({ timeout: TIMEOUT_MS })
-  await request10(2).getByText('8,77%').waitFor()
-  const filledForm = readFileSync(
-    `${work}/Aurora/_octo/avanzamento/Richiesta stato avanzamento - 1.xlsx`,
-  )
-  assert.ok(filledForm.length > 0 && !filledForm.equals(formBefore))
-  assert.ok(readFileSync(formFile).equals(formBefore))
-  await page.screenshot({ path: `${work}/avanzamento.png` })
 
   // Demo 11: an approved status report as slides on the deck of the PM.
   execFileSync('node', [`${root}demo/lib/fake-deck.ts`, `${work}/Aurora`, 'chosen'])
@@ -673,62 +621,6 @@ try {
     .getByText('Nessun dato interno (giornate, costi, tariffe, codici commessa)')
     .waitFor()
   await page.screenshot({ path: `${work}/tipi-di-testo.png` })
-
-  // Demo 13: the client's tracker against the supplier's tickets, sprint by sprint.
-  execFileSync('node', [`${root}demo/lib/fake-alignment.ts`, `${work}/Aurora`])
-  await page.getByRole('tab', { name: 'Allineamento' }).click()
-  const setup13 = page.getByRole('region', { name: 'Che cosa confronto' })
-  await setup13.waitFor({ timeout: TIMEOUT_MS })
-  // What the client's export holds is chosen, not typed: the sprint from a menu, the tags ticked.
-  await setup13.locator('select').first().waitFor({ timeout: TIMEOUT_MS })
-  await setup13.getByLabel(/^Sprint, come/).selectOption('Sprint 28')
-  await setup13.getByRole('checkbox', { name: 'Squadra', exact: true }).check()
-  await setup13.getByRole('button', { name: 'Salva' }).click()
-  await page
-    .getByText(
-      '6 voci del cliente nello sprint: 3 con il ticket nello sprint, 1 con il ticket altrove, 2 senza ticket.',
-    )
-    .waitFor({ timeout: TIMEOUT_MS })
-  await page.getByText('Quadratura: ogni voce è in una sola delle tre liste.').waitFor()
-  const list13 = (name) => page.getByRole('region', { name, exact: true })
-  await list13('Ticket da spostare nello sprint').getByText('Sprint 27', { exact: true }).waitFor()
-  await list13('Voci con più di un ticket').getByText('AUR-4, AUR-5').waitFor()
-  await list13('Ticket che nominano una voce che non c’è')
-    .getByText('999', { exact: true })
-    .waitFor()
-  await list13('Forse sono la stessa cosa')
-    .getByText(/^AUR-6 · /)
-    .waitFor()
-  await page.getByText('Che cosa confronto').click()
-  const groups13 = page.getByRole('group', { name: 'Stati che vogliono dire la stessa cosa' })
-  const stateGroups = [
-    ['da fare', 'New', 'Da completare'],
-    ['in corso', 'In Progress', 'In corso'],
-    ['chiuso', 'Closed', 'Completata'],
-  ]
-  for (const [index, [name, item, ticket]] of stateGroups.entries()) {
-    if (index > 0) await groups13.getByRole('button', { name: 'Aggiungi un gruppo' }).click()
-    await cell(groups13, `Che cosa vogliono dire, riga ${index + 1}`).fill(name)
-    await cell(groups13, `Stati del cliente (separati da virgola), riga ${index + 1}`).fill(item)
-    await cell(groups13, `Stati dei ticket (separati da virgola), riga ${index + 1}`).fill(ticket)
-  }
-  await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
-  // What is read for reference is one line with its count: it opens with a click.
-  await page.getByText(/^Collegate \(3\)$/).click()
-  await list13('Collegate').getByText('Diversi', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
-  await page.getByRole('button', { name: 'Scrivi il file di import dei ticket mancanti' }).click()
-  await page
-    .getByText(/^Scritto _octo\/allineamento\/mancanti_sprint-28\.csv con 2 ticket/)
-    .waitFor({
-      timeout: TIMEOUT_MS,
-    })
-  const importFile = readFileSync(
-    `${work}/Aurora/_octo/allineamento/mancanti_sprint-28.csv`,
-    'utf8',
-  )
-  assert.match(importFile, /\[AZDO 105\] Ricerca ordini per cliente,Story,,Mario Rossi,,Sprint 28/)
-  assert.match(importFile, /Il listino arriva in Excel\.\nUna riga per articolo/)
-  await page.screenshot({ path: `${work}/allineamento.png` })
 
   // Demo 14: people and calendar of the project, and their effect on the hours.
   await page.getByRole('tab', { name: 'Impostazioni' }).click()
@@ -940,19 +832,6 @@ try {
   await team20.getByRole('button', { name: 'Salva persone e calendario' }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: `${work}/righe.png` })
 
-  await page.getByRole('tab', { name: 'Avanzamento' }).click()
-  await page.getByRole('button', { name: 'Impostazioni', exact: true }).click()
-  const setup20 = page.getByRole('form', { name: 'Impostazioni dell’ordine e del modulo' })
-  await setup20.getByLabel('Importo della posizione 2').fill('mille')
-  await setup20.getByLabel('Cella della riga 1').fill('Numero')
-  await setup20.getByRole('button', { name: 'Salva', exact: true }).click()
-  await setup20.getByText(/^Posizione 2: servono un codice e un importo/).waitFor()
-  await setup20.getByText(/^Riga 1: una cella si scrive con lettere e numero/).waitFor()
-  await page.screenshot({ path: `${work}/righe-avanzamento.png` })
-  await setup20.getByRole('button', { name: 'Chiudi' }).click()
-  // The shares shown are still those of the order as it was saved.
-  await page.getByRole('region', { name: 'Richiesta 2' }).getByText('00004').waitFor()
-
   // A reading asked from a system that is not linked names it and leads to the sources.
   await openSheetPart('Ore')
   await page.getByRole('button', { name: 'Leggi i timesheet da NetSuite' }).click()
@@ -962,6 +841,11 @@ try {
   await page.getByRole('button', { name: 'Apri «Impostazioni»' }).click()
   await page.getByRole('region', { name: 'Avvio del progetto' }).waitFor({ timeout: TIMEOUT_MS })
   console.log('e2e: ok')
+} catch (error) {
+  // What the window showed when a step failed, to see which step no longer follows the app.
+  const [failed] = app.windows()
+  await failed?.screenshot({ path: `${work}/errore.png`, fullPage: true }).catch(() => {})
+  throw error
 } finally {
   await app.close()
   ado.server.close()

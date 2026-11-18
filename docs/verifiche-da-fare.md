@@ -33,7 +33,7 @@ Scheda dei criteri di uscita (tabella di §4 di `docs/revisione-roadmap.md`). Og
 | R2.8 | F5 — la Suite v0 non serve più; la collega produce un deliverable reale | Non verificabile prima di R4 | Vedi R4 | — | rimandato a R4 |
 | R2.9 | T1 — due persone sullo stesso progetto su SharePoint | Fuori da questo giro | R7 | — | rimandato a R7 |
 
-Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella finestra vera) è fermo da prima di R1.** Lo script non segue più le revisioni delle schermate (demo 55 e 56): si ferma su pulsanti che ora stanno nel modulo aperto di una fonte. Ho corretto i primi due punti (lettura di una fonte, posto di «Ore» e «Previsionale»); il passo successivo che fallisce è «Riempi la memoria ora». Dopo R4 lo script contiene anche i passi delle demo 10, 13 e 54, che non esistono più: vanno tolti quando lo si riallinea. Gli incrementi di questo giro sono provati nella finestra vera con script brevi (`pnpm e2e:commessa`, `pnpm e2e:riunioni`). Esito che chiude: `pnpm e2e` arriva a «ok».
+`pnpm e2e` (il giro delle demo nella finestra vera) è stato riallineato il 18/11/2026 e arriva a «ok»: seguiva ancora le schermate di prima delle demo 55 e 56 e conteneva i passi di Avanzamento e Allineamento, tolti con R4 e provati ora da `pnpm e2e:script`. Quando un passo fallisce lascia la schermata in `.tmp/e2e/errore.png`.
 
 ## R3 — Recinto sul Mac
 
