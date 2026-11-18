@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && electron .",
-    "dist": "node scripts/build.mjs && electron-builder --config electron-builder.yml --publish never",
+    "dist": "node scripts/fetch-python.mjs --dist && node scripts/build.mjs && electron-builder --config electron-builder.yml --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

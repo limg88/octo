@@ -19,6 +19,7 @@ import {
   createForecastReadings,
   createForecasts,
   createHours,
+  createKeepWork,
   createMeetings,
   createModels,
   createOpenPoints,
@@ -91,6 +92,7 @@ import {
   createFsSourceSettings,
   createFsTeamStore,
   createFsTrackerExports,
+  createFsWorkFolders,
   createGithubReleaseFeed,
   createHttpDownloads,
   createJiraHoursReader,
@@ -214,6 +216,30 @@ function secretCipher(): SecretCipher {
     encrypt: (value) => safeStorage.encryptString(value),
     decrypt: (bytes) => safeStorage.decryptString(Buffer.from(bytes)),
   }
+}
+
+const INTERPRETER_VARIABLE = 'OCTO_PYTHON_PATH'
+const INTERPRETER = join('bin', 'python3')
+/** The systems an interpreter is shipped for, as the installers name them. */
+const INTERPRETER_SYSTEMS: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: 'mac',
+  linux: 'linux',
+}
+
+/**
+ * The interpreter Octo ships for the calculations Claude runs inside its fence: the one of the
+ * installed app, else the one `scripts/fetch-python.mjs` put beside the sources. Null when there
+ * is none: then no calculation is offered.
+ */
+function shippedInterpreter(): string | null {
+  const system = INTERPRETER_SYSTEMS[process.platform]
+  const candidates = [
+    process.env[INTERPRETER_VARIABLE],
+    app.isPackaged ? join(process.resourcesPath, 'python', INTERPRETER) : undefined,
+    system &&
+      join(here, '..', '..', 'resources', 'python', `${system}-${process.arch}`, INTERPRETER),
+  ]
+  return candidates.find((path) => path !== undefined && path !== '' && existsSync(path)) ?? null
 }
 
 /** Built beside this file by scripts/build.mjs. */
@@ -418,8 +444,10 @@ function start(seatEnv: Record<string, string | undefined>): void {
       exists: existsSync,
     }),
     env: seatEnv,
+    interpreter: shippedInterpreter(),
   }
   const agent = createClaudeCliRunner(claude)
+  const work = createFsWorkFolders(dataFolder)
   const secrets = createFileVault(dataFolder, secretCipher())
   const demoPerson = fixedPersonOf(process.env[DEMO_IDENTITY_VARIABLE])
   const session = createSession({
@@ -757,7 +785,9 @@ function start(seatEnv: Record<string, string | undefined>): void {
       ids,
       models: chosenModels,
       liveSources,
+      work,
     }),
+    keepWork: createKeepWork({ questions, work, writer }),
     models,
     preferences: createPreferences({ store: createJsonPreferences(dataFolder) }),
     folderDialogTitle: FOLDER_DIALOG_TITLE,

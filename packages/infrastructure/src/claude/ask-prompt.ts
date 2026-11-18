@@ -20,6 +20,31 @@ export const draftAnswerSchema = z.object({
   missing: z.array(z.string()),
 })
 
+/** An answer with calculations: the same, with the tables computed and what they come from. */
+export const computedAnswerSchema = draftAnswerSchema.extend({
+  tables: z.array(
+    z.object({
+      title: z.string(),
+      columns: z.array(z.string()),
+      rows: z.array(z.array(z.string())),
+      sources: z.array(z.string()),
+      file: z.string(),
+    }),
+  ),
+})
+
+/** What an answer with calculations adds to the rules of every answer. */
+export const COMPUTE_PROMPT = `
+
+How to answer with calculations:
+- A figure you computed is not a quote: it goes in "tables", never behind a marker [n]. Each table
+  has a title, its columns, its rows as text, the files of the project it was computed from
+  ("sources", paths relative to the project folder, at least one) and the name of the file of the
+  work folder that holds it whole ("file", for example \`totali.csv\`; empty when there is none).
+- Write the numbers of a table as the script printed them: never round, never retype from memory.
+- Say in the text, in one line, how each table was computed. What could not be computed goes in
+  "missing".`
+
 export const ASK_SYSTEM_PROMPT = `You answer a Project Manager's question about one project.
 The project is the current folder: read as many files as you need, with no fixed limit.
 If the folder has an index or a manifest (for example wiki/indice.md, raw/_MANIFEST.md), read it

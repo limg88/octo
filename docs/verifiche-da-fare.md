@@ -35,6 +35,15 @@ Scheda dei criteri di uscita (tabella di §4 di `docs/revisione-roadmap.md`). Og
 
 Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella finestra vera) è fermo da prima di R1.** Lo script non segue più le revisioni delle schermate (demo 55 e 56): si ferma su pulsanti che ora stanno nel modulo aperto di una fonte. Ho corretto i primi due punti (lettura di una fonte, posto di «Ore» e «Previsionale»); il passo successivo che fallisce è «Riempi la memoria ora». Gli incrementi di questo giro sono provati nella finestra vera con script brevi (`pnpm e2e:commessa`, `pnpm e2e:riunioni`). Esito che chiude: `pnpm e2e` arriva a «ok».
 
+## R3 — Recinto sul Mac
+
+| # | Che cosa provare | Come | Esito che chiude | Esito |
+|---|---|---|---|---|
+| R3.1 | Un'analisi con calcoli scelta fra quelle del vault, rifatta con le stesse cifre | Scegli un'analisi del vault di cui hai le cifre. In «Chiedi», sul progetto vero, spunta «Con calcoli» e fai la stessa richiesta | Le cifre della tabella coincidono con quelle dell'analisi originale, e sotto la tabella ci sono i file giusti. Scrivi qui solo «raggiunto» o lo scarto in parole | da fare |
+| R3.2 | La prova ostile sul tuo Mac, dopo ogni aggiornamento di Claude Code | `pnpm test:recinto` | 2 test passati. Passata il 18/11/2026 con Claude Code 2.1.327 su macOS (arm64); va rifatta a ogni aggiornamento, perché la sandbox è di Claude Code | raggiunto il 18/11/2026, da ripetere |
+| R3.3 | L'interprete dentro l'app installata | Installa la build (`pnpm dist`), apri «Chiedi»: la casella «Con calcoli» c'è e una domanda con calcoli risponde | La casella c'è e il calcolo riesce. Nello sviluppo è provato; nell'app firmata e installata no (l'interprete va firmato con l'app) | da fare |
+| R3.4 | Processore Intel | Come R3.3 su un Mac Intel, se ce n'è uno | Il calcolo riesce | da fare |
+
 ## R6 — che cosa serve sapere sulla posta di Windows
 
 In `docs/` non è scritto quale Outlook ha il pilota (`docs/roadmap.md`, «Scelte prese durante F2 (posta)»: «Dipende da quale Outlook ha il pilota»). Il lettore della posta su Windows non si costruisce alla cieca. Da rilevare nella sessione con il pilota (R2.6):

@@ -52,11 +52,24 @@ const questionSchema = z.object({
       citations: z.array(citationSchema),
       missing: z.array(z.string()),
       markersWithoutCitation: z.array(z.number()),
+      tables: z
+        .array(
+          z.object({
+            title: z.string(),
+            columns: z.array(z.string()),
+            rows: z.array(z.array(z.string())),
+            sources: z.array(z.object({ path: z.string(), found: z.boolean() })),
+            file: z.string(),
+            fileWritten: z.boolean(),
+          }),
+        )
+        .optional(),
     })
     .nullable(),
   error: z.enum(DOMAIN_ERROR_CODES).nullable(),
   conversationId: z.string().optional(),
   model: z.string().nullable().optional(),
+  work: z.object({ files: z.array(z.string()), keptIn: z.string().nullable() }).optional(),
 })
 
 const PROJECTS_FILE = 'projects.json'
@@ -131,12 +144,12 @@ export function createJsonQuestionLog(dataFolder: string, projectOf: ProjectOfFo
 
   return {
     list,
-    append: async (projectFolder, record) =>
-      writeJson(
-        await ownFile(projectFolder),
-        [...(await list(projectFolder)), record],
-        PRIVATE_FILE_MODE,
-      ),
+    async append(projectFolder, record) {
+      const kept = await list(projectFolder)
+      const at = kept.findIndex((known) => known.id === record.id)
+      const next = at < 0 ? [...kept, record] : kept.with(at, record)
+      await writeJson(await ownFile(projectFolder), next, PRIVATE_FILE_MODE)
+    },
   }
 }
 

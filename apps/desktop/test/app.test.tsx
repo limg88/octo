@@ -181,6 +181,7 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     listQuestions: vi.fn(async () => ok<QuestionRecord[]>([])),
     ask: vi.fn(async () => ok(answered)),
     cancelAsk: vi.fn(async () => ok(null)),
+    keepWork: vi.fn(async () => ok(answered)),
     openEvidence: vi.fn(async () => ok(null)),
     onProgress: (listener) => {
       emit = listener
@@ -474,7 +475,7 @@ describe('App', () => {
     await askQuestion('Quando consegniamo?')
 
     expect(await screen.findByText(messages.toCheck(2))).toBeTruthy()
-    expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?', null)
+    expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?', null, false)
     // The first source is in view beside the answer, with what the check found about it.
     const panel = screen.getByRole('complementary', { name: messages.citation.panel })
     expect(within(panel).getByText('Frase riscontrata nel file')).toBeTruthy()

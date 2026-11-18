@@ -3675,3 +3675,16 @@ span.marker-warning {
   flex: 1;
   min-width: 0;
 }
+
+/* The option beside the question: said each time, so it sits by the button that asks. */
+.composer .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.computed h3 {
+  font-size: 14px;
+  margin: 16px 0 8px;
+}

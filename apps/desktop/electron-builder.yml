@@ -9,6 +9,10 @@ files:
 npmRebuild: false
 # The names Octo looks for when it updates itself: Octo-<version>-<system>-<arch>.<extension>.
 mac:
+  # The interpreter for the calculations Claude runs inside its fence (scripts/fetch-python.mjs).
+  extraResources:
+    - from: resources/python/mac-${arch}
+      to: python
   category: public.app-category.productivity
   artifactName: Octo-${version}-mac-${arch}.${ext}
   target:

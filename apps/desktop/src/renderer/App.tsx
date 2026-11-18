@@ -456,6 +456,7 @@ export function App({ api, notify = systemNotify }: Props) {
               <AskView
                 api={api}
                 project={selected}
+                canCompute={agent?.available === true && agent.computes === true}
                 seed={askSeed}
                 onSeedUsed={() => setAskSeed(null)}
                 onDraft={(next) => {

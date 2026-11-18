@@ -1,6 +1,6 @@
 // Stands in for the Claude Code executable in tests. The question, read from standard input,
 // chooses the behaviour; the events have the shape of `claude -p --output-format stream-json`.
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -520,6 +520,53 @@ function meetingPassage(request) {
 }
 
 console.log('not json at all')
+
+// A run with calculations: the fence is in the arguments. The fake writes in the work folder as
+// a script of the real one would, and answers with a table computed from a file of the project.
+const workAt = args.indexOf('--add-dir')
+if (workAt >= 0 && args.includes('Bash')) {
+  const work = args[workAt + 1]
+  const settings = JSON.parse(args[args.indexOf('--settings') + 1])
+  if (question.includes('#sandbox')) {
+    emit({
+      type: 'result',
+      is_error: true,
+      result: 'Error: sandbox is not available on this system',
+    })
+    process.exit(1)
+  }
+  const lines = readFileSync(join(process.cwd(), 'wiki', 'stato.md'), 'utf8').split('\n')
+  mkdirSync(join(work, 'dettaglio'), { recursive: true })
+  writeFileSync(join(work, 'righe.csv'), `righe\n${lines.length}\n`)
+  writeFileSync(join(work, 'dettaglio', 'calcolo.py'), 'print("righe")\n')
+  toolUse('Bash', { command: 'python3 calcolo.py' })
+  emit({
+    type: 'result',
+    is_error: false,
+    result: 'ok',
+    structured_output: {
+      text: 'Ho contato le righe del file di stato.',
+      citations: [],
+      // A test asks what the fence was: said only then, never in a demo.
+      missing: question.includes('#recinto')
+        ? [
+            `fence:${settings.sandbox.enabled && settings.sandbox.failIfUnavailable && !settings.sandbox.allowUnsandboxedCommands}`,
+            `prompts:${args[args.indexOf('--permission-prompts') + 1]}`,
+          ]
+        : [],
+      tables: [
+        {
+          title: 'Righe del file di stato',
+          columns: ['file', 'righe'],
+          rows: [['wiki/stato.md', String(lines.length)]],
+          sources: question.includes('#senzafonte') ? ['wiki/non-esiste.md'] : ['wiki/stato.md'],
+          file: question.includes('#senzafile') ? 'mai-scritto.csv' : 'righe.csv',
+        },
+      ],
+    },
+  })
+  process.exit(0)
+}
 
 if (question.includes('#lento')) {
   await new Promise((resolve) => setTimeout(resolve, 60_000))

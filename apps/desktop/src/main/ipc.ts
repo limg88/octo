@@ -15,6 +15,7 @@ import type {
   Feeds,
   Forecasts,
   Hours,
+  KeepWork,
   Meetings,
   Models,
   OpenPoints,
@@ -66,6 +67,7 @@ export type IpcDeps = {
   questions: QuestionLog
   evidence: EvidenceReader
   askQuestion: AskQuestion
+  keepWork: KeepWork
   sources: Sources
   meetings: Meetings
   documents: Documents
@@ -128,7 +130,9 @@ const byProject = z.object({ projectId: z.string().min(1) })
 const askInput = byProject.extend({
   question: z.string().max(MAX_QUESTION_LENGTH),
   conversationId: z.string().max(MAX_RULE_LENGTH).nullable().default(null),
+  compute: z.boolean().default(false),
 })
+const keepWorkInput = byProject.extend({ questionId: z.string().min(1).max(MAX_RULE_LENGTH) })
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
 const MAX_RULES = 200
 const ruleList = z.array(z.string().max(MAX_RULE_LENGTH)).max(MAX_RULES)
@@ -730,7 +734,8 @@ export function registerIpc(deps: IpcDeps): void {
     return deps.questions.list(project.folder)
   })
 
-  handle(CHANNELS.questionsAsk, askInput, async ({ projectId, question, conversationId }) => {
+  handle(CHANNELS.questionsAsk, askInput, async (input) => {
+    const { projectId, question, conversationId, compute } = input
     const project = await deps.projects.get(projectId)
     running.get(projectId)?.abort()
     const controller = new AbortController()
@@ -740,6 +745,7 @@ export function registerIpc(deps: IpcDeps): void {
         project,
         question,
         conversationId,
+        compute,
         signal: controller.signal,
         onProgress: (progress) =>
           deps.window.webContents.send(CHANNELS.questionsProgress, projectId, progress),
@@ -748,6 +754,10 @@ export function registerIpc(deps: IpcDeps): void {
       if (running.get(projectId) === controller) running.delete(projectId)
     }
   })
+
+  handle(CHANNELS.questionsKeepWork, keepWorkInput, async ({ projectId, questionId }) =>
+    deps.keepWork(await deps.projects.get(projectId), questionId),
+  )
 
   handle(CHANNELS.questionsCancel, byProject, async ({ projectId }) => {
     running.get(projectId)?.abort()

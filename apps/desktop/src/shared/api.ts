@@ -83,6 +83,7 @@ export const CHANNELS = {
   projectsChoosePath: 'projects:choose-path',
   questionsList: 'questions:list',
   questionsAsk: 'questions:ask',
+  questionsKeepWork: 'questions:keep-work',
   questionsCancel: 'questions:cancel',
   questionsProgress: 'questions:progress',
   evidenceOpen: 'evidence:open',
@@ -252,12 +253,18 @@ export type OctoApi = {
   updateJustDone(): Promise<Result<string | null>>
   /** Opens the settings of the system where Octo is given access to the whole disk. */
   openDiskAccessSettings(): Promise<Result<null>>
-  /** Asks in a conversation, or starts one when `conversationId` is null. */
+  /**
+   * Asks in a conversation, or starts one when `conversationId` is null. With `compute` Claude
+   * may run calculations inside its fence, writing in a work folder outside the project.
+   */
   ask(
     projectId: string,
     question: string,
     conversationId: string | null,
+    compute?: boolean,
   ): Promise<Result<QuestionRecord>>
+  /** Copies into the project the files a question with calculations left in its work folder. */
+  keepWork(projectId: string, questionId: string): Promise<Result<QuestionRecord>>
   cancelAsk(projectId: string): Promise<Result<null>>
   openEvidence(projectId: string, path: string): Promise<Result<null>>
   mailSource(projectId: string): Promise<Result<MailSourceView>>

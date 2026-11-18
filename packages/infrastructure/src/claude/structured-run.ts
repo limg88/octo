@@ -14,6 +14,8 @@ export type ClaudeCliConfig = {
   prefixArgs?: string[]
   env: Record<string, string | undefined>
   askTimeoutMs?: number
+  /** The interpreter Octo ships for calculations, as an absolute path; null when it has none. */
+  interpreter?: string | null
 }
 
 /** One run of the agent: what it is told, what it reads from, the shape of what it gives back. */
@@ -70,7 +72,18 @@ function jsonSchemaOf(schema: z.ZodType): string {
   return JSON.stringify(body)
 }
 
-function runArguments(systemPrompt: string, jsonSchema: string, model: string | null): string[] {
+/** What a run may use: its tools, the rules that allow them, and what else the CLI is told. */
+export type RunGrant = { tools: readonly string[]; allowed: readonly string[]; more: string[] }
+
+/** Read-only: the agent can look at the whole project and change nothing. */
+const READ_ONLY_GRANT: RunGrant = { tools: READ_ONLY_TOOLS, allowed: READ_ONLY_TOOLS, more: [] }
+
+function runArguments(
+  systemPrompt: string,
+  jsonSchema: string,
+  model: string | null,
+  grant: RunGrant,
+): string[] {
   return [
     '-p',
     ...(model === null ? [] : ['--model', model]),
@@ -80,9 +93,10 @@ function runArguments(systemPrompt: string, jsonSchema: string, model: string | 
     '--json-schema',
     jsonSchema,
     '--tools',
-    ...READ_ONLY_TOOLS,
+    ...grant.tools,
     '--allowedTools',
-    ...READ_ONLY_TOOLS,
+    ...grant.allowed,
+    ...grant.more,
     // File tools confined to the project folder; no settings, hooks or plugins from the PC.
     '--restricted',
     // No connectors: what is written comes from the project folder only.
@@ -109,10 +123,14 @@ function isNotFound(error: unknown): boolean {
 export async function runStructured<Output>(
   config: ClaudeCliConfig,
   run: StructuredRun<Output>,
+  /** What the run may use; read-only tools unless a fence says more (see `runFenced`). */
+  grant: RunGrant = READ_ONLY_GRANT,
+  /** A reason of its own for a run that gave nothing, read in the CLI's words; else the usual. */
+  failure: (detail: string) => DomainErrorCode | null = () => null,
 ): Promise<Output> {
   const args = [
     ...(config.prefixArgs ?? []),
-    ...runArguments(run.systemPrompt, jsonSchemaOf(run.schema), run.model ?? null),
+    ...runArguments(run.systemPrompt, jsonSchemaOf(run.schema), run.model ?? null, grant),
   ]
   const timeout = AbortSignal.timeout(config.askTimeoutMs ?? DEFAULT_TIMEOUT_MS)
   const signal = run.signal ? AbortSignal.any([run.signal, timeout]) : timeout
@@ -148,8 +166,8 @@ export async function runStructured<Output>(
   if (run.signal?.aborted) throw new DomainError('agent_cancelled')
   const { result } = output
   if (!result || result.is_error) {
-    const detail = result?.result ?? output.stderr
-    throw new DomainError(failureCode(detail), `exit ${output.exitCode}`)
+    const detail = `${result?.result ?? ''}\n${output.stderr}`
+    throw new DomainError(failure(detail) ?? failureCode(detail), `exit ${output.exitCode}`)
   }
   const parsed = run.schema.safeParse(result.structured_output)
   if (!parsed.success) throw new DomainError('agent_output_invalid')

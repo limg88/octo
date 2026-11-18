@@ -22,6 +22,7 @@ import {
   projectNameFromFolder,
   type QuestionRecord,
   sameFolder,
+  tableUnverified,
   unverifiedCount,
   updateAssetFor,
   updateAssetName,
@@ -259,5 +260,49 @@ describe('a newer version of Octo', () => {
     expect(() => assertChecksum('a'.repeat(64), 'A'.repeat(64))).not.toThrow()
     expect(() => assertChecksum(null, 'a'.repeat(64))).toThrow('update_checksum_missing')
     expect(() => assertChecksum('a'.repeat(64), 'c'.repeat(64))).toThrow('update_checksum_mismatch')
+  })
+})
+
+describe('a table computed inside the fence', () => {
+  const found = { kind: 'found' as const, text: 'voce;importo', modifiedAt: '2026-11-10' }
+  const table = { title: 'Totali', columns: ['voce'], rows: [['1']], sources: ['a.csv'], file: '' }
+  const evidence = new Map<string, Evidence>([['a.csv', found]])
+  const draft = { text: 'Ecco i totali.', citations: [], missing: [] }
+
+  it('is traced to the files of the project it comes from and to the file it was written in', () => {
+    const checked = checkAnswer(
+      { ...draft, tables: [table, { ...table, file: 'totali.csv' }] },
+      evidence,
+      ['totali.csv'],
+    )
+    expect(checked.tables).toEqual([
+      { ...table, sources: [{ path: 'a.csv', found: true }], fileWritten: true },
+      {
+        ...table,
+        file: 'totali.csv',
+        sources: [{ path: 'a.csv', found: true }],
+        fileWritten: true,
+      },
+    ])
+    expect(unverifiedCount(checked)).toBe(0)
+  })
+
+  it('counts as not verified with no source, a source that is not there, or a file never written', () => {
+    const checked = checkAnswer(
+      {
+        ...draft,
+        tables: [
+          { ...table, sources: [] },
+          { ...table, sources: ['a.csv', 'assente.csv'] },
+          { ...table, file: 'mai-scritto.csv' },
+          table,
+        ],
+      },
+      evidence,
+    )
+    expect(checked.tables?.map(tableUnverified)).toEqual([true, true, true, false])
+    expect(unverifiedCount(checked)).toBe(3)
+    // An answer with no calculation has no tables at all.
+    expect(checkAnswer(draft, evidence).tables).toBeUndefined()
   })
 })

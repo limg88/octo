@@ -1,5 +1,6 @@
 import {
   type ArchivedMail,
+  DomainError,
   type DraftAnswer,
   type Evidence,
   type FeedIndex,
@@ -35,6 +36,7 @@ import type {
   SharedReadings,
   SourceSettings,
   SourceStates,
+  WorkFolders,
 } from '../src/index.ts'
 import { createReadings } from '../src/index.ts'
 
@@ -77,7 +79,7 @@ export function memoryQuestionLog(): QuestionLog & { all(): QuestionRecord[] } {
     all: () => records,
     list: async () => records,
     append: async (_projectFolder, record) => {
-      records = [...records, record]
+      records = [...records.filter((known) => known.id !== record.id), record]
     },
   }
 }
@@ -92,16 +94,43 @@ export function evidenceFrom(files: Record<string, Evidence>): EvidenceReader {
 
 export function agentAnswering(
   reply: DraftAnswer | Error,
-): AgentRunner & { requests: AskRequest[] } {
+): AgentRunner & { requests: AskRequest[]; computed: string[] } {
   const requests: AskRequest[] = []
+  const computed: string[] = []
+  const ask = async (request: AskRequest) => {
+    requests.push(request)
+    request.onProgress?.({ kind: 'reading', target: 'wiki/stato.md' })
+    if (reply instanceof Error) throw reply
+    return reply
+  }
   return {
     requests,
+    computed,
     status: async () => ({ available: true, version: 'fake' }),
-    ask: async (request) => {
-      requests.push(request)
-      request.onProgress?.({ kind: 'reading', target: 'wiki/stato.md' })
-      if (reply instanceof Error) throw reply
-      return reply
+    ask,
+    compute: async (request) => {
+      computed.push(request.workFolder)
+      return ask(request)
+    },
+  }
+}
+
+/** Work folders kept in memory: what a run left is whatever the test puts there. */
+export function memoryWorkFolders(
+  left: Record<string, string> = {},
+): WorkFolders & { created: string[] } {
+  const created: string[] = []
+  return {
+    created,
+    create: async (projectId, runId) => {
+      created.push(`${projectId}/${runId}`)
+      return `/lavoro/${projectId}/${runId}`
+    },
+    files: async () => Object.keys(left).sort(),
+    read: async (_projectId, _runId, name) => {
+      const text = left[name]
+      if (text === undefined) throw new DomainError('work_not_found')
+      return new TextEncoder().encode(text)
     },
   }
 }

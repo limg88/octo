@@ -12,3 +12,6 @@ release/
 private/
 
 .DS_Store
+
+# The interpreter shipped with the app: fetched by apps/desktop/scripts/fetch-python.mjs.
+apps/desktop/resources/python/

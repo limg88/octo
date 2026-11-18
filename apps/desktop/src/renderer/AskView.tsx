@@ -6,6 +6,7 @@ import {
   LEGACY_CONVERSATION,
   type Project,
   type QuestionRecord,
+  type QuestionWork,
 } from '@octo/domain'
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
@@ -14,7 +15,10 @@ import type { Handoff } from './context.ts'
 import { dateTimeText, errorText, messages, progressText } from './messages.ts'
 import { BusyButton, Waiting } from './Spinner.tsx'
 
-type AskApi = Pick<OctoApi, 'listQuestions' | 'ask' | 'cancelAsk' | 'openEvidence' | 'onProgress'>
+type AskApi = Pick<
+  OctoApi,
+  'listQuestions' | 'ask' | 'keepWork' | 'cancelAsk' | 'openEvidence' | 'onProgress'
+>
 
 type Props = {
   api: AskApi
@@ -24,6 +28,8 @@ type Props = {
   onSeedUsed?: () => void
   /** Starts a deliverable from an answer, with its question and its sources. */
   onDraft?: (handoff: Handoff) => void
+  /** True when Claude can run calculations inside its fence on this computer. */
+  canCompute?: boolean
 }
 
 /** A question being answered, and the conversation it was asked in (null: one just started). */
@@ -41,7 +47,25 @@ const chatTitle = (chat: Conversation): string =>
  * listed beside it and are taken up again where they were left, each question knowing the ones
  * before it in the same conversation.
  */
-export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Props) {
+export function AskView({
+  api,
+  project,
+  seed = null,
+  onSeedUsed,
+  onDraft,
+  canCompute = false,
+}: Props) {
+  /** Whether the next question may be answered with calculations: said each time, never kept. */
+  const [compute, setCompute] = useState(false)
+
+  /** Copies into the project what a calculation wrote; the question then says where. */
+  async function keepWork(questionId: string) {
+    setError(null)
+    const result = await api.keepWork(project.id, questionId)
+    if (!result.ok) return setError(result.code)
+    setRecords((known) => known.map((record) => (record.id === questionId ? result.value : record)))
+  }
+
   const [records, setRecords] = useState<QuestionRecord[]>([])
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState<Pending | null>(null)
@@ -125,7 +149,7 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
     setQuestion('')
     setError(null)
     const projectId = project.id
-    const result = await api.ask(projectId, asked, chat)
+    const result = await api.ask(projectId, asked, chat, compute && canCompute)
     if (live.current !== projectId) return
     setPending(null)
     setProgress(null)
@@ -196,17 +220,22 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
                   answer={record.answer}
                   onOpenSource={(path) => api.openEvidence(project.id, path)}
                   actions={
-                    onDraft && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          record.answer &&
-                          onDraft({ question: record.question, answer: record.answer })
-                        }
-                      >
-                        {messages.askDraft}
-                      </button>
-                    )
+                    <>
+                      {onDraft && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            record.answer &&
+                            onDraft({ question: record.question, answer: record.answer })
+                          }
+                        >
+                          {messages.askDraft}
+                        </button>
+                      )}
+                      {record.work && record.work.files.length > 0 && (
+                        <WorkFiles work={record.work} onKeep={() => void keepWork(record.id)} />
+                      )}
+                    </>
                   }
                 />
               )}
@@ -262,6 +291,16 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
           >
             {messages.askSubmit}
           </BusyButton>
+          {canCompute && (
+            <label className="check" title={messages.computed.optionHint}>
+              <input
+                type="checkbox"
+                checked={compute}
+                onChange={(event) => setCompute(event.target.checked)}
+              />
+              {messages.computed.option}
+            </label>
+          )}
           {pending !== null && (
             <button type="button" onClick={() => void api.cancelAsk(project.id)}>
               {messages.askCancel}
@@ -270,5 +309,22 @@ export function AskView({ api, project, seed = null, onSeedUsed, onDraft }: Prop
         </form>
       </div>
     </section>
+  )
+}
+
+/** What a calculation wrote in its work folder: kept in the project only when the PM says so. */
+function WorkFiles({ work, onKeep }: { work: QuestionWork; onKeep: () => void }) {
+  const text = messages.computed
+  return work.keptIn === null ? (
+    <>
+      <span className="hint">{text.files(work.files.join(', '))}</span>
+      <button type="button" onClick={onKeep}>
+        {text.keep}
+      </button>
+    </>
+  ) : (
+    <span className="badge badge-ok" role="status">
+      {text.kept(work.keptIn)}
+    </span>
   )
 }

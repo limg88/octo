@@ -34,7 +34,18 @@ export type QuestionRecord = {
   model?: string | null | undefined
   /** The conversation the question belongs to; absent in what was asked before there were any. */
   conversationId?: string | undefined
+  /** Only for a question answered with calculations: what the run wrote, and where it was kept. */
+  work?: QuestionWork | undefined
 }
+
+/**
+ * What a run with calculations left in its work folder, outside the project: the names of the
+ * files, and the folder of the project the PM had them copied to (null until then).
+ */
+export type QuestionWork = { files: string[]; keptIn: string | null }
+
+/** Where the files of a calculation go when the PM keeps them, one folder per question. */
+export const ANALYSIS_FOLDER = `${OCTO_FOLDER}/analisi`
 
 /** The conversation of the questions asked before there were conversations. */
 export const LEGACY_CONVERSATION = 'precedenti'

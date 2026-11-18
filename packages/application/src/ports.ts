@@ -61,12 +61,13 @@ import type {
 
 /** What the agent is doing right now, in terms a PM can read. */
 export type AgentProgress = {
-  kind: 'reading' | 'searching' | 'listing' | 'writing'
+  kind: 'reading' | 'searching' | 'listing' | 'writing' | 'computing'
   target: string
 }
 
 export type AgentStatus =
-  | { available: true; version: string }
+  /** `computes`: it can run calculations inside its fence on this computer. */
+  | { available: true; version: string; computes?: boolean }
   | { available: false; reason: 'not_installed' }
 
 export type AskRequest = {
@@ -89,6 +90,24 @@ export interface AgentRunner {
   status(): Promise<AgentStatus>
   /** Throws a DomainError with an `agent_*` code when no answer can be had. */
   ask(request: AskRequest): Promise<DraftAnswer>
+  /**
+   * The same, with calculations: the agent reads the project, runs the interpreter Octo ships
+   * and writes only in the work folder, inside the sandbox of the system. Throws
+   * `fence_unavailable` when the sandbox cannot start: it never runs without.
+   */
+  compute(request: AskRequest & { workFolder: string }): Promise<DraftAnswer>
+}
+
+/**
+ * The folders the agent may write in when it computes: one per run, among the state of the app
+ * and never inside a project. What the PM keeps is copied from there into the project by Octo.
+ */
+export interface WorkFolders {
+  /** A new, empty folder for a run; its absolute path. */
+  create(projectId: string, runId: string): Promise<string>
+  /** The files a run left, by name, the folders inside it included as `folder/name`. */
+  files(projectId: string, runId: string): Promise<string[]>
+  read(projectId: string, runId: string, name: string): Promise<Uint8Array>
 }
 
 /** Opens a cited file so the code can check the quote. Never reads outside the project. */
@@ -104,6 +123,7 @@ export interface ProjectRegistry {
 /** The questions one person asked of a project: theirs, not of who else opens its folder. */
 export interface QuestionLog {
   list(projectFolder: string): Promise<QuestionRecord[]>
+  /** Adds a question; one with the id of a question already kept takes its place. */
   append(projectFolder: string, record: QuestionRecord): Promise<void>
 }
 

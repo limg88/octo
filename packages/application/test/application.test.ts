@@ -1,6 +1,11 @@
 import { DomainError, type Project } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
-import { type AgentProgress, createAskQuestion, createProjects } from '../src/index.ts'
+import {
+  type AgentProgress,
+  createAskQuestion,
+  createKeepWork,
+  createProjects,
+} from '../src/index.ts'
 import {
   agentAnswering,
   countingIds,
@@ -8,6 +13,8 @@ import {
   folderProbe,
   memoryQuestionLog,
   memoryRegistry,
+  memoryWorkFolders,
+  memoryWriter,
   STEP_MS,
   steppingClock,
 } from './fakes.ts'
@@ -170,6 +177,97 @@ describe('askQuestion', () => {
     expect(record).toMatchObject({ id: 'q-1', error: null, durationMs: STEP_MS })
     expect(progress).toEqual([{ kind: 'reading', target: 'wiki/stato.md' }])
     expect(await questions.list(project.folder)).toEqual([record])
+  })
+
+  it('answers with calculations in a work folder outside the project, and checks what the tables come from', async () => {
+    const computed = {
+      ...draft,
+      tables: [
+        {
+          title: 'Totali',
+          columns: ['voce', 'totale'],
+          rows: [['budget', '14500']],
+          sources: ['wiki/stato.md', 'wiki/assente.md'],
+          file: 'totali.csv',
+        },
+        { title: 'A mano', columns: ['x'], rows: [['1']], sources: ['wiki/stato.md'], file: '' },
+        {
+          title: 'Senza file',
+          columns: ['x'],
+          rows: [],
+          sources: ['wiki/stato.md'],
+          file: 'no.csv',
+        },
+      ],
+    }
+    const agent = agentAnswering(computed)
+    const questions = memoryQuestionLog()
+    const work = memoryWorkFolders({
+      'totali.csv': 'voce,totale\nbudget,14500\n',
+      'calcolo.py': '',
+    })
+    const written = new Map<string, string>()
+    const writer = {
+      ...memoryWriter(),
+      written,
+      writeBytes: async (_folder: string, path: string, bytes: Uint8Array) => {
+        written.set(path, new TextDecoder().decode(bytes))
+      },
+    }
+    const deps = { agent, evidence, questions, clock: steppingClock(), ids: countingIds('q'), work }
+    const ask = createAskQuestion(deps)
+
+    const record = await ask({ project, question: 'Quanto resta?', compute: true })
+    // The run got a folder of its own, named by the question, and never the project's.
+    expect(work.created).toEqual(['p-1/q-1'])
+    expect(agent.computed).toEqual(['/lavoro/p-1/q-1'])
+    expect(record.work).toEqual({ files: ['calcolo.py', 'totali.csv'], keptIn: null })
+    expect(record.answer?.tables?.map((table) => [table.sources, table.fileWritten])).toEqual([
+      [
+        [
+          { path: 'wiki/stato.md', found: true },
+          { path: 'wiki/assente.md', found: false },
+        ],
+        true,
+      ],
+      [[{ path: 'wiki/stato.md', found: true }], true],
+      [[{ path: 'wiki/stato.md', found: true }], false],
+    ])
+    // A question asked without calculations never touches a work folder.
+    await ask({ project, question: 'Quando consegniamo?' })
+    expect(work.created).toHaveLength(1)
+
+    // The files go in the project only when the PM says so, once, and the question says where.
+    const keep = createKeepWork({ questions, work, writer })
+    const kept = await keep(project, record.id)
+    expect(kept.work?.keptIn).toBe(`_octo/analisi/${record.askedAt.slice(0, 10)}-q-1`)
+    expect([...writer.written.keys()].sort()).toEqual([
+      `${kept.work?.keptIn}/calcolo.py`,
+      `${kept.work?.keptIn}/totali.csv`,
+    ])
+    expect((await questions.list(project.folder)).find((known) => known.id === record.id)).toEqual(
+      kept,
+    )
+    writer.written.clear()
+    expect(await keep(project, record.id)).toEqual(kept)
+    expect(writer.written.size).toBe(0)
+    await expect(keep(project, 'q-3')).rejects.toMatchObject({ code: 'work_not_found' })
+    await expect(keep(project, 'mai-chiesta')).rejects.toMatchObject({ code: 'work_not_found' })
+  })
+
+  it('refuses to compute where nothing keeps the agent inside a work folder', async () => {
+    const agent = agentAnswering(draft)
+    const questions = memoryQuestionLog()
+    const bare = createAskQuestion({
+      agent,
+      evidence,
+      questions,
+      clock: steppingClock(),
+      ids: countingIds('q'),
+    })
+    const record = await bare({ project, question: 'Quanto resta?', compute: true })
+    expect(record).toMatchObject({ answer: null, error: 'fence_unavailable' })
+    expect(agent.computed).toEqual([])
   })
 
   it('starts a conversation, and tells a question that continues it what came before', async () => {

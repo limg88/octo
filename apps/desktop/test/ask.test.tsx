@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AnswerView } from '../src/renderer/AnswerView.tsx'
 import { AskView } from '../src/renderer/AskView.tsx'
 import { provenanceOf, sourceTitle } from '../src/renderer/answer-text.ts'
-import { messages } from '../src/renderer/messages.ts'
+import { errorText, messages } from '../src/renderer/messages.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const aurora: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -54,11 +54,15 @@ const record: QuestionRecord = {
   error: null,
 }
 
-type AskApi = Pick<OctoApi, 'listQuestions' | 'ask' | 'cancelAsk' | 'openEvidence' | 'onProgress'>
+type AskApi = Pick<
+  OctoApi,
+  'listQuestions' | 'ask' | 'keepWork' | 'cancelAsk' | 'openEvidence' | 'onProgress'
+>
 
 const askApi = (overrides: Partial<AskApi> = {}): AskApi => ({
   listQuestions: vi.fn(async (projectId: string) => ok(projectId === 'p-1' ? [record] : [])),
   ask: vi.fn(async () => ok(record)),
+  keepWork: vi.fn(async () => ok(record)),
   cancelAsk: vi.fn(async () => ok(null)),
   openEvidence: vi.fn(async () => ok(null)),
   onProgress: () => () => {},
@@ -241,7 +245,9 @@ describe('the conversation with a project', () => {
       target: { value: 'E il suo sostituto?' },
     })
     fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
-    await waitFor(() => expect(api.ask).toHaveBeenCalledWith('p-1', 'E il suo sostituto?', 'c-1'))
+    await waitFor(() =>
+      expect(api.ask).toHaveBeenCalledWith('p-1', 'E il suo sostituto?', 'c-1', false),
+    )
     expect(await screen.findByText('E il suo sostituto?', { selector: '.question' })).toBeTruthy()
     expect(screen.getByText(old.question, { selector: '.question' })).toBeTruthy()
 
@@ -252,7 +258,9 @@ describe('the conversation with a project', () => {
       target: { value: 'Quando è il collaudo?' },
     })
     fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
-    await waitFor(() => expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando è il collaudo?', null))
+    await waitFor(() =>
+      expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando è il collaudo?', null, false),
+    )
     expect(await screen.findByText('Quando è il collaudo?', { selector: '.question' })).toBeTruthy()
     expect(fresh.getAttribute('aria-current')).toBeNull()
     expect(screen.queryByText(old.question, { selector: '.question' })).toBeNull()
@@ -294,5 +302,142 @@ describe('the conversation with a project', () => {
   it('says so when no conversation was had yet', async () => {
     render(<AskView api={askApi({ listQuestions: vi.fn(async () => ok([])) })} project={aurora} />)
     expect(await screen.findByText(chats.none)).toBeTruthy()
+  })
+})
+
+describe('a question answered with calculations', () => {
+  const words = messages.computed
+  const computed: QuestionRecord = {
+    ...record,
+    id: 'q-7',
+    question: 'Quanto vale ogni regione?',
+    conversationId: 'c-7',
+    answer: {
+      text: 'Ho sommato gli importi per regione.',
+      citations: [],
+      missing: [],
+      markersWithoutCitation: [],
+      tables: [
+        {
+          title: 'Totale per regione',
+          columns: ['regione', 'totale'],
+          rows: [
+            ['Nord', '2459774.23'],
+            ['Sud', '2468018.59'],
+          ],
+          sources: [{ path: 'dati/vendite.csv', found: true }],
+          file: 'totali.csv',
+          fileWritten: true,
+        },
+        {
+          title: 'Senza appoggio',
+          columns: ['x'],
+          rows: [['1']],
+          sources: [{ path: 'dati/assente.csv', found: false }],
+          file: '',
+          fileWritten: true,
+        },
+        {
+          title: 'Senza fonte',
+          columns: ['x'],
+          rows: [],
+          sources: [],
+          file: '',
+          fileWritten: true,
+        },
+        {
+          title: 'Senza file',
+          columns: ['x'],
+          rows: [],
+          sources: [{ path: 'dati/vendite.csv', found: true }],
+          file: 'mai.csv',
+          fileWritten: false,
+        },
+      ],
+    },
+    work: { files: ['calcolo.py', 'totali.csv'], keptIn: null },
+  }
+
+  /** The page opens on a new conversation: the one with the calculation is taken up from the list. */
+  const openChat = async () =>
+    fireEvent.click(await screen.findByRole('button', { name: /Quanto vale ogni regione/ }))
+
+  it('is asked only when the PM says so, where Claude can be fenced', async () => {
+    const api = askApi({ ask: vi.fn(async () => ok(computed)) })
+    const { unmount } = render(<AskView api={api} project={aurora} />)
+    await screen.findByLabelText(messages.askPlaceholder)
+    // Where there is no fence the option is not offered at all.
+    expect(screen.queryByLabelText(words.option)).toBeNull()
+    unmount()
+    render(<AskView api={api} project={aurora} canCompute />)
+    const field = await screen.findByLabelText(messages.askPlaceholder)
+    fireEvent.change(field, { target: { value: 'Quando consegniamo?' } })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    await waitFor(() =>
+      expect(api.ask).toHaveBeenCalledWith('p-1', 'Quando consegniamo?', null, false),
+    )
+    fireEvent.click(screen.getByLabelText(words.option))
+    fireEvent.change(field, { target: { value: computed.question } })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    await waitFor(() =>
+      expect(api.ask).toHaveBeenLastCalledWith('p-1', computed.question, expect.anything(), true),
+    )
+  })
+
+  it('shows each table with the files it was computed from, and says what cannot be traced', async () => {
+    const api = askApi({ listQuestions: vi.fn(async () => ok([computed])) })
+    render(<AskView api={api} project={aurora} canCompute />)
+    await openChat()
+    const table = await screen.findByRole('table', { name: 'Totale per regione' })
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .map((row) => row.textContent),
+    ).toEqual(['regionetotale', 'Nord2459774.23', 'Sud2468018.59'])
+    const first = screen.getByRole('region', { name: 'Totale per regione' })
+    expect(first.textContent).toContain(words.computedFrom)
+    expect(first.textContent).toContain(words.inFile('totali.csv'))
+    // The source opens as the source of a citation does.
+    fireEvent.click(within(first).getByRole('button', { name: 'dati/vendite.csv' }))
+    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'dati/vendite.csv')
+    expect(within(first).queryByText(words.unverified)).toBeNull()
+    const loose = screen.getByRole('region', { name: 'Senza appoggio' })
+    expect(loose.textContent).toContain(words.sourceMissing('dati/assente.csv'))
+    expect(within(loose).getByText(words.unverified)).toBeTruthy()
+    expect(
+      within(screen.getByRole('region', { name: 'Senza fonte' })).getByText(words.noSource),
+    ).toBeTruthy()
+    expect(
+      within(screen.getByRole('region', { name: 'Senza file' })).getByText(
+        words.fileMissing('mai.csv'),
+      ),
+    ).toBeTruthy()
+  })
+
+  it('keeps the files of the calculation in the project only when the PM says so', async () => {
+    const kept = {
+      ...computed,
+      work: { files: computed.work?.files ?? [], keptIn: '_octo/analisi/x' },
+    }
+    const api = askApi({
+      listQuestions: vi.fn(async () => ok([computed])),
+      keepWork: vi.fn(async () => ok(kept)),
+    })
+    render(<AskView api={api} project={aurora} canCompute />)
+    await openChat()
+    expect(await screen.findByText(words.files('calcolo.py, totali.csv'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: words.keep }))
+    expect(await screen.findByText(words.kept('_octo/analisi/x'))).toBeTruthy()
+    expect(api.keepWork).toHaveBeenCalledWith('p-1', 'q-7')
+    expect(screen.queryByRole('button', { name: words.keep })).toBeNull()
+    cleanup()
+    const refusing = askApi({
+      listQuestions: vi.fn(async () => ok([computed])),
+      keepWork: vi.fn(async () => ({ ok: false as const, code: 'work_not_found' as const })),
+    })
+    render(<AskView api={refusing} project={aurora} canCompute />)
+    await openChat()
+    fireEvent.click(await screen.findByRole('button', { name: words.keep }))
+    expect((await screen.findByRole('alert')).textContent).toBe(errorText('work_not_found'))
   })
 })

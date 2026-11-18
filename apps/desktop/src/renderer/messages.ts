@@ -567,6 +567,21 @@ export const messages = {
   askPlaceholder: 'Chiedi qualcosa su questo progetto…',
   askSubmit: 'Chiedi',
   askCancel: 'Ferma',
+  computed: {
+    option: 'Con calcoli',
+    optionHint:
+      'Claude può eseguire calcoli sui file del progetto. Legge il progetto senza poterlo modificare e scrive solo in una cartella di lavoro di Octo, senza rete.',
+    computedFrom: 'Calcolata da:',
+    inFile: (file: string) => `Per intero nel file ${file}.`,
+    sourceMissing: (path: string) => `${path}: non trovato nel progetto`,
+    noSource: 'La tabella non dice da quali file è calcolata: non è verificabile.',
+    unverified: 'Una fonte della tabella non è nel progetto: controlla le cifre prima di usarle.',
+    fileMissing: (file: string) =>
+      `La risposta nomina il file ${file}, che il calcolo non ha scritto.`,
+    files: (names: string) => `File del calcolo, nella cartella di lavoro di Octo: ${names}.`,
+    keep: 'Salva i file nel progetto',
+    kept: (folder: string) => `File salvati nel progetto, in ${folder}.`,
+  },
   askEmpty: 'Fai la prima domanda: la risposta arriva con le fonti, controllate una per una.',
   working: 'Sto cercando nella memoria del progetto…',
   sources: 'Fonti',
@@ -2032,6 +2047,11 @@ const errors: Record<ErrorCode, string> = {
   agent_limit_reached:
     'Hai raggiunto il limite d’uso del tuo account Claude. Riprova quando il limite si azzera.',
   agent_output_invalid: 'La risposta di Claude non era leggibile. Riprova.',
+  fence_unavailable:
+    'Su questo computer Claude non può fare calcoli in sicurezza: la protezione del sistema che lo tiene dentro la cartella di lavoro non parte. Octo non lo fa calcolare senza. Chiedi senza «Con calcoli».',
+  fence_interpreter_missing:
+    'Manca l’interprete che Octo usa per i calcoli: reinstalla Octo. Intanto chiedi senza «Con calcoli».',
+  work_not_found: 'Non trovo più i file di questo calcolo su questo computer.',
   agent_cancelled: 'Domanda fermata.',
   source_not_configured: 'Questa fonte non è ancora configurata.',
   source_config_invalid: 'Controlla il giorno di inizio e la cartella: uno dei due non è valido.',
@@ -2152,6 +2172,7 @@ const progress: Record<AgentProgress['kind'], string> = {
   reading: 'Leggo',
   searching: 'Cerco',
   listing: 'Guardo i file',
+  computing: 'Calcolo',
   writing: 'Scrivo la risposta',
 }
 

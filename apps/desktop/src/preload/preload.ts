@@ -24,8 +24,10 @@ const api: OctoApi = {
   },
   updateJustDone: () => ipcRenderer.invoke(CHANNELS.updateJustDone),
   openDiskAccessSettings: () => ipcRenderer.invoke(CHANNELS.diskAccessOpen),
-  ask: (projectId, question, conversationId) =>
-    ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question, conversationId }),
+  ask: (projectId, question, conversationId, compute) =>
+    ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question, conversationId, compute }),
+  keepWork: (projectId, questionId) =>
+    ipcRenderer.invoke(CHANNELS.questionsKeepWork, { projectId, questionId }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),
   openEvidence: (projectId, path) => ipcRenderer.invoke(CHANNELS.evidenceOpen, { projectId, path }),
   mailSource: (projectId) => ipcRenderer.invoke(CHANNELS.mailGet, { projectId }),

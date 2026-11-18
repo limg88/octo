@@ -62,7 +62,12 @@ function runner(overrides: { env?: Record<string, string>; askTimeoutMs?: number
 
 describe('claude cli runner', () => {
   it('reports the version of the installed agent', async () => {
-    expect(await runner().status()).toEqual({ available: true, version: '9.9.9 (Fake Claude)' })
+    // No interpreter was given to this runner: it answers, and does not compute.
+    expect(await runner().status()).toEqual({
+      available: true,
+      version: '9.9.9 (Fake Claude)',
+      computes: false,
+    })
   })
 
   it('says the agent is not installed when the executable is missing', async () => {
@@ -89,6 +94,8 @@ describe('claude cli runner', () => {
       { kind: 'searching', target: 'consegna' },
       { kind: 'listing', target: '**/*.md' },
       { kind: 'reading', target: join('wiki', 'stato.md') },
+      // A command is told as a calculation; without a fence the real one is never given the tool.
+      { kind: 'computing', target: '' },
       { kind: 'writing', target: '' },
     ])
   })

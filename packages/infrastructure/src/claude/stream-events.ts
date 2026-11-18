@@ -76,6 +76,8 @@ function progressOf(
       return [{ kind: 'searching', target: text('pattern') }]
     case 'Glob':
       return [{ kind: 'listing', target: text('pattern') }]
+    case 'Bash':
+      return [{ kind: 'computing', target: '' }]
     case STRUCTURED_OUTPUT_TOOL:
       return [{ kind: 'writing', target: '' }]
     default:

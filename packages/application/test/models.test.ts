@@ -42,6 +42,7 @@ describe('the models of a project', () => {
             if (fails) throw new DomainError('agent_failed')
             return { text: 'Non lo so.', citations: [], missing: [] }
           },
+          compute: async () => ({ text: '', citations: [], missing: [] }),
         },
         evidence: evidenceFrom({}),
         questions: memoryQuestionLog(),

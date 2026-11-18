@@ -1,6 +1,14 @@
 import { spawn } from 'node:child_process'
 import type { AgentRunner, AgentStatus } from '@octo/application'
-import { askInput, askSystemPrompt, draftAnswerSchema } from './ask-prompt.ts'
+import { DomainError } from '@octo/domain'
+import {
+  askInput,
+  askSystemPrompt,
+  COMPUTE_PROMPT,
+  computedAnswerSchema,
+  draftAnswerSchema,
+} from './ask-prompt.ts'
+import { canFence, runFenced } from './fenced-run.ts'
 import {
   type ClaudeCliConfig,
   projectRules,
@@ -20,7 +28,7 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
   async function status(): Promise<AgentStatus> {
     try {
       const version = await firstLine(config.command, [...prefix, '--version'], env)
-      return { available: true, version }
+      return { available: true, version, computes: canFence(config.interpreter ?? null) }
     } catch {
       return { available: false, reason: 'not_installed' }
     }
@@ -42,6 +50,24 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
         model: request.model,
         onModel: request.onModel,
       }),
+    async compute(request) {
+      if (!config.interpreter) throw new DomainError('fence_interpreter_missing')
+      const rules = await projectRules(request.projectFolder)
+      return runFenced(
+        config,
+        {
+          projectFolder: request.projectFolder,
+          input: askInput(request.question, request.history),
+          systemPrompt: `${askSystemPrompt(rules, request.liveSources)}${COMPUTE_PROMPT}`,
+          schema: computedAnswerSchema,
+          onProgress: request.onProgress,
+          signal: request.signal,
+          model: request.model,
+          onModel: request.onModel,
+        },
+        { workFolder: request.workFolder, interpreter: config.interpreter },
+      )
+    },
   }
 }
 

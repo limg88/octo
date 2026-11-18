@@ -5,11 +5,34 @@ export type Citation = {
   quote: string
 }
 
+/**
+ * A table the model computed inside its fence: its figures come from a calculation it ran on
+ * files of the project, not from a quote. It always says which files.
+ */
+export type AnswerTable = {
+  title: string
+  columns: string[]
+  rows: string[][]
+  /** The files of the project the figures were computed from, as paths from its folder. */
+  sources: string[]
+  /** The file of the work folder that holds the table whole; empty when only the answer has it. */
+  file: string
+}
+
 export type DraftAnswer = {
   text: string
   citations: Citation[]
   /** What the model looked for and did not find. */
   missing: string[]
+  /** Only in an answer with calculations. */
+  tables?: AnswerTable[] | undefined
+}
+
+/** A computed table as the code found it: which of its sources are there, whether its file is. */
+export type CheckedTable = Omit<AnswerTable, 'sources'> & {
+  sources: Array<{ path: string; found: boolean }>
+  /** False when the table names a file the run did not write in the work folder. */
+  fileWritten: boolean
 }
 
 /** What the code found when it opened the cited file. */
@@ -41,6 +64,8 @@ export type CheckedAnswer = {
   missing: string[]
   /** Markers in the text that no citation backs. */
   markersWithoutCitation: number[]
+  /** The tables computed, checked; absent in an answer with no calculation. */
+  tables?: CheckedTable[] | undefined
 }
 
 /** Shorter quotes match almost any file, so they prove nothing. */
@@ -119,6 +144,8 @@ export function markersIn(text: string): number[] {
 export function checkAnswer(
   draft: DraftAnswer,
   evidenceByPath: ReadonlyMap<string, Evidence>,
+  /** The files the run wrote in its work folder, by name. */
+  workFiles: readonly string[] = [],
 ): CheckedAnswer {
   const citations = draft.citations.map((citation) =>
     checkCitation(citation, evidenceByPath.get(citation.path) ?? { kind: 'missing' }),
@@ -129,10 +156,27 @@ export function checkAnswer(
     citations,
     missing: draft.missing,
     markersWithoutCitation: markersIn(draft.text).filter((marker) => !cited.has(marker)),
+    ...(draft.tables === undefined
+      ? {}
+      : {
+          tables: draft.tables.map((table) => ({
+            ...table,
+            sources: table.sources.map((path) => ({
+              path,
+              found: evidenceByPath.get(path)?.kind === 'found',
+            })),
+            fileWritten: table.file === '' || workFiles.includes(table.file),
+          })),
+        }),
   }
 }
 
+/** A table whose figures cannot be traced: no source, a source that is not there, no file. */
+export const tableUnverified = (table: CheckedTable): boolean =>
+  table.sources.length === 0 || table.sources.some((source) => !source.found) || !table.fileWritten
+
 export function unverifiedCount(answer: CheckedAnswer): number {
   const unverified = answer.citations.filter((citation) => citation.status !== 'verified')
-  return unverified.length + answer.markersWithoutCitation.length
+  const tables = (answer.tables ?? []).filter(tableUnverified)
+  return unverified.length + answer.markersWithoutCitation.length + tables.length
 }

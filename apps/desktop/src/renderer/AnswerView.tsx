@@ -5,6 +5,7 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { linkMarkers, markerOfLink, sourceElementId, sourceTitle } from './answer-text.ts'
 import { CitationPanel, type OpenSource } from './CitationPanel.tsx'
+import { ComputedTables } from './ComputedTables.tsx'
 import { citationStatusText, messages } from './messages.ts'
 
 type Props = {
@@ -98,6 +99,7 @@ export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
             {linkMarkers(answer.text)}
           </Markdown>
         </div>
+        {answer.tables && <ComputedTables tables={answer.tables} onOpenSource={onOpenSource} />}
         {answer.markersWithoutCitation.map((marker) => (
           <p key={marker} className="warning">
             {messages.citation.orphan(marker)}

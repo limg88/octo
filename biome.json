@@ -8,6 +8,7 @@
       "!**/dist",
       "!**/release",
       "!**/.tmp",
+      "!apps/desktop/resources",
       "!.claude",
       "!docs",
       "!pnpm-lock.yaml"

@@ -17,6 +17,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:recinto": "vitest run --config vitest.recinto.config.ts",
     "release:keys": "node scripts/release-keys.mjs",
     "release:passphrase": "node scripts/release-rekey.mjs",
     "release:sign": "node scripts/release-sign.mjs",
@@ -24,6 +25,7 @@
     "e2e:cruscotto": "pnpm build && node e2e/cruscotto.e2e.mjs",
     "e2e:commessa": "pnpm build && node e2e/commessa.e2e.mjs",
     "e2e:riunioni": "pnpm build && node e2e/riunioni.e2e.mjs",
+    "e2e:recinto": "pnpm build && node e2e/recinto.e2e.mjs",
     "e2e:condivisa": "pnpm build && node e2e/condivisa.e2e.mjs"
   },
   "devDependencies": {
