@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  type Alignment,
   acceptCandidate,
   addRisk,
-  alignmentItems,
   applyDecisions,
   assignmentOf,
   type BugRow,
@@ -236,35 +234,6 @@ describe('the signals computed from the sections', () => {
     expect(requirementItems([], null, true)).toEqual([])
     // Before the sprint ends the requirements are read in the dashboard, not told every day.
     expect(requirementItems(rows, null, false)).toEqual([])
-  })
-
-  it('says what the two trackers do not agree on only while the sprint is ending', () => {
-    const alignment = {
-      missing: [{}],
-      needsUpdate: [],
-      duplicates: [{}],
-      orphans: [{}],
-    } as unknown as Alignment
-    // No period of the calendar has the name of the sprint: when it ends is not known.
-    expect(alignmentItems('Sprint 28', alignment, null, NO_TEAM, MID_MONTH)).toEqual([])
-    const team = {
-      people: [],
-      periods: [{ name: 'sprint 28', from: '2026-11-03', to: '2026-11-17' }],
-    }
-    expect(alignmentItems('Sprint 28', alignment, null, team, MID_MONTH)[0]).toMatchObject({
-      key: 'alignment:sprint 28',
-      band: 'due',
-      weight: 3,
-      dueBecause: 'sprint_end',
-    })
-    expect(alignmentItems('Sprint 28', alignment, null, team, '2026-11-10')).toEqual([])
-    const aligned = {
-      missing: [],
-      needsUpdate: [],
-      duplicates: [],
-      orphans: [],
-    } as unknown as Alignment
-    expect(alignmentItems('Sprint 28', aligned, null, team, MID_MONTH)).toEqual([])
   })
 
   it('tells the last working days of the sprint, and nothing when no sprint is set', () => {

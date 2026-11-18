@@ -9,6 +9,7 @@
       "!**/release",
       "!**/.tmp",
       "!apps/desktop/resources",
+      "!**/test/fixtures",
       "!.claude",
       "!docs",
       "!pnpm-lock.yaml"

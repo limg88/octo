@@ -498,10 +498,7 @@ describe('the recorded meetings on the page of the day', () => {
         view: notSet('tracker_export_not_set'),
         settings: notSet('tracker_export_not_set'),
       },
-      alignments: {
-        view: notSet('alignment_sprint_not_set'),
-        settings: notSet('alignment_sprint_not_set'),
-      },
+      sprint: async () => '',
       deliverables: { list: async () => [] },
       sources: {
         mail: async () => ({

@@ -12,8 +12,6 @@ type Props = {
   onSelect: (section: Section) => void
   /** How many things wait in a section, said beside its name; nothing is said of zero. */
   counts?: Partial<Record<Section, { count: number; label: string }>>
-  /** The sections this project has no use for: they are not listed. */
-  hidden?: readonly Section[]
 }
 
 /** Where the arrow keys go from a section: the one before or after it, round the list. */
@@ -23,9 +21,9 @@ const STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 }
  * The sections of a project in the sidebar, grouped by how often they are used. One list for the
  * keyboard: the arrows move through all of it, whatever the group.
  */
-export function SectionNav({ current: place, onSelect, counts = {}, hidden = [] }: Props) {
+export function SectionNav({ current: place, onSelect, counts = {} }: Props) {
   const current = listedSection(place)
-  const shown = LISTED_SECTIONS.filter((section) => !hidden.includes(section))
+  const shown = LISTED_SECTIONS
   function onKey(event: KeyboardEvent<HTMLButtonElement>, section: Section) {
     const step = STEPS[event.key]
     if (step === undefined) return

@@ -58,7 +58,7 @@ const ONGOING_KINDS: readonly TodayKind[] = ['source', 'tracker_old', 'bugs_stuc
 /** The signals of numbers: critical only when a date makes them due. */
 const DUE_KINDS: readonly TodayKind[] = ['hours', 'forecast']
 /** The signals told only while the sprint ends: they are what it leaves behind. */
-const SPRINT_KINDS: readonly TodayKind[] = ['requirements', 'alignment']
+const SPRINT_KINDS: readonly TodayKind[] = ['requirements']
 
 const SEVERITY_ORDER: Readonly<Record<Importance, number>> = { alta: 0, media: 1, bassa: 2 }
 const UNSAID_SEVERITY = 1

@@ -1,8 +1,7 @@
 import type { AgentStatus, SessionView } from '@octo/application'
-import type { Assignment, Project, ProjectShape, RestoreOutcome } from '@octo/domain'
+import type { Assignment, Project, RestoreOutcome } from '@octo/domain'
 import { useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
-import { AlignmentView } from './AlignmentView.tsx'
 import { AllProjectsView } from './AllProjectsView.tsx'
 import { AskView } from './AskView.tsx'
 import {
@@ -17,7 +16,6 @@ import { DeliverablesView } from './DeliverablesView.tsx'
 import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 import { type SystemNotify, systemNotify } from './notify.ts'
-import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
 import { ProjectSettings, type SettingsPart } from './ProjectSettings.tsx'
 import { ProjectSheetView } from './ProjectSheetView.tsx'
@@ -46,7 +44,6 @@ export function App({ api, notify = systemNotify }: Props) {
   const [agent, setAgent] = useState<AgentStatus | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [tab, setTab] = useState<Section>('today')
-  const [shape, setShape] = useState<ProjectShape | null>(null)
   const [session, setSession] = useState<SessionView | null>(null)
   /** The page above the projects, shown in place of a project. */
   const [overview, setOverview] = useState(false)
@@ -293,23 +290,6 @@ export function App({ api, notify = systemNotify }: Props) {
   }
 
   // What the project is like is asked again at every section: saving its settings changes it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `tab` only says when to ask again.
-  useEffect(() => {
-    if (selectedId === null) return setShape(null)
-    let current = true
-    void api.projectShape(selectedId).then((result) => {
-      if (current) setShape(result.ok ? result.value : null)
-    })
-    return () => {
-      current = false
-    }
-  }, [api, selectedId, tab])
-  // A project with one tracker has nothing to align: the section is not offered.
-  const hiddenSections: Section[] = shape !== null && !shape.twoTrackers ? ['alignment'] : []
-  useEffect(() => {
-    if (shape !== null && !shape.twoTrackers && tab === 'alignment') setTab('today')
-  }, [shape, tab])
-
   const selected = projects.find((project) => project.id === selectedId) ?? null
 
   /** Opens «Chiedi» with a question about something of the project, for the PM to send. */
@@ -353,7 +333,6 @@ export function App({ api, notify = systemNotify }: Props) {
           <SectionNav
             current={tab}
             onSelect={openSection}
-            hidden={hiddenSections}
             counts={{
               today: { count: todayCount, label: messages.today.countLabel(todayCount) },
             }}
@@ -483,15 +462,6 @@ export function App({ api, notify = systemNotify }: Props) {
               />
             ) : tab === 'sheet' || tab === 'hours' || tab === 'forecast' ? (
               <ProjectSheetView api={api} project={selected} place={tab} onOpenSection={setTab} />
-            ) : tab === 'progress' ? (
-              <ProgressView
-                api={api}
-                project={selected}
-                fixedPrice={shape?.fixedPriceOnly ?? false}
-                onOpenSection={setTab}
-              />
-            ) : tab === 'alignment' ? (
-              <AlignmentView api={api} project={selected} onOpenSection={setTab} />
             ) : (
               <ProjectSettings api={api} project={selected} part={settingsPart} />
             )}

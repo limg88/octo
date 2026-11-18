@@ -43,7 +43,6 @@ export const GROUP_OF: Readonly<Record<TodayKind, TodayGroup>> = {
   tracker_old: 'tracker',
   bugs_stuck: 'tracker',
   requirements: 'tracker',
-  alignment: 'tracker',
   hours: 'numbers',
   forecast: 'numbers',
   month_due: 'numbers',

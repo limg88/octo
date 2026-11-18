@@ -1,6 +1,5 @@
 import type {
   AdoFeedConfig,
-  AlignmentSettings,
   ArchivedMail,
   Backup,
   ConversationTurn,
@@ -33,7 +32,6 @@ import type {
   OpenPointRegister,
   Preferences,
   PrepNote,
-  ProgressSettings,
   Project,
   ProjectEconomics,
   ProjectTeam,
@@ -568,18 +566,6 @@ export interface SpreadsheetModel {
   read(bytes: Uint8Array): SheetGrid
   /** A copy of the file with the cells written in its first sheet. */
   fill(bytes: Uint8Array, writes: readonly SheetWrite[]): Uint8Array
-}
-
-/** The order, the requests and the map of the client's form, kept with Octo's settings. */
-export interface ProgressSettingsStore {
-  load(projectFolder: string): Promise<ProgressSettings>
-  save(projectFolder: string, settings: ProgressSettings): Promise<void>
-}
-
-/** How a project compares the two trackers, kept with Octo's settings of the project. */
-export interface AlignmentSettingsStore {
-  load(projectFolder: string): Promise<AlignmentSettings>
-  save(projectFolder: string, settings: AlignmentSettings): Promise<void>
 }
 
 /** An item a feed wrote in the project: its title and its fields as the system gives them. */

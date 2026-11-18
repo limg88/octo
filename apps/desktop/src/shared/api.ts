@@ -1,9 +1,6 @@
 import type {
   AgentProgress,
   AgentStatus,
-  AlignmentChoices,
-  AlignmentFile,
-  AlignmentView,
   DashboardComment,
   DashboardRange,
   DashboardView,
@@ -18,8 +15,6 @@ import type {
   HoursView,
   MailSourceView,
   MeetingsSourceView,
-  ProgressFile,
-  ProgressView,
   ProjectOverview,
   ReadingView,
   Reminder,
@@ -33,7 +28,6 @@ import type {
   TrackerSnapshotRun,
 } from '@octo/application'
 import type {
-  AlignmentSettings,
   Assignment,
   DashboardSettings,
   Deliverable,
@@ -54,9 +48,7 @@ import type {
   OpenPointChange,
   OwnKindInput,
   Preferences,
-  ProgressSettings,
   Project,
-  ProjectShape,
   ProjectTeam,
   QuestionRecord,
   RestoreOutcome,
@@ -158,23 +150,11 @@ export const CHANNELS = {
   forecastCompile: 'forecast:compile',
   forecastOrdersRead: 'forecast:orders-read',
   projectSheets: 'sheet:list',
-  projectShape: 'projects:shape',
-  progressSettingsGet: 'progress:settings:get',
-  progressSettingsSave: 'progress:settings:save',
-  progressCandidates: 'progress:candidates',
-  progressView: 'progress:view',
-  progressCompile: 'progress:compile',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   updateProgress: 'update:progress',
   updateJustDone: 'update:just-done',
   diskAccessOpen: 'system:disk-access:open',
-  progressRegisterInvoices: 'progress:invoices:register',
-  alignmentSettingsGet: 'alignment:settings:get',
-  alignmentSettingsSave: 'alignment:settings:save',
-  alignmentView: 'alignment:view',
-  alignmentChoices: 'alignment:choices',
-  alignmentExport: 'alignment:export',
   teamGet: 'team:get',
   teamSave: 'team:save',
   modelsGet: 'models:get',
@@ -457,34 +437,8 @@ export type OctoApi = {
   compileForecast(projectId: string, month: string): Promise<Result<ForecastFile>>
   /** Reads name and ordered amount of the project codes from the company's system. */
   readForecastOrders(projectId: string): Promise<Result<ForecastOrdersRun>>
-  /** What the project is like: which sections have something to work on. */
-  projectShape(projectId: string): Promise<Result<ProjectShape>>
   /** Every project code of the project over its whole life, up to the month that runs. */
   projectSheets(projectId: string): Promise<Result<Lifetime[]>>
-  progressSettings(projectId: string): Promise<Result<ProgressSettings>>
-  saveProgressSettings(
-    projectId: string,
-    settings: ProgressSettings,
-  ): Promise<Result<ProgressSettings>>
-  /** Spreadsheets of the project that look like the progress form of the client. */
-  progressCandidates(projectId: string): Promise<Result<string[]>>
-  /** The share of each order position after each request. */
-  progressView(projectId: string): Promise<Result<ProgressView>>
-  /** Takes the invoices of the company system Octo did not know as requests already made. */
-  registerProgressInvoices(projectId: string): Promise<Result<ProgressSettings>>
-  /** Writes the filled form of request `n`; the empty form is never touched. */
-  compileProgress(projectId: string, n: number): Promise<Result<ProgressFile>>
-  alignmentSettings(projectId: string): Promise<Result<AlignmentSettings>>
-  saveAlignmentSettings(
-    projectId: string,
-    settings: AlignmentSettings,
-  ): Promise<Result<AlignmentSettings>>
-  /** The client's items of the sprint against the supplier's tickets. */
-  alignmentView(projectId: string): Promise<Result<AlignmentView>>
-  /** What the client's export offers to choose from; empty lists while there is no export. */
-  alignmentChoices(projectId: string): Promise<Result<AlignmentChoices>>
-  /** Writes the missing items as a file the supplier's tracker imports. */
-  exportMissingTickets(projectId: string): Promise<Result<AlignmentFile>>
   /** The people and the calendar of the project. */
   team(projectId: string): Promise<Result<ProjectTeam>>
   saveTeam(projectId: string, team: ProjectTeam): Promise<Result<ProjectTeam>>

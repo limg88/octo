@@ -77,8 +77,8 @@ export type ScriptedRun = {
 /** A correction asked in words, tried in the work folder and not yet in the project. */
 export type ScriptedCorrection = ScriptedRun & {
   summary: string
-  /** The files of the deliverable the correction changed. */
-  changed: string[]
+  /** The files of the deliverable the correction changed, each as it would be in the project. */
+  changed: Array<{ name: string; text: string }>
 }
 export type ScriptedKept = { folder: string; files: string[] }
 
@@ -128,7 +128,17 @@ function checkedPath(path: string): string {
   return parts.filter((part) => part !== '' && part !== '.').join('/')
 }
 
+/** The corrections tried and not approved yet that are remembered: the oldest is forgotten. */
+const MAX_PENDING = 20
+
 export function createScriptedDeliverables(deps: ScriptedDeps): ScriptedDeliverables {
+  /**
+   * What each correction changed, as the PM was shown it. An approval writes this, and nothing
+   * else: not what the work folder holds by then, not a run that was not a correction of that
+   * deliverable.
+   */
+  const pending = new Map<string, { slug: string; changed: ScriptedCorrection['changed'] }>()
+
   const parsed = (bytes: Uint8Array): unknown => {
     try {
       return JSON.parse(decoder.decode(bytes))
@@ -319,22 +329,29 @@ export function createScriptedDeliverables(deps: ScriptedDeps): ScriptedDelivera
         words: asked,
         ...options,
       })
-      const changed: string[] = []
+      const changed: ScriptedCorrection['changed'] = []
       for (const name of SCRIPTED_CORRECTABLE) {
         const bytes = await deps.work.read(project.id, runId, name).catch(() => null)
-        if (bytes !== null && decoder.decode(bytes) !== before.get(name)) changed.push(name)
+        const text = bytes === null ? null : decoder.decode(bytes)
+        if (text !== null && text !== before.get(name)) changed.push({ name, text })
       }
-      return { ...(await outcome(project, runId)), summary, changed }
+      const run = await outcome(project, runId)
+      pending.set(runId, { slug, changed })
+      if (pending.size > MAX_PENDING) pending.delete(pending.keys().next().value as string)
+      return { ...run, summary, changed }
     },
 
     async approve(project, slug, runId) {
       await manifestOf(project, slug)
+      const correction = pending.get(runId)
+      if (correction === undefined || correction.slug !== slug)
+        throw new DomainError('work_not_found')
       await deps.writer.claim(project.folder)
-      for (const name of SCRIPTED_CORRECTABLE) {
-        const bytes = await deps.work.read(project.id, runId, name).catch(() => null)
-        if (bytes === null) continue
-        await deps.writer.writeBytes(project.folder, `${scriptedFolder(slug)}/${name}`, bytes)
+      for (const { name, text } of correction.changed) {
+        const path = `${scriptedFolder(slug)}/${name}`
+        await deps.writer.writeBytes(project.folder, path, encoder.encode(text))
       }
+      pending.delete(runId)
     },
   }
 }

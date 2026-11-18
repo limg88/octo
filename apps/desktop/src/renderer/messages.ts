@@ -393,7 +393,6 @@ export const messages = {
       month_due: 'Scadenze del mese',
       bugs_stuck: 'Bug fermi',
       requirements: 'Requisiti poco chiari',
-      alignment: 'Allineamento',
       draft: 'Deliverable in bozza',
       calendar: 'Calendario',
       meeting: 'Riunioni',
@@ -406,7 +405,6 @@ export const messages = {
       hours: 'Apri «Ore»',
       forecast: 'Apri «Previsionale»',
       dashboard: 'Apri «Cruscotto»',
-      alignment: 'Apri «Allineamento»',
       deliverables: 'Apri «Deliverable»',
       risks: 'Apri il registro dei rischi',
       mail: 'Apri la mail',
@@ -452,7 +450,6 @@ export const messages = {
     daily: 'Ogni giorno',
     work: 'Lavoro',
     monthly: 'Ogni mese',
-    sprint: 'Ogni sprint',
     project: 'Progetto',
   },
   choosePath: 'Scegli…',
@@ -585,9 +582,10 @@ export const messages = {
     correcting: 'Correggo…',
     correctionTitle: 'Correzione proposta',
     changed: (files: string) => `File cambiati: ${files}.`,
+    seeFile: (name: string) => `Vedi ${name} come diventerebbe`,
     nothingChanged: 'Nessun file è cambiato.',
     approve: 'Approva la correzione',
-    approveHint: 'Solo allora i file del deliverable nel progetto cambiano.',
+    approveHint: 'Nel progetto entra ciò che vedi qui sopra, e solo allora.',
     approved: 'Correzione approvata: da ora ogni esecuzione usa i file nuovi.',
   },
   computed: {
@@ -799,266 +797,6 @@ export const messages = {
     },
   ],
   askReadyTitle: 'Domande pronte',
-  alignmentTab: 'Allineamento',
-  alignment: {
-    loading: 'Confronto i due tracker…',
-    groupColumns: {
-      name: 'Che cosa vogliono dire',
-      item: 'Stati del cliente (separati da virgola)',
-      ticket: 'Stati dei ticket (separati da virgola)',
-    },
-    groupCell: (column: string, row: number) => `${column}, riga ${row}`,
-    addGroup: 'Aggiungi un gruppo',
-    removeGroup: (row: number) => `Togli la riga ${row}`,
-    groupWrong: (n: number) =>
-      `Gruppo ${n}: servono un nome e almeno uno stato per ciascuno dei due tracker.`,
-    saveNeeds: 'Per salvare indica lo sprint.',
-    intro:
-      'Confronto le voci del tracker del cliente in uno sprint con i ticket del tuo tracker. Una voce e un ticket sono collegati quando la voce porta fra i tag la chiave del ticket, oppure il titolo del ticket nomina l’id della voce, per esempio «[AZDO 123]». Leggo l’esportazione usata dal cruscotto e i ticket che Octo ha già letto: non scrivo in nessuno dei due tracker.',
-    settings: 'Che cosa confronto',
-    sprint: 'Sprint, come lo chiamano i due tracker',
-    period: 'Periodo di pianificazione delle voci del cliente',
-    periodAny: 'Qualunque',
-    sprintNow: 'Sprint a confronto',
-    nothingIn: (lists: string) => `Niente da segnalare in: ${lists}.`,
-    sprintChoose: 'Scegli lo sprint…',
-    tags: 'Tag delle voci che sono della tua squadra (nessuno: tutte)',
-    exportPath:
-      'Esportazione del tracker del cliente: file nel progetto (vuoto: quella del cruscotto)',
-    ticketFolder: 'Cartella dei ticket nel progetto (vuoto: quella della fonte Jira)',
-    referencePrefixes:
-      'Che cosa precede l’id della voce nel titolo del ticket (separati da virgola), per esempio AZDO',
-    stateGroups: 'Stati che vogliono dire la stessa cosa',
-    stateGroupsHint:
-      'Per esempio «in corso»: dal cliente «In Progress, Active», nei ticket «In corso». Senza gruppi collego le voci ma non giudico gli stati.',
-    save: 'Salva',
-    summary: (total: number, linked: number, needsUpdate: number, missing: number) =>
-      `${total} voci del cliente nello sprint: ${linked} con il ticket nello sprint, ${needsUpdate} con il ticket altrove, ${missing} senza ticket.`,
-    adds: 'Quadratura: ogni voce è in una sola delle tre liste.',
-    stateMismatchSummary: (count: number) =>
-      count === 1
-        ? 'Uno stato è letto in modo diverso dal Cruscotto'
-        : `${count} stati sono letti in modo diverso dal Cruscotto`,
-    stateMismatch: (state: string, group: string, dashboardPhase: string) =>
-      `«${state}» appartiene al gruppo «${group}» qui e alla fase «${dashboardPhase}» nel Cruscotto.`,
-    stateMismatchHelp:
-      'I conti dello sprint possono differire. Per allinearli, cambia il gruppo in “Che cosa confronto” oppure la fase in “Impostazioni del cruscotto”, sotto “Come leggo gli stati dei bug”.',
-    phaseNames: {
-      work: 'in lavorazione',
-      verify: 'in verifica',
-      validated: 'validato',
-      closed: 'chiuso',
-    },
-    doesNotAdd: 'Le tre liste non sommano al totale: non usare questi numeri e segnalalo.',
-    data: (exported: string, tickets: number) =>
-      `Tracker del cliente letto il ${exported}; ${tickets} ticket letti dal tuo tracker.`,
-    noDate: 'data non dichiarata',
-    linkedTitle: 'Collegate',
-    needsUpdateTitle: 'Ticket da spostare nello sprint',
-    missingTitle: 'Senza ticket',
-    duplicatesTitle: 'Voci con più di un ticket',
-    orphansTitle: 'Ticket che nominano una voce che non c’è',
-    suggestionsTitle: 'Forse sono la stessa cosa',
-    suggestionsIntro:
-      'Titoli che si somigliano fra voci senza ticket e ticket senza riferimento. Non li collego da solo: se è così, aggiungi l’id della voce al titolo del ticket.',
-    unreferencedTitle: 'Ticket dello sprint senza riferimento a una voce',
-    columnItem: 'Voce',
-    columnTitle: 'Titolo',
-    columnTicket: 'Ticket',
-    columnStates: 'Stato cliente → stato ticket',
-    columnCoherent: 'Stati',
-    columnTicketSprint: 'Sprint del ticket',
-    columnType: 'Tipo',
-    columnState: 'Stato',
-    columnIds: 'Voci nominate',
-    columnReason: 'Perché',
-    columnScore: 'Somiglianza',
-    coherent: { yes: 'Coerenti', no: 'Diversi', unknown: '—' },
-    noSprint: 'nessuno',
-    reason: {
-      unknown: 'Il tracker del cliente non ha questa voce',
-      out_of_scope: 'La voce esiste, ma fuori dallo sprint o dai tag indicati',
-    },
-    confidence: { high: 'alta', medium: 'media' },
-    none: 'Nessuna.',
-    exportMissing: 'Scrivi il file di import dei ticket mancanti',
-    exported: (rows: number, path: string) =>
-      `Scritto ${path} con ${rows} ticket da creare. L’import lo fai tu dal tuo tracker.`,
-    open: 'Apri il file',
-  },
-  progressTab: 'Avanzamento',
-  progress: {
-    fixedPrice: {
-      intro:
-        'Questo progetto è venduto a corpo. Ordinato, fatturato e quanto resta da fatturare sono in «Commessa». Qui compili il modulo del cliente, quando ce n’è uno.',
-      useForm: 'Ho un modulo del cliente da compilare',
-    },
-    invoices: {
-      title: 'Che cosa risulta su NetSuite',
-      billedTotal: 'Fatturato su NetSuite',
-      salesOrders: 'Ordini di vendita di NetSuite',
-      linkHint: (order: string) =>
-        `NetSuite non conosce il numero d’ordine del cliente${order === '' ? '' : ` (${order})`}: dimmi quali suoi ordini di vendita sono quest’ordine. Da lì leggo le fatture emesse.`,
-      suggested: (orders: string) =>
-        `Propongo ${orders}: ha fatture con gli stessi importi delle posizioni.`,
-      link: 'Collega',
-      change: (orders: string) => `Ordine di vendita: ${orders} · Cambia`,
-      columnPosition: 'Posizione',
-      columnAmount: 'Importo',
-      columnState: 'Su NetSuite',
-      billed: 'Fatturata',
-      notBilled: 'Non fatturata',
-      invoice: (id: string, day: string, status: string) =>
-        [`fattura ${id}`, day === '' ? '' : `del ${day}`, status].filter(Boolean).join(' · '),
-      fulfilled: 'Ordine evaso: tutto il valore dell’ordine è fatturato.',
-      unregistered: (count: number, ids: string) =>
-        count === 1
-          ? `La fattura ${ids} non è fra le richieste di Octo.`
-          : `${count} fatture non sono fra le richieste di Octo: ${ids}.`,
-      register: 'Registra come richieste già fatte',
-      unmatched: (invoices: string) =>
-        `Fatture sull’ordine che non hanno l’importo di una posizione: ${invoices}.`,
-      how: 'Una posizione risulta fatturata quando sull’ordine di vendita c’è una fattura del suo stesso importo. Le note di credito senza ordine di vendita non sono contate.',
-    },
-    loading: 'Preparo l’avanzamento…',
-    intro:
-      'Qui prepari il modulo con cui chiedi al cliente di riconoscere una quota dell’ordine: una richiesta per fattura. Octo calcola le percentuali di ogni posizione dagli importi che scrivi e compila una copia del modulo: quello vuoto non lo tocca.',
-    setup: {
-      title: 'Impostazioni dell’ordine e del modulo',
-      open: 'Impostazioni',
-      firstTime:
-        'Per cominciare servono tre cose, che si scrivono una volta sola: il modulo del cliente, dove va ogni dato e l’ordine.',
-      done: 'fatto',
-      todo: 'da fare',
-      moduleTitle: '1 · Il modulo del cliente',
-      moduleHint:
-        'Il file Excel vuoto che il cliente chiede di compilare. Deve stare nella cartella del progetto.',
-      modelPath: 'Modulo vuoto',
-      modelNone:
-        'Non trovo file Excel che sembrino il modulo: scrivi dove sta, a partire dalla cartella del progetto.',
-      cellsTitle: '2 · Che cosa va in ogni cella',
-      cellsHint:
-        'Una riga per ogni cella da riempire. Il nome della cella lo leggi aprendo il modulo in Excel (per esempio D2). Nel testo puoi inserire i dati della richiesta con i pulsanti qui sotto; tutto il resto è scritto com’è.',
-      cell: 'Cella',
-      cellN: (n: number) => `Cella della riga ${n}`,
-      cellText: 'Che cosa scrivere',
-      cellTextN: (n: number) => `Che cosa scrivere nella riga ${n}`,
-      addCell: 'Aggiungi una cella',
-      removeCell: (n: number) => `Togli la riga ${n}`,
-      cellWrong: (n: number) =>
-        `Riga ${n}: una cella si scrive con lettere e numero, per esempio D2.`,
-      insert: 'Scegli una riga con una cella valida per inserire un dato.',
-      insertInto: (ref: string) => `Inserisci nella cella ${ref}`,
-      placeholders: [
-        { token: '{n}', label: 'Numero della richiesta' },
-        { token: '{ordine}', label: 'Ordine' },
-        { token: '{posizioni}', label: 'Posizioni' },
-        { token: '{dal}', label: 'Dal' },
-        { token: '{al}', label: 'Al' },
-        { token: '{al_precedente}', label: 'Al della richiesta precedente' },
-        { token: '{nota}', label: 'Fattura di riferimento' },
-      ],
-      tableTitle: 'La tabella delle posizioni nel modulo',
-      tableHint:
-        'Dove comincia la tabella, quante righe ha e in quali colonne vanno la posizione e le tre percentuali.',
-      firstRow: 'Prima riga',
-      rows: 'Numero di righe',
-      position: 'Colonna della posizione',
-      previous: 'Colonna «precedente»',
-      current: 'Colonna «attuale»',
-      period: 'Colonna «di periodo»',
-      tableWrong:
-        'La tabella va indicata per intero: due numeri interi e quattro colonne scritte con le lettere di Excel (A, B, …).',
-      orderTitle: '3 · L’ordine',
-      order: 'Numero dell’ordine, come lo scrive il modulo',
-      total: 'Totale dell’ordine (per controllo)',
-      positionsTitle: 'Posizioni dell’ordine',
-      code: 'Posizione',
-      codeN: (n: number) => `Codice della posizione ${n}`,
-      amount: 'Importo',
-      amountN: (n: number) => `Importo della posizione ${n}`,
-      addPosition: 'Aggiungi una posizione',
-      removePosition: (n: number) => `Togli la posizione ${n}`,
-      positionWrong: (n: number) =>
-        `Posizione ${n}: servono un codice e un importo scritto in cifre, per esempio 12.500,50.`,
-      sum: (sum: string) => `Le posizioni sommano ${sum}.`,
-      sumDiffers: (sum: string, declared: string) =>
-        `Le posizioni sommano ${sum}, il totale scritto è ${declared}: controlla gli importi.`,
-      save: 'Salva',
-      close: 'Chiudi',
-    },
-    orderTotal: 'Totale dell’ordine',
-    asked: 'Chiesto finora',
-    left: 'Resta da chiedere',
-    orderName: (order: string) => (order === '' ? 'Ordine' : `Ordine ${order}`),
-    newRequest: 'Nuova richiesta',
-    request: {
-      titleNew: (n: number) => `Nuova richiesta (la numero ${n})`,
-      titleEdit: (n: number) => `Correggi la richiesta ${n}`,
-      amount: 'Importo della richiesta',
-      allLeft: (amount: string) => `Tutto ciò che resta: ${amount}`,
-      note: 'Fattura di riferimento',
-      positionsLegend: 'Su quali posizioni',
-      inOrder: 'In ordine, dalla prima non ancora chiusa',
-      chosen: 'Solo su quelle che scelgo',
-      positionLeft: (code: string, left: string) => `${code} (restano ${left})`,
-      preview: 'Come cambiano le posizioni',
-      previewNone: 'Scrivi l’importo per vedere come cambiano le posizioni.',
-      laterRecomputed:
-        'Le richieste successive vengono ricalcolate: ricompila anche i loro moduli.',
-      saveAndCompile: 'Salva e compila il modulo',
-      saveOnly: 'Salva senza compilare',
-    },
-    requestN: (n: number) => `Richiesta ${n}`,
-    correctN: (n: number) => `Correggi la richiesta ${n}`,
-    correct: 'Correggi',
-    removeN: (n: number) => `Togli la richiesta ${n}`,
-    remove: 'Togli',
-    removeConfirm: (n: number) =>
-      `Togliere la richiesta ${n}? Un modulo già compilato resta nella cartella.`,
-    from: 'Dal',
-    to: 'Al',
-    columnPosition: 'Posizione',
-    columnAmount: 'Importo',
-    columnPrevious: 'Precedente',
-    columnCurrent: 'Attuale',
-    columnPeriod: 'Di periodo',
-    share: (value: number) =>
-      `${(value * 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
-    money: (value: number) =>
-      value.toLocaleString('it-IT', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-        useGrouping: 'always',
-      }),
-    summary: (period: string, amount: string, cumulative: string, total: string) =>
-      `${period}: ${amount}, in tutto ${cumulative} su ${total}`,
-    period: (from: string, to: string) => `dal ${from || '…'} al ${to || '…'}`,
-    closing: 'Raggiunge il totale dell’ordine: tutte le posizioni chiudono al 100%.',
-    drift: (amount: string) =>
-      `Le percentuali, arrotondate a due decimali, ricostruiscono ${amount} in più o in meno dell’importo chiesto: il modulo non ha importi, lo scarto non si può togliere.`,
-    noRequests: 'Nessuna richiesta ancora: premi «Nuova richiesta».',
-    problem: {
-      no_positions: 'Scrivi le posizioni dell’ordine con i loro importi.',
-      over_total: (n: number, excess: string) =>
-        `La richiesta ${n} porta il totale chiesto ${excess} oltre il totale dell’ordine.`,
-      unknown_positions: (n: number, codes: string) =>
-        `La richiesta ${n} nomina posizioni che l’ordine non ha: ${codes}.`,
-      over_positions: (n: number, excess: string) =>
-        `La richiesta ${n} supera di ${excess} quello che resta sulle posizioni che nomina.`,
-    },
-    warning: {
-      total_differs: (declared: string, positions: string) =>
-        `Le posizioni sommano ${positions}, l’ordine dichiara ${declared}: controlla gli importi.`,
-      dates_missing: (n: number) => `Richiesta ${n}: mancano le date.`,
-      dates_not_chained: (n: number) =>
-        `Richiesta ${n}: «Dal» non è l’«Al» della richiesta precedente.`,
-      note_missing: (n: number) => `Richiesta ${n}: manca la fattura di riferimento.`,
-    },
-    compile: (n: number) => `Compila il modulo della richiesta ${n}`,
-    compiled: (path: string) => `Modulo compilato in ${path}. Quello vuoto non è stato toccato.`,
-    open: 'Apri il file',
-  },
   sheetTab: 'Commessa',
   sheet: {
     parts: {
@@ -2152,22 +1890,6 @@ const errors: Record<ErrorCode, string> = {
   forecast_month_invalid: 'Il mese non è valido.',
   forecast_settings_invalid:
     'Le impostazioni del previsionale non sono valide: il modello deve stare nella cartella del progetto.',
-  alignment_sprint_not_set: 'Indica lo sprint da confrontare.',
-  alignment_items_missing:
-    'Indica il file di esportazione del tracker del cliente, qui o in «Cruscotto».',
-  alignment_tickets_missing:
-    'Non trovo ticket da confrontare: configura Jira in «Impostazioni» e leggi i ticket, oppure indica la cartella dove sono.',
-  alignment_settings_invalid:
-    'Le impostazioni dell’allineamento non sono valide: la cartella dei ticket deve stare nel progetto.',
-  progress_model_not_set: 'Indica il file Excel del modulo vuoto.',
-  progress_model_missing: 'Non trovo il file del modulo nel posto indicato.',
-  progress_model_invalid:
-    'Non riesco a scrivere nel modulo: non è un file Excel leggibile, o una cella indicata sta su una riga che il modulo non ha.',
-  progress_settings_invalid:
-    'Le impostazioni dell’avanzamento non sono valide: il modulo deve stare nella cartella del progetto.',
-  progress_not_computable:
-    'Non posso compilare il modulo. O c’è un problema segnalato qui sopra da correggere, o l’ordine ha più posizioni delle righe che hai indicato per la tabella del modulo: in quel caso aumenta il «numero di righe».',
-  progress_request_missing: 'Questa richiesta non c’è più.',
   forecast_timesheet_not_set: 'Indica prima, in «Ore», dove sono i timesheet.',
   hours_settings_invalid:
     'Le impostazioni delle ore non sono valide: i percorsi devono stare dentro la cartella del progetto.',

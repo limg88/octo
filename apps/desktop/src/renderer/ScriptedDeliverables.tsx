@@ -194,8 +194,14 @@ function Scripted({
                 <p className="hint">
                   {correction.changed.length === 0
                     ? text.nothingChanged
-                    : text.changed(correction.changed.join(', '))}
+                    : text.changed(correction.changed.map((file) => file.name).join(', '))}
                 </p>
+                {correction.changed.map((file) => (
+                  <details key={file.name} className="advanced">
+                    <summary>{text.seeFile(file.name)}</summary>
+                    <pre className="scripted-file">{file.text}</pre>
+                  </details>
+                ))}
                 <Outcome run={{ ...correction, files: [] }} kept={null} onKeep={() => {}} />
                 {approved ? (
                   <p className="badge badge-ok" role="status">

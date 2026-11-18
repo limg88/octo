@@ -1399,18 +1399,6 @@ describe('the page of the day', () => {
       'non è ancora compilato',
     )
     expect(words({ kind: 'requirements', count: 7, ids: ['1', '2'] }).detail).toBe('Voci: 1, 2…')
-    expect(
-      words({
-        kind: 'alignment',
-        sprint: 'Sprint 28',
-        missing: 1,
-        needsUpdate: 2,
-        duplicates: 1,
-        orphans: 3,
-      }).detail,
-    ).toBe(
-      '1 voce senza ticket · 2 voci con il ticket altrove · 1 voce con più ticket · 3 ticket orfani',
-    )
     const draft = { kind: 'draft' as const, id: 'd', title: 'Stato', days: 1, fixFirst: true }
     expect(words({ ...draft, status: 'review' }).detail).toContain('da correggere prima')
     expect(words({ ...draft, status: 'review', fixFirst: false }).title).toBe(

@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
-import { type FileHandle, mkdir, open, readdir, realpath, rm } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { type FileHandle, lstat, mkdir, open, readdir, realpath, rm } from 'node:fs/promises'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import type { WorkFolders } from '@octo/application'
 import { DomainError } from '@octo/domain'
 import { isMissing, writeAtomic } from './json-file.ts'
@@ -56,7 +56,14 @@ export function createFsWorkFolders(dataFolder: string): WorkFolders {
       const root = folderOf(projectId, runId)
       const file = resolve(root, name)
       if (!file.startsWith(`${root}${sep}`)) throw new DomainError('work_not_found')
-      await writeAtomic(file, content)
+      // A run may have left a link where a folder or the file is expected: Octo is not inside
+      // the fence, so it writes only where the real place is still the folder of the run.
+      await mkdir(dirname(file), { recursive: true })
+      const [realRoot, realParent] = await Promise.all([realpath(root), realpath(dirname(file))])
+      const inside = realParent === realRoot || realParent.startsWith(`${realRoot}${sep}`)
+      const target = await lstat(file).catch(() => null)
+      if (!inside || target?.isSymbolicLink()) throw new DomainError('work_not_found')
+      await writeAtomic(join(realParent, basename(file)), content)
     },
     async read(projectId, runId, name) {
       const root = folderOf(projectId, runId)

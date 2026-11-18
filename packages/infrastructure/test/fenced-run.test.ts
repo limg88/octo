@@ -196,6 +196,15 @@ describe('the work folders of the app', () => {
     ]) {
       await expect(work.read('p-9', 'q-2', name)).rejects.toMatchObject({ code: 'work_not_found' })
     }
+    // Octo writes in the folder of a run too, and never through what a run left as a link.
+    await work.write('p-9', 'q-2', 'uscita/modulo.xlsx', new TextEncoder().encode('ok'))
+    expect(await work.files('p-9', 'q-2')).toContain('uscita/modulo.xlsx')
+    for (const name of ['via/scritto.txt', 'link.txt', '../fuori.txt']) {
+      await expect(
+        work.write('p-9', 'q-2', name, new TextEncoder().encode('no')),
+      ).rejects.toMatchObject({ code: 'work_not_found' })
+    }
+    expect(await readFile(join(root, 'segreto.txt'), 'utf8')).toBe('fuori')
     await expect(work.create('../fuori', 'q-1')).rejects.toMatchObject({ code: 'work_not_found' })
     await expect(work.files('p-9', 'a/b')).rejects.toMatchObject({ code: 'work_not_found' })
   })

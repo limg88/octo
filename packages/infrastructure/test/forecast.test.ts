@@ -2,23 +2,16 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SheetWrite } from '@octo/application'
-import {
-  DEFAULT_ALIGNMENT_SETTINGS,
-  DEFAULT_FORECAST_SETTINGS,
-  DEFAULT_PROGRESS_SETTINGS,
-  NO_ROW_INPUTS,
-  NO_TEAM,
-  readForecastModel,
-} from '@octo/domain'
+import { DEFAULT_FORECAST_SETTINGS, NO_ROW_INPUTS, NO_TEAM, readForecastModel } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   createFeedRecords,
-  createFsAlignmentSettings,
   createFsForecastSettings,
-  createFsProgressSettings,
+  createFsKeptSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
+  createFsScriptedTemplates,
   createFsTeamStore,
   createXlsxModel,
 } from '../src/index.ts'
@@ -247,41 +240,40 @@ describe('the settings of the forecast on disk', () => {
     })
   })
 
-  it('keep the order, the requests and the map of the form', async () => {
-    const store = createFsProgressSettings()
-    expect(await store.load(folder)).toEqual(DEFAULT_PROGRESS_SETTINGS)
-    const settings = {
-      ...DEFAULT_PROGRESS_SETTINGS,
-      modelPath: 'Moduli/Richiesta.xlsx',
+  it('read what a section kept as it is, for the deliverable that takes its place', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    const kept = createFsKeptSettings()
+    expect(await kept.read(folder, 'progress.json')).toBeNull()
+    await mkdir(join(folder, '_octo', '.impostazioni'), { recursive: true })
+    const file = join(folder, '_octo', '.impostazioni', 'progress.json')
+    await writeFile(file, '{"order":"ORD-1","positions":[{"code":"1","amount":600}]}')
+    expect(await kept.read(folder, 'progress.json')).toEqual({
+      order: 'ORD-1',
       positions: [{ code: '1', amount: 600 }],
-      requests: [
-        { n: 1, from: '2026-03-01', to: '2026-03-31', amount: 100, note: 'x', positions: ['1'] },
-      ],
-      form: {
-        fields: [{ ref: 'D2', text: '{n}' }],
-        table: { firstRow: 14, rows: 6, position: 'A', previous: 'B', current: 'C', period: 'D' },
-      },
-    }
-    await store.save(folder, settings)
-    expect(await store.load(folder)).toEqual(settings)
-    const { writeFile } = await import('node:fs/promises')
-    await writeFile(join(folder, '_octo', '.impostazioni', 'progress.json'), '{"positions":1}')
-    await expect(store.load(folder)).rejects.toThrow('progress_settings_invalid')
+    })
+    // A file that is not JSON has nothing to hand over; it is left as it is.
+    await writeFile(file, 'non json')
+    expect(await kept.read(folder, 'progress.json')).toBeNull()
   })
 
-  it('keep how the two trackers are compared', async () => {
-    const store = createFsAlignmentSettings()
-    expect(await store.load(folder)).toEqual(DEFAULT_ALIGNMENT_SETTINGS)
-    const settings = {
-      ...DEFAULT_ALIGNMENT_SETTINGS,
-      sprint: 'Sprint 28',
-      stateGroups: [{ name: 'in corso', item: ['In Progress'], ticket: ['In corso'] }],
-    }
-    await store.save(folder, settings)
-    expect(await store.load(folder)).toEqual(settings)
-    const { writeFile } = await import('node:fs/promises')
-    await writeFile(join(folder, '_octo', '.impostazioni', 'alignment.json'), '{"tags":1}')
-    await expect(store.load(folder)).rejects.toThrow('alignment_settings_invalid')
+  it('list the deliverables with a script the app ships, and their files', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    const shipped = join(folder, 'spediti')
+    await mkdir(join(shipped, 'avanzamento', '__pycache__'), { recursive: true })
+    await mkdir(join(shipped, 'Non valido'), { recursive: true })
+    await writeFile(join(shipped, 'avanzamento', 'script.py'), 'print("ok")')
+    await writeFile(join(shipped, 'avanzamento', 'deliverable.json'), '{"title":"T"}')
+    await writeFile(join(shipped, 'avanzamento', '.DS_Store'), 'x')
+    await writeFile(join(shipped, 'avanzamento', 'vecchio.pyc'), 'x')
+    await writeFile(join(shipped, 'nota.txt'), 'x')
+    const templates = createFsScriptedTemplates(shipped)
+    expect(await templates.slugs()).toEqual(['avanzamento'])
+    const files = await templates.files('avanzamento')
+    expect(files.map((file) => file.name)).toEqual(['deliverable.json', 'script.py'])
+    expect(new TextDecoder().decode(files[1]?.content)).toBe('print("ok")')
+    expect(await templates.files('assente')).toEqual([])
+    expect(await templates.files('../fuori')).toEqual([])
+    expect(await createFsScriptedTemplates(join(folder, 'assente')).slugs()).toEqual([])
   })
 
   it('read back the items a feed wrote, and only those', async () => {

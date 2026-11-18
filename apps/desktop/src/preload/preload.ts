@@ -125,22 +125,6 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
   readForecastOrders: (projectId) => ipcRenderer.invoke(CHANNELS.forecastOrdersRead, { projectId }),
   projectSheets: (projectId) => ipcRenderer.invoke(CHANNELS.projectSheets, { projectId }),
-  projectShape: (projectId) => ipcRenderer.invoke(CHANNELS.projectShape, { projectId }),
-  progressSettings: (projectId) => ipcRenderer.invoke(CHANNELS.progressSettingsGet, { projectId }),
-  saveProgressSettings: (projectId, settings) =>
-    ipcRenderer.invoke(CHANNELS.progressSettingsSave, { projectId, settings }),
-  progressCandidates: (projectId) => ipcRenderer.invoke(CHANNELS.progressCandidates, { projectId }),
-  progressView: (projectId) => ipcRenderer.invoke(CHANNELS.progressView, { projectId }),
-  registerProgressInvoices: (projectId) =>
-    ipcRenderer.invoke(CHANNELS.progressRegisterInvoices, { projectId }),
-  compileProgress: (projectId, n) => ipcRenderer.invoke(CHANNELS.progressCompile, { projectId, n }),
-  alignmentSettings: (projectId) =>
-    ipcRenderer.invoke(CHANNELS.alignmentSettingsGet, { projectId }),
-  saveAlignmentSettings: (projectId, settings) =>
-    ipcRenderer.invoke(CHANNELS.alignmentSettingsSave, { projectId, settings }),
-  alignmentView: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentView, { projectId }),
-  alignmentChoices: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentChoices, { projectId }),
-  exportMissingTickets: (projectId) => ipcRenderer.invoke(CHANNELS.alignmentExport, { projectId }),
   team: (projectId) => ipcRenderer.invoke(CHANNELS.teamGet, { projectId }),
   saveTeam: (projectId, team) => ipcRenderer.invoke(CHANNELS.teamSave, { projectId, team }),
   modelSettings: (projectId) => ipcRenderer.invoke(CHANNELS.modelsGet, { projectId }),

@@ -12,8 +12,6 @@ export const SECTIONS = [
   'hours',
   'sheet',
   'forecast',
-  'progress',
-  'alignment',
   'sources',
 ] as const
 export type Section = (typeof SECTIONS)[number]
@@ -33,8 +31,6 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   hours: messages.hoursTab,
   sheet: messages.sheetTab,
   forecast: messages.forecastTab,
-  progress: messages.progressTab,
-  alignment: messages.alignmentTab,
   sources: messages.sourcesTab,
 }
 
@@ -42,7 +38,6 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
 export const SECTION_GROUPS: ReadonlyArray<{ title: string; sections: readonly Section[] }> = [
   { title: messages.nav.daily, sections: ['today'] },
   { title: messages.nav.work, sections: ['ask', 'deliverables', 'dashboard'] },
-  { title: messages.nav.monthly, sections: ['sheet', 'progress'] },
-  { title: messages.nav.sprint, sections: ['alignment'] },
+  { title: messages.nav.monthly, sections: ['sheet'] },
   { title: messages.nav.project, sections: ['sources'] },
 ]

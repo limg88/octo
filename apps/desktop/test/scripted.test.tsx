@@ -37,7 +37,7 @@ const correction: ScriptedCorrection = {
   messages: ['Richiesta 3: chiesto fin qui 352.000,00.'],
   files: [],
   summary: 'Ho aggiunto la richiesta 3.',
-  changed: ['config.json'],
+  changed: [{ name: 'config.json', text: '{"requests": 3}' }],
 }
 
 type Api = Pick<
@@ -158,6 +158,9 @@ describe('the deliverables of the project made by a script', () => {
     const proposed = within(await screen.findByRole('region', { name: text.correctionTitle }))
     expect(proposed.getByText(correction.summary)).toBeTruthy()
     expect(proposed.getByText(text.changed('config.json'))).toBeTruthy()
+    // The file as it would be in the project is there to read before approving.
+    expect(proposed.getByText(text.seeFile('config.json'))).toBeTruthy()
+    expect(proposed.getByText('{"requests": 3}')).toBeTruthy()
     expect(proposed.getByText(correction.messages[0] ?? '')).toBeTruthy()
     expect(api.approveScripted).not.toHaveBeenCalled()
     fireEvent.click(proposed.getByRole('button', { name: text.approve }))

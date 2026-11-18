@@ -54,12 +54,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const ADDRESS = /[^\s<>,;"]+@[^\s<>,;"]+/g
 /** A meeting whose name says it is about how the project goes. */
 const PROGRESS_MEETING = /\b(sal|stato|avanzamento|status|sprint|review|stand-?up|daily)\b/i
-const NUMBER_KINDS: readonly TodayKind[] = [
-  'bugs_stuck',
-  'requirements',
-  'alignment',
-  'tracker_old',
-]
+const NUMBER_KINDS: readonly TodayKind[] = ['bugs_stuck', 'requirements', 'tracker_old']
 
 const addressesOf = (text: string): string[] =>
   (text.match(ADDRESS) ?? []).map((address) => address.toLowerCase())

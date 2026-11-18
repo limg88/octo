@@ -2,7 +2,6 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   AgentRunner,
-  Alignments,
   AppPreferences,
   AskQuestion,
   Backups,
@@ -19,8 +18,6 @@ import type {
   Meetings,
   Models,
   OpenPoints,
-  Progress,
-  ProjectShapes,
   ProjectSheets,
   Projects,
   QuestionLog,
@@ -81,12 +78,9 @@ export type IpcDeps = {
   hours: Hours
   forecasts: Forecasts
   projectSheets: ProjectSheets
-  shapes: ProjectShapes
-  progress: Progress
   updates: Updates
   /** The version Octo was updated to since it last ran, where that costs it its permissions. */
   updatedTo: string | null
-  alignments: Alignments
   team: Team
   folderDialogTitle: string
   letterheadDialogTitle: string
@@ -330,58 +324,6 @@ const forecastSettingsInput = byProject.extend({
   }),
 })
 const forecastMonthInput = byProject.extend({ month: rule })
-
-const progressSettingsInput = byProject.extend({
-  settings: z.object({
-    modelPath: rule,
-    order: rule,
-    salesOrders: ruleList.default([]),
-    total: money,
-    positions: z.array(z.object({ code: rule, amount: z.number() })).max(MAX_RULES),
-    requests: z
-      .array(
-        z.object({
-          n: z.number(),
-          from: rule,
-          to: rule,
-          amount: z.number(),
-          note: z.string().max(MAX_INPUT_LENGTH),
-          positions: ruleList,
-        }),
-      )
-      .max(MAX_RULES),
-    form: z.object({
-      fields: z
-        .array(z.object({ ref: rule, text: z.string().max(MAX_INPUT_LENGTH) }))
-        .max(MAX_RULES),
-      table: z
-        .object({
-          firstRow: z.number(),
-          rows: z.number(),
-          position: rule,
-          previous: rule,
-          current: rule,
-          period: rule,
-        })
-        .nullable(),
-    }),
-  }),
-})
-const progressCompileInput = byProject.extend({ n: z.number().int().min(1) })
-
-const alignmentSettingsInput = byProject.extend({
-  settings: z.object({
-    sprint: rule,
-    period: rule,
-    tags: ruleList,
-    ownPeopleOnly: z.boolean().default(false),
-    exportPath: rule,
-    ticketFolder: rule,
-    referencePrefixes: ruleList,
-    stateGroups: z.array(z.object({ name: rule, item: ruleList, ticket: ruleList })).max(MAX_RULES),
-    typeMap: z.array(z.object({ item: rule, ticket: rule })).max(MAX_RULES),
-  }),
-})
 
 const teamInput = byProject.extend({
   team: z.object({
@@ -1139,60 +1081,12 @@ export function registerIpc(deps: IpcDeps): void {
     deps.forecasts.compile(await deps.projects.get(input.projectId), input.month),
   )
 
-  handle(CHANNELS.projectShape, byProject, async ({ projectId }) =>
-    deps.shapes.of(await deps.projects.get(projectId)),
-  )
-
   handle(CHANNELS.projectSheets, byProject, async ({ projectId }) =>
     deps.projectSheets.list(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>
     deps.forecasts.readOrders(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.progressSettingsGet, byProject, async ({ projectId }) =>
-    deps.progress.settings(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.progressSettingsSave, progressSettingsInput, async (input) =>
-    deps.progress.saveSettings(await deps.projects.get(input.projectId), input.settings),
-  )
-
-  handle(CHANNELS.progressCandidates, byProject, async ({ projectId }) =>
-    deps.progress.candidates(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.progressView, byProject, async ({ projectId }) =>
-    deps.progress.view(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.progressRegisterInvoices, byProject, async ({ projectId }) =>
-    deps.progress.registerInvoices(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.progressCompile, progressCompileInput, async (input) =>
-    deps.progress.compile(await deps.projects.get(input.projectId), input.n),
-  )
-
-  handle(CHANNELS.alignmentSettingsGet, byProject, async ({ projectId }) =>
-    deps.alignments.settings(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.alignmentSettingsSave, alignmentSettingsInput, async (input) =>
-    deps.alignments.saveSettings(await deps.projects.get(input.projectId), input.settings),
-  )
-
-  handle(CHANNELS.alignmentView, byProject, async ({ projectId }) =>
-    deps.alignments.view(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.alignmentChoices, byProject, async ({ projectId }) =>
-    deps.alignments.choices(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.alignmentExport, byProject, async ({ projectId }) =>
-    deps.alignments.exportMissing(await deps.projects.get(projectId)),
   )
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {

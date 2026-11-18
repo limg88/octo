@@ -1,6 +1,4 @@
 import {
-  type Alignment,
-  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   type Deliverable,
   DomainError,
@@ -207,10 +205,7 @@ function setup(overrides: Partial<TodayDeps> = {}, judgeScript: JudgeScript = {}
       view: notSet('tracker_export_not_set'),
       settings: async () => DEFAULT_DASHBOARD_SETTINGS,
     },
-    alignments: {
-      view: notSet('alignment_sprint_not_set'),
-      settings: async () => DEFAULT_ALIGNMENT_SETTINGS,
-    },
+    sprint: async () => '',
     deliverables: { list: async () => [] },
     sources: {
       mail: async () => ({
@@ -591,12 +586,6 @@ describe('the page of the day', () => {
       possibleDuplicates: [],
       tieOut: { ok: true },
     } as unknown as Reconciliation
-    const alignment = {
-      missing: [{}],
-      needsUpdate: [],
-      duplicates: [],
-      orphans: [],
-    } as unknown as Alignment
     const draft = {
       id: 'd-1',
       title: 'Stato',
@@ -624,12 +613,9 @@ describe('the page of the day', () => {
             requirements: [{ id: '2002' }],
           }) as never,
       },
-      alignments: {
-        settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
-        view: async () => ({ alignment, stateMismatches: [], exportedAt: null, tickets: 8 }),
-      },
+      sprint: async () => 'Sprint 28',
       deliverables: { list: async () => [draft] },
-      // The sprint ends tomorrow: what the trackers do not agree on is due.
+      // The sprint ends tomorrow: the stories that are not clear are due.
       team: {
         get: async () => ({
           people: [],
@@ -655,8 +641,6 @@ describe('the page of the day', () => {
       'tracker_old',
       'source',
       'meeting',
-      // The sprint ends tomorrow: the alignment is due.
-      'alignment',
       'draft',
       'mail_reply',
       // Equally heavy: by name.
@@ -666,9 +650,8 @@ describe('the page of the day', () => {
       'bugs_stuck',
       'requirements',
     ])
-    expect(view.now.map((entry) => [entry.item.facts.kind, entry.rule])).toEqual([
-      ['alignment', 'due'],
-    ])
+    // Nothing here is to do right now: the alignment of the sprint is a deliverable, not a signal.
+    expect(view.now).toEqual([])
     expect(view.freshness.map((entry) => entry.source)).toEqual([
       'Posta',
       'Jira',
@@ -687,8 +670,7 @@ describe('the page of the day', () => {
     await expect(today.view(project)).rejects.toThrow('disk on fire')
   })
 
-  it('keeps requirements and alignment for the end of the sprint, and off when it is not known', async () => {
-    const alignment = { missing: [{}], needsUpdate: [], duplicates: [], orphans: [] }
+  it('keeps the requirements for the end of the sprint, and off when it is not known', async () => {
     const tracker = {
       dashboard: {
         settings: async () => DEFAULT_DASHBOARD_SETTINGS,
@@ -700,15 +682,7 @@ describe('the page of the day', () => {
             requirements: [{ id: '1' }],
           }) as never,
       },
-      alignments: {
-        settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
-        view: async () => ({
-          alignment: alignment as unknown as Alignment,
-          stateMismatches: [],
-          exportedAt: null,
-          tickets: 1,
-        }),
-      },
+      sprint: async () => 'Sprint 28',
     } satisfies Partial<TodayDeps>
     const kinds = async (overrides: Partial<TodayDeps>) =>
       (await setup({ ...tracker, ...overrides }).today.view(project)).items.map(
@@ -718,7 +692,7 @@ describe('the page of the day', () => {
       get: async () => ({ people: [], periods: [{ name: 'Sprint 28', from: '2026-11-03', to }] }),
     })
     expect(await kinds({ team: period('2026-11-17') })).toEqual(
-      expect.arrayContaining(['alignment', 'requirements']),
+      expect.arrayContaining(['requirements']),
     )
     const quiet = ['meeting', 'mail_reply']
     // The sprint ends in two weeks: both are read in their own pages.
@@ -728,16 +702,13 @@ describe('the page of the day', () => {
     expect(
       await kinds({
         team: period('2026-11-17'),
-        alignments: { ...tracker.alignments, settings: notSet('alignment_sprint_not_set') },
+        sprint: notSet('scripted_not_found'),
       }),
     ).toEqual([...quiet, 'calendar'])
     await expect(
       setup({
-        alignments: {
-          ...tracker.alignments,
-          settings: async () => {
-            throw new Error('disk on fire')
-          },
+        sprint: async () => {
+          throw new Error('disk on fire')
         },
       }).today.view(project),
     ).rejects.toThrow('disk on fire')
@@ -751,10 +722,7 @@ describe('the page of the day', () => {
           periods: [{ name: 'Sprint 28', from: '2026-11-03', to: '2026-11-27' }],
         }),
       },
-      alignments: {
-        view: notSet('alignment_sprint_not_set'),
-        settings: async () => ({ ...DEFAULT_ALIGNMENT_SETTINGS, sprint: 'Sprint 28' }),
-      },
+      sprint: async () => 'Sprint 28',
     })
     expect((await today.view(project)).sprintEnd).toBe('2026-11-27')
     const later = await today.decide(project, {

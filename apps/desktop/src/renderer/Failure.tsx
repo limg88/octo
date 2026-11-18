@@ -5,8 +5,6 @@ import { SECTION_LABELS, type Section } from './sections.ts'
 /** The errors that are put right in another section: where the PM has to go. */
 const WAYS: Partial<Record<ErrorCode, Section>> = {
   forecast_timesheet_not_set: 'hours',
-  alignment_items_missing: 'dashboard',
-  alignment_tickets_missing: 'sources',
   tracker_export_not_set: 'dashboard',
 }
 

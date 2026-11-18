@@ -105,7 +105,6 @@ const SECTION_OF: Partial<Record<TodayTarget, Section>> = {
   hours: 'hours',
   forecast: 'forecast',
   dashboard: 'dashboard',
-  alignment: 'alignment',
   deliverables: 'deliverables',
 }
 

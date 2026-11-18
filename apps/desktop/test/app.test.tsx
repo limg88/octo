@@ -12,12 +12,10 @@ import type {
 } from '@octo/application'
 import {
   type Assignment,
-  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
   DEFAULT_MODEL_SETTINGS,
-  DEFAULT_PROGRESS_SETTINGS,
   type Deliverable,
   type DeliverableKind,
   type FeedName,
@@ -169,7 +167,6 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
   const status: AgentStatus = { available: true, version: '2.1' }
   const api: OctoApi = {
     chooseProjectPath: vi.fn(async () => ok<string | null>(null)),
-    alignmentChoices: vi.fn(async () => ok({ sprints: [], periods: [], tags: [] })),
     agentStatus: vi.fn(async () => ok(status)),
     preferences: vi.fn(async () => ok<Preferences>({ theme: 'system' })),
     savePreferences: vi.fn(async (preferences: Preferences) => ok(preferences)),
@@ -260,31 +257,6 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
         skipped: ['Cometa'],
       }),
     ),
-    alignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
-    saveAlignmentSettings: vi.fn(async () => ok(DEFAULT_ALIGNMENT_SETTINGS)),
-    alignmentView: vi.fn(async () => ({
-      ok: false as const,
-      code: 'alignment_sprint_not_set' as const,
-    })),
-    exportMissingTickets: vi.fn(async () => ({
-      ok: false as const,
-      code: 'alignment_sprint_not_set' as const,
-    })),
-    progressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
-    saveProgressSettings: vi.fn(async () => ok(DEFAULT_PROGRESS_SETTINGS)),
-    progressCandidates: vi.fn(async () => ok<string[]>([])),
-    progressView: vi.fn(async () => ({
-      ok: false as const,
-      code: 'progress_settings_invalid' as const,
-    })),
-    compileProgress: vi.fn(async () => ({
-      ok: false as const,
-      code: 'progress_model_not_set' as const,
-    })),
-    registerProgressInvoices: vi.fn(async () => ({
-      ok: false as const,
-      code: 'progress_settings_invalid' as const,
-    })),
     forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     saveForecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     forecastCandidates: vi.fn(async () => ok<string[]>([])),
@@ -297,7 +269,6 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       code: 'forecast_model_not_set' as const,
     })),
     projectSheets: vi.fn(async () => ok([])),
-    projectShape: vi.fn(async () => ok({ twoTrackers: true, fixedPriceOnly: false })),
     readForecastOrders: vi.fn(async () => ({
       ok: false as const,
       code: 'source_not_configured' as const,
@@ -930,29 +901,6 @@ describe('project tabs', () => {
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
   })
 
-  it('offers no alignment to a project with one tracker, and sends a fixed price to the sheet of its code', async () => {
-    const { api } = fakeApi({
-      projectShape: vi.fn(async () => ok({ twoTrackers: false, fixedPriceOnly: true })),
-    })
-    render(<App api={api} />)
-    await screen.findByRole('heading', { name: 'Aurora' })
-    // Nothing to align: the section and its group are not in the sidebar.
-    await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: messages.alignmentTab })).toBeNull(),
-    )
-    expect(screen.queryByRole('tablist', { name: messages.nav.sprint })).toBeNull()
-    expect(screen.getByRole('tab', { name: messages.progressTab })).toBeTruthy()
-    // Sold at a fixed price only: «Avanzamento» is what NetSuite says, no form of the client.
-    fireEvent.click(screen.getByRole('tab', { name: messages.progressTab }))
-    expect(await screen.findByText(messages.progress.fixedPrice.intro)).toBeTruthy()
-    // What was ordered and invoiced is in the sheet of the project code: one press away.
-    fireEvent.click(screen.getByRole('button', { name: messages.openSection(messages.sheetTab) }))
-    expect(await screen.findByText(messages.forecast.noRows)).toBeTruthy()
-    expect(screen.getByRole('tab', { name: messages.sheetTab }).getAttribute('aria-selected')).toBe(
-      'true',
-    )
-  })
-
   it('groups the sections in the sidebar and moves among them with the arrows', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)
@@ -970,11 +918,12 @@ describe('project tabs', () => {
     expect(group(messages.nav.monthly)).toEqual([
       // The hours and the forecast of the month are parts of «Commessa», not sections.
       messages.sheetTab,
-      messages.progressTab,
     ])
-    expect(group(messages.nav.sprint)).toEqual([messages.alignmentTab])
+    // The progress form and the alignment of the sprint are deliverables of the project now.
+    for (const gone of ['Avanzamento', 'Allineamento']) {
+      expect(screen.queryByRole('tab', { name: gone })).toBeNull()
+    }
     expect(group(messages.nav.project)).toEqual([messages.sourcesTab])
-    expect(api.projectShape).toHaveBeenCalledWith('p-1')
 
     // The settings have tabs of their own: the section in use is the one of the sidebar.
     const selected = () =>

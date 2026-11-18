@@ -18,3 +18,5 @@ Regole, da non cambiare senza dirlo al PM:
 - nel file di import la priorità resta vuota: la decide il team.
 
 Octo non scrive in nessuno dei due tracker.
+
+Attenzione: `mancanti_<sprint>.csv` è fatto per essere importato nel tracker interno, non per essere aperto in un foglio di calcolo. Titoli e descrizioni vengono dal tracker del cliente così come sono: un testo che comincia con `=`, `+`, `-` o `@` in un foglio di calcolo può essere letto come una formula. Non viene modificato, perché una descrizione che comincia con un trattino è un elenco, e nel tracker deve restare tale.

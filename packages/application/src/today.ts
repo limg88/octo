@@ -1,5 +1,4 @@
 import {
-  alignmentItems,
   applyDecisions,
   bugItems,
   calendarItems,
@@ -82,7 +81,6 @@ import {
   withoutDecision,
   withVisit,
 } from '@octo/domain'
-import type { Alignments } from './alignment.ts'
 import type { Dashboard } from './dashboard.ts'
 import { type DayClosing, MEETING_FILES_TO_READ } from './day-closing.ts'
 import type { Deliverables } from './deliverables.ts'
@@ -110,7 +108,8 @@ export type TodayDeps = {
   hours: Pick<Hours, 'view'>
   forecasts: Pick<Forecasts, 'view'>
   dashboard: Pick<Dashboard, 'view' | 'settings'>
-  alignments: Pick<Alignments, 'view' | 'settings'>
+  /** The sprint that runs, as the alignment of the project names it; empty when it names none. */
+  sprint: (project: Project) => Promise<string>
   deliverables: Pick<Deliverables, 'list'>
   sources: Pick<Sources, 'mail'>
   feeds: Pick<Feeds, 'view'>
@@ -274,12 +273,11 @@ const MEETING_KINDS: readonly TodayKind[] = ['meeting']
 const TRACKER_KINDS: readonly TodayKind[] = ['tracker_old', 'bugs_stuck', 'requirements']
 const HOURS_KINDS: readonly TodayKind[] = ['hours']
 const FORECAST_KINDS: readonly TodayKind[] = ['forecast', 'month_due']
-const ALIGNMENT_KINDS: readonly TodayKind[] = ['alignment']
 const DRAFT_KINDS: readonly TodayKind[] = ['draft']
 const RISK_KINDS: readonly TodayKind[] = ['risk', 'risk_candidates']
 const UNASSIGNED_KINDS: readonly TodayKind[] = ['meeting_unassigned']
 /** The kinds told only while the sprint ends, and only while the month is being closed. */
-const SPRINT_END_KINDS: readonly TodayKind[] = ['requirements', 'alignment']
+const SPRINT_END_KINDS: readonly TodayKind[] = ['requirements']
 const MONTH_CLOSING_KINDS: readonly TodayKind[] = ['month_due']
 
 /**
@@ -411,13 +409,10 @@ export function createToday(deps: TodayDeps): Today {
       today: meetingsOn(invites, today),
       next: { day: nextDay, meetings: meetingsOn(invites, nextDay) },
     }
-    const sprint = await deps.alignments
-      .settings(project)
-      .then((alignment) => alignment.sprint)
-      .catch((error: unknown) => {
-        if (!isDomainError(error)) throw error
-        return ''
-      })
+    const sprint = await deps.sprint(project).catch((error: unknown) => {
+      if (!isDomainError(error)) throw error
+      return ''
+    })
     const sprintEnding = isSprintEnding(sprint, team, today)
     if (!sprintEnding) unread(SPRINT_END_KINDS)()
     if (!isMonthClosing(today)) unread(MONTH_CLOSING_KINDS)()
@@ -447,10 +442,6 @@ export function createToday(deps: TodayDeps): Today {
           ...monthDueItems(lastMonth, written.length > 0, today),
         ]
       }, unread(FORECAST_KINDS)),
-      attempt(async () => {
-        const view = await deps.alignments.view(project)
-        return alignmentItems(sprint, view.alignment, view.exportedAt, team, today)
-      }, unread(ALIGNMENT_KINDS)),
       attempt(
         async () => draftItems(await deps.deliverables.list(project), now),
         unread(DRAFT_KINDS),

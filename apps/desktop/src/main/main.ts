@@ -5,7 +5,6 @@ import { homedir, hostname, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  createAlignments,
   createAskQuestion,
   createBackups,
   createDashboard,
@@ -24,8 +23,6 @@ import {
   createModels,
   createOpenPoints,
   createPreferences,
-  createProgress,
-  createProjectShapes,
   createProjectSheets,
   createProjects,
   createReadings,
@@ -59,7 +56,9 @@ import {
   meetingNotices,
   type Project,
   prepCount,
+  SCRIPTED_CONFIG,
   sameFolder,
+  scriptedFolder,
 } from '@octo/domain'
 import {
   createAppleMailArchive,
@@ -74,7 +73,6 @@ import {
   createFeedRecords,
   createFileVault,
   createFixedIdentityProvider,
-  createFsAlignmentSettings,
   createFsDashboardSettings,
   createFsEvidenceReader,
   createFsFeedIndexes,
@@ -86,7 +84,6 @@ import {
   createFsMemoryWriter,
   createFsModelSettings,
   createFsOpenPointStore,
-  createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
   createFsRetiredSheetPlans,
@@ -664,28 +661,27 @@ function start(seatEnv: Record<string, string | undefined>): void {
     models: chosenModels,
     liveSources,
   })
-  const alignmentSettings = createFsAlignmentSettings()
-  const alignments = createAlignments({
-    settings: alignmentSettings,
-    dashboard: dashboardSettings,
-    exports: trackerExports,
-    sources: settings,
-    records: createFeedRecords(files),
-    writer,
-    team: (project) => team.get(project),
-  })
+  const keptSettings = createFsKeptSettings()
+  /**
+   * The sprint that runs, as the alignment of the project names it: the configuration of its
+   * deliverable, else what the section kept before it became one. The page of the day tells
+   * some signals only while the sprint ends.
+   */
+  const runningSprint = async (project: Project): Promise<string> => {
+    const config = await files
+      .readText(project.folder, `${scriptedFolder('allineamento')}/${SCRIPTED_CONFIG}`)
+      .then((text) => (text === null ? null : (JSON.parse(text) as unknown)))
+      .catch(() => null)
+    const kept = config ?? (await keptSettings.read(project.folder, 'alignment.json'))
+    const sprint = (kept as { sprint?: unknown } | null)?.sprint
+    return typeof sprint === 'string' ? sprint.trim() : ''
+  }
   // The plans the sheet kept left Octo: their rates are taken over once, and they are handed back.
   const forecastSettings = forecastSettingsAfterPlans(
     createFsForecastSettings(),
     createFsRetiredSheetPlans(),
     clock,
   )
-  const shapes = createProjectShapes({
-    sources: settings,
-    dashboard: dashboardSettings,
-    alignment: alignmentSettings,
-    forecast: forecastSettings,
-  })
   const forecastDeps: ForecastDeps = {
     settings: forecastSettings,
     files,
@@ -735,7 +731,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     hours,
     forecasts,
     dashboard,
-    alignments,
+    sprint: runningSprint,
     deliverables,
     sources,
     feeds,
@@ -765,20 +761,9 @@ function start(seatEnv: Record<string, string | undefined>): void {
     feeding,
     deliverables,
     dashboard,
-    alignments,
     hours,
     forecasts,
     projectSheets,
-    shapes,
-    progress: createProgress({
-      settings: createFsProgressSettings(),
-      files,
-      sheets,
-      writer,
-      records: createFeedRecords(files),
-      invoicesFolder: async (project) =>
-        (await settings.load(project.folder)).dwsi?.targetFolder ?? null,
-    }),
     agent,
     updates: updatesOf(),
     updatedTo: updatedVersion(dataFolder),
@@ -804,7 +789,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
       templates: createFsScriptedTemplates(shippedFolder('deliverable')),
       ids,
       sheets,
-      kept: createFsKeptSettings(),
+      kept: keptSettings,
       exports: trackerExports,
       dashboard: dashboardSettings,
       sources: settings,

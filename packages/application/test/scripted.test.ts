@@ -351,7 +351,7 @@ describe('the deliverables with a script', () => {
   })
 
   it('corrects in words in the work folder, and writes in the project only what the PM approves', async () => {
-    const { scripted, ran, text, disk } = setup()
+    const { scripted, ran, text, disk, work } = setup()
     await scripted.install(project, 'avanzamento')
     disk.set(`${SCRIPTED_FOLDER}/avanzamento/config.json`, encode('{"sprint":"Sprint 28"}'))
     await expect(scripted.correct(project, 'avanzamento', '   ')).rejects.toMatchObject({
@@ -365,16 +365,30 @@ describe('the deliverables with a script', () => {
       messages: ['fatto'],
       files: [],
       summary: 'Ho cambiato lo sprint.',
-      changed: ['config.json'],
+      changed: [{ name: 'config.json', text: '{"sprint":"Sprint 29"}' }],
     })
     // Not in the project yet.
     expect(text(`${SCRIPTED_FOLDER}/avanzamento/config.json`)).toBe('{"sprint":"Sprint 28"}')
+    // What is approved is what the PM was shown: not what the work folder holds by then, not a
+    // run that was no correction, not the correction of another deliverable.
+    work.left.set('config.json', encode('{"sprint":"cambiato dopo"}'))
+    work.left.set('script.py', encode('print("cambiato dopo")'))
+    await scripted.install(project, 'allineamento')
+    for (const [slug, runId] of [
+      ['allineamento', 'run-1'],
+      ['avanzamento', 'run-9'],
+    ] as const) {
+      await expect(scripted.approve(project, slug, runId)).rejects.toMatchObject({
+        code: 'work_not_found',
+      })
+    }
     await scripted.approve(project, 'avanzamento', 'run-1')
     expect(text(`${SCRIPTED_FOLDER}/avanzamento/config.json`)).toBe('{"sprint":"Sprint 29"}')
-    expect(text(`${SCRIPTED_FOLDER}/avanzamento/script.py`)).toBe('print("ok")')
-    await expect(scripted.approve(project, 'allineamento', 'run-1')).rejects.toMatchObject({
-      code: 'scripted_not_found',
+    // Approved once: asked again there is nothing left to approve.
+    await expect(scripted.approve(project, 'avanzamento', 'run-1')).rejects.toMatchObject({
+      code: 'work_not_found',
     })
+    expect(text(`${SCRIPTED_FOLDER}/avanzamento/script.py`)).toBe('print("ok")')
     // A manifest that is not one is told, not run.
     disk.set(
       `${SCRIPTED_FOLDER}/avanzamento/deliverable.json`,

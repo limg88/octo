@@ -13,7 +13,6 @@ export const TODAY_TARGETS = [
   'hours',
   'forecast',
   'dashboard',
-  'alignment',
   'deliverables',
   'risks',
   'mail',
@@ -126,14 +125,6 @@ export type TodayFacts =
   | { kind: 'bugs_stuck'; count: number; stuckDays: number; oldestDays: number }
   | { kind: 'requirements'; count: number; ids: string[] }
   | {
-      kind: 'alignment'
-      sprint: string
-      missing: number
-      needsUpdate: number
-      duplicates: number
-      orphans: number
-    }
-  | {
       kind: 'draft'
       id: string
       title: string
@@ -176,7 +167,6 @@ export const TODAY_KINDS = [
   'month_due',
   'bugs_stuck',
   'requirements',
-  'alignment',
   'draft',
   'calendar',
   'meeting',
@@ -194,7 +184,6 @@ export const COUNTED_KINDS: readonly TodayKind[] = [
   'forecast',
   'bugs_stuck',
   'requirements',
-  'alignment',
   'risk_candidates',
 ]
 

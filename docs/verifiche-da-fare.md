@@ -33,7 +33,7 @@ Scheda dei criteri di uscita (tabella di §4 di `docs/revisione-roadmap.md`). Og
 | R2.8 | F5 — la Suite v0 non serve più; la collega produce un deliverable reale | Non verificabile prima di R4 | Vedi R4 | — | rimandato a R4 |
 | R2.9 | T1 — due persone sullo stesso progetto su SharePoint | Fuori da questo giro | R7 | — | rimandato a R7 |
 
-Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella finestra vera) è fermo da prima di R1.** Lo script non segue più le revisioni delle schermate (demo 55 e 56): si ferma su pulsanti che ora stanno nel modulo aperto di una fonte. Ho corretto i primi due punti (lettura di una fonte, posto di «Ore» e «Previsionale»); il passo successivo che fallisce è «Riempi la memoria ora». Gli incrementi di questo giro sono provati nella finestra vera con script brevi (`pnpm e2e:commessa`, `pnpm e2e:riunioni`). Esito che chiude: `pnpm e2e` arriva a «ok».
+Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella finestra vera) è fermo da prima di R1.** Lo script non segue più le revisioni delle schermate (demo 55 e 56): si ferma su pulsanti che ora stanno nel modulo aperto di una fonte. Ho corretto i primi due punti (lettura di una fonte, posto di «Ore» e «Previsionale»); il passo successivo che fallisce è «Riempi la memoria ora». Dopo R4 lo script contiene anche i passi delle demo 10, 13 e 54, che non esistono più: vanno tolti quando lo si riallinea. Gli incrementi di questo giro sono provati nella finestra vera con script brevi (`pnpm e2e:commessa`, `pnpm e2e:riunioni`). Esito che chiude: `pnpm e2e` arriva a «ok».
 
 ## R3 — Recinto sul Mac
 
@@ -43,6 +43,18 @@ Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella fine
 | R3.2 | La prova ostile sul tuo Mac, dopo ogni aggiornamento di Claude Code | `pnpm test:recinto` | 2 test passati. Passata il 18/11/2026 con Claude Code 2.1.327 su macOS (arm64); va rifatta a ogni aggiornamento, perché la sandbox è di Claude Code | raggiunto il 18/11/2026, da ripetere |
 | R3.3 | L'interprete dentro l'app installata | Installa la build (`pnpm dist`), apri «Chiedi»: la casella «Con calcoli» c'è e una domanda con calcoli risponde | La casella c'è e il calcolo riesce. Nello sviluppo è provato; nell'app firmata e installata no (l'interprete va firmato con l'app) | da fare |
 | R3.4 | Processore Intel | Come R3.3 su un Mac Intel, se ce n'è uno | Il calcolo riesce | da fare |
+
+## R4 — Deliverable del progetto con script e modello
+
+| # | Che cosa provare | Come | Esito che chiude | Esito |
+|---|---|---|---|---|
+| R4.1 | Il modulo di una richiesta reale esce come deliverable del progetto | Sul progetto vero: «Deliverable» → «Deliverable del progetto, con script» → «Aggiungi al progetto» sul modulo di avanzamento; scrivi il numero della richiesta; «Esegui» con Claude vero; «Salva nel progetto» | Il file Excel salvato in `_octo/deliverable/avanzamento/` è uguale a quello che avevi prodotto con la sezione per la stessa richiesta (percentuali, intestazione, logo e celle unite) | da fare |
+| R4.2 | L'elenco dei ticket mancanti dello sprint in corso | Come sopra con «Allineamento dello sprint» | `mancanti_<sprint>.csv` si importa nel tracker interno senza errori e le tre liste di `allineamento.md` sono quelle che ti aspetti | da fare |
+| R4.3 | Una correzione a parole diventa regola | «Correggi a parole»: aggiungi una richiesta nuova al modulo di avanzamento dettandone i dati; leggi i file cambiati; «Approva la correzione»; «Esegui» | Meno di 5 minuti dal dettato al modulo della richiesta nuova, senza toccare un file a mano | da fare |
+| R4.4 | La collega produce un deliverable reale (criterio di F5) | Sul suo computer, a recinto disponibile (su Windows dopo R6) | Un deliverable reale prodotto da lei senza aiuto | da fare |
+| R4.5 | La Suite v0 non serve più per il lavoro quotidiano (criterio di F5) | Una settimana di lavoro annotando ogni volta che apri v0 e perché | Nessuna apertura di v0, oppure l'elenco di ciò che manca | da fare |
+
+Uscito con le due sezioni e non rifatto: il confronto fra richieste e fatture di NetSuite, i titoli simili proposti fra voci senza ticket e ticket senza riferimento, il segnale dell'allineamento in «Oggi» a fine sprint. Se uno di questi ti serve, si aggiunge allo script a parole (R4.3) o si chiede.
 
 ## R6 — che cosa serve sapere sulla posta di Windows
 

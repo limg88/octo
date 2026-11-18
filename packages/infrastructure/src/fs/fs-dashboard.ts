@@ -1,30 +1,24 @@
 import { open, readFile, realpath, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
-  AlignmentSettingsStore,
   DashboardSettingsStore,
   ExportCandidates,
   ForecastSettingsStore,
   HoursSettingsStore,
   ModelSettingsStore,
-  ProgressSettingsStore,
   RetiredSheetPlans,
   TeamStore,
   TrackerExports,
 } from '@octo/application'
 import {
-  cleanAlignmentSettings,
   cleanDashboardSettings,
   cleanForecastSettings,
   cleanHoursSettings,
   cleanModelSettings,
-  cleanProgressSettings,
   cleanTeam,
-  DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
   DEFAULT_FORECAST_SETTINGS,
   DEFAULT_HOURS_SETTINGS,
-  DEFAULT_PROGRESS_SETTINGS,
   DomainError,
   FORECAST_KINDS,
   type ForecastExternal,
@@ -287,86 +281,6 @@ export function createFsRetiredSheetPlans(): RetiredSheetPlans {
       return parsed.data
     },
     handBack: (projectFolder, text) => writeAtomic(exportOf(projectFolder), text),
-  }
-}
-
-const PROGRESS_FILE = 'progress.json'
-const progressSchema = z.object({
-  modelPath: z.string().default(DEFAULT_PROGRESS_SETTINGS.modelPath),
-  order: z.string().default(DEFAULT_PROGRESS_SETTINGS.order),
-  salesOrders: z.array(z.string()).default([]),
-  total: z.number().nullable().default(DEFAULT_PROGRESS_SETTINGS.total),
-  positions: z.array(z.object({ code: z.string(), amount: z.number() })).default([]),
-  requests: z
-    .array(
-      z.object({
-        n: z.number(),
-        from: z.string(),
-        to: z.string(),
-        amount: z.number(),
-        note: z.string().default(''),
-        positions: z.array(z.string()).default([]),
-      }),
-    )
-    .default([]),
-  form: z
-    .object({
-      fields: z.array(z.object({ ref: z.string(), text: z.string() })).default([]),
-      table: z
-        .object({
-          firstRow: z.number(),
-          rows: z.number(),
-          position: z.string(),
-          previous: z.string(),
-          current: z.string(),
-          period: z.string(),
-        })
-        .nullable()
-        .default(null),
-    })
-    .default(DEFAULT_PROGRESS_SETTINGS.form),
-})
-
-export function createFsProgressSettings(): ProgressSettingsStore {
-  const fileOf = (projectFolder: string) =>
-    join(projectFolder, PROJECT_SETTINGS_FOLDER, PROGRESS_FILE)
-  return {
-    async load(projectFolder) {
-      const parsed = progressSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
-      if (!parsed.success) throw new DomainError('progress_settings_invalid', PROGRESS_FILE)
-      return cleanProgressSettings(parsed.data)
-    },
-    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
-  }
-}
-
-const ALIGNMENT_FILE = 'alignment.json'
-const alignmentSchema = z.object({
-  sprint: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.sprint),
-  period: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.period),
-  tags: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.tags),
-  ownPeopleOnly: z.boolean().default(false),
-  exportPath: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.exportPath),
-  ticketFolder: z.string().default(DEFAULT_ALIGNMENT_SETTINGS.ticketFolder),
-  referencePrefixes: z.array(z.string()).default(DEFAULT_ALIGNMENT_SETTINGS.referencePrefixes),
-  stateGroups: z
-    .array(z.object({ name: z.string(), item: z.array(z.string()), ticket: z.array(z.string()) }))
-    .default(DEFAULT_ALIGNMENT_SETTINGS.stateGroups),
-  typeMap: z
-    .array(z.object({ item: z.string(), ticket: z.string() }))
-    .default(DEFAULT_ALIGNMENT_SETTINGS.typeMap),
-})
-
-export function createFsAlignmentSettings(): AlignmentSettingsStore {
-  const fileOf = (projectFolder: string) =>
-    join(projectFolder, PROJECT_SETTINGS_FOLDER, ALIGNMENT_FILE)
-  return {
-    async load(projectFolder) {
-      const parsed = alignmentSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
-      if (!parsed.success) throw new DomainError('alignment_settings_invalid', ALIGNMENT_FILE)
-      return cleanAlignmentSettings(parsed.data)
-    },
-    save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
   }
 }
 

@@ -126,21 +126,6 @@ function followWhy(facts: Extract<TodayFacts, { kind: 'mail_follow' }>): string 
   }
 }
 
-function alignmentDetail(facts: Extract<TodayFacts, { kind: 'alignment' }>): string {
-  return [
-    facts.missing > 0 ? count(facts.missing, 'voce senza ticket', 'voci senza ticket') : '',
-    facts.needsUpdate > 0
-      ? count(facts.needsUpdate, 'voce con il ticket altrove', 'voci con il ticket altrove')
-      : '',
-    facts.duplicates > 0
-      ? count(facts.duplicates, 'voce con più ticket', 'voci con più ticket')
-      : '',
-    facts.orphans > 0 ? count(facts.orphans, 'ticket orfano', 'ticket orfani') : '',
-  ]
-    .filter((part) => part !== '')
-    .join(' · ')
-}
-
 /** A signal in the words a PM reads. Every figure comes from the signal: nothing is worked out here. */
 export function signalText(item: TodayItem): SignalText {
   const facts = item.facts
@@ -211,11 +196,6 @@ export function signalText(item: TodayItem): SignalText {
       return {
         title: `${count(facts.count, 'storia poco chiara', 'storie poco chiare')} nel periodo`,
         detail: `Voci: ${facts.ids.join(', ')}${facts.count > facts.ids.length ? '…' : ''}`,
-      }
-    case 'alignment':
-      return {
-        title: `${facts.sprint}: i due tracker non sono allineati`,
-        detail: capital(alignmentDetail(facts)),
       }
     case 'draft':
       return {

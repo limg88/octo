@@ -1,4 +1,3 @@
-import type { Alignment } from '../alignment/align.ts'
 import type { Deliverable } from '../deliverables/deliverable.ts'
 import type { DomainErrorCode } from '../errors.ts'
 import type { Forecast } from '../forecast/compile.ts'
@@ -204,40 +203,6 @@ export function sprintEnd(sprint: string, team: ProjectTeam): string | null {
 export function isSprintEnding(sprint: string, team: ProjectTeam, today: string): boolean {
   const end = sprintEnd(sprint, team)
   return end !== null && today <= end && workdaysBetween(today, end) <= SPRINT_ENDING_WORKDAYS
-}
-
-/**
- * What the two trackers do not agree on in the sprint compared, said only while the sprint ends:
- * before, it is read in its own page.
- */
-export function alignmentItems(
-  sprint: string,
-  alignment: Alignment,
-  exportedAt: string | null,
-  team: ProjectTeam,
-  today: string,
-): TodayItem[] {
-  const facts = {
-    kind: 'alignment' as const,
-    sprint,
-    missing: alignment.missing.length,
-    needsUpdate: alignment.needsUpdate.length,
-    duplicates: alignment.duplicates.length,
-    orphans: alignment.orphans.length,
-  }
-  const weight = facts.missing + facts.needsUpdate + facts.duplicates + facts.orphans
-  if (weight === 0 || !isSprintEnding(sprint, team, today)) return []
-  return [
-    {
-      key: `alignment:${sprint.trim().toLowerCase()}`,
-      band: 'due',
-      facts,
-      weight,
-      target: 'alignment',
-      asOf: exportedAt,
-      dueBecause: 'sprint_end',
-    },
-  ]
 }
 
 /** The drafts that wait for the PM: to approve, or failed and to start again. */

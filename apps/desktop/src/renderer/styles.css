@@ -3700,3 +3700,10 @@ span.marker-warning {
 .scripted textarea {
   width: 100%;
 }
+
+.scripted-file {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
