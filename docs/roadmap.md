@@ -33,7 +33,7 @@ Il tetto iniziale di 15.000 righe di codice nuovo è stato superato nei primi qu
 - **Che cosa si conta**: i sorgenti in `packages/*/src` e `apps/*/src` (`.ts` e `.tsx`), senza righe vuote e senza commenti. Sono compresi i connettori portati da octobrief-new e i testi dell'interfaccia. Restano fuori i test (37.900 righe alla stessa data), i fogli di stile, le demo e il server del distillato di T2, che è un programma a parte.
 - **Interfaccia**: `apps/desktop/src` non supera le 20.000 righe. Al 18/11/2026 sono 19.700.
 - **Sopra il tetto**: ogni aggiunta si paga con una rimozione nello stesso incremento.
-- **Perché 50.000**: il lavoro previsto (Claude che calcola e scrive in una cartella di lavoro, deliverable del progetto con script e modello, memoria curata, tabella con fonte in Chiedi, posta su Windows, aggiornamento automatico) è stimato fra 5.200 e 7.100 righe. Il tetto lo lascia entrare solo se una parte del codice di oggi esce. È un freno dichiarato, non una misura di quante righe regge una persona.
+- **Perché 50.000**: il lavoro previsto (Claude che calcola e scrive in una cartella di lavoro, deliverable del progetto con script e modello, memoria curata, tabella con fonte in Chiedi, posta su Windows, aggiornamento automatico) era stimato fra 5.200 e 7.100 righe; la roadmap approvata il 18/11/2026 lo stima in circa 4.700 righe in entrata e circa 5.400 in uscita, perché l'aggiornamento automatico esiste già e la parte economica si riduce. Il tetto lo lascia entrare solo se una parte del codice di oggi esce. È un freno dichiarato, non una misura di quante righe regge una persona.
 
 Dove sta il codice al 18/11/2026:
 
@@ -54,11 +54,11 @@ find packages/*/src apps/*/src \( -name '*.ts' -o -name '*.tsx' \) -print0 | xar
 ### Claude dentro un recinto (deciso il 18/11/2026)
 
 - **Decisione del PM**: Claude può eseguire calcoli sui dati del progetto e scrivere file, purché il suo ambito di manovra sia recintato. A questa condizione la sicurezza non è un ostacolo.
-- **Che cosa cambia**: finora Claude leggeva soltanto in Chiedi (Read, Grep, Glob) e nei deliverable scriveva in `_octo/lavori/<id>/` senza eseguire comandi. La decisione rivede la regola di F4 «Niente script nel progetto e niente Python sul PC».
+- **Che cosa cambia**: finora Claude leggeva soltanto (Read, Grep, Glob), in Chiedi come nei deliverable: restituiva un testo in formato fisso e i file li scriveva Octo (vedi «Scelte prese durante F4»). La decisione rivede la regola di F4 «Niente script nel progetto e niente Python sul PC».
 - **Perché**: nel vault di v0 il lavoro è fatto in gran parte di analisi su misura con calcoli e di file rivisti a più giri. Leggendo soltanto, Claude non aggrega un'esportazione da decine di megabyte e non verifica i conti di un documento.
-- **Il recinto**: Claude legge il progetto e scrive solo in una cartella di lavoro sotto `_octo/`. Il limite lo impongono gli strumenti concessi a Claude, non una frase nel prompt.
+- **Il recinto**: Claude legge il progetto e scrive solo in una cartella di lavoro **fuori dal progetto** (nello stato dell'app); Octo copia in `_octo/` ciò che il PM approva. Il limite lo impone la sandbox del sistema operativo attivata da Claude Code, non le sole regole sugli strumenti né una frase nel prompt: senza sandbox un interprete autorizzato scrive ovunque (prova del 18/11/2026, `docs/revisione-roadmap.md` §6).
 - **Che cosa resta nel codice di Octo**: ciò che va garantito e vale per ogni PM (lettura delle fonti, controlli, ciclo di revisione, conti che devono coincidere con NetSuite).
-- **Da verificare prima di costruirci sopra**: che in modalità ristretta si possa concedere l'esecuzione di calcoli tenendo la scrittura nella sola cartella di lavoro, sul Mac e sul PC Windows del pilota. Non è ancora stato provato.
+- **Verificato sul Mac il 18/11/2026** con l'interprete del sistema (configurazione D4 della revisione). **Da verificare**: l'interprete incluso nell'app dentro la sandbox (primo passo di R3); il PC Windows del pilota, dove la sandbox esiste solo dentro WSL2 (R6).
 
 ## T0 — MVP a fette
 
@@ -80,6 +80,26 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | **T2** | cruscotto economico; server del distillato; deleghe del project manager su una commessa (`docs/identita-e-login.md`) | i numeri coincidono con NetSuite; una domanda su 3 progetti con risposta citata |
 | **T3** | aggiornamento automatico; 3-5 PM | metriche dei 90 giorni raggiunte |
 
+## Roadmap approvata il 18/11/2026 (R0–R7)
+
+Sostituisce l'ordine di lavoro delle due tabelle sopra, che restano come elenco dei criteri di uscita: la loro verifica è l'incremento R2. Analisi, prove e decisioni del PM sono in [revisione-roadmap.md](revisione-roadmap.md); qui c'è solo ciò che serve per lavorare. L'ordine non è scambiabile: il picco è dopo R3 e sta sotto i due tetti solo perché R1 viene prima.
+
+Totali di partenza, misurati il 18/11/2026 con il comando di «Tetto del codice»: **46.878** righe in tutto, **19.700** in `apps/desktop/src`.
+
+| # | Incremento | Scopo | Criterio di uscita | Entrano (stima) | Escono (stima) | Totale dopo (stima) | Interfaccia dopo (stima) |
+|---|---|---|---|---|---|---|---|
+| R0 | Fissare che cosa resta | committare il lavoro delle demo 57-59; togliere le cifre reali da `verifica-deem-petrolvalves.md`; nessun codice nuovo | `git status` pulito; roadmap riportata qui; cifre e nomi sostituiti | 0 | 0 | 46.878 | 19.700 |
+| R1 | Economia a riepilogo | «Commessa» diventa il riepilogo e assorbe Ore e Previsionale; escono budget, mesi, piano di fatturazione, anagrafica; l'avanzamento si legge da NetSuite | le cifre del riepilogo coincidono con NetSuite sui due progetti reali; il previsionale di un mese vero esce in Excel; interfaccia sotto 18.700; la vista dell'avanzamento è popolata per le commesse a corpo, altrimenti vale il riconosciuto su ordinato | 230 | 1.775 | 45.333 | 18.610 |
+| R2 | Verifica di T0 su ciò che resta | chiudere i criteri di F1-F4 sul Mac e la prima sessione con il pilota; riunioni assegnate da sole quando è certo; per il resto solo correzioni | ogni riga dei criteri di F1-F5 e T1 ha un esito scritto, «raggiunto» o «fallito, con il perché» | 420 | 0 | 45.753 | 18.780 |
+| R3 | Recinto sul Mac | Claude calcola e scrive nella cartella di lavoro, con un interprete incluso nell'app; tabella con fonte in Chiedi | un'analisi con calcoli del vault rifatta con le stesse cifre; la prova ostile passa come test di integrazione; senza sandbox Octo rifiuta di eseguire | 1.200 | 0 | 46.953 | 19.180 |
+| R4 | Deliverable del progetto con script e modello | F5; Avanzamento e Allineamento escono dal codice e tornano come deliverable del progetto | modulo di una richiesta ed elenco dei ticket mancanti escono come deliverable con lo stesso risultato delle sezioni, e solo allora le sezioni si tolgono; la collega produce un deliverable reale | 1.400 | 3.090 | 45.263 | 17.560 |
+| R4b | Catalogo in file | i dieci tipi del catalogo diventano cartelle distribuite con l'app, correggibili a parole | i dieci tipi producono le stesse bozze di prima; il PM corregge un'istruzione in meno di 5 minuti | 150 | 500 | 44.913 | 17.560 |
+| R5 | Memoria: pagine scritte da Claude | pagine curate in `_octo/progetto/`, approvate dal PM, lette per prime da Chiedi | cinque domande di contesto citano le pagine; il PM corregge una pagina a parole in meno di 5 minuti | 400 | 0 | 45.313 | 17.660 |
+| R6 | Windows: WSL2 e posta | recinto dentro WSL2 sul PC del pilota; lettore della posta su Windows | la prova ostile passa dentro WSL2 sul PC del pilota; tre giorni di posta letta su Windows | 900 | 0 | 46.213 | 17.860 |
+| R7 | Ciò che resta di T1 e T2 | due persone su SharePoint; server del distillato (programma a parte) | da stimare dopo R2 | — | — | — | — |
+
+Regole di lavoro: un ramo per incremento, creato dal precedente; alla chiusura suite e copertura, demo da `demo/60-…`, misura delle righe, «Stato», commit. Un criterio che chiede il PM, il pilota, il suo PC o giorni di calendario si chiude nel codice e la verifica mancante va in [verifiche-da-fare.md](verifiche-da-fare.md): l'incremento risulta «codice chiuso, criterio da verificare», mai «raggiunto».
+
 ## Metriche dei primi 90 giorni
 - deliverable reali prodotti a settimana per PM;
 - almeno il 90% degli elementi entra in memoria senza intervento;
@@ -97,6 +117,24 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 | F4 | codice chiuso il 14/11/2026: catalogo (email al cliente, stato di avanzamento, verbale, stima), bozza con fonti controllate, rilettura critica, modifica a parole, approvazione, Markdown e Word, tempi e giri; demo `demo/06-deliverable`. Aggiunti stima, registro e carta intestata. Criterio di uscita da verificare su due deliverable reali |
 | F5 | in corso. Fatti il 14/11/2026: tipi di deliverable definiti dal PM a parole. Non fattibile oggi: i connettori del PM dentro Chiedi (vedi sotto). Fatti poi: Excel e PowerPoint su modello (previsionale, modulo di avanzamento, presentazione: demo 09, 10, 11) e la cartella di un progetto nuovo creata da Octo con un posto per contratti, documenti, riunioni e tracker (demo 14). Restano le prove su un progetto vero |
 | T1 | in corso. Riunioni da Verbale: fatte il 16/11/2026, demo `demo/25-riunioni-verbale` (fonte «Riunioni (Verbale)», assegnazione al progetto per invito o parole chiave, altrimenti segnalazione in «Oggi»; verbale dalla riunione scelta). Octo legge anche ciò che Verbale ha aggiunto all'export (cartella dichiarata, riepilogo leggero, partecipanti, revisione dell'esportazione). Stato delle richieste a Verbale in `docs/verbale-richieste.md`: manca il legame con l'evento di calendario. Cartella condivisa: fatta il 16/11/2026, demo `demo/42-cartella-condivisa` (vedi «Scelte prese per la cartella condivisa»). Resta: la prova con due persone vere su SharePoint, e la posta su Windows. Criterio «le riunioni entrano senza intervento» da verificare su riunioni vere |
+| T2 | in corso, mai chiamato così finora: previsionale per commessa, progetto a corpo, sezione «Commessa» (demo 41, 43-54, 57-59). Accesso e tipi delle colonne verificati sul NetSuite vero; la lettura completa sulle commesse vere no. Server del distillato e deleghe: non iniziati (R7) |
+| T3 | l'aggiornamento automatico esiste, solo su Mac. Le metriche dei 90 giorni non sono misurate |
+
+### Stato della roadmap R0–R7
+
+Da qui riparte una sessione nuova: l'ultimo incremento chiuso dice il ramo su cui stare e il prossimo da aprire. Le righe sono misurate alla chiusura con il comando di «Tetto del codice» (solo `.ts` e `.tsx`); script Python e file del catalogo sono contati a parte, perché quel comando non li vede.
+
+| # | Ramo | Stato | Demo | Entrano: stima → vero | Escono: stima → vero | Totale: stima → vero | Interfaccia: stima → vero |
+|---|---|---|---|---|---|---|---|
+| R0 | `feat/project-sheet` | **chiuso il 18/11/2026**. Lavoro delle demo 57-59 committato com'era, dopo la suite (1.451 test, copertura sopra l'80%); cifre e nomi tolti da `verifica-deem-petrolvalves.md`; roadmap riportata. Nessun codice nuovo, quindi nessuna demo | — | 0 → 0 | 0 → 0 | 46.878 → 46.878 | 19.700 → 19.700 |
+| R1 | `feat/r1-economia-riepilogo` | da fare | | 230 → | 1.775 → | 45.333 → | 18.610 → |
+| R2 | `feat/r2-verifica-t0` | da fare | | 420 → | 0 → | 45.753 → | 18.780 → |
+| R3 | `feat/r3-recinto-mac` | da fare | | 1.200 → | 0 → | 46.953 → | 19.180 → |
+| R4 | `feat/r4-deliverable-progetto` | da fare | | 1.400 → | 3.090 → | 45.263 → | 17.560 → |
+| R4b | `feat/r4b-catalogo-in-file` | da fare | | 150 → | 500 → | 44.913 → | 17.560 → |
+| R5 | `feat/r5-memoria` | da fare | | 400 → | 0 → | 45.313 → | 17.660 → |
+| R6 | `feat/r6-windows-wsl` | da fare | | 900 → | 0 → | 46.213 → | 17.860 → |
+| R7 | — | escluso da questo giro | | | | | |
 
 ## Scelte prese durante F1
 - **Claude in modalità ristretta** (`--restricted --strict-mcp-config`), con i soli strumenti Read, Grep e Glob:
@@ -178,7 +216,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Freschezza**: la pagina Fonti mostra l'ultima lettura e avvisa dopo un giorno senza letture o se l'ultima è fallita.
 - **Permesso su macOS**: leggere `~/Library/Mail` richiede «Accesso completo al disco» per Octo. Se manca, la pagina lo dice.
 - **Windows**: nessun lettore ancora; la pagina dice che la posta non è disponibile. Dipende da quale Outlook ha il pilota.
-- **Non verificato**: la lettura della posta reale (fatta solo su archivio finto, anche nella finestra vera).
+- *Superata*: la posta reale dei due progetti è stata letta da Octo sul Mac (verifica del 17/11/2026). Resta non verificata su Windows, dove il lettore non esiste.
 
 ## Scelte prese durante F2 (documenti)
 - **Perché**: nel confronto con v0 due file Excel del vault erano invisibili a Chiedi, perché Claude in sola lettura apre solo testo.
@@ -207,7 +245,7 @@ Ogni fetta finisce con qualcosa di usabile su un progetto reale. La successiva p
 - **Quando**: «Leggi ora» e ogni 15 minuti ad app aperta, dopo la posta e prima dei documenti.
 - **App impacchettata**: il client Postgres è una libreria CommonJS; il processo principale ha ora il suo `require`.
 - **Test**: il warehouse finto è un Postgres vero (`pnpm db:setup`, porta 5460); dove non c'è, quei test restano fuori.
-- **Non verificato**: Azure DevOps, Jira e DWSI reali. In octobrief-new il primo contatto con un ADO vero aveva richiesto due correzioni, già incluse nei connettori portati.
+- *Superata*: Jira e NetSuite reali sono stati letti sui due progetti (verifica del 17/11/2026 e nota in fondo a «Schede progetto»); Azure DevOps solo da esportazione. In octobrief-new il primo contatto con un ADO vero aveva richiesto due correzioni, già incluse nei connettori portati.
 - **Aperto per F4**: le skill di v0 leggono lo snapshot ADO in un loro formato (`azdo_latest.json`). I deliverable di Octo dovranno leggere questi file, oppure Octo dovrà scrivere anche quello snapshot.
 
 ## Scelte prese durante F3 (configurazione guidata)
