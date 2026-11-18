@@ -97,6 +97,12 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.instructionsGet, { projectId, kindId }),
   saveDeliverableInstructions: (projectId, kindId, text) =>
     ipcRenderer.invoke(CHANNELS.instructionsSave, { projectId, kindId, text }),
+  correctKind: (projectId, kindId, words) =>
+    ipcRenderer.invoke(CHANNELS.kindCorrect, { projectId, kindId, words }),
+  approveKindCorrection: (projectId, kindId, correctionId) =>
+    ipcRenderer.invoke(CHANNELS.kindCorrectionApprove, { projectId, kindId, correctionId }),
+  restoreKind: (projectId, kindId) =>
+    ipcRenderer.invoke(CHANNELS.kindRestore, { projectId, kindId }),
   kindTemplates: (projectId) => ipcRenderer.invoke(CHANNELS.kindTemplates, { projectId }),
   chooseKindTemplate: (projectId, kindId) =>
     ipcRenderer.invoke(CHANNELS.kindTemplateChoose, { projectId, kindId }),

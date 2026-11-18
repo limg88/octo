@@ -38,6 +38,8 @@ export type DeliverableKind = {
   deck?: true
   /** A page of the memory of the project: once approved, its text is kept as that page. */
   memoryPage?: string
+  /** A kind of Octo whose instructions are the ones the PM corrected for this project. */
+  corrected?: true
 }
 
 /** What the writer gives back: the text and, for a kind with numbers, the lines to compute. */

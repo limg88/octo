@@ -390,9 +390,23 @@ export type RedTeamRequest = {
  * Writes the draft of a deliverable from the project folder, read-only, and reads a draft again
  * as the one who will receive it. Failures are DomainErrors with an `agent_*` code.
  */
+export type KindCorrectionRequest = {
+  projectFolder: string
+  kind: DeliverableKind
+  /** What the PM wants changed in how the kind is written, in their words. */
+  words: string
+  model?: string | null
+  signal?: AbortSignal
+}
+
+/** The instructions of a kind written again, whole, and what changed in a few words. */
+export type KindCorrectionDraft = { instructions: string; summary: string }
+
 export interface DeliverableWriter {
   draft(request: DraftRequest): Promise<DeliverableDraft>
   redTeam(request: RedTeamRequest): Promise<RedTeamReport>
+  /** Writes again how a kind is written, as the PM asked. Nothing is saved by this. */
+  correctKind(request: KindCorrectionRequest): Promise<KindCorrectionDraft>
 }
 
 /** Turns an approved text into the files a person sends or files away. */

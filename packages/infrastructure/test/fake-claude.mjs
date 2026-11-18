@@ -308,6 +308,25 @@ if (args.join(' ').includes('You look for the risks of one project')) {
   process.exit(0)
 }
 
+// A run that corrects how a kind is written: the instructions as they are come in the system
+// prompt, the request of the PM on standard input. What is asked is added as a rule.
+if (args.join(' ').includes('You maintain the instructions a writer follows')) {
+  const prompt = args.join(' ')
+  const now = prompt.slice(
+    prompt.indexOf('<kind_instructions>') + '<kind_instructions>'.length,
+    prompt.indexOf('</kind_instructions>'),
+  )
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      instructions: `${now.trim()}\n\nRegola del PM: ${question.trim()}`,
+      summary: 'Ho aggiunto in fondo la regola chiesta; il resto è com’era.',
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the red team: it is told so in its system prompt, and reads the text on standard input.
 if (args.join(' ').includes('You attack the content of a deliverable')) {
   const invented = question.includes('99.000')

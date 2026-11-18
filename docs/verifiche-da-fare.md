@@ -60,7 +60,7 @@ Uscito con le due sezioni e non rifatto: il confronto fra richieste e fatture di
 
 | # | Che cosa provare | Come | Esito che chiude | Esito |
 |---|---|---|---|---|
-| R4b.1 | Il PM corregge l'istruzione di un tipo in meno di 5 minuti, senza codice | Oggi la via a parole è per progetto: «Deliverable» → un tipo → «Istruzioni per questo progetto». Cronometra una correzione vera e la bozza successiva | Meno di 5 minuti, e la bozza successiva la rispetta | da fare |
+| R4b.1 | Il PM corregge l'istruzione di un tipo in meno di 5 minuti, senza codice | Dal 18/11/2026 si corregge a parole anche il tipo di Octo (demo 67): «Deliverable» → un tipo → «Come Octo scrive questo tipo» → scrivi che cosa cambiare → leggi le istruzioni proposte → «Usa queste istruzioni». Con Claude vero, cronometra una correzione vera e la bozza successiva; guarda che la riscrittura non abbia toccato ciò che non hai chiesto | Meno di 5 minuti; la bozza successiva segue la correzione; il resto delle istruzioni è com'era. Provato solo con Claude finto | da fare |
 | R4b.2 | Le bozze dei dieci tipi con Claude vero sono quelle di prima | Una bozza per due tipi che usi spesso, sul progetto vero | Nessuna differenza di struttura rispetto alle bozze di prima del 18/11. I dieci tipi letti dai file sono stati confrontati con le costanti del codice: dieci su dieci uguali, quindi le istruzioni che arrivano a Claude sono le stesse | da fare |
 | R4b.3 | Il catalogo dentro l'app installata | Installa la build (`pnpm dist`) e apri «Deliverable» | I dieci tipi ci sono | da fare |
 
@@ -92,21 +92,23 @@ Tutto questo si prova sul PC del pilota, a PC preparato (WSL2 installato, Claude
 | R6.6 | Cartelle sincronizzate con OneDrive o SharePoint | Progetto in una cartella sincronizzata, con qualche file «solo online» | Chiedi e un calcolo funzionano; un file solo online viene scaricato o segnalato, non letto vuoto | da fare |
 | R6.7 | L'interprete per Linux distribuito con l'installatore | Dopo l'installazione: `wsl -e "/mnt/c/…/Octo/resources/python-linux/bin/python3" -c "import openpyxl; print(1)"` | Stampa 1. Se i collegamenti del pacchetto si sono persi nell'installatore di Windows, `bin/python3` manca e va usato `bin/python3.13` | da fare |
 | R6.8 | Antivirus aziendale sui processi avviati da WSL | Guardare se un calcolo viene bloccato o rallentato | Nessun blocco, o l'eccezione chiesta all'IT | da fare |
-| R6.9 | Tre giorni di posta letta su Windows senza intervento | Non verificabile: il lettore non è costruito | Vedi la sezione che segue | bloccato |
+| R6.9 | Tre giorni di posta letta su Windows senza intervento | Non verificabile: il lettore non è costruito. Il pilota ha il nuovo Outlook, che non si legge dal PC | Serve la risposta dell'IT: vedi la sezione che segue e `docs/richiesta-it-posta.md` | bloccato |
 
 Sul Mac è provato che i percorsi con spazi reggono (il comando e la regola portano le virgolette): la prova ostile gira in una cartella con uno spazio nel nome.
 
-## R6 — che cosa serve sapere sulla posta di Windows
+## R6 — la posta su Windows: che cosa si sa e che cosa manca
 
-In `docs/` non è scritto quale Outlook ha il pilota (`docs/roadmap.md`, «Scelte prese durante F2 (posta)»: «Dipende da quale Outlook ha il pilota»). Il lettore della posta su Windows non si costruisce alla cieca. Da rilevare nella sessione con il pilota (R2.6):
+**Rilevato il 18/11/2026**: il pilota usa il **nuovo Outlook per Windows** (versione 1.2026.1103.200, client 20261106001.18, WebView2 157.0.4341.46). È l'applicazione costruita su WebView2, non l'Outlook classico (Win32).
 
-| # | Domanda | Come si vede | Che cosa ne segue |
+Che cosa ne segue:
+
+| # | Domanda | Risposta | Conseguenza |
 |---|---|---|---|
-| P1 | Outlook classico (Win32) o «nuovo Outlook» | In Outlook: File → Account di Office → «Informazioni su Outlook»; il nuovo Outlook ha l'interruttore «Nuovo Outlook» in alto a destra e non ha il menu File | Il classico tiene un archivio locale (file OST o PST) e si può interrogare sul PC; il nuovo non tiene un archivio leggibile: resta solo l'accesso con Microsoft Graph, che chiede un permesso all'IT |
-| P2 | Tipo di account | File → Impostazioni account: Exchange/Microsoft 365, IMAP, altro | Con Exchange in modalità cache c'è un file OST; con IMAP anche |
-| P3 | Dove sta l'archivio e quanto pesa | File → Impostazioni account → File di dati | Percorso e dimensione del file OST o PST; se è su un disco sincronizzato |
-| P4 | Outlook è aperto mentre si lavora | Chiedere | Il file OST è bloccato finché Outlook è aperto: un lettore del file non funziona, serve chiedere i messaggi a Outlook stesso |
-| P5 | Che cosa permette il PC aziendale | Chiedere all'IT o provare: esecuzione di PowerShell, automazione di Outlook (COM), registrazione di un'app per Graph | Decide fra le tre strade: automazione di Outlook sul PC, lettura del file, Graph |
-| P6 | Le cartelle del progetto in Outlook | Guardare l'albero delle cartelle | Le regole di Octo (parole chiave, indirizzi, cartelle) valgono come sul Mac |
+| P1 | Outlook classico o nuovo | **Nuovo** | Non c'è un archivio locale in un formato documentato (niente file OST o PST) e non c'è l'automazione sul PC (COM, MAPI) su cui si appoggiava il classico. Le strade «leggere il file» e «chiedere a Outlook» sono chiuse |
+| P2-P4 | Tipo di account, dove sta l'archivio, Outlook aperto | Non più pertinenti | Riguardavano il file OST |
+| P5 | Che cosa permette l'azienda | **Aperta: è la richiesta all'IT** (`docs/richiesta-it-posta.md`) | Restano tre strade, tutte da far dire all'IT: permesso delegato `Mail.Read` di Microsoft Graph sull'app di accesso di Octo; Outlook classico sul PC del pilota; IMAP |
+| P6 | Le cartelle del progetto in Outlook | Da guardare con il pilota | Le regole di Octo (parole chiave, indirizzi, cartelle) valgono come sul Mac qualunque sia la strada |
 
-Esito che chiude: le sei risposte scritte qui. Solo allora si sceglie la strada e si stima il lettore.
+Deciso dal PM il 18/11/2026: **non si costruisce nulla finché l'IT non risponde.** La strada di Graph rimetterebbe in discussione una scelta scritta in `docs/identita-e-login.md` («all'IT si chiede la sola identità: nessun permesso su posta o calendario»): la si riapre solo con la risposta in mano.
+
+Esito che chiude: la risposta dell'IT scritta qui, con la strada scelta. Solo allora si stima il lettore. Fino ad allora su Windows la posta non si legge, e con lei mancano le mail e le riunioni di «Oggi».

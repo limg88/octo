@@ -13,6 +13,7 @@ import type {
   ForecastView,
   HoursCandidates,
   HoursView,
+  KindCorrection,
   MailSourceView,
   MeetingsSourceView,
   ProjectOverview,
@@ -115,6 +116,9 @@ export const CHANNELS = {
   scriptedApprove: 'scripted:approve',
   instructionsGet: 'deliverables:instructions:get',
   instructionsSave: 'deliverables:instructions:save',
+  kindCorrect: 'deliverables:kind:correct',
+  kindCorrectionApprove: 'deliverables:kind:correction:approve',
+  kindRestore: 'deliverables:kind:restore',
   kindTemplates: 'deliverables:templates:list',
   kindTemplateChoose: 'deliverables:templates:choose',
   kindTemplateRemove: 'deliverables:templates:remove',
@@ -365,6 +369,15 @@ export type OctoApi = {
     kindId: string,
     text: string,
   ): Promise<Result<null>>
+  /** Has Claude write again how a kind of Octo is written; nothing is kept until approved. */
+  correctKind(projectId: string, kindId: string, words: string): Promise<Result<KindCorrection>>
+  approveKindCorrection(
+    projectId: string,
+    kindId: string,
+    correctionId: string,
+  ): Promise<Result<null>>
+  /** Goes back to how Octo writes the kind. */
+  restoreKind(projectId: string, kindId: string): Promise<Result<null>>
   /** The formats each kind of deliverable has a template in. */
   kindTemplates(projectId: string): Promise<Result<Record<string, TemplateFormat[]>>>
   /**

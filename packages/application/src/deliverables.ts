@@ -4,6 +4,7 @@ import {
   type CheckedAnswer,
   checkAnswer,
   cleanInputs,
+  correctedKindPath,
   DECK_MODEL_PATH,
   type DeckOutline,
   type Deliverable,
@@ -86,6 +87,19 @@ export type ReviseInput = {
   onProgress?: (progress: AgentProgress) => void
 }
 
+/** How a kind would be written after a correction: shown to the PM, kept only if approved. */
+export type KindCorrection = {
+  id: string
+  kindId: string
+  instructions: string
+  /** What changed, in a few words of the one who wrote it. */
+  summary: string
+}
+
+const MAX_CORRECTION_WORDS = 4000
+/** The corrections proposed and not approved yet that are remembered: the oldest is forgotten. */
+const MAX_PENDING_CORRECTIONS = 20
+
 export type Deliverables = {
   /** The kinds Octo ships with, then the ones the PM defined for this project. */
   catalog(project: Project): Promise<DeliverableKind[]>
@@ -105,6 +119,15 @@ export type Deliverables = {
   /** What the PM added, for this project, to how a kind is written. Empty when nothing. */
   instructions(project: Project, kindId: string): Promise<string>
   saveInstructions(project: Project, kindId: string, text: string): Promise<void>
+  /**
+   * Has Claude write again how a kind of Octo is written, as the PM asks in words. Nothing
+   * changes until the PM approves what is shown.
+   */
+  correctKind(project: Project, kindId: string, words: string): Promise<KindCorrection>
+  /** Keeps in the project the instructions a correction proposed, as the PM was shown them. */
+  approveKindCorrection(project: Project, kindId: string, correctionId: string): Promise<void>
+  /** Goes back to the instructions the kind travels with. */
+  restoreKind(project: Project, kindId: string): Promise<void>
   /** The formats each kind has a template in, for the kinds that have one. */
   templates(project: Project): Promise<Record<string, TemplateFormat[]>>
   /**
@@ -145,10 +168,32 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     return kinds.sort((a, b) => a.title.localeCompare(b.title))
   }
 
+  /** A kind of Octo as this project writes it: with the instructions its PM corrected, if any. */
+  async function asCorrected(project: Project, kind: DeliverableKind): Promise<DeliverableKind> {
+    const text = await deps.files.readText(project.folder, correctedKindPath(kind.id))
+    const instructions = text?.trim() ?? ''
+    return instructions === '' ? kind : { ...kind, instructions, corrected: true }
+  }
+
   const catalog = async (project: Project): Promise<DeliverableKind[]> => [
-    ...(await deps.shipped.kinds()),
+    ...(await Promise.all((await deps.shipped.kinds()).map((kind) => asCorrected(project, kind)))),
     ...(await ownKinds(project)),
   ]
+
+  /** What each correction proposed, as the PM was shown it: an approval writes this and no more. */
+  const corrections = new Map<string, KindCorrection>()
+
+  /** A kind of Octo: the ones the PM defined are changed in their own form, not corrected. */
+  async function shippedKind(project: Project, kindId: string): Promise<DeliverableKind> {
+    const kind = await kindOf(project, kindId)
+    if (isOwnKind(kind.id)) throw new DomainError('deliverable_kind_unknown', kindId)
+    return kind
+  }
+
+  async function writeCorrected(project: Project, kindId: string, text: string): Promise<void> {
+    await deps.memory.claim(project.folder)
+    await deps.memory.write(project.folder, correctedKindPath(kindId), text)
+  }
 
   async function kindOf(project: Project, kindId: string): Promise<DeliverableKind> {
     const kind = (await catalog(project)).find((candidate) => candidate.id === kindId)
@@ -515,6 +560,37 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     setLetterhead,
     hasDeckModel,
     setDeckModel,
+    async correctKind(project, kindId, words) {
+      const asked = words.trim().slice(0, MAX_CORRECTION_WORDS)
+      if (asked === '') throw new DomainError('request_empty')
+      const kind = await shippedKind(project, kindId)
+      const chosen = await deps.models?.(project)
+      const draft = await deps.writer.correctKind({
+        projectFolder: project.folder,
+        kind,
+        words: asked,
+        model: chosen?.write ?? null,
+      })
+      const instructions = draft.instructions.trim()
+      if (instructions === '') throw new DomainError('agent_output_invalid')
+      const id = deps.ids.next()
+      const correction = { id, kindId, instructions, summary: draft.summary.trim() }
+      corrections.set(correction.id, correction)
+      if (corrections.size > MAX_PENDING_CORRECTIONS)
+        corrections.delete(corrections.keys().next().value as string)
+      return correction
+    },
+    async approveKindCorrection(project, kindId, correctionId) {
+      await shippedKind(project, kindId)
+      const correction = corrections.get(correctionId)
+      if (correction === undefined || correction.kindId !== kindId)
+        throw new DomainError('work_not_found')
+      await writeCorrected(project, kindId, `${correction.instructions}\n`)
+      corrections.delete(correctionId)
+    },
+    async restoreKind(project, kindId) {
+      await writeCorrected(project, (await shippedKind(project, kindId)).id, '')
+    },
     saveInstructions: async (project, kindId, text) => {
       const path = projectInstructionsPath((await kindOf(project, kindId)).id)
       await deps.memory.claim(project.folder)

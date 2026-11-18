@@ -227,6 +227,8 @@ const kindSaveInput = byProject.extend({
     checklist: ruleList,
   }),
 })
+const kindCorrectInput = byKind.extend({ words: z.string().max(MAX_QUESTION_LENGTH) })
+const kindCorrectionInput = byKind.extend({ correctionId: id })
 const instructionsSaveInput = byKind.extend({ text: z.string().max(MAX_INSTRUCTIONS_LENGTH) })
 
 /** Opening the dashboard reads the tracker again when its reading is older than a day. */
@@ -905,6 +907,21 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.instructionsSave, instructionsSaveInput, async (input) => {
     const project = await deps.projects.get(input.projectId)
     await deps.deliverables.saveInstructions(project, input.kindId, input.text)
+    return null
+  })
+
+  handle(CHANNELS.kindCorrect, kindCorrectInput, async ({ projectId, kindId, words }) =>
+    deps.deliverables.correctKind(await deps.projects.get(projectId), kindId, words),
+  )
+
+  handle(CHANNELS.kindCorrectionApprove, kindCorrectionInput, async (input) => {
+    const project = await deps.projects.get(input.projectId)
+    await deps.deliverables.approveKindCorrection(project, input.kindId, input.correctionId)
+    return null
+  })
+
+  handle(CHANNELS.kindRestore, byKind, async ({ projectId, kindId }) => {
+    await deps.deliverables.restoreKind(await deps.projects.get(projectId), kindId)
     return null
   })
 

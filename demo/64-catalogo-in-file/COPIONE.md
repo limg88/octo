@@ -44,7 +44,7 @@ Durata: 4 minuti. I dieci tipi del catalogo non sono più costanti nel codice: o
    Dimostra: mezzo catalogo non viene mai mostrato, e l'errore dice quale file correggere.
 
 ## Che cosa non fa
-- Correggere a parole il tipo distribuito con l'app. Le correzioni a parole del PM restano quelle di sempre, per progetto («Istruzioni per questo progetto», in `_octo/.istruzioni/`), e si aggiungono a ciò che il tipo dice.
+- Correggere a parole il tipo distribuito con l'app: è la demo 67, e la correzione vale per il progetto senza toccare questi file.
 
 ## Prova automatica nella finestra vera
 ```bash

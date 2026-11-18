@@ -16,6 +16,7 @@ import {
   createFsProjectFiles,
   createFsShippedCatalog,
   createWordRenderer,
+  kindCorrectionPrompt,
   redTeamSystemPrompt,
   writerInput,
   writerSystemPrompt,
@@ -153,6 +154,35 @@ describe('a deliverable from the request to the approved file', () => {
     await expect(service.instructions(project, 'inesistente')).rejects.toMatchObject({
       code: 'deliverable_kind_unknown',
     })
+  })
+})
+
+describe('a kind of Octo corrected in words', () => {
+  it('is written again by Claude, kept in the project once approved, and given back', async () => {
+    const service = deliverables()
+
+    const proposed = await service.correctKind(project, 'stima', 'Niente giornate in vista.')
+    expect(proposed.instructions).toContain('Regola del PM: Niente giornate in vista.')
+    expect(proposed.summary).toContain('regola chiesta')
+    await service.approveKindCorrection(project, 'stima', proposed.id)
+
+    expect(await readFile(join(project.folder, '_octo/.tipi/corretti/stima.md'), 'utf8')).toBe(
+      `${proposed.instructions}\n`,
+    )
+    const corrected = (await service.catalog(project)).find((kind) => kind.id === 'stima')
+    expect(corrected).toMatchObject({ corrected: true, instructions: proposed.instructions })
+
+    await service.restoreKind(project, 'stima')
+    const back = (await service.catalog(project)).find((kind) => kind.id === 'stima')
+    expect(back?.corrected).toBeUndefined()
+    expect(back?.instructions).not.toContain('Regola del PM')
+  })
+
+  it('tells who corrects what the kind is, how it is written now, and what cannot be lifted', () => {
+    const prompt = kindCorrectionPrompt(email)
+    expect(prompt).toContain(`<kind_instructions>\n${email.instructions}\n</kind_instructions>`)
+    expect(prompt).toContain(email.title)
+    expect(prompt).toContain('every\nstatement has a source')
   })
 })
 

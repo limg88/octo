@@ -70,6 +70,10 @@ function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft 
         if (options.redTeamFails) throw options.redTeamFails
         return clean
       },
+      correctKind: async ({ kind, words }) => ({
+        instructions: words.includes('#vuoto') ? '  ' : `${kind.instructions}\nRegola: ${words}`,
+        summary: ' Aggiunta la regola. ',
+      }),
     },
     renderer: {
       word: async (_title, _markdown, letterhead) =>
@@ -482,6 +486,83 @@ describe('approving a deliverable', () => {
     expect(requests[0]?.inputs).toEqual({ riunione: folder })
     expect(requests[0]?.kind.instructions).toContain('_octo/riunioni/')
     expect(other.title).toBe(gone)
+  })
+})
+
+describe('correcting in words how a kind of Octo is written', () => {
+  const shipped = DELIVERABLE_CATALOG.find((kind) => kind.id === 'email-cliente')
+  const kindNow = async (service: ReturnType<typeof setup>['service']) =>
+    (await service.catalog(project)).find((kind) => kind.id === 'email-cliente')
+
+  it('proposes the instructions written again and keeps nothing until the PM approves', async () => {
+    const { service, memory } = setup()
+
+    const proposed = await service.correctKind(project, 'email-cliente', '  chiudi con i saluti ')
+
+    expect(proposed).toMatchObject({ kindId: 'email-cliente', summary: 'Aggiunta la regola.' })
+    expect(proposed.instructions).toBe(`${shipped?.instructions}\nRegola: chiudi con i saluti`)
+    expect(memory.files.has('_octo/.tipi/corretti/email-cliente.md')).toBe(false)
+    expect((await kindNow(service))?.corrected).toBeUndefined()
+  })
+
+  it('writes for the project what was approved, and goes back to the kind of Octo', async () => {
+    const { service, memory, requests } = setup()
+    const proposed = await service.correctKind(project, 'email-cliente', 'chiudi con i saluti')
+
+    await service.approveKindCorrection(project, 'email-cliente', proposed.id)
+
+    expect(memory.files.get('_octo/.tipi/corretti/email-cliente.md')).toBe(
+      `${proposed.instructions}\n`,
+    )
+    expect(await kindNow(service)).toMatchObject({
+      corrected: true,
+      instructions: proposed.instructions,
+    })
+    // The writer of the next draft follows the corrected instructions.
+    await service.start(project, { kindId: 'email-cliente', inputs })
+    expect(requests.at(-1)?.kind.instructions).toBe(proposed.instructions)
+    // An approval is spent: the same proposal is not written twice.
+    await expect(
+      service.approveKindCorrection(project, 'email-cliente', proposed.id),
+    ).rejects.toMatchObject({ code: 'work_not_found' })
+
+    await service.restoreKind(project, 'email-cliente')
+    expect(await kindNow(service)).toEqual(shipped)
+  })
+
+  it('refuses an empty request, an empty answer, another kind’s proposal and a kind of the PM', async () => {
+    const { service } = setup()
+    await expect(service.correctKind(project, 'email-cliente', '  ')).rejects.toMatchObject({
+      code: 'request_empty',
+    })
+    await expect(service.correctKind(project, 'email-cliente', '#vuoto')).rejects.toMatchObject({
+      code: 'agent_output_invalid',
+    })
+    const proposed = await service.correctKind(project, 'email-cliente', 'più breve')
+    await expect(
+      service.approveKindCorrection(project, 'verbale', proposed.id),
+    ).rejects.toMatchObject({ code: 'work_not_found' })
+    const own = await service.saveKind(project, {
+      title: 'Nota',
+      summary: '',
+      audience: 'client',
+      questions: [],
+      instructions: 'Scrivi.',
+      checklist: [],
+    })
+    await expect(service.correctKind(project, own.id, 'più breve')).rejects.toMatchObject({
+      code: 'deliverable_kind_unknown',
+    })
+  })
+
+  it('remembers only the last proposals', async () => {
+    const { service } = setup()
+    const first = await service.correctKind(project, 'email-cliente', 'uno')
+    for (let n = 0; n < 20; n += 1)
+      await service.correctKind(project, 'email-cliente', `altro ${n}`)
+    await expect(
+      service.approveKindCorrection(project, 'email-cliente', first.id),
+    ).rejects.toMatchObject({ code: 'work_not_found' })
   })
 })
 

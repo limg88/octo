@@ -29,6 +29,7 @@
     "e2e:script": "pnpm build && node e2e/script.e2e.mjs",
     "e2e:catalogo": "pnpm build && node e2e/catalogo.e2e.mjs",
     "e2e:memoria": "pnpm build && node e2e/memoria.e2e.mjs",
+    "e2e:correggi": "pnpm build && node e2e/correggi.e2e.mjs",
     "e2e:condivisa": "pnpm build && node e2e/condivisa.e2e.mjs"
   },
   "devDependencies": {

@@ -26,6 +26,7 @@ import type { OpenSource } from './CitationPanel.tsx'
 import type { Handoff } from './context.ts'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { citedPaths, handoffField, handoffText } from './handoff-text.ts'
+import { KindCorrection } from './KindCorrection.tsx'
 import { KindTemplate, type KindTemplateApi } from './KindTemplate.tsx'
 import { MeetingField } from './MeetingField.tsx'
 import { dateText, errorText, messages, progressText } from './messages.ts'
@@ -226,6 +227,11 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
             busy={busy}
             writing={step === 'start'}
             handoff={handoff}
+            onKindChanged={() => {
+              void api.deliverableCatalog(project.id).then((next) => {
+                if (next.ok) setCatalog(next.value)
+              })
+            }}
             onStart={async (inputs) => {
               const made = await run('start', () =>
                 api.startDeliverable(project.id, formKind.id, inputs),
@@ -310,6 +316,7 @@ function KindForm({
   writing,
   handoff,
   onStart,
+  onKindChanged,
 }: {
   api: OctoApi
   project: Project
@@ -318,6 +325,8 @@ function KindForm({
   writing: boolean
   handoff: Handoff | null
   onStart: (inputs: Record<string, string>) => void
+  /** How the kind is written changed: the catalog is read again. */
+  onKindChanged: () => void
 }) {
   const filledField = handoff ? handoffField(kind) : null
   /** What the form starts with: the context of an answer in its field, when there is one. */
@@ -397,6 +406,9 @@ function KindForm({
         </div>
       </form>
       <KindTemplate api={api} project={project} kind={kind} />
+      {!isOwnKind(kind.id) && (
+        <KindCorrection api={api} project={project} kind={kind} onChanged={onKindChanged} />
+      )}
       <details className="project-instructions">
         <summary>{messages.deliverableProjectInstructions}</summary>
         <p className="hint">{messages.deliverableProjectInstructionsHint}</p>

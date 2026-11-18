@@ -20,6 +20,12 @@ export type OwnKindInput = {
 
 /** Where a project keeps the kinds its PM defined. Hidden: they are settings, not sources. */
 export const OWN_KINDS_FOLDER = `${OCTO_FOLDER}/.tipi`
+/**
+ * Where a project keeps how a kind of Octo is written once its PM corrected it in words: the
+ * kind that travels with the app stays as it is, and the project goes back to it by emptying this.
+ */
+export const CORRECTED_KINDS_FOLDER = `${OWN_KINDS_FOLDER}/corretti`
+export const correctedKindPath = (id: string): string => `${CORRECTED_KINDS_FOLDER}/${id}.md`
 export const OWN_KIND_PREFIX = 'proprio-'
 const REQUIRED_MARK = '*'
 const MAX_QUESTIONS = 8

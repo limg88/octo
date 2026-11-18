@@ -15,7 +15,7 @@ import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
 import { handoffField, handoffText } from '../src/renderer/handoff-text.ts'
 import { DECK_MODEL_TEXT, LETTERHEAD_TEXT, ModelFile } from '../src/renderer/ModelFile.tsx'
-import { messages } from '../src/renderer/messages.ts'
+import { errorText, messages } from '../src/renderer/messages.ts'
 import { DELIVERABLE_INPUT_LIMIT, type OctoApi, type Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -101,6 +101,9 @@ type DeliverablesApi = Pick<
   | 'approveDeliverable'
   | 'deliverableInstructions'
   | 'saveDeliverableInstructions'
+  | 'correctKind'
+  | 'approveKindCorrection'
+  | 'restoreKind'
   | 'onDeliverableProgress'
   | 'saveDeliverableKind'
   | 'removeDeliverableKind'
@@ -124,6 +127,11 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
     approveDeliverable: vi.fn(async () => ok(approved)),
     deliverableInstructions: vi.fn(async () => ok('Dai del lei.')),
     saveDeliverableInstructions: vi.fn(async () => ok(null)),
+    correctKind: vi.fn(async (_project: string, kindId: string) =>
+      ok({ id: 'c-1', kindId, instructions: 'Scrivi breve.', summary: 'Più breve.' }),
+    ),
+    approveKindCorrection: vi.fn(async () => ok(null)),
+    restoreKind: vi.fn(async () => ok(null)),
     onDeliverableProgress: (listener) => {
       progress = listener
       return () => {}
@@ -455,6 +463,57 @@ describe('DeliverablesView', () => {
 
     expect(await screen.findByText(messages.deliverableInstructionsSaved)).toBeTruthy()
     expect(api.saveDeliverableInstructions).toHaveBeenCalledWith('p-1', 'verbale', 'Dai del tu.')
+  })
+
+  it('corrects in words how a kind of Octo is written: proposed, read, then kept', async () => {
+    const text = messages.kindCorrection
+    const { api } = fakeApi()
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Verbale di riunione/ }))
+
+    const ask = await screen.findByRole<HTMLButtonElement>('button', { name: text.ask })
+    expect(ask.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(text.words), { target: { value: 'Più breve' } })
+    fireEvent.click(ask)
+
+    const proposal = await screen.findByRole('region', { name: text.proposed })
+    expect(proposal.textContent).toContain('Più breve.')
+    expect(proposal.textContent).toContain('Scrivi breve.')
+    expect(api.correctKind).toHaveBeenCalledWith('p-1', 'verbale', 'Più breve')
+    fireEvent.click(screen.getByRole('button', { name: text.approve }))
+
+    expect(await screen.findByText(text.approved)).toBeTruthy()
+    expect(api.approveKindCorrection).toHaveBeenCalledWith('p-1', 'verbale', 'c-1')
+    // The catalog is read again: the kind is now the corrected one.
+    await waitFor(() => expect(api.deliverableCatalog).toHaveBeenCalledTimes(2))
+  })
+
+  it('discards a proposal, says what went wrong, and goes back to the kind of Octo', async () => {
+    const text = messages.kindCorrection
+    const corrected = DELIVERABLE_CATALOG.map((kind) =>
+      kind.id === 'verbale' ? { ...kind, corrected: true as const } : kind,
+    )
+    const { api } = fakeApi({ deliverableCatalog: vi.fn(async () => ok(corrected)) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Verbale di riunione/ }))
+
+    fireEvent.change(await screen.findByLabelText(text.words), { target: { value: 'Più breve' } })
+    fireEvent.click(screen.getByRole('button', { name: text.ask }))
+    await screen.findByRole('region', { name: text.proposed })
+    fireEvent.click(screen.getByRole('button', { name: text.discard }))
+    expect(screen.queryByRole('region', { name: text.proposed })).toBeNull()
+
+    vi.mocked(api.correctKind).mockResolvedValueOnce({ ok: false, code: 'agent_failed' })
+    fireEvent.click(screen.getByRole('button', { name: text.ask }))
+    expect(await screen.findByText(errorText('agent_failed'))).toBeTruthy()
+
+    expect(screen.getByText(text.corrected, { exact: false })).toBeTruthy()
+    vi.mocked(api.restoreKind).mockResolvedValueOnce({ ok: false, code: 'agent_cancelled' })
+    fireEvent.click(screen.getByRole('button', { name: text.restore }))
+    expect(await screen.findByText(errorText('agent_cancelled'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: text.restore }))
+    expect(await screen.findByText(text.restored)).toBeTruthy()
+    expect(api.restoreKind).toHaveBeenCalledWith('p-1', 'verbale')
   })
 
   it('offers the meetings imported from Verbale for the minutes, or any other told in words', async () => {

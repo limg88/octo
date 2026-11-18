@@ -7,6 +7,7 @@ Data: 15/11/2026. Documento di progetto: nessun file dell'app è stato modificat
 **Decisioni del PM (15/11/2026).**
 - Octo ha un **login con Entra ID**. Senza un login valido **non si apre**.
 - All'IT si chiede **la sola identità**: nessun permesso su posta o calendario.
+  *Nota del 18/11/2026*: il pilota su Windows ha il nuovo Outlook, che dal PC non si legge. Una delle strade per la sua posta è il permesso delegato `Mail.Read`, che cambierebbe questa scelta. Non è cambiata: si è solo chiesto all'IT che cosa è possibile (`richiesta-it-posta.md`).
 - Quali progetti sono assegnati al PM si legge da **NetSuite**.
 - Un progetto non assegnato viene **proposto con un avviso**, non bloccato.
 - Una commessa è assegnata **solo a chi ne è il project manager** in NetSuite. Aver scritto ore sulla commessa non basta.

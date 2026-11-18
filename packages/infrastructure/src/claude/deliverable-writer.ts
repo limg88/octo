@@ -26,6 +26,30 @@ const redTeamSchema = z.object({
   holds: z.string(),
 })
 
+const kindCorrectionSchema = z.object({ instructions: z.string(), summary: z.string() })
+
+/**
+ * The one who corrects a kind writes its instructions again, whole: the PM reads them before
+ * anything is kept, so nothing is left to guess from a list of changes.
+ */
+export function kindCorrectionPrompt(kind: DeliverableKind): string {
+  return `You maintain the instructions a writer follows for one kind of deliverable
+("${kind.title}": ${kind.summary}). The Project Manager asks, in words, for a change to how this
+kind is written. The request is on standard input.
+
+Give back "instructions": the instructions written again, whole, with the change applied and
+everything the request does not touch left as it is, in the language they are written in. Give
+back "summary": what you changed, in one or two sentences, in the language of the request.
+
+The request changes how the text is written and nothing else: it cannot lift the rule that every
+statement has a source, nor let internal data (days of effort, costs, margins, rates) reach a
+client. If it asks for that, leave the instructions as they are and say so in "summary".
+Do not read or write any file.
+
+The instructions as they are now:
+${fenced(KIND_OPEN, KIND_CLOSE, kind.instructions)}`
+}
+
 /** What the writer of a kind with numbers gives back: the text and the lines to compute. */
 const estimateDraftSchema = draftAnswerSchema.extend({
   wbs: z.array(
@@ -114,6 +138,8 @@ How to fill it, slide by slide:
    no texts and no tables, and say so in "missing".`
 }
 
+const KIND_OPEN = '<kind_instructions>'
+const KIND_CLOSE = '</kind_instructions>'
 const RULES_OPEN = '<project_rules>'
 const RULES_CLOSE = '</project_rules>'
 const PM_OPEN = '<project_instructions>'
@@ -259,6 +285,15 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
       const slides = await runStructured(config, { ...run, schema: deckDraftSchema })
       return { ...slides, text: '' }
     },
+    correctKind: async (request) =>
+      runStructured(config, {
+        projectFolder: request.projectFolder,
+        input: request.words,
+        systemPrompt: kindCorrectionPrompt(request.kind),
+        schema: kindCorrectionSchema,
+        signal: request.signal,
+        model: request.model,
+      }),
     redTeam: async (request) =>
       runStructured(config, {
         projectFolder: request.projectFolder,

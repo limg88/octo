@@ -1497,6 +1497,22 @@ export const messages = {
   ownKindSave: 'Salva nel catalogo',
   ownKindEdit: 'Modifica',
   ownKindRemove: 'Elimina',
+  kindCorrection: {
+    title: 'Come Octo scrive questo tipo',
+    intro:
+      'Di’ a parole che cosa cambiare in come viene scritto. Claude riscrive le istruzioni, tu le leggi e decidi. Vale per questo progetto.',
+    corrected: 'Questo progetto usa istruzioni corrette da te.',
+    words: 'Che cosa va cambiato',
+    ask: 'Proponi la correzione',
+    asking: 'Riscrivo le istruzioni…',
+    proposed: 'Istruzioni proposte',
+    approve: 'Usa queste istruzioni',
+    discard: 'Scarta',
+    approved: 'Fatto: da ora questo tipo si scrive così in questo progetto.',
+    restore: 'Torna alle istruzioni di Octo',
+    restored: 'Questo tipo è tornato alle istruzioni di Octo.',
+    now: 'Istruzioni in uso',
+  },
   kindTemplate: {
     title: 'Modello di questo tipo',
     none: 'Nessun modello: il testo segue le istruzioni del tipo ed esce sulla carta intestata del progetto, se c’è.',
