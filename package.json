@@ -22,6 +22,7 @@
     "release:sign": "node scripts/release-sign.mjs",
     "e2e": "pnpm build && node e2e/app.e2e.mjs",
     "e2e:cruscotto": "pnpm build && node e2e/cruscotto.e2e.mjs",
+    "e2e:commessa": "pnpm build && node e2e/commessa.e2e.mjs",
     "e2e:condivisa": "pnpm build && node e2e/condivisa.e2e.mjs"
   },
   "devDependencies": {

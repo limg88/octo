@@ -1,5 +1,7 @@
 # Demo 58 — «Commessa»: fatture, fornitori e controllo con NetSuite
 
+> **Aggiornamento del 18/11/2026 (R1).** «Ore» e «Previsionale» sono ora schede di «Commessa», che ha quattro schede: «Sintesi», «Fatturazione», «Ore», «Previsionale». Budget, mesi e piano di fatturazione non sono arrivati in Octo: restano nelle schede progetto. L'avanzamento si legge da NetSuite. I passi che nominano le due sezioni si seguono dalle schede; il giro aggiornato è la demo 60.
+
 Durata: 5 minuti. Le regole della scheda progetto dell'amministrazione entrano in «Commessa»: il fatturato è la somma delle righe fattura, il costo di un fornitore è ciò che ha consegnato sui suoi ordini, lavoro non fatturato e fatture da emettere (WIP e FRD) dicono che cosa resta da regolare, e i costi registrati da NetSuite stanno accanto a quelli che Octo calcola.
 
 ## Prerequisiti

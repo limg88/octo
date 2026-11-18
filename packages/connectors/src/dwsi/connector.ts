@@ -378,6 +378,7 @@ const LEDGER_VIEW = viewNamed('v_project_revenue_all')
 const PURCHASES_VIEW = viewNamed('v_purchase_order_all')
 const RECEIPTS_VIEW = viewNamed('v_itemreceiptpo_all')
 const VENDOR_INVOICES_VIEW = viewNamed('v_invoice_po_all')
+const PROGRESS_VIEW = viewNamed('dw_prod_projectpercentcomplete')
 
 type Row = Record<string, unknown>
 const wordOf = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
@@ -417,6 +418,23 @@ function ledgerOf(rows: readonly Row[]): ProjectEconomics['ledger'] {
         revenue: amountOf(row.actualrevenue) ?? 0,
       },
     ]
+  })
+}
+
+const WHOLE = 1
+const PERCENT = 100
+
+/**
+ * How far the work is at the end of each period the system tells of. The system may write the
+ * share of the whole (0,4) or the percentage (40): up to the whole it is read as a share, up to
+ * a hundred as a percentage. A row with no day, or with a figure that is neither, tells nothing.
+ */
+function progressOf(rows: readonly Row[]): ProjectEconomics['progress'] {
+  return rows.flatMap((row) => {
+    const day = dayOf(row.perioddate)
+    const value = amountOf(row.percentcomplete)
+    if (day === '' || value === null || value < 0 || value > PERCENT) return []
+    return [{ day, share: value <= WHOLE ? value : value / PERCENT }]
   })
 }
 
@@ -601,6 +619,7 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
                 amount: -amount,
               }),
             ),
+            progress: progressOf(await readView(session, PROGRESS_VIEW, code)),
           }
           all.push({
             projectid: code,

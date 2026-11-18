@@ -4,7 +4,7 @@ import {
   type ForecastSettings,
   type HoursEntry,
   NO_FORECAST_PROJECT,
-  NO_SHEET_REGISTRY,
+  NO_PROJECT_ECONOMICS,
   NO_SOURCES,
   type Project,
   type SheetGrid,
@@ -20,8 +20,10 @@ import {
   FORECAST_FOLDER,
   type ForecastDeps,
   type ForecastSettingsStore,
+  forecastSettingsAfterPlans,
   type ProjectFiles,
   type ProjectOrder,
+  type RetiredSheetPlans,
   type SheetWrite,
   type SpreadsheetModel,
 } from '../src/index.ts'
@@ -138,10 +140,18 @@ function setup(
       written.set(path, bytes)
     },
   }
-  let plans: SheetPlans = options.plans ?? {}
+  // The plans the sheet kept, still to hand back; the text they were handed back as.
+  const handedBack: string[] = []
+  const retired: RetiredSheetPlans = {
+    pending: async () => (handedBack.length > 0 ? null : (options.plans ?? null)),
+    handBack: async (_folder, text) => {
+      handedBack.push(text)
+    },
+  }
   const deps: ForecastDeps = {
-    sheetPlans: async () => plans,
-    settings,
+    settings: forecastSettingsAfterPlans(settings, retired, {
+      now: () => new Date(`${options.today ?? '2026-11-18'}T10:00:00.000Z`),
+    }),
     files,
     sheets,
     timesheet: async () => (options.timesheet === undefined ? hours : options.timesheet),
@@ -190,19 +200,8 @@ function setup(
   // One reading for both, as the app wires them.
   const readings = createForecastReadings(deps)
   const forecasts = createForecasts(deps, readings)
-  const projectSheets = createProjectSheets(
-    {
-      ...deps,
-      plans: {
-        load: async () => plans,
-        save: async (_folder, next) => {
-          plans = next
-        },
-      },
-    },
-    readings,
-  )
-  return { forecasts, projectSheets, filled, written, saved: () => saved, plans: () => plans }
+  const projectSheets = createProjectSheets(deps, readings)
+  return { forecasts, projectSheets, filled, written, saved: () => saved, handedBack }
 }
 
 const configured = {
@@ -707,17 +706,82 @@ describe('the monthly forecast', () => {
   })
 })
 
-describe('the plan of a project code', () => {
-  const worked: HoursEntry[] = [
+describe('the plans the sheet of a project code kept', () => {
+  const june: HoursEntry[] = [
     {
       person: 'Rossi Mario',
-      day: '2026-09-10',
-      hours: 32,
+      day: '2026-06-03',
+      hours: 16,
       project: 'P1',
       approved: true,
       id: '1',
-      cost: 800,
+      cost: 400,
     },
+  ]
+  const plans: SheetPlans = {
+    P1: {
+      lines: [
+        {
+          group: 'internal',
+          name: 'Mario Rossi',
+          unitCost: null,
+          unitPrice: 60,
+          budget: { '2026-06': 16 },
+          forecast: {},
+          declared: {},
+        },
+      ],
+      confirmedOn: null,
+      milestones: [],
+      declaredProgress: {},
+      registry: {},
+    },
+  }
+
+  it('leave their rates to the forecast and are handed back as a text, once', async () => {
+    const bare = setup({}, { codes: ['P1'], timesheet: june })
+    const before = await bare.forecasts.view(project, '2026-06')
+    expect(before.forecast.gaps).toContainEqual(expect.objectContaining({ kind: 'no_rate' }))
+    expect(bare.handedBack).toEqual([])
+
+    const app = setup({}, { codes: ['P1'], timesheet: june, plans, today: '2026-11-18' })
+    const after = await app.forecasts.view(project, '2026-06')
+    // Two days at 480, as when the plan priced the month: the rate is in the settings now.
+    expect(after.forecast.rows[0]?.values.revenue).toBe(960)
+    expect(after.forecast.gaps.filter((gap) => gap.kind === 'no_rate')).toEqual([])
+    expect(app.saved().rates).toEqual([{ person: 'Mario Rossi', code: 'P1', ratePerDay: 480 }])
+    expect(app.handedBack).toHaveLength(1)
+    expect(app.handedBack[0]).toContain('Scritto il 2026-11-18.')
+    expect(app.handedBack[0]).toContain('| Risorse interne | Mario Rossi | — | 60 | 2026-06: 16 |')
+
+    // From then the settings are the PM's again: a rate changed is not taken back.
+    const settings = await app.forecasts.settings(project)
+    await app.forecasts.saveSettings(project, {
+      ...settings,
+      rates: [{ person: 'Mario Rossi', code: 'P1', ratePerDay: 500 }],
+    })
+    expect((await app.forecasts.view(project, '2026-06')).forecast.rows[0]?.values.revenue).toBe(
+      1000,
+    )
+    expect(app.handedBack).toHaveLength(1)
+  })
+
+  it('are taken over before the first save too: a save never loses their rates', async () => {
+    const app = setup({}, { codes: ['P1'], timesheet: june, plans })
+    const store = forecastSettingsAfterPlans(
+      { load: async () => app.saved(), save: async () => undefined },
+      { pending: async () => null, handBack: async () => undefined },
+      { now: () => new Date() },
+    )
+    // Nothing pending: the store answers as the one it wraps.
+    expect(await store.load(project.folder)).toEqual(app.saved())
+    await app.forecasts.saveSettings(project, { ...app.saved(), hoursPerDay: 8 })
+    expect(app.handedBack).toHaveLength(1)
+  })
+})
+
+describe('the summary of a project code', () => {
+  const worked: HoursEntry[] = [
     {
       person: 'Rossi Mario',
       day: '2026-10-05',
@@ -726,15 +790,6 @@ describe('the plan of a project code', () => {
       approved: true,
       id: '2',
       cost: 1440,
-    },
-    {
-      person: 'Bianchi Luca',
-      day: '2026-10-06',
-      hours: 4,
-      project: 'P1',
-      approved: true,
-      id: '3',
-      cost: 160,
     },
     {
       person: 'Neri Ugo',
@@ -750,170 +805,39 @@ describe('the plan of a project code', () => {
     code: 'P1',
     description: 'Aurora',
     ordered: 10000,
-    kind: 'time_material',
-    startMonth: '2026-09',
+    kind: 'fixed_price',
+    startMonth: '2026-10',
     invoiced: null,
-    recognized: null,
+    recognized: 4000,
     economics: {
+      ...NO_PROJECT_ECONOMICS,
       standardCosts: [{ person: 'Mario Rossi', costPerHour: 35 }],
-      ledger: [],
-      invoices: [],
-      purchases: [
-        { order: 'PO-1', vendor: 'Studio Blu', day: '2026-09-01', amount: 2000 },
-        { order: 'PO-2', vendor: 'Verdi Sara', day: '2026-09-01', amount: 500 },
-      ],
-      receipts: [],
-      vendorInvoices: [],
+      progress: [{ day: '2026-10-31', share: 0.45 }],
     },
-  }
-  const settings: Partial<ForecastSettings> = {
-    rates: [{ person: 'Rossi Mario', code: null, ratePerDay: 480 }],
-    externals: [
-      { name: 'Verdi Sara', code: 'P1', costPerDay: 400, ratePerDay: 560 },
-      { name: 'Altri', code: 'P9', costPerDay: 1, ratePerDay: 1 },
-    ],
   }
   const options = { codes: ['P1'], timesheet: worked, orders: [order], today: '2026-11-17' }
 
-  it('is proposed from who is known, kept, confirmed at the costs of today and read against the months', async () => {
-    const app = setup(settings, options)
-    expect(await app.projectSheets.plans(project)).toEqual({})
-    const proposed = await app.projectSheets.propose(project, ' p1 ')
-    expect(
-      proposed.P1?.lines.map((line) => [line.group, line.name, line.unitCost, line.unitPrice]),
-    ).toEqual([
-      ['internal', 'Bianchi Luca', null, null],
-      // 480 a day over 8 hours.
-      ['internal', 'Rossi Mario', null, 60],
-      // Declared from outside on this code, at 400 and 560 a day; then the suppliers with an order.
-      ['external', 'Verdi Sara', 50, 70],
-      ['external', 'Studio Blu', null, null],
-    ])
-    // Asked again it adds nothing.
-    expect(await app.projectSheets.propose(project, 'P1')).toEqual(proposed)
-    const typed = {
-      P1: {
-        ...(proposed.P1 as NonNullable<typeof proposed.P1>),
-        lines: (proposed.P1?.lines ?? []).map((line) =>
-          line.name === 'Rossi Mario'
-            ? { ...line, budget: { '2026-09': 40, '2026-11': 40 } }
-            : line,
-        ),
-      },
-    }
-    expect(await app.projectSheets.savePlans(project, typed)).toEqual(typed)
-    expect(app.plans()).toEqual(typed)
-
-    const [sheet] = await app.projectSheets.list(project)
-    // The month that runs is not a fact yet: the plan is read up to October.
-    expect(sheet?.plan).toMatchObject({ through: '2026-10', confirmedOn: null })
-    const mario = sheet?.plan?.lines.find((line) => line.name === 'Rossi Mario')
-    // What an hour costs today is what the company's system says: 35, not the 25 or 30 of the rows.
-    expect(mario).toMatchObject({
-      unitCost: 35,
-      current: { '2026-09': 32, '2026-10': 48, '2026-11': 40 },
+  it('reads how far the code is from the company system, and says so', async () => {
+    const [sheet] = await setup({}, options).projectSheets.list(project)
+    expect(sheet).toMatchObject({
+      code: 'P1',
+      // What an hour costs today is what the company's system says: 35, not the 30 of the row.
+      costs: 48 * 35,
+      progress: { share: 0.45, source: 'system', day: '2026-10-31' },
     })
-    expect(sheet?.budgetCosts).toBe(80 * 35)
-    // So far 80 hours at 35 and 4 at 40; 40 more hours planned for November.
-    expect(sheet?.costs).toBe(80 * 35 + 160)
-    expect(sheet?.expectedCosts).toBe(80 * 35 + 160 + 40 * 35)
-    expect(sheet?.marginAtEnd).toBeCloseTo((10000 - 4360) / 10000)
-
-    const confirmed = await app.projectSheets.confirm(project, 'P1')
-    expect(confirmed.P1?.confirmedOn).toBe('2026-11-17')
-    expect(confirmed.P1?.lines.map((line) => line.unitCost)).toEqual([40, 35, 50, null])
   })
 
-  it('writes the long table of a code as a file, and refuses a code that is not of the project', async () => {
-    const app = setup(settings, {
-      ...options,
-      plans: {
-        P1: {
-          lines: [
-            {
-              group: 'internal',
-              name: 'Rossi Mario',
-              unitCost: 30,
-              unitPrice: 60,
-              budget: { '2026-09': 40 },
-              forecast: {},
-              declared: {},
-            },
-          ],
-          confirmedOn: null,
-          milestones: [],
-          declaredProgress: {},
-          registry: NO_SHEET_REGISTRY,
-        },
-      },
-    })
-    expect(await app.projectSheets.exportData(project, 'P1')).toEqual({
-      path: '_octo/commessa/P1/Dati 2026-11-17.csv',
-    })
-    const file = new TextDecoder().decode(app.written.get('_octo/commessa/P1/Dati 2026-11-17.csv'))
-    expect(file.split('\n')[1]).toMatch(/^P1;2026;2026-10;BUDGET;Ricavi;0,00;.*;2400,00$/)
-    for (const call of [
-      () => app.projectSheets.exportData(project, 'P9'),
-      () => app.projectSheets.propose(project, 'P9'),
-      () => app.projectSheets.confirm(project, 'P9'),
-    ]) {
-      await expect(call()).rejects.toMatchObject({ code: 'sheet_code_unknown' })
-    }
-    // With the company's system out of reach the plan still starts from the timesheets.
-    const alone = setup(settings, { ...options, linked: false })
-    expect(
-      (await alone.projectSheets.propose(project, 'P1')).P1?.lines.map((line) => line.name),
-    ).toEqual(['Bianchi Luca', 'Rossi Mario', 'Verdi Sara'])
+  it('falls back on the revenue recognised when the system tells no period', async () => {
+    const silent = { ...order, economics: { ...NO_PROJECT_ECONOMICS } }
+    const [sheet] = await setup({}, { ...options, orders: [silent] }).projectSheets.list(project)
+    expect(sheet?.progress).toEqual({ share: 0.4, source: 'recognized', day: null })
+  })
+
+  it('still tells hours and costs with the company system out of reach, and asks for the timesheets', async () => {
+    const [alone] = await setup({}, { ...options, linked: false }).projectSheets.list(project)
+    expect(alone).toMatchObject({ hours: 48, economics: null, progress: null })
     await expect(
-      setup(settings, { ...options, timesheet: null }).projectSheets.propose(project, 'P1'),
+      setup({}, { ...options, timesheet: null }).projectSheets.list(project),
     ).rejects.toMatchObject({ code: 'forecast_timesheet_not_set' })
-  })
-
-  it('prices the month of its code: a rate written in the budget is the rate of the forecast', async () => {
-    const june: HoursEntry[] = [
-      {
-        person: 'Rossi Mario',
-        day: '2026-06-03',
-        hours: 16,
-        project: 'P1',
-        approved: true,
-        id: '1',
-        cost: 400,
-      },
-    ]
-    const bare = setup({}, { codes: ['P1'], timesheet: june })
-    const before = await bare.forecasts.view(project, '2026-06')
-    expect(before.forecast.gaps).toContainEqual(expect.objectContaining({ kind: 'no_rate' }))
-    const planned = setup(
-      {},
-      {
-        codes: ['P1'],
-        timesheet: june,
-        plans: {
-          P1: {
-            lines: [
-              {
-                group: 'internal',
-                name: 'Mario Rossi',
-                unitCost: null,
-                unitPrice: 60,
-                budget: {},
-                forecast: {},
-                declared: {},
-              },
-            ],
-            confirmedOn: null,
-            milestones: [],
-            declaredProgress: {},
-            registry: NO_SHEET_REGISTRY,
-          },
-        },
-      },
-    )
-    const after = await planned.forecasts.view(project, '2026-06')
-    // Two days at 480: no rate is missing any more, and nothing was written in the settings.
-    expect(after.forecast.rows[0]?.values.revenue).toBe(960)
-    expect(after.forecast.gaps.filter((gap) => gap.kind === 'no_rate')).toEqual([])
-    expect((await planned.forecasts.settings(project)).rates).toEqual([])
   })
 })

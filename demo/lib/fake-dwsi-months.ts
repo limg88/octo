@@ -1,7 +1,7 @@
 // A fake NetSuite warehouse for a project sold at a fixed price whose work began two months ago:
 // the timesheets of both months are in the warehouse, but Octo holds only those of last month,
 // as when the PM read in «Ore» the month it proposes. It also writes what a PM sets once.
-// Usage: node demo/lib/fake-dwsi-months.ts <project folder> <app data folder> [no-credential|lifetime|estimate|budget|suppliers]
+// Usage: node demo/lib/fake-dwsi-months.ts <project folder> <app data folder> [no-credential|lifetime|estimate|budget|suppliers|summary]
 //        (prints the name of its database and keeps running; SIGTERM drops the database)
 // `no-credential` leaves the NetSuite source without its password: Octo cannot read by itself.
 // `lifetime` adds what the page of the whole life of the code shows: a second person on the
@@ -10,6 +10,8 @@
 // not yet in NetSuite, and those of who has no timesheet, counted at the cost of an hour.
 // `budget` is `estimate` with the caps in days of the people and no costs at budget written:
 // Octo proposes them from the caps.
+// `summary` is `suppliers` with how far the work is as the company's system tells it, and with
+// the plan the sheet kept before the plans left Octo: it is handed back at the first reading.
 // It needs the test Postgres: `pnpm db:setup` once.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -57,7 +59,10 @@ const CAPS: Array<[name: string, days: number]> = [
   ['Verdi Sara', 1.5],
 ]
 /** `suppliers` is `lifetime` with an order to a supplier, what it delivered and its invoice. */
-const suppliers = mode === 'suppliers'
+const summary = mode === 'summary'
+const suppliers = mode === 'suppliers' || summary
+/** How far the work is at the end of last month, as the company's system says. */
+const PROGRESS = 0.62
 const lifetime = mode === 'lifetime' || estimate || suppliers
 const SUPPLIER = { name: 'Studio Blu Srl', order: 'PO-31', ordered: 2000, received: 1200 }
 /** Logged on the tracker in the month that runs: NetSuite gets these hours when it closes. */
@@ -108,6 +113,13 @@ await fake.exec(`
             ${-SUPPLIER.received}, '${CODE}', '${SUPPLIER.order}', 'Bill', NULL);`
       : ''
   }
+  ${
+    summary
+      ? `DELETE FROM dwsi.dw_prod_projectpercentcomplete WHERE projectid = '${CODE}';
+         INSERT INTO dwsi.dw_prod_projectpercentcomplete VALUES
+           ('${CODE}', '${lastMonth}', '${lastMonth}-28', ${PROGRESS}, 'Open', NULL, 1);`
+      : ''
+  }
   DELETE FROM dwsi.base_timesheet WHERE projectid = '${CODE}';
   INSERT INTO dwsi.base_timesheet VALUES
     ${row(FIRST, `${firstMonth}-15`)},
@@ -136,6 +148,28 @@ write(join(settings, 'sources.json'), {
     tls: 'plaintext',
   },
 })
+if (summary) {
+  // What the sheet kept until the plans left Octo: a rate, hours at budget, an invoice planned.
+  write(join(settings, 'sheet-plan.json'), {
+    [CODE]: {
+      lines: [
+        {
+          group: 'internal',
+          name: SECOND_PERSON,
+          unitCost: null,
+          unitPrice: 60,
+          budget: { [lastMonth]: 24, [monthsAgo(0)]: 16 },
+          forecast: {},
+          declared: {},
+        },
+      ],
+      confirmedOn: null,
+      milestones: [{ salesOrder: 'SO-17', month: monthsAgo(0), amount: 2250 }],
+      declaredProgress: { [lastMonth]: 0.6 },
+      registry: { sales: 'Rino Venditti' },
+    },
+  })
+}
 write(
   join(dataFolder, 'secrets.json'),
   mode === 'no-credential'

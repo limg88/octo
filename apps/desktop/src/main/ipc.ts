@@ -45,9 +45,7 @@ import {
   OPEN_POINT_STATES,
   opensAsDocument,
   PHASES,
-  PLAN_GROUPS,
   pathInProject,
-  REGISTRY_FIELDS,
   RISK_STATES,
   TEAM_SIDES,
   TEMPLATE_FORMATS,
@@ -318,45 +316,6 @@ const forecastSettingsInput = byProject.extend({
   }),
 })
 const forecastMonthInput = byProject.extend({ month: rule })
-
-const MAX_PLAN_LINES = 400
-const planQuantities = z
-  .record(rule, z.number())
-  .refine((months) => Object.keys(months).length <= MAX_FORECAST_MONTHS)
-const sheetPlansInput = byProject.extend({
-  plans: z
-    .record(
-      rule,
-      z.object({
-        lines: z
-          .array(
-            z.object({
-              group: z.enum(PLAN_GROUPS),
-              name: rule,
-              unitCost: money,
-              unitPrice: money,
-              budget: planQuantities,
-              forecast: planQuantities,
-              declared: planQuantities,
-            }),
-          )
-          .max(MAX_PLAN_LINES),
-        confirmedOn: rule.nullable(),
-        milestones: z
-          .array(z.object({ salesOrder: rule, month: rule, amount: z.number() }))
-          .max(MAX_PLAN_LINES),
-        declaredProgress: planQuantities,
-        registry: z.object(
-          Object.fromEntries(REGISTRY_FIELDS.map((field) => [field, rule])) as Record<
-            (typeof REGISTRY_FIELDS)[number],
-            typeof rule
-          >,
-        ),
-      }),
-    )
-    .refine((plans) => Object.keys(plans).length <= MAX_RULES),
-})
-const sheetCodeInput = byProject.extend({ code: rule })
 
 const progressSettingsInput = byProject.extend({
   settings: z.object({
@@ -1133,26 +1092,6 @@ export function registerIpc(deps: IpcDeps): void {
 
   handle(CHANNELS.projectSheets, byProject, async ({ projectId }) =>
     deps.projectSheets.list(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.sheetPlans, byProject, async ({ projectId }) =>
-    deps.projectSheets.plans(await deps.projects.get(projectId)),
-  )
-
-  handle(CHANNELS.sheetPlansSave, sheetPlansInput, async (input) =>
-    deps.projectSheets.savePlans(await deps.projects.get(input.projectId), input.plans),
-  )
-
-  handle(CHANNELS.sheetPropose, sheetCodeInput, async (input) =>
-    deps.projectSheets.propose(await deps.projects.get(input.projectId), input.code),
-  )
-
-  handle(CHANNELS.sheetConfirm, sheetCodeInput, async (input) =>
-    deps.projectSheets.confirm(await deps.projects.get(input.projectId), input.code),
-  )
-
-  handle(CHANNELS.sheetExport, sheetCodeInput, async (input) =>
-    deps.projectSheets.exportData(await deps.projects.get(input.projectId), input.code),
   )
 
   handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>

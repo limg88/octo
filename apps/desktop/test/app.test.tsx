@@ -288,11 +288,6 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       code: 'forecast_model_not_set' as const,
     })),
     projectSheets: vi.fn(async () => ok([])),
-    sheetPlans: vi.fn(async () => ok({})),
-    saveSheetPlans: vi.fn(async () => ok({})),
-    proposeSheetPlan: vi.fn(async () => ok({})),
-    confirmSheetBudget: vi.fn(async () => ok({})),
-    exportSheetData: vi.fn(async () => ok({ path: '' })),
     projectShape: vi.fn(async () => ok({ twoTrackers: true, fixedPriceOnly: false })),
     readForecastOrders: vi.fn(async () => ({
       ok: false as const,
@@ -964,9 +959,8 @@ describe('project tabs', () => {
       messages.dashboardTab,
     ])
     expect(group(messages.nav.monthly)).toEqual([
-      messages.hoursTab,
+      // The hours and the forecast of the month are parts of «Commessa», not sections.
       messages.sheetTab,
-      messages.forecastTab,
       messages.progressTab,
     ])
     expect(group(messages.nav.sprint)).toEqual([messages.alignmentTab])
@@ -989,6 +983,13 @@ describe('project tabs', () => {
     expect(selected()).toBe(messages.sourcesTab)
     fireEvent.keyDown(today, { key: 'a' })
     expect(selected()).toBe(messages.sourcesTab)
+    // Inside «Commessa» the hours are a place of their own, and the sidebar stays on the section.
+    fireEvent.click(screen.getByRole('tab', { name: messages.sheetTab }))
+    fireEvent.click(await screen.findByRole('tab', { name: messages.sheet.parts.hours }))
+    expect(selected()).toBe(messages.sheetTab)
+    expect(
+      screen.getByRole('tab', { name: messages.sheet.parts.hours }).getAttribute('aria-selected'),
+    ).toBe('true')
   })
 
   it('has no sections to show while there is no project', async () => {

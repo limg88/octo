@@ -1,6 +1,6 @@
-import type { Lifetime, LifetimeLine } from '@octo/domain'
+import type { Lifetime, LifetimeLine, SheetProgress } from '@octo/domain'
 import { messages } from './messages.ts'
-import { monthText } from './today-text.ts'
+import { monthText, shortDayText } from './today-text.ts'
 
 const THOUSANDS = /^\d{1,3}(\.\d{3})+$/
 
@@ -34,6 +34,13 @@ export const amountText = (value: number | null): string =>
 export function lifetimeSourceText(line: Pick<LifetimeLine, 'source' | 'months'>): string {
   const source = messages.sheet.summary.sources[line.source]
   return line.months.length === 0 ? source : `${source} (${line.months.join(', ')})`
+}
+
+/** What says how far a project code is: the page never shows the figure without it. */
+export function progressSourceText(progress: SheetProgress): string {
+  const sources = messages.sheet.summary.progressSources
+  if (progress.source !== 'system') return sources[progress.source]
+  return sources.system(progress.day === null ? '' : shortDayText(progress.day))
 }
 
 const SHORT_MONTH = new Intl.DateTimeFormat('it-IT', {
@@ -104,11 +111,10 @@ export function lifetimeMail(life: Lifetime): string {
     ...table,
     '',
     `${text.marginToDate}: ${share(life.marginToDate)}`,
-    ...(life.budgetCosts === null
+    ...(life.progress === null
       ? []
-      : [
-          `${text.budgetCosts}: ${money(life.budgetCosts)} · ${text.progress(share(life.progress))}`,
-        ]),
+      : [text.progressMail(share(life.progress.share), progressSourceText(life.progress))]),
+    ...(life.budgetCosts === null ? [] : [`${text.budgetCosts}: ${money(life.budgetCosts)}`]),
     ...(life.marginAtEnd === null
       ? []
       : [

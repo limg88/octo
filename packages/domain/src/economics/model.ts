@@ -35,6 +35,14 @@ export type VendorInvoiceLine = {
   amount: number
 }
 
+/** How far the work is at the end of a period, as the company's system says. */
+export type ProgressReading = {
+  /** The last day of the period, `YYYY-MM-DD`. */
+  day: string
+  /** The share of the work done, between 0 and 1. */
+  share: number
+}
+
 /** Everything the company's system says of the money of a project code. */
 export type ProjectEconomics = {
   /** What an hour costs today of who wrote hours on the code, by name. */
@@ -44,6 +52,8 @@ export type ProjectEconomics = {
   purchases: PurchaseLine[]
   receipts: ReceiptLine[]
   vendorInvoices: VendorInvoiceLine[]
+  /** How far the work is, period by period; empty when the system does not tell. */
+  progress: ProgressReading[]
 }
 
 export const NO_PROJECT_ECONOMICS: ProjectEconomics = {
@@ -53,4 +63,5 @@ export const NO_PROJECT_ECONOMICS: ProjectEconomics = {
   purchases: [],
   receipts: [],
   vendorInvoices: [],
+  progress: [],
 }

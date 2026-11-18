@@ -734,7 +734,8 @@ describe('a project code over its whole life', () => {
       unreadMonths: [],
     })
     expect(life.marginToDate).toBeCloseTo((7500 - 3456) / 7500)
-    expect(life.progress).toBeCloseTo(3456 / 4800)
+    // The company's system tells no period: the revenue recognised over the order.
+    expect(life.progress).toEqual({ share: 5250 / 7500, source: 'recognized', day: null })
     expect(life.marginAtEnd).toBeCloseTo((7500 - 4800) / 7500)
   })
 
@@ -752,13 +753,7 @@ describe('a project code over its whole life', () => {
     expect(overrun.marginAtEnd).toBeCloseTo(overrun.marginToDate ?? 0)
     expect(
       compileLifetime('P1', rows, { ...settings, months: {} }, '2026-11', months),
-    ).toMatchObject({ budgetCosts: null, progress: null, expectedCosts: null, marginAtEnd: null })
-    // Costs beyond the budget stop at the whole.
-    const small = {
-      ...settings,
-      months: { '2026-09': { P1: { ...NO_ROW_INPUTS, budgetCosts: 100 } } },
-    }
-    expect(compileLifetime('P1', rows, small, '2026-11', months).progress).toBe(1)
+    ).toMatchObject({ budgetCosts: null, expectedCosts: null, marginAtEnd: null })
   })
 
   it('says the months it misses, and leaves the margins empty for a code nothing is known of', () => {

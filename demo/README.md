@@ -2,6 +2,8 @@
 
 Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 
+Dal 18/11/2026 (R1, demo 60) «Ore» e «Previsionale» non sono più voci della colonna di sinistra: sono schede di «Commessa». Nei copioni scritti prima, «apri Ore» e «apri Previsionale» vogliono dire: apri «Commessa» e poi quella scheda. Le tabelle di tariffe e costi sono tornate nelle impostazioni del previsionale.
+
 | # | Demo | Comando | Copione |
 |---|---|---|---|
 | 01 | App e Chiedi: l'app si apre su un progetto sintetico e risponde con le fonti controllate una per una | `bash demo/01-app-e-chiedi/run.sh` | [COPIONE](01-app-e-chiedi/COPIONE.md) |
@@ -66,6 +68,7 @@ Ogni fetta della roadmap si chiude con una demo eseguibile in pochi minuti.
 | 56 | Pannelli di configurazione (`docs/revisione-ux.md`, UX-24 … UX-35): liste lunghe di opzioni richiuse sotto «Scegli tra N opzioni», «Leggi con le impostazioni salvate» nei moduli delle fonti, server NetSuite e ricerca commesse accanto ai codici, «Apri la fonte» nei rischi, aiuti di campo per domande e data limite, fasi accanto agli stati, formato del mese, tariffe a richiesta, cella di destinazione del dato, stati equivalenti che vanno a capo | `bash demo/56-pannelli-di-configurazione/run.sh` | [COPIONE](56-pannelli-di-configurazione/COPIONE.md) |
 | 57 | Sezione «Commessa»: la commessa a vita intera ha una sezione sua, con le cifre dell'ordine e di costi e margine in prima schermata; «Previsionale» resta il mese di tutte le commesse, senza schede interne; «Avanzamento» di un progetto a corpo rimanda a «Commessa» invece di ripetere ordinato e fatturato. Primo incremento delle schede progetto. Serve Docker | `bash demo/57-sezione-commessa/run.sh` | [COPIONE](57-sezione-commessa/COPIONE.md) |
 | 58 | «Commessa» con le regole della scheda progetto: fatturato dalle righe fattura, ordini a fornitore con ricevuto e fatturato, costo dei fornitori fra i costi, WIP e FRD, costi di NetSuite per gruppo accanto a quelli calcolati, «Come sono calcolate le cifre», scheda «Fatturazione» (al cliente e dai fornitori). Serve Docker | `bash demo/58-commessa-fornitori/run.sh` | [COPIONE](58-commessa-fornitori/COPIONE.md) |
-| 59 | «Commessa», schede «Budget» e «Mesi»: budget per riga e per mese proposto da ciò che Octo sa, conferma del budget, mesi chiusi dai timesheet e mesi a venire ripianificati, calcolato accanto a NetSuite e scostamento dal budget, avanzamento dichiarato, piano di fatturazione contro il fatturato, anagrafica, esportazione nel formato «Dati». Serve Docker | `bash demo/59-commessa-budget-e-mesi/run.sh` | [COPIONE](59-commessa-budget-e-mesi/COPIONE.md) |
+| 59 | Tolta il 18/11/2026 con R1: budget, mesi, piano di fatturazione, anagrafica ed esportazione «Dati» sono usciti da Octo e restano nelle schede progetto | — | vedi la demo 60 |
+| 60 | «Commessa» come riepilogo (R1 di `docs/roadmap.md`): le cifre di NetSuite con l'avanzamento letto da NetSuite e la fonte sempre scritta, «Ore» e «Previsionale» come schede della pagina, «Copia i dati per un report», il piano della versione precedente esportato in un file leggibile e le sue tariffe passate al previsionale | `bash demo/60-commessa-riepilogo/run.sh` | [COPIONE](60-commessa-riepilogo/COPIONE.md) |
 
 `pnpm e2e:condivisa` segue i passi della demo 42 in due finestre vere aperte sulla stessa cartella, ognuna con la sua cartella dei dati, la sua persona e il suo nome di computer.

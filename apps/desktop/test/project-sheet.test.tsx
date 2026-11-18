@@ -5,17 +5,14 @@ import {
   type Lifetime,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
-  NO_SHEET_PLAN,
   type Project,
-  planView,
-  type SheetPlan,
-  type SheetPlans,
 } from '@octo/domain'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lifetimeMail } from '../src/renderer/forecast-text.ts'
-import { dateText, errorText, messages } from '../src/renderer/messages.ts'
+import { messages } from '../src/renderer/messages.ts'
 import { ProjectSheetView } from '../src/renderer/ProjectSheetView.tsx'
+import type { Section } from '../src/renderer/sections.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -23,30 +20,40 @@ const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 const text = messages.forecast
 const words = messages.sheet.summary
 
-type Api = Pick<
-  OctoApi,
-  | 'projectSheets'
-  | 'forecastSettings'
-  | 'saveForecastSettings'
-  | 'sheetPlans'
-  | 'saveSheetPlans'
-  | 'proposeSheetPlan'
-  | 'confirmSheetBudget'
-  | 'exportSheetData'
-  | 'openEvidence'
->
+// The hours and the forecast of the month have their own tests: here they are only held.
+vi.mock('../src/renderer/HoursView.tsx', () => ({
+  HoursView: (props: { project: Project; onOpenSources: () => void }) => (
+    <button type="button" onClick={props.onOpenSources}>
+      sources<span>hours of {props.project.id}</span>
+    </button>
+  ),
+}))
+vi.mock('../src/renderer/ForecastView.tsx', () => ({
+  ForecastView: (props: { project: Project }) => <p>forecast of {props.project.id}</p>,
+}))
+
+type Api = Pick<OctoApi, 'projectSheets' | 'forecastSettings' | 'saveForecastSettings'>
+type SheetProps = {
+  api: Api
+  project: Project
+  place?: 'sheet' | 'hours' | 'forecast'
+  onOpenSection?: (section: Section) => void
+}
+/** The page as the app holds it: on its figures, unless a test says where the PM is. */
+const Sheet = ({ api, project, place = 'sheet', onOpenSection = () => {} }: SheetProps) => (
+  <ProjectSheetView
+    api={api as OctoApi}
+    project={project}
+    place={place}
+    onOpenSection={onOpenSection}
+  />
+)
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
     projectSheets: vi.fn(async () => ok<Lifetime[]>([])),
     forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     saveForecastSettings: vi.fn(async (_id: string, settings: ForecastSettings) => ok(settings)),
-    sheetPlans: vi.fn(async () => ok<SheetPlans>({})),
-    saveSheetPlans: vi.fn(async (_id: string, plans: SheetPlans) => ok(plans)),
-    proposeSheetPlan: vi.fn(async () => ok<SheetPlans>({})),
-    confirmSheetBudget: vi.fn(async () => ok<SheetPlans>({})),
-    exportSheetData: vi.fn(async () => ok({ path: '_octo/commessa/AUR-01/Dati 2026-11-17.csv' })),
-    openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
   return api
@@ -71,13 +78,12 @@ const life: Lifetime = {
   wip: 3457 - 2250,
   toBill: 5250 - 2250,
   economics: null,
-  plan: null,
   estimatedHours: 0,
   estimatedCosts: 0,
   marginToDate: (7500 - 3457) / 7500,
   budgetCosts: 4800,
   proposedBudget: null,
-  progress: 3457 / 4800,
+  progress: { share: 0.55, source: 'system', day: '2026-10-31' },
   expectedCosts: 4800,
   marginAtEnd: 0.36,
   notApprovedHours: 3,
@@ -121,7 +127,7 @@ describe('the sheet of a project code', () => {
     const writeText = vi.fn(async () => {})
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     const table = await screen.findByRole('table', { name: words.people })
     expect(screen.getByRole('heading', { name: /AUR-01 · Assessment Aurora/ })).toBeTruthy()
     expect(screen.getByText(text.internal)).toBeTruthy()
@@ -136,7 +142,7 @@ describe('the sheet of a project code', () => {
     expect(figuresOf(words.groups.margin)).toEqual([
       `${words.costs}: 3.457,00${words.hoursWorked('68')}`,
       `${words.marginToDate}: 53,91%`,
-      `${words.budgetCosts}: 4.800,00${words.progress('72,02%')}`,
+      `${words.progress}: 55%${words.progressSources.system('31/10/2026')}`,
       `${words.marginAtEnd}: 36%${words.onCosts('4.800,00')}`,
     ])
     const rows = within(table)
@@ -161,7 +167,7 @@ describe('the sheet of a project code', () => {
   it('is chosen among the codes of the project, the fixed price first, and stays chosen', async () => {
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([days, life])) })
     const other: Project = { ...project, id: 'p-2' }
-    const { unmount } = render(<ProjectSheetView api={api} project={other} />)
+    const { unmount } = render(<Sheet api={api} project={other} />)
     // The fixed price is shown first, whatever the order of the codes.
     const chosen = await screen.findByLabelText<HTMLSelectElement>(words.code)
     expect(chosen.value).toBe('AUR-01')
@@ -176,12 +182,12 @@ describe('the sheet of a project code', () => {
       `${words.recognized}: —`,
     ])
     expect(figuresOf(words.groups.margin).slice(2)).toEqual([
-      `${words.budgetCosts}: —${words.noBudget}`,
+      `${words.progress}: —${words.noProgress}`,
       `${words.marginAtEnd}: —${words.noExpected}`,
     ])
     // Back from another section the same code is shown.
     unmount()
-    render(<ProjectSheetView api={api} project={other} />)
+    render(<Sheet api={api} project={other} />)
     expect((await screen.findByLabelText<HTMLSelectElement>(words.code)).value).toBe('AUR-02')
   })
 
@@ -199,7 +205,7 @@ describe('the sheet of a project code', () => {
       estimatedCosts: 207,
     }
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([estimated])) })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     const table = await screen.findByRole('table', { name: words.people })
     const rows = within(table)
       .getAllByRole('row')
@@ -242,7 +248,7 @@ describe('the sheet of a project code', () => {
         .mockResolvedValueOnce(ok([proposed]))
         .mockResolvedValue(ok([{ ...proposed, budgetCosts: 4584 }])),
     })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     expect(
       await screen.findByText(
         new RegExp(
@@ -284,7 +290,7 @@ describe('the sheet of a project code', () => {
       projectSheets: vi.fn(async () => ok([proposed])),
       forecastSettings: vi.fn(async () => refused),
     })
-    render(<ProjectSheetView api={unread} project={project} />)
+    render(<Sheet api={unread} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: words.useProposed }))
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(unread.saveForecastSettings).not.toHaveBeenCalled()
@@ -293,7 +299,7 @@ describe('the sheet of a project code', () => {
       projectSheets: vi.fn(async () => ok([proposed])),
       saveForecastSettings: vi.fn(async () => refused),
     })
-    render(<ProjectSheetView api={unsaved} project={project} />)
+    render(<Sheet api={unsaved} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: words.useProposed }))
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(unsaved.projectSheets).toHaveBeenCalledTimes(1)
@@ -307,10 +313,10 @@ describe('the sheet of a project code', () => {
         code: 'forecast_timesheet_not_set' as const,
       })),
     })
-    render(<ProjectSheetView api={failing} project={project} onOpenSection={onOpenSection} />)
+    render(<Sheet api={failing} project={project} onOpenSection={onOpenSection} />)
     expect((await screen.findByRole('alert')).textContent).toMatch(/timesheet/i)
     cleanup()
-    render(<ProjectSheetView api={fakeApi()} project={project} />)
+    render(<Sheet api={fakeApi()} project={project} />)
     expect(await screen.findByText(text.noRows)).toBeTruthy()
   })
 
@@ -356,7 +362,7 @@ describe('the sheet of a project code', () => {
 
   it('settles costs, revenue and invoices, and says once how each figure is computed', async () => {
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     await screen.findByRole('table', { name: words.people })
     expect(figuresOf(words.groups.settle)).toEqual([
       `${words.wip}: 1.207,00${words.wipNote}`,
@@ -377,7 +383,7 @@ describe('the sheet of a project code', () => {
 
   it('puts what NetSuite booked beside what Octo computes, and counts the suppliers', async () => {
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([withSuppliers])) })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     await screen.findByRole('table', { name: words.people })
     expect(figuresOf(words.groups.margin)[0]).toBe(
       `${words.costs}: 4.657,00${words.withSuppliers('68', '1.200,00')}`,
@@ -404,10 +410,7 @@ describe('the sheet of a project code', () => {
       lines: life.lines.filter((line) => line.source !== 'declared'),
     }
     render(
-      <ProjectSheetView
-        api={fakeApi({ projectSheets: vi.fn(async () => ok([same])) })}
-        project={project}
-      />,
+      <Sheet api={fakeApi({ projectSheets: vi.fn(async () => ok([same])) })} project={project} />,
     )
     expect(await screen.findByText(words.ledger.same('4.500,00'))).toBeTruthy()
     expect(screen.queryByText(words.doubleCount)).toBeNull()
@@ -424,10 +427,7 @@ describe('the sheet of a project code', () => {
       },
     }
     render(
-      <ProjectSheetView
-        api={fakeApi({ projectSheets: vi.fn(async () => ok([empty])) })}
-        project={project}
-      />,
+      <Sheet api={fakeApi({ projectSheets: vi.fn(async () => ok([empty])) })} project={project} />,
     )
     expect(await screen.findByText(words.ledger.none)).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: messages.sheet.parts.billing }))
@@ -438,7 +438,7 @@ describe('the sheet of a project code', () => {
   it('shows the invoices to the client by order and by month, and the orders to the suppliers', async () => {
     const bill = messages.sheet.billing
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([withSuppliers])) })
-    render(<ProjectSheetView api={api} project={project} />)
+    render(<Sheet api={api} project={project} />)
     const tab = await screen.findByRole('tab', { name: messages.sheet.parts.billing })
     expect(
       screen.getByRole('tab', { name: messages.sheet.parts.summary }).getAttribute('aria-selected'),
@@ -470,18 +470,11 @@ describe('the sheet of a project code', () => {
     const bill = messages.sheet.billing
     const onOpenSection = vi.fn()
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
-    const { unmount } = render(
-      <ProjectSheetView api={api} project={project} onOpenSection={onOpenSection} />,
-    )
+    render(<Sheet api={api} project={project} onOpenSection={onOpenSection} />)
     fireEvent.click(await screen.findByRole('tab', { name: messages.sheet.parts.billing }))
     expect(screen.getByText(bill.notRead)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: messages.openSection(messages.sourcesTab) }))
     expect(onOpenSection).toHaveBeenCalledWith('sources')
-    unmount()
-    render(<ProjectSheetView api={api} project={project} />)
-    fireEvent.click(await screen.findByRole('tab', { name: messages.sheet.parts.billing }))
-    expect(screen.getByText(bill.notRead)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Apri/ })).toBeNull()
   })
 
   it('goes in a mail as plain text, with what it misses said in words', () => {
@@ -504,6 +497,11 @@ describe('the sheet of a project code', () => {
     ])
     expect(new Set(table.map((line) => line.length)).size).toBe(1)
     expect(mail).toContain(`${words.marginToDate}: 53,91%`)
+    // How far the code is never goes without what says so.
+    expect(mail).toContain(words.progressMail('55%', words.progressSources.system('31/10/2026')))
+    expect(mail).toContain(`${words.budgetCosts}: 4.800,00`)
+    const other = { ...life, progress: { share: 0.7, source: 'recognized' as const, day: null } }
+    expect(lifetimeMail(other)).toContain(words.progressSources.recognized)
     expect(mail).toContain(`${words.marginAtEnd}: 36% · ${words.onCosts('4.800,00')}`)
     const bare = lifetimeMail(days)
     expect(bare.split('\n')[0]).toBe('AUR-02')
@@ -515,360 +513,36 @@ describe('the sheet of a project code', () => {
     expect(lifetimeMail({ ...days, invoiced: 100 })).toContain(`${words.invoiced}: 100,00`)
   })
 
-  describe('with a plan', () => {
-    const plan = messages.sheet.plan
-    const kept: SheetPlan = {
-      ...NO_SHEET_PLAN,
-      lines: [
-        {
-          group: 'internal',
-          name: 'Rossi Anna',
-          unitCost: null,
-          unitPrice: 60,
-          budget: { '2026-09': 40, '2026-10': 40, '2026-11': 16 },
-          forecast: {},
-          declared: {},
-        },
-        {
-          group: 'external',
-          name: 'Studio Blu',
-          unitCost: 50,
-          unitPrice: 70,
-          budget: { '2026-10': 16 },
-          forecast: {},
-          declared: {},
-        },
-      ],
-    }
-    const worked = [
-      {
-        person: 'Rossi Anna',
-        day: '2026-09-10',
-        hours: 32,
-        project: 'AUR-01',
-        approved: true,
-        id: null,
-      },
-      {
-        person: 'Rossi Anna',
-        day: '2026-10-05',
-        hours: 48,
-        project: 'AUR-01',
-        approved: true,
-        id: null,
-      },
-      {
-        person: 'Bianchi Luca',
-        day: '2026-10-06',
-        hours: 4,
-        project: 'AUR-01',
-        approved: true,
-        id: null,
-      },
-    ]
-    const viewOf = (of: SheetPlan) =>
-      planView(of, 'AUR-01', worked, new Map([['anna rossi', 40]]), '2026-10', 8)
-    const planned: Lifetime = { ...life, plan: viewOf(kept) }
-    const apiWith = (plans: SheetPlans, more: Partial<Api> = {}) =>
-      fakeApi({
-        projectSheets: vi.fn(async () => ok([planned])),
-        sheetPlans: vi.fn(async () => ok(plans)),
-        ...more,
-      })
-    const open = async (part: 'budget' | 'months' | 'billing') =>
-      fireEvent.click(await screen.findByRole('tab', { name: messages.sheet.parts[part] }))
-    const type = (label: string, value: string) =>
-      fireEvent.change(screen.getByLabelText(label), { target: { value } })
-
-    it('starts a budget from who is known, and says who works with no line', async () => {
-      const proposed = { 'AUR-01': kept }
-      const api = fakeApi({
-        projectSheets: vi.fn(async () => ok([{ ...life, plan: viewOf(NO_SHEET_PLAN) }])),
-        proposeSheetPlan: vi.fn(async () => ok(proposed)),
-      })
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('budget')
-      expect(screen.getByText(plan.empty)).toBeTruthy()
-      expect(screen.getByText(plan.unplannedWarning('Bianchi Luca, Rossi Anna'))).toBeTruthy()
-      // Nothing to confirm and nothing to save yet.
-      expect(screen.queryByRole('button', { name: plan.confirm })).toBeNull()
-      expect(screen.getByRole<HTMLButtonElement>('button', { name: plan.save }).disabled).toBe(true)
-      fireEvent.click(screen.getByRole('button', { name: plan.propose }))
-      await waitFor(() => expect(api.proposeSheetPlan).toHaveBeenCalledWith('p-1', 'AUR-01'))
-      expect(await screen.findByRole('status')).toBeTruthy()
-      expect(api.projectSheets).toHaveBeenCalledTimes(2)
-    })
-
-    it('writes the budget line by line and month by month, and saves it in one go', async () => {
-      const api = apiWith({ 'AUR-01': kept })
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('budget')
-      const table = screen.getByRole('table', { name: plan.budgetTitle })
-      // The year of the month that runs: twelve months, the line, what it costs and is sold for.
-      expect(within(table).getAllByRole('columnheader')).toHaveLength(16)
-      expect(
-        within(table)
-          .getAllByRole('row')
-          .map((row) => row.querySelector('th')?.textContent?.trim())
-          .slice(-4),
-      ).toEqual([plan.totals.budget, plan.totals.revenue, plan.totals.costs, plan.totals.margin])
-      // What an hour of the person costs today stands where no cost is written.
-      const cost = screen.getByLabelText<HTMLInputElement>(plan.costOf('Rossi Anna'))
-      expect(cost.value).toBe('')
-      expect(cost.placeholder).toBe(plan.followsToday('40,00'))
-      // A price written nowhere shows nothing; a cost of who is not of the company is as typed.
-      expect(screen.getByLabelText<HTMLInputElement>(plan.costOf('Studio Blu')).value).toBe('50')
-      expect(
-        screen.getByLabelText<HTMLInputElement>(plan.cellOf('Rossi Anna', 'set 2026')).value,
-      ).toBe('40')
-      type(plan.cellOf('Rossi Anna', 'dic 2026'), 'otto')
-      expect(screen.getByRole('alert').textContent).toBe(plan.wrong)
-      expect(screen.getByRole<HTMLButtonElement>('button', { name: plan.save }).disabled).toBe(true)
-      type(plan.cellOf('Rossi Anna', 'dic 2026'), '8,5')
-      type(plan.priceOf('Rossi Anna'), '65')
-      type(plan.cellOf('Rossi Anna', 'set 2026'), '')
-      expect(screen.getByText(plan.unsaved)).toBeTruthy()
-      // A line more, named, and one less.
-      fireEvent.click(screen.getByRole('button', { name: plan.addLine(plan.groups.product) }))
-      type(plan.nameOf(plan.groups.product, 1), 'Licenza')
-      fireEvent.click(screen.getByRole('button', { name: plan.removeLine('Studio Blu') }))
-      // What is typed stays while another tab is read.
-      await open('months')
-      await open('budget')
-      expect(screen.getByLabelText<HTMLInputElement>(plan.priceOf('Rossi Anna')).value).toBe('65')
-      fireEvent.click(screen.getByRole('button', { name: plan.save }))
-      await waitFor(() =>
-        expect(api.saveSheetPlans).toHaveBeenCalledWith('p-1', {
-          'AUR-01': {
-            ...kept,
-            lines: [
-              {
-                ...kept.lines[0],
-                unitPrice: 65,
-                budget: { '2026-10': 40, '2026-11': 16, '2026-12': 8.5 },
-              },
-              {
-                group: 'product',
-                name: 'Licenza',
-                unitCost: null,
-                unitPrice: null,
-                budget: {},
-                forecast: {},
-                declared: {},
-              },
-            ],
-          },
-        }),
-      )
-    })
-
-    it('confirms the budget, and reopens it only when the PM says so twice', async () => {
-      const confirmed = { 'AUR-01': { ...kept, confirmedOn: '2026-11-17' } }
-      const api = apiWith(
-        { 'AUR-01': kept },
-        { confirmSheetBudget: vi.fn(async () => ok(confirmed)) },
-      )
-      api.sheetPlans = vi
-        .fn()
-        .mockResolvedValueOnce(ok({ 'AUR-01': kept }))
-        .mockResolvedValue(ok(confirmed))
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('budget')
-      fireEvent.click(screen.getByRole('button', { name: plan.confirm }))
-      await waitFor(() => expect(api.confirmSheetBudget).toHaveBeenCalledWith('p-1', 'AUR-01'))
-      const told = plan.confirmed(dateText('2026-11-17'))
-      expect(
-        await screen.findByText(
-          (_text, element) =>
-            element?.tagName === 'P' && (element.textContent ?? '').startsWith(told),
-        ),
-      ).toBeTruthy()
-      expect(screen.queryByRole('button', { name: plan.confirm })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: plan.reopen }))
-      const dialog = screen.getByRole('dialog', { name: plan.reopenTitle })
-      fireEvent.click(within(dialog).getByRole('button', { name: plan.cancel }))
-      expect(screen.queryByRole('dialog')).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: plan.reopen }))
-      fireEvent.click(
-        within(screen.getByRole('dialog', { name: plan.reopenTitle })).getByRole('button', {
-          name: plan.reopen,
-        }),
-      )
-      expect(screen.getByRole('button', { name: plan.confirm })).toBeTruthy()
-      expect(screen.getByText(plan.unsaved)).toBeTruthy()
-    })
-
-    it('reads the months as they went and plans again those to come', async () => {
-      const withLedger: Lifetime = {
-        ...planned,
-        economics: {
-          invoiced: 0,
-          billingMonths: [],
-          billing: [],
-          ledger: { revenue: 1900, costs: 1300, groups: [] },
-          ledgerMonths: { '2026-09': { revenue: 1900, costs: 1300 } },
-          suppliers: null,
-        },
-      }
-      const api = apiWith(
-        { 'AUR-01': kept },
-        { projectSheets: vi.fn(async () => ok([withLedger])) },
-      )
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('months')
-      expect(screen.getByText(plan.monthsIntro('ottobre 2026', 'novembre 2026'))).toBeTruthy()
-      const rows = within(screen.getByRole('table', { name: plan.monthsTitle }))
-        .getAllByRole('row')
-        .map((row) => row.textContent ?? '')
-      // September and October are what the timesheets say: read, never typed.
-      const anna = rows.find((row) => row.startsWith('Rossi Anna')) ?? ''
-      expect(anna).toContain('40,0060,003248')
-      expect(screen.queryByLabelText(plan.cellOf('Rossi Anna', 'ott 2026'))).toBeNull()
-      // Who has hours and no line is told, with nothing to type.
-      expect(rows.some((row) => row.startsWith(`Bianchi Luca ${plan.unplanned}`))).toBe(true)
-      expect(screen.queryByLabelText(plan.cellOf('Bianchi Luca', 'nov 2026'))).toBeNull()
-      expect(screen.getByText(plan.withoutCost('Bianchi Luca'))).toBeTruthy()
-      // What is computed, what NetSuite booked, the distance from the budget, how far the work is.
-      for (const band of [
-        plan.totals.computed,
-        plan.totals.netsuite,
-        plan.totals.variance,
-        plan.totals.progress,
-      ]) {
-        expect(rows).toContain(band)
-      }
-      expect(figuresOf(plan.monthsTitle).map((figure) => figure.split(':')[0])).toEqual([
-        plan.figures.actual,
-        plan.figures.forecast,
-        plan.figures.atEnd,
-      ])
-      // November is planned as in the budget until the PM writes otherwise.
-      const november = screen.getByLabelText<HTMLInputElement>(
-        plan.cellOf('Rossi Anna', 'nov 2026'),
-      )
-      expect(november.value).toBe('')
-      expect(november.placeholder).toBe('16')
-      type(plan.cellOf('Rossi Anna', 'nov 2026'), '24')
-      type(plan.cellOf('Studio Blu', 'ott 2026'), '20')
-      type(plan.totals.declaredOf('ott 2026'), '55')
-      fireEvent.click(screen.getByRole('button', { name: plan.save }))
-      await waitFor(() =>
-        expect(api.saveSheetPlans).toHaveBeenCalledWith('p-1', {
-          'AUR-01': {
-            ...kept,
-            lines: [
-              { ...kept.lines[0], forecast: { '2026-11': 24 } },
-              { ...kept.lines[1], forecast: { '2026-10': 20 } },
-            ],
-            declaredProgress: { '2026-10': 0.55 },
-          },
-        }),
-      )
-      // Another year is another grid.
-      fireEvent.change(screen.getByLabelText(plan.year), { target: { value: '2027' } })
-      expect(screen.getByLabelText(plan.cellOf('Rossi Anna', 'gen 2027'))).toBeTruthy()
-    })
-
-    it('has nothing to plan again while there is no budget and nobody worked', async () => {
-      const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('months')
-      expect(screen.getByText(plan.emptyMonths)).toBeTruthy()
-    })
-
-    it('plans the invoices to issue and sets them beside those issued', async () => {
-      const bill = messages.sheet.billing
-      const api = fakeApi({ projectSheets: vi.fn(async () => ok([withSuppliers])) })
-      render(<ProjectSheetView api={api} project={project} />)
-      await open('billing')
-      expect(screen.queryByRole('table', { name: bill.compareTable })).toBeNull()
-      const cell = (column: keyof typeof bill.planColumns, row: number) =>
-        bill.planCell(bill.planColumns[column], row)
-      type(cell('salesOrder', 1), 'SO-1')
-      type(cell('month', 1), 'ottobre')
-      type(cell('amount', 1), '1.000')
-      expect(screen.getByText(bill.planWrong(1))).toBeTruthy()
-      expect(screen.getByRole<HTMLButtonElement>('button', { name: bill.planSave }).disabled).toBe(
-        true,
-      )
-      type(cell('month', 1), '2026-10')
-      expect(rowsOf(bill.compareTable)).toEqual([
-        `${bill.month}${bill.planned}${bill.invoiced}${bill.difference}`,
-        'set 20260,002.250,002.250,00',
-        'ott 20261.000,001.300,00300,00',
-        `${bill.total}1.000,003.550,002.550,00`,
-      ])
-      fireEvent.click(screen.getByRole('button', { name: bill.planSave }))
-      await waitFor(() =>
-        expect(api.saveSheetPlans).toHaveBeenCalledWith('p-1', {
-          'AUR-01': {
-            ...NO_SHEET_PLAN,
-            milestones: [{ salesOrder: 'SO-1', month: '2026-10', amount: 1000 }],
-          },
-        }),
-      )
-    })
-
-    it('keeps what the sheet says of the code beyond its figures, and writes its data in a file', async () => {
-      const api = apiWith({ 'AUR-01': kept })
-      render(<ProjectSheetView api={api} project={project} />)
-      const registry = messages.sheet.registry
-      fireEvent.change(await screen.findByLabelText(registry.fields.sales), {
-        target: { value: 'Bassi Luca' },
-      })
-      fireEvent.click(screen.getByRole('button', { name: registry.save }))
-      await waitFor(() =>
-        expect(api.saveSheetPlans).toHaveBeenCalledWith('p-1', {
-          'AUR-01': { ...kept, registry: { ...kept.registry, sales: 'Bassi Luca' } },
-        }),
-      )
-      fireEvent.click(await screen.findByRole('button', { name: messages.sheet.exportData }))
-      const path = '_octo/commessa/AUR-01/Dati 2026-11-17.csv'
-      expect(
-        await screen.findByText(new RegExp(messages.sheet.exported(path).slice(0, 30))),
-      ).toBeTruthy()
-      fireEvent.click(screen.getByRole('button', { name: messages.sheet.open }))
-      expect(api.openEvidence).toHaveBeenCalledWith('p-1', path)
-    })
-
-    it('says why a plan could not be read, kept or written', async () => {
-      const refused = { ok: false as const, code: 'sheet_plan_invalid' as const }
-      render(
-        <ProjectSheetView
-          api={fakeApi({
-            projectSheets: vi.fn(async () => ok([life])),
-            sheetPlans: vi.fn(async () => refused),
-          })}
-          project={project}
-        />,
-      )
-      expect((await screen.findByRole('alert')).textContent).toContain(
-        errorText('sheet_plan_invalid'),
-      )
-      cleanup()
-      const api = apiWith(
-        { 'AUR-01': kept },
-        {
-          saveSheetPlans: vi.fn(async () => refused),
-          exportSheetData: vi.fn(async () => ({
-            ok: false as const,
-            code: 'sheet_code_unknown' as const,
-          })),
-        },
-      )
-      render(<ProjectSheetView api={api} project={project} />)
-      fireEvent.click(await screen.findByRole('button', { name: messages.sheet.exportData }))
-      expect((await screen.findByRole('alert')).textContent).toContain(
-        errorText('sheet_code_unknown'),
-      )
-      await open('budget')
-      type(plan.priceOf('Rossi Anna'), '1')
-      fireEvent.click(screen.getByRole('button', { name: plan.save }))
-      await waitFor(() =>
-        expect(screen.getByRole('alert').textContent).toContain(errorText('sheet_plan_invalid')),
-      )
-      // What was typed is still there to be saved again.
-      expect(screen.getByText(plan.unsaved)).toBeTruthy()
-    })
+  it('holds the hours and the forecast of the month as parts of the page, each a place of its own', async () => {
+    const onOpenSection = vi.fn()
+    const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
+    const { rerender } = render(<Sheet api={api} project={project} onOpenSection={onOpenSection} />)
+    await screen.findByRole('table', { name: words.people })
+    const parts = messages.sheet.parts
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      parts.summary,
+      parts.billing,
+      parts.hours,
+      parts.forecast,
+    ])
+    // The hours are a place the signals of «Oggi» send to: the app is told, and shows them.
+    fireEvent.click(screen.getByRole('tab', { name: parts.hours }))
+    expect(onOpenSection).toHaveBeenLastCalledWith('hours')
+    rerender(<Sheet api={api} project={project} place="hours" onOpenSection={onOpenSection} />)
+    expect(screen.getByText('hours of p-1')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: parts.hours }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+    expect(screen.queryByRole('table', { name: words.people })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^sources/ }))
+    expect(onOpenSection).toHaveBeenLastCalledWith('sources')
+    rerender(<Sheet api={api} project={project} place="forecast" onOpenSection={onOpenSection} />)
+    expect(screen.getByText('forecast of p-1')).toBeTruthy()
+    // Back to the figures: they are read again, so hours read meanwhile are counted.
+    fireEvent.click(screen.getByRole('tab', { name: parts.summary }))
+    expect(onOpenSection).toHaveBeenLastCalledWith('sheet')
+    rerender(<Sheet api={api} project={project} place="sheet" onOpenSection={onOpenSection} />)
+    await screen.findByRole('table', { name: words.people })
+    expect(api.projectSheets).toHaveBeenCalledTimes(2)
   })
 })

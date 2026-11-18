@@ -14,8 +14,6 @@ import {
 } from './context.ts'
 import { DashboardView } from './DashboardView.tsx'
 import { DeliverablesView } from './DeliverablesView.tsx'
-import { ForecastView } from './ForecastView.tsx'
-import { HoursView } from './HoursView.tsx'
 import { Logo } from './Logo.tsx'
 import { errorText, messages } from './messages.ts'
 import { type SystemNotify, systemNotify } from './notify.ts'
@@ -482,12 +480,8 @@ export function App({ api, notify = systemNotify }: Props) {
                 focus={dashboardFocus}
                 onFocus={setDashboardFocus}
               />
-            ) : tab === 'hours' ? (
-              <HoursView api={api} project={selected} onOpenSources={() => setTab('sources')} />
-            ) : tab === 'sheet' ? (
-              <ProjectSheetView api={api} project={selected} onOpenSection={setTab} />
-            ) : tab === 'forecast' ? (
-              <ForecastView api={api} project={selected} onOpenSection={setTab} />
+            ) : tab === 'sheet' || tab === 'hours' || tab === 'forecast' ? (
+              <ProjectSheetView api={api} project={selected} place={tab} onOpenSection={setTab} />
             ) : tab === 'progress' ? (
               <ProgressView
                 api={api}

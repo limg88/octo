@@ -1,5 +1,5 @@
 import type { ProjectEconomics } from '../economics/model.ts'
-import type { PlanView } from '../economics/plan.ts'
+import { type SheetProgress, sheetProgress } from '../economics/progress.ts'
 import { type SheetEconomics, sheetEconomics } from '../economics/sheet.ts'
 import { type HoursEntry, personKey } from '../hours/model.ts'
 import type { PersonCap } from '../team/model.ts'
@@ -111,8 +111,6 @@ export type Lifetime = {
   toBill: number | null
   /** What the company's system says of the money of the code; null when it was not read. */
   economics: SheetEconomics | null
-  /** The plan of the code read against what happened; null while the PM wrote none. */
-  plan: PlanView | null
   /** The part of the hours and of the costs that is an estimate from the tracker. */
   estimatedHours: number
   estimatedCosts: number
@@ -122,8 +120,8 @@ export type Lifetime = {
   budgetCosts: number | null
   /** The costs at budget the caps of the people would give; null when they tell nothing. */
   proposedBudget: BudgetProposal | null
-  /** The costs so far over those at budget, at most the whole. */
-  progress: number | null
+  /** How far the work is, as the company's system tells it, with what says so. */
+  progress: SheetProgress | null
   /** What the whole project is expected to cost: as the PM wrote it, else the budget. */
   expectedCosts: number | null
   /** The margin when the project ends, on the expected costs or on those so far when higher. */
@@ -134,7 +132,6 @@ export type Lifetime = {
   unreadMonths: string[]
 }
 
-const WHOLE = 1
 const CENTS = 100
 /** An amount to the cent: a product of hours and a cost is no longer a sum of rows. */
 const cents = (value: number): number => Math.round(value * CENTS) / CENTS
@@ -283,27 +280,6 @@ export function currentHourlyCosts(
 }
 
 /**
- * The sheet of a code with its plan: once the PM plans the code line by line, the costs at
- * budget are those of the plan, the costs expected are those so far with those planned for the
- * months to come, and the progress is the one of the plan. A plan with no line changes nothing.
- */
-export function withPlan(life: Lifetime, plan: PlanView | null): Lifetime {
-  // With no line planned the view still tells who worked in which month: nothing else changes.
-  if (plan === null || plan.lines.every((line) => line.unplanned)) return { ...life, plan }
-  const budgetCosts = plan.totals.budget.costs > 0 ? plan.totals.budget.costs : life.budgetCosts
-  const expectedCosts = life.costs + plan.totals.forecast.costs
-  const { ordered } = life
-  return {
-    ...life,
-    plan,
-    budgetCosts,
-    expectedCosts,
-    progress: plan.progress[plan.through] ?? life.progress,
-    marginAtEnd: ordered ? (ordered - Math.max(expectedCosts, life.costs)) / ordered : null,
-  }
-}
-
-/**
  * A project code from its start to a month: who worked how much and at what cost, and the
  * margins a PM computes by hand. A cost that is missing is left out and the line says so; what
  * is estimated from the tracker is a line of its own, marked as an estimate. `readMonths` as in
@@ -368,13 +344,19 @@ export function compileLifetime(
     wip: invoiced === null ? null : costs - invoiced,
     toBill: invoiced === null || recognized === null ? null : recognized - invoiced,
     economics,
-    plan: null,
     estimatedHours: estimates.reduce((total, line) => total + line.hours, 0),
     estimatedCosts: estimates.reduce((total, line) => total + (line.cost ?? 0), 0),
     marginToDate: marginOn(costs),
     budgetCosts,
     proposedBudget: budgetFromCaps(caps, timesheet, settings),
-    progress: budgetCosts === null ? null : Math.min(WHOLE, costs / budgetCosts),
+    progress: sheetProgress({
+      readings: read?.progress ?? [],
+      through: month,
+      recognized,
+      ordered,
+      costs,
+      totalCosts: expectedCosts,
+    }),
     expectedCosts,
     marginAtEnd: expectedCosts === null ? null : marginOn(Math.max(expectedCosts, costs)),
     notApprovedHours: upTo

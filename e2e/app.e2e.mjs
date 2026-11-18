@@ -90,12 +90,15 @@ try {
   // Demo 21: the sections are in the sidebar, grouped, and the arrows move among them.
   const nav21 = (group) => page.getByRole('tablist', { name: group }).getByRole('tab')
   assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
-  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), [
-    'Ore',
-    'Commessa',
-    'Previsionale',
-    'Avanzamento',
-  ])
+  // «Ore» and «Previsionale» are parts of «Commessa», the summary of the money of the project.
+  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Commessa', 'Avanzamento'])
+  const openSheetPart = async (name) => {
+    await page.getByRole('tab', { name: 'Commessa', exact: true }).click()
+    await page
+      .getByRole('tablist', { name: 'Schede della commessa' })
+      .getByRole('tab', { name, exact: true })
+      .click()
+  }
   assert.deepEqual(await nav21('Progetto').allInnerTexts(), ['Impostazioni'])
   // Demo 23: Octo opens on the page of the day, the first section, for who is signed in.
   assert.deepEqual(await nav21('Ogni giorno').allInnerTexts(), ['Oggi'])
@@ -396,7 +399,7 @@ try {
   )
 
   // Demo 08: timesheet hours against tracker hours, from the exports in the project folder.
-  await page.getByRole('tab', { name: 'Ore' }).click()
+  await openSheetPart('Ore')
   const setup08 = page.getByRole('region', { name: 'Da dove leggo le ore' })
   await setup08.waitFor({ timeout: TIMEOUT_MS })
   await page.waitForFunction(
@@ -464,7 +467,7 @@ try {
     /collaudo del modulo ordini è confermato per il 17 dicembre 2026/,
   )
   await page.screenshot({ path: `${work}/confluence.png` })
-  await page.getByRole('tab', { name: 'Ore' }).click()
+  await openSheetPart('Ore')
   await page.getByText('Quadratura: 664 ore approvate, tutte nel confronto').waitFor({
     timeout: TIMEOUT_MS,
   })
@@ -487,7 +490,7 @@ try {
   execFileSync('node', [`${root}demo/lib/fake-forecast.ts`, `${work}/Aurora`])
   const modelFile = `${work}/Aurora/Amministrazione/Previsionale avanzamenti.xlsx`
   const modelBefore = readFileSync(modelFile)
-  await page.getByRole('tab', { name: 'Previsionale' }).click()
+  await openSheetPart('Previsionale')
   const forecastRow = (code) => page.locator('table.data tbody tr', { hasText: code })
   // The costs come from the rows of the timesheets: nobody typed them.
   await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
@@ -536,8 +539,10 @@ try {
   await page.screenshot({ path: `${work}/previsionale.png` })
 
   // Demo 57: the sheet of a project code over its whole life is a section of its own.
-  await page.getByRole('tab', { name: 'Commessa', exact: true }).click()
+  await openSheetPart('Sintesi')
   await page.getByRole('region', { name: 'Ordine', exact: true }).waitFor({ timeout: TIMEOUT_MS })
+  // How far the code is comes with what says so: here no system was read, so it is not told.
+  await page.getByText('Avanzamento', { exact: true }).first().waitFor()
   await page.getByRole('region', { name: 'Costi e margine', exact: true }).waitFor()
   await page.getByRole('table', { name: 'Ore e costi per persona' }).waitFor()
   await page.getByText('Documento interno: costi e margini non vanno al cliente.').waitFor()
@@ -947,7 +952,7 @@ try {
   await page.getByRole('region', { name: 'Richiesta 2' }).getByText('00004').waitFor()
 
   // A reading asked from a system that is not linked names it and leads to the sources.
-  await page.getByRole('tab', { name: 'Ore' }).click()
+  await openSheetPart('Ore')
   await page.getByRole('button', { name: 'Leggi i timesheet da NetSuite' }).click()
   await page
     .getByText(/^NetSuite non è collegato a questo progetto/)

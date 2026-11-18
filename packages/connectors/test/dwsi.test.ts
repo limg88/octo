@@ -995,6 +995,8 @@ describe('a DWSI sync', () => {
           purchases: [],
           receipts: [],
           vendorInvoices: [],
+          // How far the work is at the end of the period, as a share of the whole.
+          progress: [{ day: '2026-10-31', share: 0.53 }],
         },
       },
       {
@@ -1012,6 +1014,7 @@ describe('a DWSI sync', () => {
           purchases: [],
           receipts: [],
           vendorInvoices: [],
+          progress: [],
         },
       },
     ])
@@ -1043,6 +1046,12 @@ describe('a DWSI sync', () => {
         (7002, 1, 32, 'PO-31', '2026-10-29', 'Studio Blu', 'SERVPRO', 'Consulenza', 1, 400, NULL, 'PRJ000202');
       INSERT INTO dwsi.base_invoice_po VALUES
         ('FF-12', 1, 'Open', '2026-10-30', 'Studio Blu', 'SERVPRO', -1200, 'PRJ000202', 'PO-31', 'Bill', 'memo');
+      INSERT INTO dwsi.dw_prod_projectpercentcomplete VALUES
+        ('PRJ000202', 'Set 2026', '2026-09-30', 40, 'Closed', NULL, 1),
+        ('PRJ000202', 'Ott 2026', '2026-10-31', 0.55, 'Open', NULL, 2),
+        ('PRJ000202', 'Nov 2026', NULL, 0.6, 'Open', NULL, 3),
+        ('PRJ000202', 'Dic 2026', '2026-12-31', 250, 'Open', NULL, 4),
+        ('PRJ000202', 'Gen 2027', '2027-01-31', NULL, 'Open', NULL, 5);
     `)
     try {
       const [, borea] = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
@@ -1059,8 +1068,17 @@ describe('a DWSI sync', () => {
           },
         ],
       })
+      // A percentage is read as the share it is; a period with no day, or a figure that is
+      // neither a share nor a percentage, tells nothing.
+      expect(
+        [...(borea?.economics.progress ?? [])].sort((a, b) => a.day.localeCompare(b.day)),
+      ).toEqual([
+        { day: '2026-09-30', share: 0.4 },
+        { day: '2026-10-31', share: 0.55 },
+      ])
     } finally {
       await fake.exec(`
+        DELETE FROM dwsi.dw_prod_projectpercentcomplete WHERE projectid = 'PRJ000202';
         DELETE FROM dwsi.base_purchase_order;
         DELETE FROM dwsi.base_item_receipt;
         DELETE FROM dwsi.base_invoice_po;

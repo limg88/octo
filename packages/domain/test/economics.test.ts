@@ -8,6 +8,7 @@ import {
   NO_ROW_INPUTS,
   type ProjectEconomics,
   sheetEconomics,
+  sheetProgress,
 } from '../src/index.ts'
 
 const economics: ProjectEconomics = {
@@ -40,6 +41,12 @@ const economics: ProjectEconomics = {
   ],
   vendorInvoices: [
     { invoice: 'FF-1', order: 'PO-31', vendor: 'Studio Blu', day: '2026-11-15', amount: 1200 },
+  ],
+  progress: [
+    { day: '2026-10-31', share: 0.55 },
+    { day: '2026-09-30', share: 0.3 },
+    // After the month asked: not told yet.
+    { day: '2026-12-31', share: 0.9 },
   ],
 }
 
@@ -139,7 +146,7 @@ describe('the sheet of a project code with what the company system says', () => 
       toBill: 5250 - 3550,
     })
     expect(sheet.marginToDate).toBeCloseTo((7500 - 2270) / 7500)
-    expect(sheet.progress).toBeCloseTo(2270 / 4000)
+    expect(sheet.progress).toMatchObject({ share: 0.55, source: 'system' })
     expect(sheet.economics?.suppliers?.received).toBe(1250)
   })
 
@@ -158,5 +165,58 @@ describe('the sheet of a project code with what the company system says', () => 
     expect(
       compileLifetime('P1', hours, unknown, '2026-11', null, undefined, [], null),
     ).toMatchObject({ wip: null, toBill: null })
+  })
+})
+
+describe('how far a project code is', () => {
+  const nothing = {
+    readings: [],
+    through: '2026-11',
+    recognized: null,
+    ordered: null,
+    costs: 0,
+    totalCosts: null,
+  }
+
+  it('is what the company system says of the last period up to the month, with its day', () => {
+    const read = { ...nothing, readings: economics.progress, recognized: 100, ordered: 1000 }
+    expect(sheetProgress(read)).toEqual({ share: 0.55, source: 'system', day: '2026-10-31' })
+    expect(sheetProgress({ ...read, through: '2026-09' })).toMatchObject({ share: 0.3 })
+    // A period told beyond the whole is the whole.
+    expect(sheetProgress({ ...read, readings: [{ day: '2026-10-31', share: 1.2 }] })).toMatchObject(
+      { share: 1 },
+    )
+  })
+
+  it('without a period is the revenue recognised over the order', () => {
+    const read = { ...nothing, recognized: 5250, ordered: 7500, costs: 10, totalCosts: 20 }
+    expect(sheetProgress(read)).toEqual({ share: 0.7, source: 'recognized', day: null })
+    // A period that comes only after the month asked tells nothing of it.
+    expect(sheetProgress({ ...read, readings: [{ day: '2026-12-31', share: 0.9 }] })).toMatchObject(
+      { source: 'recognized' },
+    )
+  })
+
+  it('without those is the costs so far over the costs of the whole, said as an estimate', () => {
+    const read = { ...nothing, costs: 1200, totalCosts: 4800 }
+    expect(sheetProgress(read)).toEqual({ share: 0.25, source: 'costs', day: null })
+    expect(sheetProgress({ ...read, ordered: 0, recognized: 10 })).toMatchObject({
+      source: 'costs',
+    })
+    expect(sheetProgress({ ...read, costs: 9000 })).toMatchObject({ share: 1 })
+  })
+
+  it('is not told when none of the three can be', () => {
+    expect(sheetProgress(nothing)).toBeNull()
+    expect(sheetProgress({ ...nothing, costs: 10, totalCosts: 0 })).toBeNull()
+  })
+
+  it('reaches the sheet of the code from what the company system read', () => {
+    const settings: ForecastSettings = {
+      ...DEFAULT_FORECAST_SETTINGS,
+      projects: { P1: { ...NO_FORECAST_PROJECT, ordered: 7500 } },
+    }
+    const life = compileLifetime('P1', [], settings, '2026-11', null, undefined, [], economics)
+    expect(life.progress).toEqual({ share: 0.55, source: 'system', day: '2026-10-31' })
   })
 })

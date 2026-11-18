@@ -13,6 +13,7 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { ForecastMonth } from './ForecastMonth.tsx'
+import { ForecastRates } from './ForecastRates.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
 import { messages } from './messages.ts'
@@ -187,7 +188,11 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
           codes={view?.forecast.rows.map((row) => row.code) ?? []}
           onSave={save}
           onChooseModel={chooseModel}
-          onOpenSection={onOpenSection}
+        />
+        <ForecastRates
+          settings={settings}
+          codes={view?.forecast.rows.map((row) => row.code) ?? []}
+          onSave={save}
         />
       </details>
       <p className="badge badge-warning">{text.internal}</p>
@@ -289,7 +294,6 @@ function SettingsForm({
   codes,
   onSave,
   onChooseModel,
-  onOpenSection,
 }: {
   settings: ForecastSettings
   candidates: string[]
@@ -297,8 +301,6 @@ function SettingsForm({
   codes: string[]
   onSave: (settings: ForecastSettings) => Promise<void>
   onChooseModel: () => Promise<string | null>
-  /** Takes the PM to the budget of a code, where rates and costs are written. */
-  onOpenSection?: ((section: Section) => void) | undefined
 }) {
   const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraft(settings))
   const [problems, setProblems] = useState<{ projects: string[] } | null>(null)
@@ -452,14 +454,6 @@ function SettingsForm({
           }}
         />
       </label>
-      <p className="hint">{text.ratesInBudget}</p>
-      {onOpenSection && (
-        <div className="actions">
-          <button type="button" onClick={() => onOpenSection('sheet')}>
-            {messages.openSection(messages.sheetTab)}
-          </button>
-        </div>
-      )}
       <div className="actions">
         <button type="submit">{text.save}</button>
         {problems && <NotSaved text={messages.notSaved} />}

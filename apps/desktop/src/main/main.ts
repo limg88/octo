@@ -38,6 +38,7 @@ import {
   createUpdates,
   type Feeding,
   type ForecastDeps,
+  forecastSettingsAfterPlans,
   type MailArchive,
   type Projects,
   type Session,
@@ -84,9 +85,9 @@ import {
   createFsProgressSettings,
   createFsProjectFiles,
   createFsProjectScaffold,
+  createFsRetiredSheetPlans,
   createFsRiskRegisterStore,
   createFsSharedReadings,
-  createFsSheetPlans,
   createFsSourceSettings,
   createFsTeamStore,
   createFsTrackerExports,
@@ -637,14 +638,18 @@ function start(seatEnv: Record<string, string | undefined>): void {
     writer,
     team: (project) => team.get(project),
   })
-  const forecastSettings = createFsForecastSettings()
+  // The plans the sheet kept left Octo: their rates are taken over once, and they are handed back.
+  const forecastSettings = forecastSettingsAfterPlans(
+    createFsForecastSettings(),
+    createFsRetiredSheetPlans(),
+    clock,
+  )
   const shapes = createProjectShapes({
     sources: settings,
     dashboard: dashboardSettings,
     alignment: alignmentSettings,
     forecast: forecastSettings,
   })
-  const sheetPlans = createFsSheetPlans()
   const forecastDeps: ForecastDeps = {
     settings: forecastSettings,
     files,
@@ -660,15 +665,11 @@ function start(seatEnv: Record<string, string | undefined>): void {
     clock,
     worklog: (project) => hours.trackerHours(project),
     team: (project) => team.get(project),
-    sheetPlans: (project) => sheetPlans.load(project.folder),
   }
   // The forecast and the sheet read the same things: one reading serves both.
   const forecastReadings = createForecastReadings(forecastDeps)
   const forecasts = createForecasts(forecastDeps, forecastReadings)
-  const projectSheets = createProjectSheets(
-    { ...forecastDeps, plans: sheetPlans },
-    forecastReadings,
-  )
+  const projectSheets = createProjectSheets(forecastDeps, forecastReadings)
   const judge = createClaudeTodayJudge(claude)
   const risks = createRisks({
     store: createFsRiskRegisterStore(),

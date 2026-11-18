@@ -1,5 +1,7 @@
 # Demo 57 — La sezione «Commessa»
 
+> **Aggiornamento del 18/11/2026 (R1).** «Ore» e «Previsionale» sono ora schede di «Commessa», che ha quattro schede: «Sintesi», «Fatturazione», «Ore», «Previsionale». Budget, mesi e piano di fatturazione non sono arrivati in Octo: restano nelle schede progetto. L'avanzamento si legge da NetSuite. I passi che nominano le due sezioni si seguono dalle schede; il giro aggiornato è la demo 60.
+
 Durata: 4 minuti. Primo passo per portare in Octo le regole delle schede progetto dell'amministrazione: la commessa a vita intera ha una sezione sua. Ordinato e fatturato stanno in un posto solo; «Previsionale» resta il mese di tutte le commesse; «Avanzamento» resta il modulo del cliente. Nessun numero nuovo: cambia dove si trovano.
 
 ## Prerequisiti

@@ -537,16 +537,49 @@ describe('the forecast', () => {
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
     const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     await waitFor(() => expect(model.value).toBe('amministrazione/Previsionale.xlsx'))
-    // Rates and costs are of the budget of a code: here they are said to be there, not typed.
-    expect(screen.getByText(text.ratesInBudget)).toBeTruthy()
-    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
-    expect(screen.queryByRole('group', { name: text.externalRates })).toBeNull()
-    expect(screen.queryByRole('group', { name: text.hourlyCosts })).toBeNull()
-    const settings = screen.getByText(text.ratesInBudget).closest('form') as HTMLElement
-    fireEvent.click(
-      within(settings).getByRole('button', { name: messages.openSection(messages.sheetTab) }),
+    // Rates and costs the company's system does not tell are typed here, a table for each.
+    const rates = screen.getByRole('region', { name: text.tables.rates.title })
+    const cell = (column: string, row: number) => text.cell(column, row)
+    expect(within(rates).getByLabelText<HTMLInputElement>(cell(text.columns.person, 1)).value).toBe(
+      'Rossi Mario',
     )
-    expect(onOpenSection).toHaveBeenCalledWith('sheet')
+    expect(
+      within(
+        screen.getByRole('region', { name: text.tables.externals.title }),
+      ).getByLabelText<HTMLInputElement>(cell(text.columns.cost, 1)).value,
+    ).toBe('300')
+    const hourly = screen.getByRole('region', { name: text.tables.hourlyCosts.title })
+    expect(
+      within(hourly).getByLabelText<HTMLInputElement>(cell(text.columnHourlyCost, 1)).value,
+    ).toBe('70')
+    // A row that does not say what it must is told, and nothing is saved.
+    fireEvent.change(within(rates).getByLabelText(cell(text.columns.rate, 1)), {
+      target: { value: 'tanto' },
+    })
+    fireEvent.change(within(hourly).getByLabelText(cell(text.columnHourlyCost, 1)), {
+      target: { value: '0' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: text.saveRates }))
+    expect(screen.getByText(text.wrong.rates(1))).toBeTruthy()
+    expect(screen.getByText(text.wrong.hourlyCosts(1))).toBeTruthy()
+    expect(api.saveForecastSettings).not.toHaveBeenCalled()
+    fireEvent.change(within(rates).getByLabelText(cell(text.columns.rate, 1)), {
+      target: { value: '450' },
+    })
+    fireEvent.change(within(rates).getByLabelText(cell(text.columns.codeOrAll, 1)), {
+      target: { value: 'p1' },
+    })
+    fireEvent.change(within(hourly).getByLabelText(cell(text.columnHourlyCost, 1)), {
+      target: { value: '72,5' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: text.saveRates }))
+    const priced: ForecastSettings = {
+      ...before,
+      rates: [{ person: 'Rossi Mario', code: 'P1', ratePerDay: 450 }],
+      hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 72.5 }],
+    }
+    await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', priced))
+    vi.mocked(api.saveForecastSettings).mockClear()
     fireEvent.change(screen.getByLabelText(text.hoursPerDay), { target: { value: '7.5' } })
 
     // How each code of the project is sold: a fee with months that are not a number is told.
@@ -564,7 +597,7 @@ describe('the forecast', () => {
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', {
-        ...before,
+        ...priced,
         modelPath: 'amministrazione/Previsionale.xlsx',
         projects: {
           P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price' },
@@ -647,8 +680,6 @@ describe('the forecast', () => {
     expect(
       screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnOrdered, 'P2')).value,
     ).toBe('7500')
-    // No rate is asked here, however the code is sold: rates are of its budget.
-    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
 
     cleanup()
     // Every code is known already: NetSuite is not asked again.
@@ -657,7 +688,7 @@ describe('the forecast', () => {
       forecastView: vi.fn(async () => ok(fixed)),
     })
     render(<ForecastView api={settled} project={project} now={now} />)
-    expect(await screen.findByText(text.ratesInBudget)).toBeTruthy()
+    expect(await screen.findByText(text.ratesTitle)).toBeTruthy()
     expect(settled.readForecastOrders).not.toHaveBeenCalled()
 
     cleanup()

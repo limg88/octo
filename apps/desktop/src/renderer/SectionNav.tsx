@@ -1,5 +1,11 @@
 import type { KeyboardEvent } from 'react'
-import { SECTION_GROUPS, SECTION_LABELS, SECTIONS, type Section } from './sections.ts'
+import {
+  LISTED_SECTIONS,
+  listedSection,
+  SECTION_GROUPS,
+  SECTION_LABELS,
+  type Section,
+} from './sections.ts'
 
 type Props = {
   current: Section
@@ -17,8 +23,9 @@ const STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 }
  * The sections of a project in the sidebar, grouped by how often they are used. One list for the
  * keyboard: the arrows move through all of it, whatever the group.
  */
-export function SectionNav({ current, onSelect, counts = {}, hidden = [] }: Props) {
-  const shown = SECTIONS.filter((section) => !hidden.includes(section))
+export function SectionNav({ current: place, onSelect, counts = {}, hidden = [] }: Props) {
+  const current = listedSection(place)
+  const shown = LISTED_SECTIONS.filter((section) => !hidden.includes(section))
   function onKey(event: KeyboardEvent<HTMLButtonElement>, section: Section) {
     const step = STEPS[event.key]
     if (step === undefined) return

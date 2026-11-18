@@ -112,15 +112,6 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
   readForecastOrders: (projectId) => ipcRenderer.invoke(CHANNELS.forecastOrdersRead, { projectId }),
   projectSheets: (projectId) => ipcRenderer.invoke(CHANNELS.projectSheets, { projectId }),
-  sheetPlans: (projectId) => ipcRenderer.invoke(CHANNELS.sheetPlans, { projectId }),
-  saveSheetPlans: (projectId, plans) =>
-    ipcRenderer.invoke(CHANNELS.sheetPlansSave, { projectId, plans }),
-  proposeSheetPlan: (projectId, code) =>
-    ipcRenderer.invoke(CHANNELS.sheetPropose, { projectId, code }),
-  confirmSheetBudget: (projectId, code) =>
-    ipcRenderer.invoke(CHANNELS.sheetConfirm, { projectId, code }),
-  exportSheetData: (projectId, code) =>
-    ipcRenderer.invoke(CHANNELS.sheetExport, { projectId, code }),
   projectShape: (projectId) => ipcRenderer.invoke(CHANNELS.projectShape, { projectId }),
   progressSettings: (projectId) => ipcRenderer.invoke(CHANNELS.progressSettingsGet, { projectId }),
   saveProgressSettings: (projectId, settings) =>

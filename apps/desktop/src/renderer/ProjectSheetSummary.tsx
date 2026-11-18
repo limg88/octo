@@ -1,6 +1,6 @@
 import type { Lifetime } from '@octo/domain'
 import { useEffect, useState } from 'react'
-import { lifetimeMail, lifetimeSourceText } from './forecast-text.ts'
+import { lifetimeMail, lifetimeSourceText, progressSourceText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { monthText } from './today-text.ts'
 
@@ -22,7 +22,7 @@ const sameAmount = (proposed: number, written: number | null): boolean =>
   written !== null && roundMoney(proposed) === roundMoney(written)
 
 /** A figure of the sheet: what it is called, what it is worth, and a line that reads it. */
-type Figure = { label: string; value: string; note?: string | undefined }
+export type Figure = { label: string; value: string; note?: string | undefined }
 
 /** The share of the order an amount is, in words; nothing when either is unknown. */
 const ofOrdered = (value: number | null, ordered: number | null): string | undefined =>
@@ -50,12 +50,12 @@ function marginFigures(sheet: Lifetime): Figure[] {
           : text.hoursWorked(hours(sheet.hours)),
     },
     { label: text.marginToDate, value: share(sheet.marginToDate) },
-    sheet.budgetCosts === null
-      ? { label: text.budgetCosts, value: UNKNOWN, note: text.noBudget }
+    sheet.progress === null
+      ? { label: text.progress, value: UNKNOWN, note: text.noProgress }
       : {
-          label: text.budgetCosts,
-          value: money(sheet.budgetCosts),
-          note: text.progress(share(sheet.progress)),
+          label: text.progress,
+          value: share(sheet.progress.share),
+          note: progressSourceText(sheet.progress),
         },
     sheet.marginAtEnd === null
       ? { label: text.marginAtEnd, value: UNKNOWN, note: text.noExpected }
@@ -144,7 +144,7 @@ function Rules() {
   )
 }
 
-function Figures({ title, figures }: { title: string; figures: readonly Figure[] }) {
+export function Figures({ title, figures }: { title: string; figures: readonly Figure[] }) {
   return (
     <section aria-label={title}>
       <h4>{title}</h4>

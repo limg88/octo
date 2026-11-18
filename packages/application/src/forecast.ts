@@ -22,8 +22,6 @@ import {
   type ProjectTeam,
   readForecastModel,
   romeDateString,
-  type SheetPlans,
-  settingsWithPlans,
   type TrackerHours,
 } from '@octo/domain'
 import { secretKey } from './feeds.ts'
@@ -65,11 +63,6 @@ export type ForecastDeps = {
   worklog?: (project: Project) => Promise<TrackerHours[]>
   /** The people of the project: their caps propose the costs at budget. */
   team?: (project: Project) => Promise<ProjectTeam>
-  /**
-   * The plans of the project codes: what a line says an hour is sold for, or costs, is what the
-   * forecast of its code uses. Without them the settings stand alone.
-   */
-  sheetPlans?: (project: Project) => Promise<SheetPlans>
 }
 
 /** Where Octo puts the filled models, one folder per month. The model itself is never touched. */
@@ -259,9 +252,7 @@ export function createForecasts(
     const codes = await codesOf(project, timesheet)
     const read = await monthsRead(project, month)
     const worklog = await worklogOf(project, codes)
-    const plans = deps.sheetPlans ? await deps.sheetPlans(project) : {}
-    const used = settingsWithPlans(settings, plans)
-    return compileForecast(codes, timesheet, used, month, undefined, read, worklog)
+    return compileForecast(codes, timesheet, settings, month, undefined, read, worklog)
   }
 
   async function load(

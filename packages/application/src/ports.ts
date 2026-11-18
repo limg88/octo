@@ -489,10 +489,15 @@ export interface ForecastSettingsStore {
   save(projectFolder: string, settings: ForecastSettings): Promise<void>
 }
 
-/** The plans of the project codes of a project, kept with Octo's settings of the project. */
-export interface SheetPlanStore {
-  load(projectFolder: string): Promise<SheetPlans>
-  save(projectFolder: string, plans: SheetPlans): Promise<void>
+/**
+ * The plans of the project codes Octo kept until they left it. They are read once, to hand them
+ * back to the PM as a text; the file they were kept in is never changed nor removed.
+ */
+export interface RetiredSheetPlans {
+  /** The plans still to hand back; null when there are none or they were handed back already. */
+  pending(projectFolder: string): Promise<SheetPlans | null>
+  /** Writes them in the project as a text the PM reads: from then nothing is pending. */
+  handBack(projectFolder: string, text: string): Promise<void>
 }
 
 /** A cell to write in a sheet: where, and what. */

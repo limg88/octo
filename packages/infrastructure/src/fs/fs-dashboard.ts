@@ -8,7 +8,7 @@ import type {
   HoursSettingsStore,
   ModelSettingsStore,
   ProgressSettingsStore,
-  SheetPlanStore,
+  RetiredSheetPlans,
   TeamStore,
   TrackerExports,
 } from '@octo/application'
@@ -19,7 +19,6 @@ import {
   cleanHoursSettings,
   cleanModelSettings,
   cleanProgressSettings,
-  cleanSheetPlans,
   cleanTeam,
   DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
@@ -34,15 +33,15 @@ import {
   isDomainError,
   NO_DECISIONS,
   NO_FORECAST_PROJECT,
-  NO_SHEET_REGISTRY,
   PHASES,
   PLAN_GROUPS,
-  type SheetPlans,
+  PRIVATE_FOLDER,
+  RETIRED_PLANS_FILE,
   TEAM_SIDES,
 } from '@octo/domain'
 import { z } from 'zod'
 import { realPathInside, walkFiles } from './fs-project-files.ts'
-import { isMissing, readJsonOr, writeJson } from './json-file.ts'
+import { isMissing, readJsonOr, writeAtomic, writeJson } from './json-file.ts'
 import { PROJECT_SETTINGS_FOLDER } from './project-files.ts'
 
 const DASHBOARD_FILE = 'dashboard.json'
@@ -266,21 +265,28 @@ const sheetPlanSchema = z.record(
   }),
 )
 
-/** The plans of the project codes, in a file of their own beside the other settings. */
-export function createFsSheetPlans(): SheetPlanStore {
-  const fileOf = (projectFolder: string) =>
-    join(projectFolder, PROJECT_SETTINGS_FOLDER, SHEET_PLAN_FILE)
+/**
+ * The plans of the project codes, in the file Octo kept them in until they left it. The file is
+ * only read. What is handed back to the PM is a text with the costs in it, so it goes where
+ * the search of the agent does not look.
+ */
+export function createFsRetiredSheetPlans(): RetiredSheetPlans {
+  const exportOf = (projectFolder: string) =>
+    join(projectFolder, PRIVATE_FOLDER, RETIRED_PLANS_FILE)
   return {
-    async load(projectFolder) {
-      const parsed = sheetPlanSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
-      if (!parsed.success) throw new DomainError('sheet_plan_invalid', SHEET_PLAN_FILE)
-      const plans: SheetPlans = {}
-      for (const [code, plan] of Object.entries(parsed.data)) {
-        plans[code] = { ...plan, registry: { ...NO_SHEET_REGISTRY, ...plan.registry } }
-      }
-      return cleanSheetPlans(plans)
+    async pending(projectFolder) {
+      const handedBack = await stat(exportOf(projectFolder)).then(
+        () => true,
+        () => false,
+      )
+      if (handedBack) return null
+      const file = join(projectFolder, PROJECT_SETTINGS_FOLDER, SHEET_PLAN_FILE)
+      // A file nobody can read any more has nothing to hand back: it stays where it is.
+      const parsed = sheetPlanSchema.safeParse(await readJsonOr(file, {}).catch(() => null))
+      if (!parsed.success || Object.keys(parsed.data).length === 0) return null
+      return parsed.data
     },
-    save: (projectFolder, plans) => writeJson(fileOf(projectFolder), plans),
+    handBack: (projectFolder, text) => writeAtomic(exportOf(projectFolder), text),
   }
 }
 

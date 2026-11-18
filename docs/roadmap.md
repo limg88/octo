@@ -122,12 +122,12 @@ Regole di lavoro: un ramo per incremento, creato dal precedente; alla chiusura s
 
 ### Stato della roadmap R0–R7
 
-Da qui riparte una sessione nuova: l'ultimo incremento chiuso dice il ramo su cui stare e il prossimo da aprire. Le righe sono misurate alla chiusura con il comando di «Tetto del codice» (solo `.ts` e `.tsx`); script Python e file del catalogo sono contati a parte, perché quel comando non li vede.
+Da qui riparte una sessione nuova: l'ultimo incremento chiuso dice il ramo su cui stare e il prossimo da aprire. I due totali sono misurati alla chiusura con il comando di «Tetto del codice» (solo `.ts` e `.tsx`, righe effettive); «entrano» ed «escono» sono le righe aggiunte e tolte nei sorgenti secondo `git diff --numstat`, quindi con righe vuote e commenti; script Python e file del catalogo sono contati a parte, perché quel comando non li vede.
 
 | # | Ramo | Stato | Demo | Entrano: stima → vero | Escono: stima → vero | Totale: stima → vero | Interfaccia: stima → vero |
 |---|---|---|---|---|---|---|---|
 | R0 | `feat/project-sheet` | **chiuso il 18/11/2026**. Lavoro delle demo 57-59 committato com'era, dopo la suite (1.451 test, copertura sopra l'80%); cifre e nomi tolti da `verifica-deem-petrolvalves.md`; roadmap riportata. Nessun codice nuovo, quindi nessuna demo | — | 0 → 0 | 0 → 0 | 46.878 → 46.878 | 19.700 → 19.700 |
-| R1 | `feat/r1-economia-riepilogo` | da fare | | 230 → | 1.775 → | 45.333 → | 18.610 → |
+| R1 | `feat/r1-economia-riepilogo` | **codice chiuso il 18/11/2026, criterio da verificare** (R1.1-R1.6 in `verifiche-da-fare.md`). «Commessa» è il riepilogo con quattro schede (Sintesi, Fatturazione, Ore, Previsionale); usciti budget, mesi, piano di fatturazione, anagrafica, esportazione «Dati» e lo store del piano, dopo averne esportato il contenuto in `_octo/.riservato/commessa/piano-esportato.md`; avanzamento letto da NetSuite con la fonte sempre scritta. **Criterio «interfaccia sotto 18.700» non raggiunto: 18.857.** La revisione non contava che le tabelle di tariffe e costi stavano nel budget (vedi «Schede progetto», *Restano*): togliendo il budget sono dovute tornare nelle impostazioni del previsionale (circa 150 righe), e il passaggio di Ore e Previsionale a schede ha tolto la navigazione ma non codice delle due viste. Il picco stimato dopo R3 sale di conseguenza a circa 47.200 in tutto e 19.430 di interfaccia: sotto i due tetti, con 570 righe di margine sull'interfaccia invece di 820. `pnpm e2e` (demo 01-59 nella finestra vera) falliva già prima di R1 al passo della posta: da guardare in R2; R1 è provato nella finestra vera con `pnpm e2e:commessa` | `demo/60-commessa-riepilogo` | 230 → 612 righe di diff (di cui 332 di interfaccia) | 1.775 → 2.038 righe di diff (di cui 1.221 di interfaccia) | 45.333 → **45.587** | 18.610 → **18.857** |
 | R2 | `feat/r2-verifica-t0` | da fare | | 420 → | 0 → | 45.753 → | 18.780 → |
 | R3 | `feat/r3-recinto-mac` | da fare | | 1.200 → | 0 → | 46.953 → | 19.180 → |
 | R4 | `feat/r4-deliverable-progetto` | da fare | | 1.400 → | 3.090 → | 45.263 → | 17.560 → |
@@ -432,6 +432,8 @@ Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un a
 **Debito da non portare**: periodo attivo cablato, percorsi assoluti, connettori dismessi, note ed esclusioni come costanti nel codice, profili e glossario dentro il prompt. Note, esclusioni, profili e glossario sono dati del progetto, con data e autore.
 
 ## Schede progetto
+
+*Rivisto il 18/11/2026 con R1*: Octo non gestisce i dati della commessa, li mostra. Degli incrementi qui sotto restano 1-4 senza il piano di fatturazione; 5, 6 e 7 (budget, mesi, anagrafica, tabella «Dati») sono usciti e la demo 59 è stata tolta. Ciò che il piano conteneva è esportato una volta in `_octo/.riservato/commessa/piano-esportato.md`; tariffe e costi che portava sono passati alle impostazioni del previsionale, dove si scrivono di nuovo. L'avanzamento non è più dichiarato dal PM: si legge da NetSuite (periodo scritto da NetSuite, altrimenti riconosciuto su ordinato, altrimenti costi a oggi su costi totali, detto come stima).
 
 Le schede progetto dell'amministrazione (un file Excel per commessa) fissano le colonne di NetSuite e le formule dei numeri economici. Octo le adotta come regola e le mostra nella sezione «Commessa». Sette incrementi, chiusi con le demo 57, 58 e 59.
 
