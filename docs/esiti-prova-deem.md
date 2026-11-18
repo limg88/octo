@@ -14,34 +14,34 @@ Questo documento è il passaggio di consegne: i rilievi, la causa trovata o ciò
 
 ## Rilievi
 
-Stato: tutti **aperti**.
+Stato al 18/11/2026, a I6 chiuso: per tutti e ventiquattro il **codice è chiuso e il criterio è da verificare** sulla prossima prova con il progetto reale. Nessuno è «chiuso»: lo dice il PM, voce per voce, in `verifiche-da-fare.md` (R6c.1-R6c.16).
 
-| N. | Dove | Rilievo | Incremento |
-|---|---|---|---|
-| 1 | Ovunque | Le fonti sono markdown: vanno viste in un lettore dentro Octo, già alla riga citata | I5 |
-| 2 | Ovunque | Il logo va sostituito con quello del progetto precedente | I5 |
-| 3 | Riunioni | Le sigle sentite male nelle trascrizioni non vengono riportate alla forma giusta | I5 |
-| 4 | Ovunque | Cambiando sezione le richieste a Claude sembrano interrompersi (visto in «Commessa» e in «Deliverable») | I1 |
-| 5 | Tabelle | Le colonne devono essere ridimensionabili | I5 |
-| 6 | Oggi | Quando una voce entra in «Adesso» arriva la notifica? | I2 |
-| 7 | Oggi, «Il punto» | Troppo rumore: attività non del PM, e riunioni agganciate al progetto sbagliato | I2 |
-| 8 | Oggi, «Adesso» | Il clic su una voce non fa nulla | I1 |
-| 9 | Oggi, «Adesso» | «Perché contano oggi» è già tutto aperto al caricamento | I1 |
-| 10 | Oggi, «Criticità della settimana» | Impaginato male | I2 |
-| 11 | Oggi, «Da fare oggi» | Le riunioni fanno rumore: vanno agganciate al progetto in automatico, insieme a Verbale | I2 |
-| 12 | Oggi, «Da tenere d'occhio» | Troppo rumore: solo ciò che tocca al PM | I2 |
-| 13 | Oggi, «Valutazione di Claude» | Troppa prosa: poche parole | I2 |
-| 14 | Chiedi | «Con calcoli» non si capisce e sembra messo a caso | I4 |
-| 15 | Chiedi | Non si possono allegare file | I4 |
-| 16 | Deliverable, email | La mail dà del lei a una persona a cui il PM dà del tu | I3 |
-| 17 | Deliverable | La rilettura critica è prolissa | I3 |
-| 18 | Deliverable | Su ogni rilievo della rilettura si deve poter rigenerare solo quel passo, dicendo che cosa cambiare | I3 |
-| 19 | Deliverable | Il campo di correzione generale deve restare, precompilato con una proposta | I3 |
-| 20 | Deliverable, stima | Lentissima; spostandosi in un'altra sezione si è interrotta | I1 |
-| 21 | Commessa, «Sintesi» | Non si carica mai | I1 |
-| 22 | Commessa, «Fatturazione» | Non si carica mai | I1 |
-| 23 | Commessa, «Previsionale» | «Calcolo e dettagli» aperto occupa troppo spazio ed è impaginato male | I5 |
-| 24 | Commessa, «Previsionale» | «Dati che mancano» è impaginato male | I5 |
+| N. | Dove | Rilievo | Incremento | Stato |
+|---|---|---|---|---|
+| 1 | Ovunque | Le fonti sono markdown: vanno viste in un lettore dentro Octo, già alla riga citata | I5 | codice chiuso, da verificare (R6c.13) |
+| 2 | Ovunque | Il logo va sostituito con quello del progetto precedente | I5 | codice chiuso, da verificare (R6c.15) |
+| 3 | Riunioni | Le sigle sentite male nelle trascrizioni non vengono riportate alla forma giusta | I5 | codice chiuso, da verificare (R6c.14) |
+| 4 | Ovunque | Cambiando sezione le richieste a Claude sembrano interrompersi (visto in «Commessa» e in «Deliverable») | I1 | codice chiuso, da verificare (R6c.1) |
+| 5 | Tabelle | Le colonne devono essere ridimensionabili | I5 | codice chiuso, da verificare (R6c.16) |
+| 6 | Oggi | Quando una voce entra in «Adesso» arriva la notifica? | I2 | codice chiuso, da verificare (R6c.7) |
+| 7 | Oggi, «Il punto» | Troppo rumore: attività non del PM, e riunioni agganciate al progetto sbagliato | I2 | codice chiuso, da verificare (R6c.5, R6c.6) |
+| 8 | Oggi, «Adesso» | Il clic su una voce non fa nulla | I1 | codice chiuso, da verificare (R6c.3) |
+| 9 | Oggi, «Adesso» | «Perché contano oggi» è già tutto aperto al caricamento | I1 | codice chiuso, da verificare (R6c.3) |
+| 10 | Oggi, «Criticità della settimana» | Impaginato male | I2 | codice chiuso, da verificare (R6c.5) |
+| 11 | Oggi, «Da fare oggi» | Le riunioni fanno rumore: vanno agganciate al progetto in automatico, insieme a Verbale | I2 | codice chiuso, da verificare (R6c.6, R6c.10) |
+| 12 | Oggi, «Da tenere d'occhio» | Troppo rumore: solo ciò che tocca al PM | I2 | codice chiuso, da verificare (R6c.5) |
+| 13 | Oggi, «Valutazione di Claude» | Troppa prosa: poche parole | I2 | codice chiuso, da verificare (R6c.5) |
+| 14 | Chiedi | «Con calcoli» non si capisce e sembra messo a caso | I4 | codice chiuso, da verificare (R6c.12) |
+| 15 | Chiedi | Non si possono allegare file | I4 | codice chiuso, da verificare (R6c.11) |
+| 16 | Deliverable, email | La mail dà del lei a una persona a cui il PM dà del tu | I3 | codice chiuso, da verificare (R6c.8) |
+| 17 | Deliverable | La rilettura critica è prolissa | I3 | codice chiuso, da verificare (R6c.9) |
+| 18 | Deliverable | Su ogni rilievo della rilettura si deve poter rigenerare solo quel passo, dicendo che cosa cambiare | I3 | codice chiuso, da verificare (R6c.9) |
+| 19 | Deliverable | Il campo di correzione generale deve restare, precompilato con una proposta | I3 | codice chiuso, da verificare (R6c.9) |
+| 20 | Deliverable, stima | Lentissima; spostandosi in un'altra sezione si è interrotta | I1 | codice chiuso, da verificare (R6c.1, R6c.4) |
+| 21 | Commessa, «Sintesi» | Non si carica mai | I1 | codice chiuso, da verificare (R6c.2) |
+| 22 | Commessa, «Fatturazione» | Non si carica mai | I1 | codice chiuso, da verificare (R6c.2) |
+| 23 | Commessa, «Previsionale» | «Calcolo e dettagli» aperto occupa troppo spazio ed è impaginato male | I5 | codice chiuso, da verificare (R6c.16) |
+| 24 | Commessa, «Previsionale» | «Dati che mancano» è impaginato male | I5 | codice chiuso, da verificare (R6c.16) |
 
 ## I1 — Guasti che bloccano la prova
 
@@ -126,6 +126,15 @@ Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sez
 - Misura delle righe, scritta in «Stato» di `roadmap.md`.
 - Build per Mac arm64 come quella di R6b.
 - `ripartenza-da-zero.md` aggiornato dove i gesti cambiano; lo stato di ogni rilievo scritto qui; ciò che solo il PM può dire chiuso va in `verifiche-da-fare.md`.
+
+**Esito di I6 (18/11/2026).**
+- `pnpm typecheck`, `pnpm lint` (42 avvisi, quelli di prima) e `pnpm test:coverage`: 110 file, 1.473 test, copertura sopra le soglie.
+- Nella finestra vera arrivano a «ok»: `pnpm e2e`, `e2e:commessa`, `e2e:riunioni`, `e2e:correggi`, `e2e:catalogo`, `e2e:memoria`, `e2e:cruscotto`, `e2e:script`, `e2e:recinto` e il nuovo `e2e:esiti`, che segue i passi delle demo 68-72. `pnpm e2e` e `e2e:riunioni` sono stati riallineati: le sezioni restano montate (i passi guardano la sezione in vista) e le riunioni senza progetto stanno in «Da assegnare». **`e2e:condivisa` fallisce**, al primo «Leggi ora» di Azure DevOps: falliva allo stesso passo sul ramo `feat/r6b-ripartenza`, quindi non è di questo giro; non è stato corretto.
+- Righe: 45.399 in tutto, 18.432 in `apps/desktop/src`. Margine di 1.568 righe sul tetto dell'interfaccia.
+- Build per Mac arm64, non firmata, versione invariata: `apps/desktop/release/Octo-0.10.0-mac-arm64.dmg`. Quella di R6b è tenuta accanto come `Octo-0.10.0-mac-arm64-r6b.dmg`.
+- `ripartenza-da-zero.md` aggiornato dove i gesti cambiano.
+
+Non riuscito: la riproduzione **con i tempi** di «Sintesi» e «Fatturazione» sul progetto reale. La copia in cartella temporanea delle ore e dei costi non è stata permessa in questa sessione, e la lettura da NetSuite passa da una credenziale che non ho aperto. Fatto al suo posto: conteggio su una copia delle sole impostazioni (sei codici, dodici mesi da chiedere) e prova sui dati sintetici. I tempi veri sono la voce R6c.2.
 
 ## Che cosa non si fa
 

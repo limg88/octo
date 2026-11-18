@@ -35,11 +35,11 @@ try {
   const page = await app.firstWindow()
   await page.getByRole('heading', { name: 'Aurora' }).waitFor({ timeout: TIMEOUT_MS })
   // On Aurora: the meeting with people of both projects waits; the daily of Aurora does not.
-  await page
-    .getByText(/Allineamento ambienti.*non ha un progetto/)
-    .first()
-    .waitFor({ timeout: TIMEOUT_MS })
-  assert.equal(await page.getByText(/Daily Standup Fornitori.*non ha un progetto/).count(), 0)
+  // It is not a signal of the page: it waits in the list of the meetings to assign.
+  await page.getByText(/^\d+ riunion[ei] da assegnare$/).click({ timeout: TIMEOUT_MS })
+  const aside = page.getByRole('list', { name: 'Riunioni da assegnare' })
+  await aside.getByText('Allineamento ambienti').waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(await aside.getByText('Daily Standup Fornitori').count(), 0)
   // The reading of the meetings brings the daily into Aurora, and nothing else.
   await page.getByRole('tab', { name: 'Impostazioni' }).click()
   const meetings = page.getByRole('region', { name: 'Riunioni (Verbale)' })

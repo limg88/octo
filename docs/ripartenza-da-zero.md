@@ -1,6 +1,6 @@
 # Ripartire da zero con DEEM e Petrolvalves
 
-Copione scritto il 18/11/2026 per la build 0.10.0 del ramo `feat/r6b-ripartenza`. Serve a provare Octo sui due progetti reali come li troverebbe un PM il primo giorno: cartelle con i soli documenti di partenza, stato dell'app vuoto, nessuna wiki e nulla di ciò che Octo aveva già letto o scritto. Ogni passo dice il gesto, che cosa aspettarsi e quale voce di `verifiche-da-fare.md` chiude.
+Copione scritto il 18/11/2026 per la build 0.10.0 del ramo `feat/r6b-ripartenza`, aggiornato lo stesso giorno alla build del ramo `feat/r6c-esiti-prova` (stessa versione, stesso nome di file), dove i gesti sono cambiati dopo la prima prova: vedi `esiti-prova-deem.md`. Serve a provare Octo sui due progetti reali come li troverebbe un PM il primo giorno: cartelle con i soli documenti di partenza, stato dell'app vuoto, nessuna wiki e nulla di ciò che Octo aveva già letto o scritto. Ogni passo dice il gesto, che cosa aspettarsi e quale voce di `verifiche-da-fare.md` chiude.
 
 Qui non ci sono cifre, nomi di persone o testi dei clienti: i valori veri stanno nel foglio privato (vedi sotto), fuori dal repository.
 
@@ -86,6 +86,7 @@ Lo stesso vale per `forecast.json` (tariffe e tipi delle commesse). Se la usi, s
     Segna per ognuna: alla pari, meglio, peggio di prima, e perché. **Chiude R2.1.** Tieni le risposte: le rifai al passo 22.
 15. Una domanda «Con calcoli» su un file della cartella (una somma o un confronto che sapresti rifare a mano).
     Atteso: una tabella con la fonte e il file prodotto; nella cartella del progetto nulla finché non scegli tu che cosa tenere.
+    «Con calcoli» ora sta subito prima di «Chiedi», con una «i» che dice che cosa fa: **chiude R6c.12** se si capisce. Prova anche «Allega…» con un Word o un PDF e una domanda che solo quel file sa (**R6c.11**). Aprendo una fonte di testo dalla risposta, si legge dentro Octo sulla frase citata (**R6c.13**).
     Se «Con calcoli» non è offerto, Octo dice perché. **Chiude R3.1** se rifai un'analisi del vault e le cifre tornano; **R3.3** per il solo fatto che l'interprete dell'app installata parte.
 
 ## 5. DEEM: «Oggi»
@@ -93,10 +94,11 @@ Lo stesso vale per `forecast.json` (tariffe e tipi delle commesse). Se la usi, s
 16. Apri «Oggi» dopo la prima lettura.
     Guarda: le mail che aspettano te sono quelle che ti aspetti; le riunioni di oggi ci sono; bug fermi e storie poco chiare hanno i conteggi che conosci; le fonti sono segnate come lette.
     Segna che cosa manca e che cosa è di troppo.
+    Cambiato dopo la prima prova: un clic su una voce di «Adesso» la apre sotto la riga (**R6c.3**); in «Il punto» e in «Da tenere d'occhio» restano le voci tue, quelle di altri sono dietro una riga di conteggio (**R6c.5**); le riunioni che Octo non sa dire del progetto non sono in pagina ma in fondo, sotto «N riunioni da assegnare», con ciò che ne ha detto Claude (**R6c.6**). Mentre Claude valuta puoi cambiare sezione: accanto a «Oggi» resta una rotella e al rientro trovi il risultato (**R6c.1**).
 
 ## 6. DEEM: «Commessa»
 
-17. «Commessa» → «Sintesi», per ogni commessa: ordinato, fatturato, riconosciuto, costi, margine contro NetSuite aperto accanto. **Chiude R1.1.**
+17. «Commessa» → «Sintesi», **con il cronometro**: alla prima apertura Octo chiede a NetSuite ordini e fatture e poi un mese di timesheet alla volta, e lo scrive («mese 3 di 12»). Segna quanto dura; se si ferma, la pagina dice perché e «Riprendi la lettura» continua da lì (**R6c.2**). Poi, per ogni commessa: ordinato, fatturato, riconosciuto, costi, margine contro NetSuite aperto accanto. **Chiude R1.1.**
 18. Guarda l'avanzamento e la fonte scritta sotto: sistema, riconosciuto su ordinato, oppure stima dai costi. Per le commesse a corpo dice se la vista di NetSuite è popolata e in che forma. **Chiude R1.2 e R1.3.**
 19. «Ore»: «Leggi i timesheet da NetSuite», «Leggi le ore da Jira», codici e soglie dal foglio. Poi «Previsionale»: tipi delle commesse e tariffe («Impostazioni del previsionale» → «Tariffe e costi che NetSuite non dice»), il modello dell'amministrazione, «Compila il modello Excel» sul mese scorso. **Chiude R1.5.**
     R1.6 (il piano esportato dalla versione precedente) non si prova qui: riguarda la cartella di prima.
@@ -129,7 +131,7 @@ Lo stesso giro su `~/Documents/Projects/Petrolvalves-da-zero`, con queste differ
 - Qui la wiki c'era davvero ed è rimasta fuori: è il progetto su cui il confronto del passo 14 contro il 23 dice di più.
 - Una sola commessa, a corpo: i passi 17 e 18 sono quelli che contano (R1.2, R1.3).
 - Nessun periodo di calendario e nessun modulo di avanzamento: salta la parte sugli script se non ti serve.
-- Con due progetti aperti guarda anche che una riunione con persone di uno solo dei due vada nel progetto giusto, e che una con persone di tutti e due resti da assegnare.
+- Con due progetti aperti guarda anche che una riunione con persone di uno solo dei due vada nel progetto giusto, e che una con persone di tutti e due resti da assegnare: la trovi in fondo a «Oggi», sotto «N riunioni da assegnare», non più fra le segnalazioni (**R6c.6**, **R6c.10**). Perché la regola funzioni servono le persone del progetto in «Persone e calendario».
 
 ## 11. Tre mattine senza toccare nulla
 

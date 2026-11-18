@@ -31,7 +31,7 @@ try {
   await page.getByRole('tab', { name: 'Chiedi' }).click()
   // A question asked as always is answered as always: nothing is computed.
   const field = page.getByLabel('Chiedi qualcosa su questo progetto…')
-  await page.getByLabel('Con calcoli').check({ timeout: TIMEOUT_MS })
+  await page.getByRole('checkbox', { name: 'Con calcoli' }).check({ timeout: TIMEOUT_MS })
   await field.fill('Quante righe ha il file di stato?')
   await page.getByRole('button', { name: 'Chiedi', exact: true }).click()
   const table = page.getByRole('table', { name: 'Righe del file di stato' })

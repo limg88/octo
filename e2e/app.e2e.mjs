@@ -64,9 +64,22 @@ const launch = (dataFolder = `${work}/dati`) =>
     },
   })
 
+/**
+ * The sections of a project the PM opened stay mounted, out of sight: what a step looks for by
+ * its words, its label or a selector is looked for in the section in sight, as a person would.
+ */
+function inSight(page) {
+  const shown = page.locator(':not(.section-view[hidden] *)')
+  for (const find of ['getByText', 'getByLabel', 'getByPlaceholder', 'locator']) {
+    const all = page[find].bind(page)
+    page[find] = (...asked) => all(...asked).and(shown)
+  }
+  return page
+}
+
 let app = await launch()
 try {
-  let page = await app.firstWindow()
+  let page = inSight(await app.firstWindow())
   /**
    * «Chiedi» opens on a new conversation: this opens, among those already had, the one that
    * shows the text given.
@@ -273,6 +286,8 @@ try {
   // Demo 06: a deliverable from the PM's request to the approved Word file.
   await page.getByRole('tab', { name: 'Deliverable' }).click()
   const work06 = page.getByRole('region', { name: 'Deliverable' })
+  // The section stays as it was left: a new deliverable starts from the catalog.
+  await work06.getByRole('button', { name: 'Nuovo deliverable' }).click()
   await work06.getByRole('button', { name: /Email al cliente/ }).click()
   await work06.getByLabel('A chi scrivi').fill('Carla Bianchi')
   await work06.getByLabel(/^Di che cosa/).fill('Data di consegna')
@@ -283,7 +298,7 @@ try {
   await work06.getByLabel('Che cosa vuoi cambiare?').fill('Aggiungi il budget #inventa')
   await work06.getByRole('button', { name: 'Chiedi modifica' }).click()
   await work06.getByText('Da correggere prima di farlo uscire.').waitFor({ timeout: TIMEOUT_MS })
-  await work06.getByText('Il budget non ha una fonte').waitFor()
+  await work06.getByText('Il budget non ha una fonte').first().waitFor()
   // The code points at the amount by itself: the text goes to the client.
   await work06
     .getByRole('region', { name: 'Cifre da controllare prima che esca' })
@@ -404,8 +419,8 @@ try {
   await openSheetPart('Ore')
   const setup08 = page.getByRole('region', { name: 'Da dove leggo le ore' })
   await setup08.waitFor({ timeout: TIMEOUT_MS })
-  await page.waitForFunction(
-    () => document.querySelector('.settings-form input')?.value === 'dati/Timesheets',
+  await assertEventuallyAsync(
+    async () => (await setup08.locator('input').first().inputValue()) === 'dati/Timesheets',
   )
   await setup08.getByLabel(/^Codici di progetto/).fill('PRJ000101')
   await setup08.getByRole('button', { name: 'Salva' }).click()
@@ -663,7 +678,7 @@ try {
   // The history survives a restart of the app.
   await app.close()
   app = await launch()
-  page = await app.firstWindow()
+  page = inSight(await app.firstWindow())
   await page.getByRole('tab', { name: 'Chiedi' }).click()
   await openChatWith('1 punto da controllare')
 
@@ -732,7 +747,7 @@ try {
   const movedFolder = `${work}/Aurora sul nuovo computer`
   renameSync(`${work}/Aurora`, movedFolder)
   app = await launch(`${work}/dati-nuovo`)
-  page = await app.firstWindow()
+  page = inSight(await app.firstWindow())
   await page.getByRole('heading', { name: 'Nessun progetto' }).waitFor({ timeout: TIMEOUT_MS })
   await app.evaluate(
     ({ dialog }, { file, folder }) => {
