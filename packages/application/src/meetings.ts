@@ -1,12 +1,15 @@
 import {
+  applyGlossary,
   beforeFirstDay,
   certainProject,
   cleanMeetingsSource,
   DomainError,
+  type GlossaryEntry,
   isDomainError,
   likelierProject,
   MEETING_META_FILE,
   MEETING_TEXT_FILES,
+  MEETING_TRANSCRIPT_FILE,
   MEETINGS_FOLDER,
   MEETINGS_READING_PATH,
   type MeetingCandidate,
@@ -58,6 +61,8 @@ export type MeetingsDeps = {
   team?: (project: Project) => Promise<ProjectTeam>
   /** The name and the addresses of who uses Octo: in every meeting, so they tell no project. */
   pm?: () => readonly string[]
+  /** The words a transcript hears badly, with their right form: put right as it enters. */
+  glossary?: (project: Project) => Promise<GlossaryEntry[]>
   /** What else of a project came from a meeting, to take away with it: its open points. */
   forget?: (project: Project, meeting: { id: string; folder: string }) => Promise<unknown>
 }
@@ -296,12 +301,15 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     }
     const after = await deps.exports.reading(config.root, reading.folder)
     if (after === null || !sameExport(reading.meeting, after)) return 'changing'
+    const heard = (await deps.glossary?.(project)) ?? []
     const outcomes: WriteOutcome[] = []
     for (const name of MEETING_TEXT_FILES) {
       const path = `${folder}/${name}`
       const text = texts.get(name)
       if (text !== undefined) {
-        outcomes.push(await deps.writer.write(project.folder, path, text))
+        // What a transcript heard badly is written in its right form as it enters the project.
+        const entered = name === MEETING_TRANSCRIPT_FILE ? applyGlossary(text, heard) : text
+        outcomes.push(await deps.writer.write(project.folder, path, entered))
       } else if ((await deps.files.readText(project.folder, path)) !== null) {
         await deps.files.remove(project.folder, path)
         outcomes.push('written')

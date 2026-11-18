@@ -16,6 +16,7 @@ import {
   deckProblemText,
   type Evidence,
   fitDeckDraft,
+  type GlossaryEntry,
   isDomainError,
   isOwnKind,
   JOBS_FOLDER,
@@ -73,6 +74,8 @@ export type DeliverablesDeps = {
   models?: (project: Project) => Promise<ModelSettings>
   /** What Octo reads directly for the project, told to the writer of every draft. */
   liveSources?: (project: Project) => Promise<LiveSource[]>
+  /** The words the transcripts hear badly, with their right form: told to the writer. */
+  glossary?: (project: Project) => Promise<GlossaryEntry[]>
 }
 
 /** What a writing tells while it runs. */
@@ -218,7 +221,13 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   async function list(project: Project): Promise<Deliverable[]> {
     const paths = await deps.files.under(project.folder, JOBS_FOLDER)
     const all: Deliverable[] = []
-    for (const path of paths.filter((candidate) => candidate.endsWith('.json'))) {
+    // Only the files of the folder itself: what the PM attaches to a conversation is kept in a
+    // folder under it, and a JSON among the attachments is never taken for a deliverable.
+    const jobs = paths.filter(
+      (candidate) =>
+        candidate.endsWith('.json') && !candidate.slice(JOBS_FOLDER.length + 1).includes('/'),
+    )
+    for (const path of jobs) {
       const text = await deps.files.readText(project.folder, path)
       if (text !== null) all.push(JSON.parse(text) as Deliverable)
     }
@@ -293,6 +302,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         ...(sections.length > 0 ? { sectionOutline: sections } : {}),
         model: chosen?.write ?? null,
         liveSources: (await deps.liveSources?.(project)) ?? [],
+        glossary: (await deps.glossary?.(project)) ?? [],
         onModel: (used) => {
           models.write = used
         },

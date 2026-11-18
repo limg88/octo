@@ -35,6 +35,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/renderer/App.tsx'
 import { linkMarkers, markerOfLink } from '../src/renderer/answer-text.ts'
 import { messages, progressText } from '../src/renderer/messages.ts'
+import { quotedBlock, readableHere, sourceBlocks } from '../src/renderer/source-text.ts'
 import type { OctoApi, Result, SavedBackup } from '../src/shared/api.ts'
 
 const aurora: Project = {
@@ -191,6 +192,14 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     ),
     approveScripted: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
+    glossary: vi.fn(async () => ok({ entries: [], proposed: [] })),
+    saveGlossary: vi.fn(async () => ok({ entries: [], proposed: [] })),
+    proposeGlossary: vi.fn(async () => ok({ entries: [], proposed: [] })),
+    readEvidence: vi.fn(async () =>
+      ok<string | null>(
+        '---\ntipo: "nota"\n---\n\n# Stato\n\nPrima riga.\n\nLa consegna è **fissata al 12 dicembre 2026**.\n',
+      ),
+    ),
     onProgress: (listener) => {
       emit = listener
       return () => {}
@@ -480,7 +489,21 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'wiki · stato' }))
     expect(within(panel).getByText('wiki/stato.md')).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: messages.citation.open }))
-    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md'))
+    // A text is read inside Octo, on the sentence quoted; the original is one click further.
+    const reader = await screen.findByRole('dialog', { name: 'wiki/stato.md' })
+    expect(api.readEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md')
+    expect(api.openEvidence).not.toHaveBeenCalled()
+    const quoted = await waitFor(() => {
+      const found = reader.querySelector('.source-quoted')
+      expect(found).not.toBeNull()
+      return found as Element
+    })
+    expect(quoted.textContent).toContain('fissata al 12 dicembre 2026')
+    expect(within(reader).getByRole('heading', { name: 'Stato' })).toBeTruthy()
+    fireEvent.click(within(reader).getByRole('button', { name: messages.reader.openWithSystem }))
+    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'wiki/stato.md')
+    fireEvent.click(within(reader).getByRole('button', { name: messages.close }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('tells what the agent is doing and lets the PM stop it', async () => {
@@ -922,6 +945,23 @@ describe('project tabs', () => {
     fireEvent.keyDown(window, { key: '2', metaKey: true })
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('12 dicembre')).toBeNull())
+  })
+
+  it('cuts a text where a reader would, and finds the sentence under the marks of markdown', () => {
+    const blocks = sourceBlocks(
+      '---\na: 1\n---\n# T\r\n\r\nUno **due** tre quattro.\n\n```\nx\n\ny\n```\n\n~~~\naperto',
+    )
+    expect(blocks.map((block) => block.kind)).toEqual(['header', 'text', 'text', 'text', 'text'])
+    expect(blocks[3]?.text).toBe('```\nx\n\ny\n```')
+    expect(quotedBlock(blocks, 'uno due  TRE')).toBe(2)
+    expect(quotedBlock(blocks, 'non c’è')).toBe(-1)
+    expect(quotedBlock(blocks, ' ')).toBe(-1)
+    // A sentence that goes on in the next block is found where it starts.
+    const long = sourceBlocks(`${'parola '.repeat(8)}fine.\n\nSeguito del discorso.`)
+    expect(quotedBlock(long, `${'parola '.repeat(8)}fine. Seguito del discorso.`)).toBe(0)
+    expect(sourceBlocks('Solo testo')).toEqual([{ text: 'Solo testo', kind: 'text' }])
+    expect(readableHere('wiki/stato.MD')).toBe(true)
+    expect(readableHere('Contratti/ordine.pdf')).toBe(false)
   })
 
   it('switches between asking and the sources of the project', async () => {

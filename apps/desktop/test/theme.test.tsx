@@ -73,11 +73,12 @@ describe('the theme of the interface', () => {
     expect(screen.getByRole('group', { name: messages.theme.label })).toBeTruthy()
   })
 
-  it('draws the mark at the size asked, with eight arms, and hides it from who listens', () => {
+  it('shows the mark of the octopus at the size asked, and hides it from who listens', () => {
     const { container } = render(<Logo size={48} />)
-    const mark = container.querySelector('svg')
+    const mark = container.querySelector('img')
     expect(mark?.getAttribute('width')).toBe('48')
+    expect(mark?.getAttribute('src')).toMatch(/octo\.png$/)
+    expect(mark?.getAttribute('alt')).toBe('')
     expect(mark?.getAttribute('aria-hidden')).toBe('true')
-    expect(container.querySelectorAll('.logo-arms path')).toHaveLength(8)
   })
 })

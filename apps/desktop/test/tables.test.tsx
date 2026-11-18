@@ -9,6 +9,7 @@ import { KnownList } from '../src/renderer/KnownList.tsx'
 import { messages } from '../src/renderer/messages.ts'
 import { type Row, RowsField } from '../src/renderer/RowsField.tsx'
 import { TodaySettings } from '../src/renderer/TodaySettings.tsx'
+import { MIN_COLUMN_PX } from '../src/renderer/use-column-widths.ts'
 import type { Result } from '../src/shared/api.ts'
 
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
@@ -88,6 +89,44 @@ describe('a table of data', () => {
     // A column of buttons has a name for who cannot see it, and is not sorted.
     const actions = screen.getByRole('columnheader', { name: 'Azioni' })
     expect(actions.getAttribute('aria-sort')).toBeNull()
+  })
+
+  it('lets a column be made wider or narrower, and remembers it for that table', () => {
+    window.localStorage.clear()
+    const table = (label: string) => (
+      <DataTable label={label} columns={COLUMNS} rows={BUGS} rowKey={(bug) => bug.id} />
+    )
+    const widthOf = (at: number): string =>
+      (screen.getByRole('table').querySelectorAll('col')[at] as HTMLElement).style.width
+    const { unmount } = render(table('Bug'))
+    const edge = screen.getByRole('separator', { name: messages.table.widthOf('Titolo') })
+    // The buttons of a row have no edge to drag.
+    expect(screen.getAllByRole('separator')).toHaveLength(3)
+    expect(widthOf(1)).toBe('')
+    // Dragged with the mouse: the column follows, and never gets too narrow to read.
+    fireEvent.mouseDown(edge, { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 400 })
+    // (A heading has no width in this test: the column is as wide as the mouse went.)
+    expect(widthOf(1)).toBe('300px')
+    fireEvent.mouseMove(document, { clientX: -900 })
+    fireEvent.mouseUp(document)
+    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX}px`)
+    fireEvent.mouseMove(document, { clientX: 700 })
+    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX}px`)
+    // Moved with the arrows, for who does not use the mouse.
+    fireEvent.keyDown(edge, { key: 'ArrowRight' })
+    fireEvent.keyDown(edge, { key: 'Enter' })
+    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX + 16}px`)
+    unmount()
+    // The same table opened again is as it was left; another table is not touched.
+    const again = render(table('Bug'))
+    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX + 16}px`)
+    fireEvent.doubleClick(screen.getByRole('separator', { name: messages.table.widthOf('Titolo') }))
+    expect(widthOf(1)).toBe('')
+    again.unmount()
+    window.localStorage.setItem('octo.colonne.Altra', 'non è JSON')
+    render(table('Altra'))
+    expect(widthOf(1)).toBe('')
   })
 
   it('finds the rows that hold every word typed, and says how many', () => {

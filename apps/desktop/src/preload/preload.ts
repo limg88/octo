@@ -45,6 +45,7 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.scriptedApprove, { projectId, slug, runId }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),
   openEvidence: (projectId, path) => ipcRenderer.invoke(CHANNELS.evidenceOpen, { projectId, path }),
+  readEvidence: (projectId, path) => ipcRenderer.invoke(CHANNELS.evidenceRead, { projectId, path }),
   mailSource: (projectId) => ipcRenderer.invoke(CHANNELS.mailGet, { projectId }),
   saveMailSource: (projectId, config) =>
     ipcRenderer.invoke(CHANNELS.mailSave, { projectId, config }),
@@ -143,6 +144,10 @@ const api: OctoApi = {
   },
   team: (projectId) => ipcRenderer.invoke(CHANNELS.teamGet, { projectId }),
   saveTeam: (projectId, team) => ipcRenderer.invoke(CHANNELS.teamSave, { projectId, team }),
+  glossary: (projectId) => ipcRenderer.invoke(CHANNELS.glossaryGet, { projectId }),
+  saveGlossary: (projectId, glossary) =>
+    ipcRenderer.invoke(CHANNELS.glossarySave, { projectId, glossary }),
+  proposeGlossary: (projectId) => ipcRenderer.invoke(CHANNELS.glossaryPropose, { projectId }),
   modelSettings: (projectId) => ipcRenderer.invoke(CHANNELS.modelsGet, { projectId }),
   saveModelSettings: (projectId, settings) =>
     ipcRenderer.invoke(CHANNELS.modelsSave, { projectId, settings }),

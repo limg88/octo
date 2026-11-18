@@ -129,7 +129,7 @@ describe('writing a deliverable', () => {
   })
 
   it('drafts with the sources checked and the red team done, and measures the writing', async () => {
-    const { service, requests } = setup()
+    const { service, requests, memory } = setup()
     const told: string[] = []
     const drafts: Deliverable[] = []
 
@@ -159,6 +159,9 @@ describe('writing a deliverable', () => {
     expect(drafts[0]?.draft).toEqual(made.draft)
     expect(requests[0]).toMatchObject({ revision: null, projectInstructions: null })
     expect(await service.get(project, 'd-1')).toEqual(made)
+    // A JSON the PM attached to a conversation sits under the same folder: it is no deliverable.
+    memory.files.set('_octo/.lavori/chiedi/c-1/dati.json', '{"non": "un deliverable"}')
+    expect((await service.list(project)).map((deliverable) => deliverable.id)).toEqual(['d-1'])
   })
 
   it('keeps a first draft that failed as failed, with the reason', async () => {

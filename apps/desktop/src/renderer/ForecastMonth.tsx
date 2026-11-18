@@ -550,7 +550,7 @@ function CodeDetails({
   const hintId = useId()
   const amount = (name: AmountField, label: string, hint: string) => (
     <>
-      <label>
+      <label className="code-figure">
         {label}
         <input
           type="text"
@@ -561,7 +561,7 @@ function CodeDetails({
           onChange={(event) => onChange({ [name]: event.target.value })}
         />
       </label>
-      <p id={`${hintId}-${name}`} className="hint">
+      <p id={`${hintId}-${name}`} className="hint code-hint">
         {hint}
       </p>
       <FieldProblems lines={problems?.amounts.includes(name) ? [messages.amountWrong] : []} />
@@ -588,7 +588,7 @@ function CodeDetails({
     <>
       {amount('budgetCosts', text.budgetCosts, text.budgetCostsHint)}
       {amount('totalCosts', text.totalCosts, text.totalCostsHint)}
-      <label className="check">
+      <label className="check code-tick">
         <input
           type="checkbox"
           checked={draft.totalCostsBeforeMonth}
@@ -600,7 +600,7 @@ function CodeDetails({
   )
   return (
     // biome-ignore lint/a11y/useSemanticElements: the fields of one code, grouped under its row.
-    <div className="settings-form" role="group" aria-label={text.inputsTitle(code)}>
+    <div className="settings-form code-details" role="group" aria-label={text.inputsTitle(code)}>
       {wholeFirst ? whole : externals}
       {wholeFirst ? externals : whole}
     </div>
@@ -683,7 +683,7 @@ function Gaps({
               <span className="hint">{text.copyRatesHint}</span>
             </div>
           )}
-          <ul className="missing gaps">
+          <ol className="missing gaps" aria-label={text.gapsTitle}>
             {gaps.map((gap) => (
               <li key={gapText(gap)}>
                 {gapText(gap)}
@@ -699,7 +699,7 @@ function Gaps({
             {notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
-          </ul>
+          </ol>
         </>
       )}
     </section>

@@ -8,7 +8,7 @@ import { BusyButton } from './Spinner.tsx'
 const text = messages.citation
 
 /** Hands the original to the system; says whether it could. */
-export type OpenSource = (path: string) => Promise<Result<null>>
+export type OpenSource = (path: string, quote?: string) => Promise<Result<null>>
 
 type Props = {
   citations: readonly CheckedCitation[]
@@ -54,12 +54,12 @@ export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) 
     [],
   )
 
-  async function open(path: string) {
+  async function open(path: string, quote: string) {
     asked.current += 1
     const mine = asked.current
     setOpening(true)
     setFailed(false)
-    const result = await onOpen(path)
+    const result = await onOpen(path, quote)
     if (mine !== asked.current) return
     setOpening(false)
     setFailed(!result.ok)
@@ -150,7 +150,7 @@ export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) 
             busy={opening}
             busyLabel={messages.wait.opening}
             disabled={CANNOT_OPEN.has(citation.status)}
-            onClick={() => void open(citation.path)}
+            onClick={() => void open(citation.path, citation.quote)}
           >
             {text.open}
           </BusyButton>
@@ -163,7 +163,11 @@ export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) 
         {failed && (
           <p className="warning" role="alert">
             {text.openFailed}{' '}
-            <button type="button" className="quiet" onClick={() => void open(citation.path)}>
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => void open(citation.path, citation.quote)}
+            >
               {messages.wait.retry}
             </button>
           </p>

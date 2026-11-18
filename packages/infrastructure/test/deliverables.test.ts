@@ -255,6 +255,13 @@ describe('what the writer and the red team are told', () => {
     // How a person is addressed is a rule of the writer, not of a kind: the PM's word, then the
     // mail already sent, then «lei».
     expect(prompt).toContain(ADDRESS_PROMPT)
+    // The right forms the PM approved are told to the writer; without a glossary nothing is said.
+    const spelled = writerSystemPrompt(
+      { ...request, glossary: [{ heard: 'dim', right: 'DEEM' }] },
+      null,
+    )
+    expect(spelled).toContain('- "dim" is "DEEM"')
+    expect(prompt).not.toContain('<project_glossary>')
     expect(ADDRESS_PROMPT).toContain('_octo/progetto/persone-e-calendario.md')
     expect(redTeamSystemPrompt(request.kind, null)).toContain(`${MAX_FINDING_SENTENCE} characters`)
     expect(prompt).not.toContain('<live_sources>')

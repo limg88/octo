@@ -256,7 +256,7 @@ export function AskView({
               {record.answer && (
                 <AnswerView
                   answer={record.answer}
-                  onOpenSource={(path) => api.openEvidence(project.id, path)}
+                  onOpenSource={(path, quote) => api.openEvidence(project.id, path, quote)}
                   actions={
                     <>
                       {onDraft && (
@@ -310,7 +310,7 @@ export function AskView({
           </div>
         )}
         {attached.length > 0 && (
-          <ul className="chips" aria-label={messages.attach.list}>
+          <ul className="chat-files" aria-label={messages.attach.list}>
             {attached.map((file) => (
               <li key={file.name} className="chip">
                 {file.name}

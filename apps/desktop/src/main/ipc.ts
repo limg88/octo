@@ -19,6 +19,7 @@ import type {
   Meetings,
   Models,
   OpenPoints,
+  ProjectGlossary,
   ProjectSheets,
   Projects,
   QuestionLog,
@@ -41,6 +42,8 @@ import {
   IMPORTANCES,
   isDomainError,
   MAIL_TURNS,
+  MAX_GLOSSARY_ENTRIES,
+  MAX_GLOSSARY_WORD,
   MODEL_CHOICES,
   OPEN_POINT_STATES,
   opensAsDocument,
@@ -85,6 +88,7 @@ export type IpcDeps = {
   /** The version Octo was updated to since it last ran, where that costs it its permissions. */
   updatedTo: string | null
   team: Team
+  glossary: ProjectGlossary
   folderDialogTitle: string
   letterheadDialogTitle: string
   kindTemplateDialogTitle: string
@@ -130,6 +134,17 @@ const askInput = byProject.extend({
   question: z.string().max(MAX_QUESTION_LENGTH),
   conversationId: z.string().max(MAX_RULE_LENGTH).nullable().default(null),
   compute: z.boolean().default(false),
+})
+const glossaryPairs = z
+  .array(
+    z.object({
+      heard: z.string().max(MAX_GLOSSARY_WORD),
+      right: z.string().max(MAX_GLOSSARY_WORD),
+    }),
+  )
+  .max(MAX_GLOSSARY_ENTRIES)
+const glossaryInput = byProject.extend({
+  glossary: z.object({ entries: glossaryPairs, proposed: glossaryPairs }),
 })
 const chatInput = byProject.extend({ conversationId: z.string().min(1).max(MAX_RULE_LENGTH) })
 const keepWorkInput = byProject.extend({ questionId: z.string().min(1).max(MAX_RULE_LENGTH) })
@@ -639,6 +654,22 @@ export function registerIpc(deps: IpcDeps): void {
     deps.team.get(await deps.projects.get(projectId)),
   )
 
+  handle(CHANNELS.glossaryGet, byProject, async ({ projectId }) =>
+    deps.glossary.get(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.glossarySave, glossaryInput, async ({ projectId, glossary }) => {
+    const project = await deps.projects.get(projectId)
+    const saved = await deps.glossary.save(project, glossary)
+    // The transcripts already in the project are written again with the right forms.
+    sourcesChanged(projectId)
+    return saved
+  })
+
+  handle(CHANNELS.glossaryPropose, byProject, async ({ projectId }) =>
+    deps.glossary.propose(await deps.projects.get(projectId)),
+  )
+
   handle(CHANNELS.modelsGet, byProject, async ({ projectId }) =>
     deps.models.get(await deps.projects.get(projectId)),
   )
@@ -1133,6 +1164,13 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>
     deps.forecasts.readOrders(await deps.projects.get(projectId)),
   )
+
+  handle(CHANNELS.evidenceRead, evidenceInput, async ({ projectId, path }) => {
+    const project = await deps.projects.get(projectId)
+    // The same reader that checks a citation: what is not a source of the project is not read.
+    const found = await deps.evidence.read(project.folder, path)
+    return found.kind === 'found' ? found.text : null
+  })
 
   handle(CHANNELS.evidenceOpen, evidenceInput, async ({ projectId, path }) => {
     const project = await deps.projects.get(projectId)

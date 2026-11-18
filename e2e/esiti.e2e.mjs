@@ -205,6 +205,36 @@ try {
     .first()
     .waitFor({ timeout: TIMEOUT_MS })
   await page.screenshot({ path: `${work}/risposta.png`, fullPage: true })
+  // I5. A source is read inside Octo, opened on the sentence quoted, which is marked.
+  await page.getByRole('button', { name: 'Apri la fonte' }).locator('visible=true').first().click()
+  const reader = page.getByRole('dialog', { name: 'wiki/stato.md' })
+  await reader
+    .locator('.source-quoted')
+    .getByText(/fissata al 12 dicembre 2026/)
+    .waitFor({
+      timeout: TIMEOUT_MS,
+    })
+  await reader.getByRole('button', { name: 'Apri con il sistema' }).waitFor()
+  await page.screenshot({ path: `${work}/lettore.png`, fullPage: true })
+  await reader.getByRole('button', { name: 'Chiudi' }).click()
+  // The mark is the octopus that reads a page.
+  await page.locator('img.logo').first().waitFor()
+  // A column is made wider from the edge of its heading, and stays so.
+  await section('Oggi').click()
+  const watched = page.getByRole('table', { name: 'Da tenere d’occhio' })
+  const edge = watched.getByRole('separator', { name: 'Larghezza della colonna Che cosa' })
+  await edge.focus()
+  await edge.press('ArrowRight')
+  assert.match((await watched.locator('col').first().getAttribute('style')) ?? '', /width: \d+px/)
+  // The glossary: Claude proposes a pair, the PM takes it, and it is kept with the settings.
+  await section('Impostazioni').click()
+  await page.getByRole('tab', { name: 'Persone e calendario' }).click()
+  const glossary = page.getByRole('region', { name: 'Glossario: sigle e nomi sentiti male' })
+  await glossary.getByRole('button', { name: 'Chiedi a Claude le coppie' }).click()
+  await glossary.getByText('«aurora uan» → «Aurora ONE»').waitFor({ timeout: TIMEOUT_MS })
+  await glossary.getByRole('button', { name: 'Aggiungi al glossario: aurora uan' }).click()
+  await assertFile(`${work}/Aurora/_octo/.impostazioni/glossario.json`, /"right": "Aurora ONE"/)
+  await page.screenshot({ path: `${work}/glossario.png`, fullPage: true })
   console.log('e2e esiti: ok')
 } catch (error) {
   // What the window showed when a step failed, to look at.

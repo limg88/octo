@@ -14,8 +14,10 @@ import {
 } from '@octo/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  createClaudeGlossaryAdvisor,
   createClaudeTodayJudge,
   createFixedIdentityProvider,
+  createFsGlossaryStore,
   createFsOpenPointStore,
   createFsRiskRegisterStore,
   createJsonTodayStore,
@@ -434,6 +436,24 @@ describe('Claude as the one who judges', () => {
       },
     ])
     expect(await judge.risks({ projectFolder: folder, known: [risks[0]?.title ?? ''] })).toEqual([])
+  })
+
+  it('proposes the words the transcripts heard badly, and none the PM already has', async () => {
+    const advisor = createClaudeGlossaryAdvisor({
+      command: process.execPath,
+      prefixArgs: [join(here, 'fake-claude.mjs')],
+      env: process.env,
+    })
+    const pair = { heard: 'aurora uan', right: 'Aurora ONE' }
+    expect(await advisor.propose({ projectFolder: folder, known: [] })).toEqual([pair])
+    expect(await advisor.propose({ projectFolder: folder, known: [pair] })).toEqual([])
+    // The glossary is kept with the settings of the project; a broken file is no glossary.
+    const store = createFsGlossaryStore()
+    expect(await store.load(folder)).toEqual({ entries: [], proposed: [] })
+    await store.save(folder, { entries: [pair], proposed: [] })
+    expect((await store.load(folder)).entries).toEqual([pair])
+    writeFileSync(join(folder, '_octo', '.impostazioni', 'glossario.json'), '{"entries": 3}')
+    expect(await store.load(folder)).toEqual({ entries: [], proposed: [] })
   })
 
   it('says whose the meetings in doubt are, with the sentence it stands on, without reading files', async () => {

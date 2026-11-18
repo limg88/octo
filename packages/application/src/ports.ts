@@ -19,6 +19,8 @@ import type {
   ForecastCell,
   ForecastKind,
   ForecastSettings,
+  Glossary,
+  GlossaryEntry,
   HoursPeriod,
   HoursSettings,
   Identity,
@@ -373,6 +375,8 @@ export type DraftRequest = {
   deckOutline?: DeckOutline
   /** The headings of the Word template of the kind: the sections the draft must have. */
   sectionOutline?: readonly string[]
+  /** The words the transcripts hear badly, with their right form: always written in that form. */
+  glossary?: readonly GlossaryEntry[]
   liveSources?: readonly LiveSource[]
   model?: string | null
   onModel?: (model: string) => void
@@ -608,6 +612,25 @@ export interface FeedRows {
 }
 
 /** The people and the calendar of a project, kept with Octo's settings of the project. */
+/** The glossary of a project, kept with its settings. */
+export interface GlossaryStore {
+  load(projectFolder: string): Promise<Glossary>
+  save(projectFolder: string, glossary: Glossary): Promise<void>
+}
+
+/**
+ * Claude as the one who finds the words a transcript heard badly: it reads the transcripts and
+ * the written documents of the project, and gives the pairs. Failures are `agent_*` errors.
+ */
+export interface GlossaryAdvisor {
+  propose(request: {
+    projectFolder: string
+    known: readonly GlossaryEntry[]
+    model?: string | null
+    signal?: AbortSignal
+  }): Promise<GlossaryEntry[]>
+}
+
 export interface TeamStore {
   load(projectFolder: string): Promise<ProjectTeam>
   save(projectFolder: string, team: ProjectTeam): Promise<void>

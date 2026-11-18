@@ -4,6 +4,7 @@ import type {
   DashboardSettingsStore,
   ExportCandidates,
   ForecastSettingsStore,
+  GlossaryStore,
   HoursSettingsStore,
   ModelSettingsStore,
   RetiredSheetPlans,
@@ -13,6 +14,7 @@ import type {
 import {
   cleanDashboardSettings,
   cleanForecastSettings,
+  cleanGlossary,
   cleanHoursSettings,
   cleanModelSettings,
   cleanTeam,
@@ -24,9 +26,11 @@ import {
   type ForecastExternal,
   type ForecastExternalRate,
   type ForecastSettings,
+  GLOSSARY_FILE,
   isDomainError,
   NO_DECISIONS,
   NO_FORECAST_PROJECT,
+  NO_GLOSSARY,
   PHASES,
   PLAN_GROUPS,
   PRIVATE_FOLDER,
@@ -315,6 +319,25 @@ export function createFsTeamStore(): TeamStore {
       return cleanTeam(parsed.data)
     },
     save: (projectFolder, team) => writeJson(fileOf(projectFolder), team),
+  }
+}
+
+const pairSchema = z.object({ heard: z.string(), right: z.string() })
+const glossarySchema = z.object({
+  entries: z.array(pairSchema).default([]),
+  proposed: z.array(pairSchema).default([]),
+})
+
+/** The glossary of a project, kept with its settings; a file that cannot be read is no glossary. */
+export function createFsGlossaryStore(): GlossaryStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, GLOSSARY_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = glossarySchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      return parsed.success ? cleanGlossary(parsed.data) : NO_GLOSSARY
+    },
+    save: (projectFolder, glossary) => writeJson(fileOf(projectFolder), glossary),
   }
 }
 

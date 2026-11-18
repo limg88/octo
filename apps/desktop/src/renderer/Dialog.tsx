@@ -11,10 +11,12 @@ type Props = {
   error?: ErrorCode | null
   onClose: () => void
   children: ReactNode
+  /** A dialog that holds a page to read is as wide as a page. */
+  wide?: boolean
 }
 
 /** A window over the page for one thing to decide: it closes with Escape, the cross or outside. */
-export function Dialog({ title, error = null, onClose, children }: Props) {
+export function Dialog({ title, error = null, onClose, children, wide = false }: Props) {
   const panel = useRef<HTMLDivElement>(null)
   // The focus goes into the dialog, and back to where it was when the dialog closes.
   useEffect(() => {
@@ -53,7 +55,7 @@ export function Dialog({ title, error = null, onClose, children }: Props) {
     >
       <div
         ref={panel}
-        className="dialog"
+        className={wide ? 'dialog dialog-wide' : 'dialog'}
         role="dialog"
         aria-modal="true"
         aria-label={title}

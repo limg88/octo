@@ -443,7 +443,7 @@ describe('a question answered with calculations', () => {
     expect(first.textContent).toContain(words.inFile('totali.csv'))
     // The source opens as the source of a citation does.
     fireEvent.click(within(first).getByRole('button', { name: 'dati/vendite.csv' }))
-    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'dati/vendite.csv')
+    expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'dati/vendite.csv', undefined)
     expect(within(first).queryByText(words.unverified)).toBeNull()
     const loose = screen.getByRole('region', { name: 'Senza appoggio' })
     expect(loose.textContent).toContain(words.sourceMissing('dati/assente.csv'))

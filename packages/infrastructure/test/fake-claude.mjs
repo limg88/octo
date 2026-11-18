@@ -69,6 +69,18 @@ function addresseeOf(line, pmName) {
 /** A mail that only thanks, confirms or informs asks nothing of who reads it. */
 const ASKS_NOTHING = /\b(grazie|per conoscenza|vi informo|confermo che|ricevuto)\b/i
 
+// A run that proposes the glossary: one pair, unless the PM already has it.
+if (args.join(' ').includes('You look for the words the transcripts of a project heard badly')) {
+  const { known } = JSON.parse(question)
+  const pair = { heard: 'aurora uan', right: 'Aurora ONE' }
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: { pairs: known.some((kept) => kept.heard === pair.heard) ? [] : [pair] },
+  })
+  process.exit(0)
+}
+
 // A run that says whose the meetings in doubt are: a title that names another project is of
 // something else, and the rest cannot be told.
 if (args.join(' ').includes('You say whether some meetings are of one project')) {

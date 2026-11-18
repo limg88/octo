@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode, useId, useMemo, useState } from 'react'
 import { messages } from './messages.ts'
+import { useColumnWidths } from './use-column-widths.ts'
 
 /** What a column is put in order by: words, a number, or nothing (always last). */
 export type SortValue = string | number | null
@@ -76,6 +77,7 @@ export function DataTable<Row>({
   initialOrder,
 }: Props<Row>) {
   const filterId = useId()
+  const resize = useColumnWidths(label)
   const [typed, setTyped] = useState('')
   const [order, setOrder] = useState<Order>(initialOrder ?? null)
   const searched = columns.some((column) => column.text)
@@ -123,7 +125,16 @@ export function DataTable<Row>({
       <table className="data data-fixed" aria-label={label}>
         <colgroup>
           {columns.map((column) => (
-            <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+            <col
+              key={column.key}
+              style={
+                resize.widths[column.key] !== undefined
+                  ? { width: `${resize.widths[column.key]}px` }
+                  : column.width
+                    ? { width: column.width }
+                    : undefined
+              }
+            />
           ))}
         </colgroup>
         <thead>
@@ -162,6 +173,19 @@ export function DataTable<Row>({
                     </button>
                   ) : (
                     column.label
+                  )}
+                  {column.kind !== 'actions' && (
+                    // biome-ignore lint/a11y/useSemanticElements: the edge between two headings, dragged or moved with the arrows.
+                    <span
+                      className="column-edge"
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={text.widthOf(column.label)}
+                      aria-valuenow={resize.widths[column.key] ?? 0}
+                      title={text.widthHint}
+                      tabIndex={0}
+                      {...resize.handle(column.key)}
+                    />
                   )}
                 </th>
               )

@@ -40,6 +40,7 @@ import type {
   FeedConfig,
   FeedName,
   ForecastSettings,
+  Glossary,
   HoursPeriod,
   HoursSettings,
   Lifetime,
@@ -88,6 +89,7 @@ export const CHANNELS = {
   questionsCancel: 'questions:cancel',
   questionsProgress: 'questions:progress',
   evidenceOpen: 'evidence:open',
+  evidenceRead: 'evidence:read',
   mailGet: 'sources:mail:get',
   mailSave: 'sources:mail:save',
   mailSync: 'sources:mail:sync',
@@ -167,6 +169,9 @@ export const CHANNELS = {
   diskAccessOpen: 'system:disk-access:open',
   teamGet: 'team:get',
   teamSave: 'team:save',
+  glossaryGet: 'glossary:get',
+  glossarySave: 'glossary:save',
+  glossaryPropose: 'glossary:propose',
   modelsGet: 'models:get',
   modelsSave: 'models:save',
   projectsCreate: 'projects:create',
@@ -292,7 +297,13 @@ export type OctoApi = {
   /** Writes in the project what a correction changed. */
   approveScripted(projectId: string, slug: string, runId: string): Promise<Result<null>>
   cancelAsk(projectId: string): Promise<Result<null>>
-  openEvidence(projectId: string, path: string): Promise<Result<null>>
+  /**
+   * Opens a source of the project. Inside the app a text is read in Octo, on the sentence quoted
+   * when one is given; any other file, or the original on request, goes to the system.
+   */
+  openEvidence(projectId: string, path: string, quote?: string): Promise<Result<null>>
+  /** The text of a source of the project; null when it is not one, or is not a text to read. */
+  readEvidence(projectId: string, path: string): Promise<Result<string | null>>
   mailSource(projectId: string): Promise<Result<MailSourceView>>
   /** Null switches the mail of the project off. */
   saveMailSource(
@@ -474,6 +485,11 @@ export type OctoApi = {
   /** The people and the calendar of the project. */
   team(projectId: string): Promise<Result<ProjectTeam>>
   saveTeam(projectId: string, team: ProjectTeam): Promise<Result<ProjectTeam>>
+  /** The words the transcripts hear badly with their right form, and those Claude proposes. */
+  glossary(projectId: string): Promise<Result<Glossary>>
+  saveGlossary(projectId: string, glossary: Glossary): Promise<Result<Glossary>>
+  /** Asks Claude which words the transcripts heard badly: proposed, never applied by itself. */
+  proposeGlossary(projectId: string): Promise<Result<Glossary>>
   /** Which model answers, writes and reads again in the project. */
   modelSettings(projectId: string): Promise<Result<ModelSettings>>
   saveModelSettings(projectId: string, settings: ModelSettings): Promise<Result<ModelSettings>>

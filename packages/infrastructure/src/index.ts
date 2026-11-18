@@ -1,6 +1,7 @@
 export * from './claude/claude-cli-runner.ts'
 export * from './claude/deliverable-writer.ts'
 export * from './claude/fenced-run.ts'
+export * from './claude/glossary-advisor.ts'
 export * from './claude/locate.ts'
 export * from './claude/meeting-reader.ts'
 export * from './claude/script-runner.ts'

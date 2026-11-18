@@ -1745,6 +1745,9 @@ export const messages = {
     shown: (shown: number, all: number) => `${shown} di ${all}`,
     none: 'Nessuna riga corrisponde.',
     sortBy: (label: string) => `Ordina per ${label}`,
+    widthOf: (label: string) => `Larghezza della colonna ${label}`,
+    widthHint:
+      'Trascina per allargare o stringere la colonna; doppio clic per tornare alla larghezza di Octo.',
   },
   ownPeopleOnly: {
     label: 'Solo le voci assegnate alle nostre persone',
@@ -1772,6 +1775,32 @@ export const messages = {
     'Octo usa Claude Code con il tuo account. Installalo, accedi una volta dal terminale con «claude» e riapri Octo.',
   agentRetry: 'Riprova',
   agentReady: (version: string) => `Claude ${version}`,
+  glossary: {
+    title: 'Glossario: sigle e nomi sentiti male',
+    intro:
+      'Le trascrizioni delle riunioni scrivono sigle e nomi come li sentono. Qui dici la forma giusta: Octo la mette nelle trascrizioni quando entrano nel progetto e la dà a chi scrive i deliverable. Claude propone le coppie, tu le approvi.',
+    heard: 'Come viene scritta',
+    right: 'Forma giusta',
+    add: 'Aggiungi una coppia',
+    cell: (column: string, row: number) => `${column}, coppia ${row}`,
+    remove: (row: number) => `Togli la coppia ${row}`,
+    save: 'Salva il glossario',
+    propose: 'Chiedi a Claude le coppie',
+    asking: 'Leggo le trascrizioni…',
+    proposed: 'Coppie proposte da Claude',
+    pair: (heard: string, right: string) => `«${heard}» → «${right}»`,
+    accept: 'Aggiungi',
+    acceptOf: (heard: string) => `Aggiungi al glossario: ${heard}`,
+    dismiss: 'Scarta',
+    dismissOf: (heard: string) => `Scarta la proposta: ${heard}`,
+  },
+  reader: {
+    content: 'Testo della fonte',
+    loading: 'Apro la fonte…',
+    unreadable: 'Non riesco a leggere questo file dentro Octo: aprilo con il sistema.',
+    openWithSystem: 'Apri con il sistema',
+    quoteNotFound: 'La frase citata non è in questo testo: te lo mostro dall’inizio.',
+  },
   citation: {
     panel: 'Fonte citata',
     marker: (n: number) => `Fonte ${n}`,
@@ -1784,7 +1813,7 @@ export const messages = {
     foundNote: 'Leggi il contesto della fonte per valutare la conclusione.',
     notFoundNote:
       'Questa citazione non regge il controllo: verifica sull’originale prima di usarla.',
-    open: 'Apri l’originale',
+    open: 'Apri la fonte',
     opening: 'Apro la fonte…',
     openFailed: 'Non sono riuscito ad aprire il file.',
     path: 'Percorso completo',

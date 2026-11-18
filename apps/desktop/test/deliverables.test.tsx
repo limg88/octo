@@ -262,12 +262,15 @@ describe('DeliverablesView', () => {
     expect(screen.queryByRole('button', { name: messages.deliverableApprove })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '2026-11-14_email-cliente_collaudo.docx' }))
-    expect(api.openEvidence).toHaveBeenCalledWith('p-1', approved.files[1])
+    expect(api.openEvidence).toHaveBeenCalledWith('p-1', approved.files[1], undefined)
     // A source of the draft is shown beside it; the original is one click further.
     const panel = screen.getByRole('complementary', { name: messages.citation.panel })
     expect(within(panel).getByText('posta/a.md')).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: messages.citation.open }))
-    await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md'))
+    // The sentence quoted goes with the file: where it is read, it is opened on it.
+    await waitFor(() =>
+      expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md', expect.any(String)),
+    )
   })
 
   it('writes again the passage of one finding only, with what the PM says of it', async () => {

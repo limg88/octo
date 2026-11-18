@@ -18,6 +18,7 @@ import {
   createFolderMigration,
   createForecastReadings,
   createForecasts,
+  createGlossary,
   createHours,
   createKeepWork,
   createMeetings,
@@ -66,6 +67,7 @@ import {
   createAppleMailArchive,
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
+  createClaudeGlossaryAdvisor,
   createClaudeMeetingReader,
   createClaudeScriptRunner,
   createClaudeTodayJudge,
@@ -80,6 +82,7 @@ import {
   createFsFeedIndexes,
   createFsFolderProbe,
   createFsForecastSettings,
+  createFsGlossaryStore,
   createFsHoursSettings,
   createFsKeptSettings,
   createFsMeetingExports,
@@ -562,6 +565,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     team: (project) => team.get(project),
     forget: (project, meeting) => points.forget(project, meeting),
     pm: () => [identity()?.name ?? '', ...identityAddresses(identity())],
+    glossary: (project) => glossary.entries(project),
   })
   const devWarehouse =
     process.env[DEV_WAREHOUSE_VARIABLE] === '1'
@@ -608,6 +612,12 @@ function start(seatEnv: Record<string, string | undefined>): void {
     }
   }
   const team = createTeam({ store: createFsTeamStore(), writer })
+  // The words the transcripts hear badly: proposed by Claude, approved by the PM.
+  const glossary = createGlossary({
+    store: createFsGlossaryStore(),
+    advisor: createClaudeGlossaryAdvisor(claude),
+    model: async (project) => (await models.get(project)).ask,
+  })
   const models = createModels({ store: createFsModelSettings() })
   const chosenModels = (project: Project) => models.get(project)
   const hoursSettings = createFsHoursSettings()
@@ -662,6 +672,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     ids,
     models: chosenModels,
     liveSources,
+    glossary: (project) => glossary.entries(project),
   })
   const dashboard = createDashboard({
     settings: dashboardSettings,
@@ -813,6 +824,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
       attachments: (project, conversationId) => chatFiles.of(project, conversationId),
     }),
     chatFiles,
+    glossary,
     keepWork: createKeepWork({ questions, work, writer }),
     scripted: createScriptedDeliverables({
       files,

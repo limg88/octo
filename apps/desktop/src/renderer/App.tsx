@@ -23,7 +23,9 @@ import { ProjectSheetView } from './ProjectSheetView.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
 import { SignIn } from './SignIn.tsx'
+import { type SourceAsked, SourceReader } from './SourceReader.tsx'
 import { KEPT_SECTIONS, listedSection, SECTION_LABELS, type Section } from './sections.ts'
+import { readableHere } from './source-text.ts'
 import { ThemeToggle } from './ThemeToggle.tsx'
 import { TodayView } from './TodayView.tsx'
 import { signalText } from './today-text.ts'
@@ -76,19 +78,33 @@ export function App({ api, notify = systemNotify }: Props) {
   const sheetPlace = useRef<'sheet' | 'hours' | 'forecast'>('sheet')
   /** Where Claude is working now, as project and section. */
   const [busy, setBusy] = useState<readonly string[]>([])
+  /** The source being read inside Octo; null when none is. */
+  const [reading, setReading] = useState<SourceAsked | null>(null)
+  /** The api the sections use: a text source is read here, anything else goes to the system. */
+  const shown = useMemo<OctoApi>(
+    () => ({
+      ...api,
+      openEvidence: async (projectId, path, quote) => {
+        if (!readableHere(path)) return api.openEvidence(projectId, path)
+        setReading({ projectId, path, quote: quote ?? null })
+        return { ok: true, value: null }
+      },
+    }),
+    [api],
+  )
   /** One api for each section that stays open: it tells when Claude works for that section. */
   const apis = useMemo(
     () =>
       Object.fromEntries(
         KEPT_SECTIONS.map((section) => [
           section,
-          watchedApi(api, (projectId, working) => {
+          watchedApi(shown, (projectId, working) => {
             const key = busyKey(projectId, section)
             setBusy((now) => (working ? [...now, key] : now.filter((other) => other !== key)))
           }),
         ]),
       ) as Record<Section, OctoApi>,
-    [api],
+    [shown],
   )
 
   // Nothing of a project follows the PM into another one.
@@ -406,7 +422,7 @@ export function App({ api, notify = systemNotify }: Props) {
     }
     return (
       <ProjectSheetView
-        api={api}
+        api={shown}
         project={project}
         active={active}
         place={sheetPlace.current}
@@ -559,6 +575,7 @@ export function App({ api, notify = systemNotify }: Props) {
           )
         )}
       </main>
+      {reading && <SourceReader api={api} source={reading} onClose={() => setReading(null)} />}
       {dialog === 'add' && (
         <AddProjectDialog
           error={error}

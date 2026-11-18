@@ -113,6 +113,13 @@ Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sez
 
 **Previsionale (23, 24).** «Calcolo e dettagli» compatto, non a tutta larghezza; «Dati che mancano» come elenco ordinato (`ForecastMonth.tsx`, `ForecastView.tsx`, `FieldProblems.tsx`).
 
+**Esito di I5 (18/11/2026): codice chiuso, criterio da verificare** (R6c.13-R6c.16 in `verifiche-da-fare.md`). Demo `demo/72-trasversali`, `pnpm e2e:esiti`.
+- *Lettore delle fonti*: aprendo una fonte di testo (md, txt) da qualunque sezione, una finestra di Octo mostra il file impaginato, con il paragrafo della frase citata evidenziato e in vista; l'intestazione del file è mostrata com'è scritta. «Apri con il sistema» resta, ed è l'unica strada per Word, Excel e PDF. Nessuna libreria nuova: è quella delle risposte.
+- *Colonne*: bordo dell'intestazione trascinabile, anche con le frecce; larghezze ricordate per tabella su questo computer; doppio clic per tornare a quella di Octo. In «Commessa» sono passate a `DataTable` «Ore e costi per persona» e «Ordini a fornitore»; il registro mese per mese, le fatture per ordine e la griglia del previsionale restano scritte a mano, perché hanno colonne che cambiano con i dati.
+- *Sigle*: `_octo/.impostazioni/glossario.json`, con le coppie approvate e quelle proposte. Claude le propone leggendo trascrizioni e documenti scritti; il PM le approva una per una o le scrive a mano, in «Impostazioni» → «Persone e calendario». Le coppie approvate sono applicate alla trascrizione quando entra (parola intera, senza guardare maiuscole; anche a quelle già entrate, alla lettura successiva) e date a chi scrive i deliverable.
+- *Logo*: il PNG confermato è in `apps/desktop/src/renderer/octo.png`; `Logo.tsx` lo mostra, e ingrandito a 1024 punti è `apps/desktop/build/icon.png`, l'icona delle build.
+- *Previsionale*: riprodotto in schermata. «Calcolo e dettagli» ereditava la regola dei campi della tabella (larghi quanto la cella, quindi quanto tutta la tabella, spunta compresa): ora è un modulo di 620 punti con ogni cifra accanto al suo nome. «Dati che mancano» è un elenco numerato, una riga per cosa, con il rimedio sotto.
+
 ## I6 — Chiusura
 
 - `pnpm typecheck && pnpm lint && pnpm test:coverage`, `pnpm e2e` e gli e2e delle sezioni toccate.

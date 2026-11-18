@@ -275,7 +275,7 @@ export function DeliverablesView({
             deliverable={one}
             kind={kindOf(one.kindId)}
             step={step}
-            onOpen={(path) => api.openEvidence(project.id, path)}
+            onOpen={(path, quote) => api.openEvidence(project.id, path, quote)}
             onRevise={(request) =>
               void run('revise', () => api.reviseDeliverable(project.id, one.id, request))
             }

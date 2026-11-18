@@ -157,6 +157,18 @@ const AUDIENCE: Readonly<Record<DeliverableKind['audience'], string>> = {
   internal: 'people inside the supplier',
 }
 
+const GLOSSARY_OPEN = '<project_glossary>'
+const GLOSSARY_CLOSE = '</project_glossary>'
+
+/** The right form of what the transcripts hear badly: the PM approved each pair. */
+function glossaryPrompt(glossary: NonNullable<DraftRequest['glossary']>): string {
+  const lines = glossary.map((entry) => `- "${entry.heard}" is "${entry.right}"`).join('\n')
+  return `The transcripts of the meetings sometimes write a name or an acronym as it sounds. The Project
+Manager approved the right forms below: when a source writes the first form, write the second in
+the text. A quote in "citations" stays as the file writes it.
+${fenced(GLOSSARY_OPEN, GLOSSARY_CLOSE, lines)}`
+}
+
 /**
  * How a person is addressed in a text written to them: as the PM fixed it, else as the PM already
  * writes to them, else formally. Nothing about it is fixed in the instructions of a kind.
@@ -206,6 +218,7 @@ ${kind.instructions}`,
 the ones above and win where they differ, except for what must never reach a client.
 ${fenced(PM_OPEN, PM_CLOSE, request.projectInstructions)}`)
   }
+  if (request.glossary?.length) parts.push(glossaryPrompt(request.glossary))
   if (request.deckOutline) parts.push(deckPrompt(request.deckOutline))
   else if (request.sectionOutline?.length) parts.push(sectionsPrompt(request.sectionOutline))
   const live = liveSourcesPrompt(request.liveSources).trim()

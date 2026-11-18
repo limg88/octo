@@ -1,5 +1,6 @@
 import type { Lifetime } from '@octo/domain'
 import { useEffect, useState } from 'react'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { lifetimeMail, lifetimeSourceText, progressSourceText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { monthText } from './today-text.ts'
@@ -14,6 +15,15 @@ type Props = {
 const text = messages.sheet.summary
 const { money, share, hours } = messages.forecast
 const UNKNOWN = '—'
+
+/** A line of who worked on the code, already in words: a person, or the suppliers together. */
+type PersonRow = { key: string; person: string; hours: string; cost: string; source: string }
+const PEOPLE_COLUMNS: DataColumn<PersonRow>[] = [
+  { key: 'person', label: text.person, cell: (row) => <strong>{row.person}</strong> },
+  { key: 'hours', label: text.hours, kind: 'number', width: '110px', cell: (row) => row.hours },
+  { key: 'cost', label: text.cost, kind: 'number', width: '130px', cell: (row) => row.cost },
+  { key: 'source', label: text.source, cell: (row) => row.source },
+]
 const amount = (value: number | null): string => (value === null ? UNKNOWN : money(value))
 
 const CENTS = 100
@@ -222,48 +232,39 @@ export function ProjectSheetSummary({ sheet, onUseBudget }: Props) {
         {sheet.lines.length === 0 ? (
           <p className="hint">{text.noLines}</p>
         ) : (
-          <div className="table-wide table-intrinsic">
-            <table className="data" aria-label={text.people}>
-              <thead>
-                <tr>
-                  <th scope="col">{text.person}</th>
-                  <th scope="col" className="number">
-                    {text.hours}
-                  </th>
-                  <th scope="col" className="number">
-                    {text.cost}
-                  </th>
-                  <th scope="col">{text.source}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sheet.lines.map((line) => (
-                  <tr key={`${line.source} ${line.person}`}>
-                    <th scope="row">{line.person}</th>
-                    <td className="number">{hours(line.hours)}</td>
-                    <td className="number">{amount(line.cost)}</td>
-                    <td>{lifetimeSourceText(line)}</td>
-                  </tr>
-                ))}
-                {sheet.supplierCosts > 0 && (
-                  <tr>
-                    <th scope="row">{text.suppliersLine}</th>
-                    <td />
-                    <td className="number">{money(sheet.supplierCosts)}</td>
-                    <td>{text.suppliersSource}</td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th scope="row">{text.total}</th>
-                  <td className="number">{hours(sheet.hours)}</td>
-                  <td className="number">{money(sheet.costs)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <DataTable
+            label={text.people}
+            columns={PEOPLE_COLUMNS}
+            rows={[
+              ...sheet.lines.map((line) => ({
+                key: `${line.source} ${line.person}`,
+                person: line.person,
+                hours: hours(line.hours),
+                cost: amount(line.cost),
+                source: lifetimeSourceText(line),
+              })),
+              ...(sheet.supplierCosts > 0
+                ? [
+                    {
+                      key: 'suppliers',
+                      person: text.suppliersLine,
+                      hours: '',
+                      cost: money(sheet.supplierCosts),
+                      source: text.suppliersSource,
+                    },
+                  ]
+                : []),
+            ]}
+            rowKey={(row) => row.key}
+            footer={
+              <tr>
+                <th scope="row">{text.total}</th>
+                <td className="number">{hours(sheet.hours)}</td>
+                <td className="number">{money(sheet.costs)}</td>
+                <td />
+              </tr>
+            }
+          />
         )}
         {sheet.estimatedHours > 0 && (
           <p className="hint">

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { OctoApi } from '../shared/api.ts'
 import { DocumentsSection } from './DocumentsSection.tsx'
 import { FeedSection } from './FeedSection.tsx'
+import { GlossarySection } from './GlossarySection.tsx'
 import { MeetingsSection } from './MeetingsSection.tsx'
 import { DECK_MODEL_TEXT, LETTERHEAD_TEXT, ModelFile } from './ModelFile.tsx'
 import { ModelsSection } from './ModelsSection.tsx'
@@ -98,7 +99,12 @@ export function ProjectSettings({ api, project, part: asked = null }: Props) {
           <DocumentsSection api={api} project={project} />
         </>
       )}
-      {part === 'team' && <TeamSection api={api} project={project} />}
+      {part === 'team' && (
+        <>
+          <TeamSection api={api} project={project} />
+          <GlossarySection api={api} project={project} />
+        </>
+      )}
       {part === 'today' && <TodaySettings api={api} project={project} />}
       {part === 'deliverables' && (
         <section className="panel settings-panel" aria-label={messages.deliverableSettings.title}>

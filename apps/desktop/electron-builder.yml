@@ -7,6 +7,8 @@ files:
   - package.json
 # Everything is bundled into dist/: no node_modules travel with the app.
 npmRebuild: false
+# The mark of Octo, the octopus that reads a page, as the icon of the app on every system.
+icon: build/icon.png
 # The names Octo looks for when it updates itself: Octo-<version>-<system>-<arch>.<extension>.
 mac:
   # The interpreter for the calculations Claude runs inside its fence (scripts/fetch-python.mjs).

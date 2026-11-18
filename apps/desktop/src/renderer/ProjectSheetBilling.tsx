@@ -1,4 +1,5 @@
 import type { Lifetime, SupplierCycle } from '@octo/domain'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { shortMonthText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { type Figure, Figures } from './ProjectSheetSummary.tsx'
@@ -13,6 +14,33 @@ type Props = {
 const text = messages.sheet.billing
 const { money } = messages.forecast
 const BLANK = ''
+
+type SupplierOrder = SupplierCycle['orders'][number]
+const paid = (
+  key: 'ordered' | 'received' | 'invoiced',
+  label: string,
+): DataColumn<SupplierOrder> => ({
+  key,
+  label,
+  kind: 'number',
+  width: '130px',
+  cell: (order) => money(order[key]),
+})
+const SUPPLIER_COLUMNS: DataColumn<SupplierOrder>[] = [
+  {
+    key: 'vendor',
+    label: text.vendor,
+    cell: (order) => <strong>{order.vendor === '' ? text.noVendor : order.vendor}</strong>,
+  },
+  {
+    key: 'order',
+    label: text.order,
+    cell: (order) => (order.order === '' ? text.noOrder : order.order),
+  },
+  paid('ordered', text.ordered),
+  paid('received', text.received),
+  paid('invoiced', text.invoiced),
+]
 
 /** What was invoiced to the client on each sales order, month by month. */
 function ClientBilling({ sheet }: { sheet: Lifetime }) {
@@ -86,36 +114,12 @@ function SupplierBilling({ suppliers }: { suppliers: SupplierCycle }) {
   return (
     <>
       <Figures title={text.suppliers} figures={figures} />
-      <div className="table-wide table-intrinsic">
-        <table className="data" aria-label={text.suppliersTable}>
-          <thead>
-            <tr>
-              <th scope="col">{text.vendor}</th>
-              <th scope="col">{text.order}</th>
-              <th scope="col" className="number">
-                {text.ordered}
-              </th>
-              <th scope="col" className="number">
-                {text.received}
-              </th>
-              <th scope="col" className="number">
-                {text.invoiced}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {suppliers.orders.map((order) => (
-              <tr key={`${order.vendor} ${order.order}`}>
-                <th scope="row">{order.vendor === '' ? text.noVendor : order.vendor}</th>
-                <td>{order.order === '' ? text.noOrder : order.order}</td>
-                <td className="number">{money(order.ordered)}</td>
-                <td className="number">{money(order.received)}</td>
-                <td className="number">{money(order.invoiced)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        label={text.suppliersTable}
+        columns={SUPPLIER_COLUMNS}
+        rows={suppliers.orders}
+        rowKey={(order) => `${order.vendor} ${order.order}`}
+      />
     </>
   )
 }

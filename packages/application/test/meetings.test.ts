@@ -1,5 +1,6 @@
 import {
   DomainError,
+  type GlossaryEntry,
   MEETINGS_FOLDER,
   type MeetingReading,
   NEVER_READ,
@@ -61,6 +62,8 @@ function setup(
     after?: Record<string, MeetingReading | null>
     /** The people of each project, by its id. */
     teams?: Record<string, string[]>
+    /** The words the transcripts hear badly, with their right form. */
+    glossary?: () => GlossaryEntry[]
   } = {},
 ) {
   // The open points of each project, by its folder: what came from a meeting goes away with it.
@@ -125,6 +128,7 @@ function setup(
       },
     },
     clock: { now: () => NOW },
+    ...(options.glossary ? { glossary: async () => options.glossary?.() ?? [] } : {}),
     ...(options.teams
       ? {
           team: async (project: Project) => ({
@@ -228,6 +232,22 @@ describe('the meetings of a project', () => {
     expect((await meetings.imported(borea)).map((stored) => stored.title)).toEqual(['Punto Borea'])
     expect((await meetings.unassigned(aurora)).map((waiting) => waiting.title)).toEqual(['Varie'])
     expect(disk.get(`${aurora.folder}:${MEETINGS_FOLDER}/_lettura.md`)).toContain('«Varie»')
+  })
+
+  it('writes a transcript with the right form of what it heard badly, also when the glossary grows', async () => {
+    let pairs: GlossaryEntry[] = [{ heard: 'export', right: 'Esportazione' }]
+    const { meetings, disk } = setup({
+      readings: [complete(1, 'Kickoff Aurora')],
+      glossary: () => pairs,
+    })
+    await meetings.sync(aurora)
+    const [held] = await meetings.imported(aurora)
+    const transcript = `${aurora.folder}:${held?.folder}/transcript.md`
+    expect(disk.get(transcript)).toMatch(/^# Esportazione-/)
+    // A pair approved later puts right the transcripts the project already holds.
+    pairs = [{ heard: 'export', right: 'Uscita' }]
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 1 })
+    expect(disk.get(transcript)).toMatch(/^# Uscita-/)
   })
 
   it('writes nothing of a meeting exported again while its files were being read', async () => {
