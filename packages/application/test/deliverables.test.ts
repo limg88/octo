@@ -246,6 +246,31 @@ describe('reviewing a deliverable', () => {
     expect(approved.reviewMs).toBe(MAX_REVIEW_PAUSE_MS)
   })
 
+  it('keeps a page of the memory only once the PM approved it, with the files it comes from', async () => {
+    const { service, memory } = setup()
+    const page = '_octo/progetto/memoria/fatti-correnti.md'
+    const made = await service.start(project, {
+      kindId: 'memoria-fatti-correnti',
+      inputs: { periodo: '17 novembre 2026' },
+    })
+    // Under review it is a draft like any other: the memory does not have it yet.
+    expect(made.status).toBe('review')
+    expect(memory.files.has(page)).toBe(false)
+    const approved = await service.approve(project, made.id)
+    expect(approved.files).toContain(page)
+    const kept = memory.files.get(page) ?? ''
+    expect(kept.split('\n')[0]).toBe('# Memoria: fatti correnti')
+    expect(kept).toContain('approvata dal PM il')
+    expect(kept).toContain('## Fonti')
+    // The markers of the sources are for the review: the page names the files instead.
+    expect(kept).not.toMatch(/\[\d+\]/)
+    for (const citation of made.draft?.citations ?? []) expect(kept).toContain(citation.path)
+    // A kind that is no page of the memory writes none.
+    const email = await service.start(project, { kindId: 'email-cliente', inputs })
+    await service.approve(project, email.id)
+    expect([...memory.files.keys()].filter((path) => path.includes('/memoria/'))).toEqual([page])
+  })
+
   it('keeps the draft under review when a change fails', async () => {
     const context = setup()
     const made = await context.service.start(project, { kindId: 'email-cliente', inputs })

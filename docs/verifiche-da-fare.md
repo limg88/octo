@@ -66,6 +66,17 @@ Uscito con le due sezioni e non rifatto: il confronto fra richieste e fatture di
 
 Non costruito: correggere a parole il tipo distribuito con l'app, per tutti i progetti. I file ora ci sono; manca chi li scrive al posto del PM e dove tenere la correzione fuori dall'app installata.
 
+## R5 — Memoria: pagine scritte da Claude
+
+| # | Che cosa provare | Come | Esito che chiude | Esito |
+|---|---|---|---|---|
+| R5.1 | Le tre pagine sul progetto vero | «Deliverable» → «Memoria: fatti correnti», poi le altre due, con Claude vero; leggi, correggi a parole, approva | Tre pagine in `_octo/progetto/memoria/`, ognuna con fonti controllate e nessun fatto che sai sbagliato | da fare |
+| R5.2 | Cinque domande che chiedono contesto ricevono risposte che citano le pagine | In «Chiedi», cinque domande del tipo «perché abbiamo deciso…», «da quando…», «a che punto siamo su…» | In almeno quattro su cinque la risposta cita una pagina di memoria fra le fonti, e la fonte della pagina regge | da fare |
+| R5.3 | Il PM corregge una pagina a parole in meno di 5 minuti | Riscrivi una pagina chiedendo una correzione nel riquadro della revisione, poi approva | Meno di 5 minuti dalla richiesta alla pagina nuova nel progetto | da fare |
+| R5.4 | Una pagina sbagliata non inquina | Lascia una riga superata in una pagina e fai una domanda su quel punto | La risposta va alla fonte e dice che pagina e fonte non coincidono | da fare |
+
+Non costruito, per scelta della revisione: il controllo di doppioni e contraddizioni fra le pagine, i contratti di output con l'esempio validato, l'aggiornamento periodico da solo.
+
 ## R6 — che cosa serve sapere sulla posta di Windows
 
 In `docs/` non è scritto quale Outlook ha il pilota (`docs/roadmap.md`, «Scelte prese durante F2 (posta)»: «Dipende da quale Outlook ha il pilota»). Il lettore della posta su Windows non si costruisce alla cieca. Da rilevare nella sessione con il pilota (R2.6):

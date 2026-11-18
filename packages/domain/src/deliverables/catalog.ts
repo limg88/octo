@@ -1,4 +1,5 @@
 import type { DeliverableField, DeliverableKind } from './deliverable.ts'
+import { isMemoryPage } from './memory.ts'
 import { ESTIMATE_PLACEHOLDER } from './pert.ts'
 
 /**
@@ -62,6 +63,10 @@ export function parseCatalogKind(
   if (checklist.length === 0 || checklist.includes('')) return broken('checklist')
   if (kind.calculation !== undefined && kind.calculation !== 'pert') return broken('calculation')
   if (kind.deck !== undefined && kind.deck !== true) return broken('deck')
+  const page = kind.memoryPage
+  if (page !== undefined && (typeof page !== 'string' || !isMemoryPage(page))) {
+    return broken('memoryPage')
+  }
   if (instructions.trim().length < MIN_INSTRUCTIONS) return broken(CATALOG_INSTRUCTIONS)
   // An estimate tells the writer where the code puts its figures: without, they would be lost.
   if (kind.calculation === 'pert' && !instructions.includes(ESTIMATE_PLACEHOLDER)) {
@@ -79,6 +84,7 @@ export function parseCatalogKind(
       checklist,
       ...(kind.calculation === 'pert' ? { calculation: 'pert' as const } : {}),
       ...(kind.deck === true ? { deck: true as const } : {}),
+      ...(typeof page === 'string' ? { memoryPage: page } : {}),
     },
   }
 }

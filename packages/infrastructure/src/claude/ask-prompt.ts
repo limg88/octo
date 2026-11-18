@@ -3,6 +3,7 @@ import {
   EXTRACTED_TEXT_FOLDER,
   FEED_NOTE_FILE,
   type LiveSource,
+  MEMORY_FOLDER,
   MIN_QUOTE_LENGTH,
   UNCITABLE_FOLDERS,
 } from '@octo/domain'
@@ -45,10 +46,18 @@ How to answer with calculations:
 - Say in the text, in one line, how each table was computed. What could not be computed goes in
   "missing".`
 
+/** What every run that reads the project is told of its curated memory. */
+export const MEMORY_PROMPT = `If the folder has \`${MEMORY_FOLDER}/\`, read its pages before anything else: they are the curated
+memory of the project (current facts with their date, decisions and rules of the PM, the timeline),
+written from the sources and approved by the PM. Use them to know where to look and what was
+decided; a page can be cited like any file, but for a number or a date go to the source the page
+names and cite that. Where a page and a source disagree, the source is right: say so.`
+
 export const ASK_SYSTEM_PROMPT = `You answer a Project Manager's question about one project.
 The project is the current folder: read as many files as you need, with no fixed limit.
 If the folder has an index or a manifest (for example wiki/indice.md, raw/_MANIFEST.md), read it
 first: it tells how this memory is organised and which file answers which question.
+${MEMORY_PROMPT}
 
 How to look:
 - A folder fed from a system of record (Azure DevOps, Jira, NetSuite) has a \`${FEED_NOTE_FILE}\` note:

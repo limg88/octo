@@ -194,6 +194,11 @@ describe('what the writer and the red team are told', () => {
     expect(withLive.indexOf('<live_sources>')).toBeLessThan(withLive.indexOf('<project_rules>'))
     expect(askSystemPrompt('Regola.', live)).toContain('<live_sources>')
     expect(askSystemPrompt(null, [])).not.toContain('<live_sources>')
+    // Whoever answers or writes reads the curated memory first, and trusts the sources over it.
+    for (const prompt of [askSystemPrompt(null, []), withLive]) {
+      expect(prompt).toContain('`_octo/progetto/memoria/`')
+      expect(prompt).toContain('the source is right')
+    }
     expect(liveSourcesPrompt(undefined)).toBe('')
     // A question alone goes as it is; one that continues a conversation goes with what came
     // before, marked as context that is not a source and cannot close its own block.
@@ -384,6 +389,9 @@ describe('the catalog the app ships', () => {
       'scenari-di-test',
       'note-di-rilascio',
       'technical-proposal',
+      'memoria-fatti-correnti',
+      'memoria-decisioni-e-regole',
+      'memoria-cronologia',
     ])
     expect(await catalog.kinds()).toBe(kinds)
   })
@@ -408,8 +416,8 @@ describe('the catalog the app ships', () => {
       const failing = createFsShippedCatalog(copy)
       await expect(failing.kinds()).rejects.toMatchObject({ code: 'catalog_invalid' })
       await writeFile(join(copy, 'verbale', 'tipo.json'), good)
-      expect(await failing.kinds()).toHaveLength(10)
-      expect(await catalog.kinds()).toHaveLength(10)
+      expect(await failing.kinds()).toHaveLength(13)
+      expect(await catalog.kinds()).toHaveLength(13)
       await rm(join(copy, 'stima', 'istruzioni.md'))
       await expect(createFsShippedCatalog(copy).kinds()).rejects.toMatchObject({
         code: 'catalog_invalid',

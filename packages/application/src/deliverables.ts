@@ -27,6 +27,8 @@ import {
   MEETINGS_FOLDER,
   type ModelSettings,
   mapDeckStrings,
+  memoryPageMarkdown,
+  memoryPagePath,
   OWN_KINDS_FOLDER,
   type OwnKindInput,
   ownKind,
@@ -397,6 +399,14 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
           : await deps.renderer.deck(approved.title, text, model),
       )
       files.push(deck)
+    }
+    if (kind.memoryPage !== undefined) {
+      // Only now, approved, the page is memory: answers and drafts read it first from here on.
+      const page = memoryPagePath(kind.memoryPage)
+      const citations = current.draft.citations
+      const kept = memoryPageMarkdown(kind.title, text, citations, approved.approvedAt ?? '')
+      await deps.memory.write(project.folder, page, kept)
+      files.push(page)
     }
     const done = { ...approved, files }
     await save(project, done)

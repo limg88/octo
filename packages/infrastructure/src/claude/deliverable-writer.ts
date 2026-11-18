@@ -10,7 +10,7 @@ import {
   WBS_STATES,
 } from '@octo/domain'
 import { z } from 'zod'
-import { draftAnswerSchema, liveSourcesPrompt } from './ask-prompt.ts'
+import { draftAnswerSchema, liveSourcesPrompt, MEMORY_PROMPT } from './ask-prompt.ts'
 import { type ClaudeCliConfig, projectRules, runStructured } from './structured-run.ts'
 
 const redTeamSchema = z.object({
@@ -134,7 +134,9 @@ export function writerSystemPrompt(request: DraftRequest, rules: string | null):
     `You write the draft of a deliverable for a Project Manager: "${kind.title}".
 Its reader is ${AUDIENCE[kind.audience]}.
 The project is the current folder: read as many files as you need. If it has an index or a manifest
-(for example wiki/indice.md, raw/_MANIFEST.md), read it first. Word, Excel, PowerPoint and PDF files
+(for example wiki/indice.md, raw/_MANIFEST.md), read it first.
+${MEMORY_PROMPT}
+Word, Excel, PowerPoint and PDF files
 have their text in \`_octo/testo/<path of the file>.md\`.
 ${UNCITABLE_FOLDERS.map((folder) => `\`${folder}/\``).join(', ')} hold earlier answers, settings and
 internal costs: they are not sources. Never read, search or cite them.

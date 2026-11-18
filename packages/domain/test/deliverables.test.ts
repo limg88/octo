@@ -8,8 +8,11 @@ import {
   ESTIMATE_PLACEHOLDER,
   estimate,
   estimateMarkdown,
+  isMemoryPage,
   isOwnKind,
   MAX_REVIEW_PAUSE_MS,
+  memoryPageMarkdown,
+  memoryPagePath,
   ownKind,
   ownKindInput,
   ownKindPath,
@@ -68,6 +71,15 @@ describe('the catalog', () => {
       'scenari-di-test',
       'note-di-rilascio',
       'technical-proposal',
+      // The three pages of the curated memory of the project.
+      'memoria-fatti-correnti',
+      'memoria-decisioni-e-regole',
+      'memoria-cronologia',
+    ])
+    expect(DELIVERABLE_CATALOG.flatMap((kind) => kind.memoryPage ?? [])).toEqual([
+      'fatti-correnti',
+      'decisioni-e-regole',
+      'cronologia',
     ])
     // Every kind asks for what names the deliverable in the lists.
     for (const kind of DELIVERABLE_CATALOG) {
@@ -349,6 +361,8 @@ describe('a kind of the catalog read from its files', () => {
     expect(broken({ checklist: 'x' })).toBe('checklist')
     expect(broken({ calculation: 'somma' })).toBe('calculation')
     expect(broken({ deck: 'si' })).toBe('deck')
+    expect(broken({ memoryPage: '../fuori' })).toBe('memoryPage')
+    expect(broken({ memoryPage: 3 })).toBe('memoryPage')
     expect(broken({}, 'Scrivi bene.')).toBe('istruzioni.md')
     const notAKind = parseCatalogKind('email', ['x'], instructions)
     expect(notAKind.ok ? null : notAKind.why).toBe('tipo.json')
@@ -371,5 +385,45 @@ describe('a kind of the catalog read from its files', () => {
     for (const wrong of [[], 'email', ['email', 'email'], ['Email'], ['email', 3], ['../fuori']]) {
       expect(parseCatalogIndex(wrong)).toBeNull()
     }
+  })
+})
+
+describe('a page of the memory of the project', () => {
+  const cited = (path: string, status: 'verified' | 'quote_not_found') => ({
+    n: 1,
+    path,
+    quote: 'una frase lunga abbastanza',
+    status,
+    modifiedAt: null,
+  })
+
+  it('is kept with its title, the day it was approved, its text and the files it comes from', () => {
+    const page = memoryPageMarkdown(
+      'Memoria: fatti correnti',
+      '\n## Dove siamo\n\nLa consegna è il 12 dicembre (al 2026-11-17)\n',
+      [
+        cited('wiki/stato.md', 'verified'),
+        cited('wiki/stato.md', 'verified'),
+        cited('_octo/posta/2026-11/mail.md', 'quote_not_found'),
+      ],
+      '2026-11-18T09:30:00.000Z',
+    )
+    expect(page.split('\n')[0]).toBe('# Memoria: fatti correnti')
+    expect(page).toContain('approvata dal PM il 2026-11-18')
+    expect(page).toContain(
+      '## Dove siamo\n\nLa consegna è il 12 dicembre (al 2026-11-17)\n\n## Fonti',
+    )
+    // Each file once, in order; one the code did not find is said to be so.
+    expect(
+      page.endsWith('- `_octo/posta/2026-11/mail.md` (fonte non verificata)\n- `wiki/stato.md`\n'),
+    ).toBe(true)
+    expect(memoryPageMarkdown('T', 'x', [], '2026-11-18')).toContain('Nessuna fonte citata')
+  })
+
+  it('has a name that is the name of its file, inside the folder of the memory', () => {
+    expect(memoryPagePath('fatti-correnti')).toBe('_octo/progetto/memoria/fatti-correnti.md')
+    expect(isMemoryPage('fatti-correnti')).toBe(true)
+    for (const wrong of ['', 'Fatti', '../x', 'a/b', 'a.md'])
+      expect(isMemoryPage(wrong)).toBe(false)
   })
 })

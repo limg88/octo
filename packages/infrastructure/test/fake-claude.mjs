@@ -1,7 +1,14 @@
 // Stands in for the Claude Code executable in tests. The question, read from standard input,
 // chooses the behaviour; the events have the shape of `claude -p --output-format stream-json`.
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -427,6 +434,28 @@ if (args.join(' ').includes('Write the status report of the period')) {
   process.exit(0)
 }
 
+// A run of the writer of a page of the memory of the project: dated facts, each with its source.
+if (args.join(' ').includes('Write or update one page of the curated memory')) {
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      text: [
+        '## Dove siamo',
+        '- La consegna del modulo ordini è fissata al 12 dicembre 2026 (al 2026-11-17) [1].',
+        '## Numeri correnti',
+        '- Il budget residuo è di 14.500 euro (al 2026-11-17) [2].',
+      ].join('\n\n'),
+      citations: [
+        { n: 1, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' },
+        { n: 2, path: 'wiki/stato.md', quote: 'Il budget residuo è di 14.500 euro' },
+      ],
+      missing: ['Che cosa è in attesa dal cliente'],
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the writer of release notes: what changes for who uses the system.
 if (args.join(' ').includes('Write the release notes')) {
   emit({
@@ -612,6 +641,20 @@ if (question.includes('#lento')) {
 } else if (question.includes('#forma')) {
   emit({ type: 'result', is_error: false, structured_output: { text: 42 } })
 } else {
+  // A question of context, once the project has a page of memory: answered from the page.
+  const memoryPage = '_octo/progetto/memoria/fatti-correnti.md'
+  if (/a che punto siamo/i.test(question) && existsSync(join(process.cwd(), memoryPage))) {
+    answer.text =
+      'La consegna del modulo ordini è fissata al 12 dicembre 2026, secondo la memoria del progetto [1] e la sua fonte [2].'
+    answer.citations = [
+      {
+        n: 1,
+        path: memoryPage,
+        quote: 'La consegna del modulo ordini è fissata al 12 dicembre 2026',
+      },
+      { n: 2, path: 'wiki/stato.md', quote: 'fissata al 12 dicembre 2026' },
+    ]
+  }
   const passage = meetingPassage(question)
   if (passage) {
     answer.text = `In riunione è stato detto: «${passage.quote}» [1].`

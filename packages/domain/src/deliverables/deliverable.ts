@@ -36,6 +36,8 @@ export type DeliverableKind = {
   calculation?: 'pert'
   /** Shown to an audience: once approved it is also written as slides, on the PM's deck. */
   deck?: true
+  /** A page of the memory of the project: once approved, its text is kept as that page. */
+  memoryPage?: string
 }
 
 /** What the writer gives back: the text and, for a kind with numbers, the lines to compute. */

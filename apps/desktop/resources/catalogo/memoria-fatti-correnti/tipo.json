@@ -1,0 +1,27 @@
+{
+  "title": "Memoria: fatti correnti",
+  "summary": "Lo stato del progetto oggi, fatto per fatto, ciascuno con la data e la fonte.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "periodo",
+      "label": "Aggiornata fino a",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: 17 novembre 2026"
+    },
+    {
+      "key": "note",
+      "label": "Che cosa guardare in particolare",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni riga ha la sua fonte, e le fonti risultano controllate",
+    "Le date sono giorni, non «la settimana scorsa»",
+    "Niente che tu sappia essere superato",
+    "Nessun costo o tariffa di una persona"
+  ],
+  "memoryPage": "fatti-correnti"
+}
