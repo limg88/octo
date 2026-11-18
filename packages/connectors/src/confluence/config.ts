@@ -1,14 +1,19 @@
 import { ConnectorError } from '../errors.ts'
 import type { HttpRule, PathPart } from '../rules.ts'
+import { ATLASSIAN_GATEWAY, cloudIdOf } from '../shared/atlassian.ts'
 
 /**
  * How a source reads Confluence Cloud. The site and the credentials are those of Jira: the email
  * of the account and an API token (the secret), which the PM declares read-only when linking,
- * since Atlassian gives no way to read the scopes of a token with the token itself.
+ * since Atlassian gives no way to read the scopes of a token with the token itself. A token with
+ * scopes is used through the Atlassian API gateway (`api.atlassian.com/ex/confluence/<cloudId>`):
+ * the configuration then names the site's cloud id.
  */
 export interface ConfluenceConfig {
   /** The site name, as in `<site>.atlassian.net`. */
   site: string
+  /** The cloud id of the site, to reach it through the API gateway; null for the site itself. */
+  cloudId: string | null
   /** The email of the account the token belongs to. */
   email: string
   /** The PM declared the token read-only. */
@@ -46,13 +51,22 @@ export function parseConfluenceConfig(raw: unknown): ConfluenceConfig {
   if (typeof email !== 'string' || email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) {
     return notConfigured()
   }
-  return { site, email, readOnlyToken: true }
+  return { site, cloudId: cloudIdOf(cfg.cloudId), email, readOnlyToken: true }
 }
 
 /** The public endpoint of the site: never anything the configuration could widen. */
 export function confluenceEndpoint(cfg: ConfluenceConfig): ConfluenceEndpoint {
-  const site = `${parseConfluenceConfig(cfg).site}.atlassian.net`
-  return { origin: `https://${site}`, host: site, prefix: [WIKI], browse: `https://${site}` }
+  const parsed = parseConfluenceConfig(cfg)
+  const site = `${parsed.site}.atlassian.net`
+  if (parsed.cloudId === null) {
+    return { origin: `https://${site}`, host: site, prefix: [WIKI], browse: `https://${site}` }
+  }
+  return {
+    origin: `https://${ATLASSIAN_GATEWAY}`,
+    host: ATLASSIAN_GATEWAY,
+    prefix: ['ex', 'confluence', parsed.cloudId, WIKI],
+    browse: `https://${site}`,
+  }
 }
 
 const lit = (...names: readonly string[]): PathPart[] => names.map((literal) => ({ literal }))

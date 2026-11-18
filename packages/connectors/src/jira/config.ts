@@ -1,5 +1,6 @@
 import { ConnectorError } from '../errors.ts'
 import type { HttpRule, PathPart } from '../rules.ts'
+import { ATLASSIAN_GATEWAY, cloudIdOf } from '../shared/atlassian.ts'
 
 /**
  * How a source reads Jira Cloud. The credentials are the email of the service account and an
@@ -34,7 +35,6 @@ export interface JiraEndpoint {
 
 // Site names: lowercase letters, digits and hyphens, starting and ending with a letter or digit.
 const SITE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const CUSTOM_FIELD = /^customfield_\d{1,10}$/
 // The user of Basic authorization never holds a colon.
 const EMAIL = /^[^\s@:]+@[^\s@:]+\.[^\s@:]+$/
@@ -43,14 +43,6 @@ function siteOf(value: unknown): string {
   const site = typeof value === 'string' ? value.toLowerCase() : null
   if (site === null || !SITE.test(site)) throw new ConnectorError('source_not_configured')
   return site
-}
-
-function cloudIdOf(value: unknown): string | null {
-  if (value === null || value === undefined) return null
-  if (typeof value !== 'string' || !GUID.test(value.toLowerCase())) {
-    throw new ConnectorError('source_not_configured')
-  }
-  return value.toLowerCase()
 }
 
 function fieldOf(value: unknown): string | null {
@@ -92,8 +84,8 @@ export function publicEndpoint(cfg: JiraConfig): JiraEndpoint {
     return { origin: `https://${site}`, host: site, prefix: [], browse: `https://${site}` }
   }
   return {
-    origin: 'https://api.atlassian.com',
-    host: 'api.atlassian.com',
+    origin: `https://${ATLASSIAN_GATEWAY}`,
+    host: ATLASSIAN_GATEWAY,
     prefix: ['ex', 'jira', cloudId],
     browse: `https://${site}`,
   }

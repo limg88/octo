@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFeeds, type SecretVault } from '@octo/application'
+import { ConnectorError } from '@octo/connectors'
 import {
   type AdoFeedConfig,
   type ConfluenceFeedConfig,
@@ -14,7 +15,7 @@ import {
   parseTrackerHistory,
   type WarehouseFeedConfig,
 } from '@octo/domain'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { type FakeAdo, startFakeAdo, workItem } from '../../connectors/test/support/fake-ado.ts'
 import {
   type FakeConfluence,
@@ -28,6 +29,7 @@ import {
   startFakeJira,
 } from '../../connectors/test/support/fake-jira.ts'
 import {
+  atlassianCloud,
   type ConnectorFeedOptions,
   createConnectorFeedReader,
   createFsFeedIndexes,
@@ -37,6 +39,7 @@ import {
   createJiraHoursReader,
   createTrackerReader,
   createWarehouseTimesheetReader,
+  forgetAtlassianRoutes,
   jiraSite,
 } from '../src/index.ts'
 import { fsReadings } from './support/readings.ts'
@@ -93,6 +96,68 @@ async function setup(options: ConnectorFeedOptions) {
   const text = (path: string) => readFile(join(folder, path), 'utf8')
   return { feeds, project, names, text }
 }
+
+describe('an Atlassian token with scopes', () => {
+  const CLOUD = '11111111-2222-3333-4444-555555555555'
+  const refused = new ConnectorError('source_auth_failed')
+  /** A site that refuses the credential, and a gateway that takes it or not. */
+  const probeOf = (gateway: 'takes' | 'refuses' | 'breaks') => {
+    const asked: Array<string | null> = []
+    const probe = async (cloudId: string | null) => {
+      asked.push(cloudId)
+      if (cloudId === null || gateway === 'refuses') throw refused
+      if (gateway === 'breaks') throw new Error('boom')
+    }
+    return { asked, probe }
+  }
+  afterEach(forgetAtlassianRoutes)
+
+  it('is tried through the gateway when the site refuses it, and the way is remembered', async () => {
+    const { asked, probe } = probeOf('takes')
+    const discover = vi.fn(async () => CLOUD)
+
+    expect(await atlassianCloud('contoso', 'segreto', probe, discover)).toBe(CLOUD)
+    expect(asked).toEqual([null, CLOUD])
+    expect(await atlassianCloud('contoso', 'segreto', probe, discover)).toBe(CLOUD)
+    expect(asked).toHaveLength(2)
+    expect(discover).toHaveBeenCalledTimes(1)
+    // Another credential for the same site is found out again.
+    await atlassianCloud('contoso', 'altro', probe, discover)
+    expect(discover).toHaveBeenCalledTimes(2)
+  })
+
+  it('stays on the site when the site takes the credential, without asking anything else', async () => {
+    const discover = vi.fn(async () => CLOUD)
+    const probe = vi.fn(async () => {})
+    expect(await atlassianCloud('contoso', 'segreto', probe, discover)).toBeNull()
+    expect(await atlassianCloud('contoso', 'segreto', probe, discover)).toBeNull()
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(discover).not.toHaveBeenCalled()
+  })
+
+  it('leaves the refusal to the site when nothing else is known or the gateway refuses too', async () => {
+    const unknown = probeOf('takes')
+    expect(await atlassianCloud('contoso', 's', unknown.probe, async () => null)).toBeNull()
+    expect(unknown.asked).toEqual([null])
+    const both = probeOf('refuses')
+    expect(await atlassianCloud('contoso', 's', both.probe, async () => CLOUD)).toBeNull()
+    // Nothing was remembered: a corrected credential is tried again from the site.
+    expect(await atlassianCloud('contoso', 's', both.probe, async () => CLOUD)).toBeNull()
+    expect(both.asked).toEqual([null, CLOUD, null, CLOUD])
+  })
+
+  it('does not look for another way when the site fails for another reason', async () => {
+    const discover = vi.fn(async () => CLOUD)
+    const down = async () => {
+      throw new ConnectorError('source_unreachable')
+    }
+    expect(await atlassianCloud('contoso', 's', down, discover)).toBeNull()
+    expect(discover).not.toHaveBeenCalled()
+    await expect(atlassianCloud('contoso', 's', probeOf('breaks').probe, discover)).rejects.toThrow(
+      'boom',
+    )
+  })
+})
 
 describe('Azure DevOps as files of the project', () => {
   const PROJECT = 'Aurora'

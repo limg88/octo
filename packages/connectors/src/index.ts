@@ -101,3 +101,4 @@ export {
   statusCode,
 } from './safe-http.ts'
 export { MAX_SECRET_LENGTH, SecretValue } from './secret-value.ts'
+export { ATLASSIAN_GATEWAY, atlassianCloudId } from './shared/atlassian.ts'

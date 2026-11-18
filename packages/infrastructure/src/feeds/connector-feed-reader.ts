@@ -6,6 +6,7 @@ import type {
   TrackerSnapshotReader,
 } from '@octo/application'
 import {
+  atlassianCloudId,
   type ConfluenceCursor,
   ConnectorError,
   type ConnectorReader,
@@ -123,6 +124,66 @@ const trackerOf = {
     config: { site: jiraSite(config.site), email: config.email, readOnlyToken: true },
     scope: config.projects,
   }),
+}
+
+/** The cloud id found for a site and a credential; null: the site itself answers that credential. */
+const atlassianRoutes = new Map<string, string | null>()
+
+/**
+ * How an Atlassian site is reached with a credential. A token with scopes is refused by the site
+ * and works only through the API gateway, under the cloud id of the site: when the site refuses
+ * the credential, the cloud id is asked to the site and the same call is tried there. `probe`
+ * is that call: it fails with a ConnectorError when the credential is refused. What was found
+ * is remembered while the app runs. Null: the site itself, as for every token without scopes.
+ */
+export async function atlassianCloud(
+  site: string,
+  secret: string,
+  probe: (cloudId: string | null) => Promise<unknown>,
+  discover: (site: string) => Promise<string | null> = atlassianCloudId,
+): Promise<string | null> {
+  const key = `${site} ${shortHash(secret)}`
+  const known = atlassianRoutes.get(key)
+  if (known !== undefined) return known
+  try {
+    await probe(null)
+    atlassianRoutes.set(key, null)
+    return null
+  } catch (error) {
+    if (!(error instanceof ConnectorError) || error.code !== 'source_auth_failed') return null
+  }
+  const cloudId = await discover(site)
+  if (cloudId === null) return null
+  try {
+    await probe(cloudId)
+  } catch (error) {
+    // Refused there too: the credential is wrong, and the site is who says so.
+    if (error instanceof ConnectorError) return null
+    throw error
+  }
+  atlassianRoutes.set(key, cloudId)
+  return cloudId
+}
+
+/** Tests only: forgets how each site was reached. */
+export const forgetAtlassianRoutes = (): void => atlassianRoutes.clear()
+
+/**
+ * Jira as the credential reaches it: the settings of the tracker, with the cloud id of the site
+ * when the token is one with scopes. A fake Jira on this computer is always reached directly.
+ */
+async function jiraTracker(
+  trackers: ConnectorReader,
+  config: JiraFeedConfig,
+  secret: string,
+  options: ConnectorFeedOptions,
+): Promise<Tracker> {
+  const plain = trackerOf.jira(config)
+  if (options.devEndpoints?.jira) return plain
+  const cloudId = await atlassianCloud(jiraSite(config.site), secret, (id) =>
+    trackers.entries('jira', { ...plain.config, cloudId: id }, secret),
+  )
+  return cloudId === null ? plain : { ...plain, config: { ...plain.config, cloudId } }
 }
 
 const PROJECT_OPTION_PREFIX = 'project:'
@@ -291,8 +352,27 @@ function confluenceReader(options: ConnectorFeedOptions) {
     signal: AbortSignal,
     work: (ctx: Parameters<typeof connector.sync>[0]) => Promise<T>,
   ): Promise<T> {
+    const cloudId = local
+      ? null
+      : await atlassianCloud(jiraSite(config.site), secret, async (id) => {
+          const check = await direct(config, secret, id, signal, (ctx) => connector.test(ctx))
+          if (!check.ok) throw new ConnectorError(check.code)
+        })
+    return direct(config, secret, cloudId, signal, work, perimeter)
+  }
+
+  /** The same, on the route given: the site itself, or the gateway under a cloud id. */
+  async function direct<T>(
+    config: ConfluenceFeedConfig,
+    secret: string,
+    cloudId: string | null,
+    signal: AbortSignal,
+    work: (ctx: Parameters<typeof connector.sync>[0]) => Promise<T>,
+    perimeter: readonly string[] = [],
+  ): Promise<T> {
     const parsed = connector.parseConfig({
       site: jiraSite(config.site),
+      cloudId,
       email: config.email,
       readOnlyToken: true,
     })
@@ -382,10 +462,10 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
   )
   const confluence = confluenceReader(options)
 
-  const tracker = (feed: FeedName, config: FeedConfig): Tracker =>
+  const tracker = async (feed: FeedName, config: FeedConfig, secret: string): Promise<Tracker> =>
     feed === 'ado'
       ? trackerOf.ado(config as AdoFeedConfig)
-      : trackerOf.jira(config as JiraFeedConfig)
+      : jiraTracker(trackers, config as JiraFeedConfig, secret, options)
 
   async function* readTracker(
     feed: FeedName,
@@ -394,7 +474,7 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
     cursor: unknown,
     signal: AbortSignal,
   ): AsyncGenerator<FeedStep> {
-    const { kind, config: raw, scope } = tracker(feed, config)
+    const { kind, config: raw, scope } = await tracker(feed, config, secret)
     const connected = await trackers.connect(kind, raw, secret, scope)
     const source = { kind, ...connected, secret }
     let from = cursor ?? cursorFrom(kind, startOfDay(config.since))
@@ -430,7 +510,7 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
     config: FeedConfig,
     secret: string,
   ): Promise<FeedChoices> {
-    const { kind, config: raw } = tracker(feed, config)
+    const { kind, config: raw } = await tracker(feed, config, secret)
     const listed = await trackers.entries(kind, raw, secret)
     if (kind === 'jira') return { projects: listed.map(jiraProjectChoice), areas: [] }
     const projects = listed.map((entry) => ({ value: entry.label, label: entry.label }))
@@ -483,7 +563,7 @@ export function createConnectorFeedReader(options: ConnectorFeedOptions = {}): F
         if (feed === 'confluence') {
           return await confluence.check(config as ConfluenceFeedConfig, secret)
         }
-        const { kind, config: raw, scope } = tracker(feed, config)
+        const { kind, config: raw, scope } = await tracker(feed, config, secret)
         await trackers.connect(kind, raw, secret, scope)
       } catch (error) {
         throw failure(error)
@@ -515,7 +595,7 @@ export function createJiraHoursReader(options: ConnectorFeedOptions = {}): Track
   return {
     async read(config, secret, period, signal) {
       try {
-        const { config: raw, scope } = trackerOf.jira(config)
+        const { config: raw, scope } = await jiraTracker(trackers, config, secret, options)
         const source = await trackers.connect('jira', raw, secret, scope)
         const worklogs = await trackers.worklogs({ ...source, secret }, period, signal)
         return worklogs.map((worklog) => ({
@@ -547,7 +627,9 @@ export function createTrackerReader(options: ConnectorFeedOptions = {}): Tracker
           kind,
           config: raw,
           scope,
-        } = tracker.kind === 'ado' ? trackerOf.ado(tracker.config) : trackerOf.jira(tracker.config)
+        } = tracker.kind === 'ado'
+          ? trackerOf.ado(tracker.config)
+          : await jiraTracker(trackers, tracker.config, secret, options)
         const source = await trackers.connect(kind, raw, secret, scope)
         return await trackers.tracker({ kind, ...source, secret }, { detailTypes }, signal)
       } catch (error) {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  atlassianCloudId,
   type BlockedCall,
   type ConfluenceConfig,
   type ConfluenceCursor,
@@ -24,7 +25,13 @@ const TOKEN = 'token-di-prova'
 const AURORA = { id: '100', key: 'AUR', name: 'Aurora' }
 const BOREA = { id: '200', key: 'BOR', name: 'Borea' }
 const NOW = new Date('2026-11-15T09:00:00.000Z')
-const config: ConfluenceConfig = { site: 'contoso', email: EMAIL, readOnlyToken: true }
+const config: ConfluenceConfig = {
+  site: 'contoso',
+  cloudId: null,
+  email: EMAIL,
+  readOnlyToken: true,
+}
+const CLOUD_ID = '11111111-2222-3333-4444-555555555555'
 
 const page = (id: string, spaceId: string, changedAt: string, over: Partial<FakePage> = {}) => ({
   id,
@@ -85,6 +92,28 @@ async function setup(extra: Partial<FakeConfluenceOptions> = {}, secret: string 
 }
 
 const text = (bytes: Uint8Array | undefined) => new TextDecoder().decode(bytes)
+
+describe('Confluence for a token with scopes', () => {
+  it('goes through the API gateway under the cloud id of the site, and nowhere else', () => {
+    const { rules, parseConfig } = createConfluenceConnector()
+    const gateway = rules(parseConfig({ ...config, cloudId: CLOUD_ID.toUpperCase() }))
+    expect(new Set(gateway.map((rule) => rule.host))).toEqual(new Set(['api.atlassian.com']))
+    expect(
+      gateway.every(
+        (rule) =>
+          (rule.path.slice(0, 4) as { literal: string }[]).map((part) => part.literal).join('/') ===
+          `ex/confluence/${CLOUD_ID}/wiki`,
+      ),
+    ).toBe(true)
+    expect(() => parseConfig({ ...config, cloudId: 'contoso' })).toThrow()
+    assertRulesConfined(rules, (site) => ({ ...config, site, cloudId: CLOUD_ID }))
+  })
+
+  it('does not ask a name that is not one of a site for its cloud id', async () => {
+    expect(await atlassianCloudId('evil.example/x')).toBeNull()
+    expect(await atlassianCloudId('')).toBeNull()
+  })
+})
 
 describe('the Confluence connector', () => {
   it('reads a configuration as it is saved, and refuses one that is not', () => {
