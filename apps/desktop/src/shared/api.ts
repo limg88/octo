@@ -94,7 +94,7 @@ export const CHANNELS = {
   meetingsSync: 'sources:meetings:sync',
   meetingsChooseRoot: 'sources:meetings:choose-root',
   meetingsImported: 'sources:meetings:imported',
-  meetingsAssign: 'sources:meetings:assign',
+  meetingsPlace: 'sources:meetings:place',
   meetingsDestinations: 'sources:meetings:destinations',
   meetingsMove: 'sources:meetings:move',
   feedChoices: 'sources:feed:choices',
@@ -306,7 +306,11 @@ export type OctoApi = {
   /** The meetings the project holds, the newest first. */
   importedMeetings(projectId: string): Promise<Result<StoredMeeting[]>>
   /** Takes into the project a recorded meeting that had none; gives the page of the day back. */
-  assignMeeting(projectId: string, meetingId: string): Promise<Result<TodayView>>
+  placeMeeting(
+    projectId: string,
+    meetingId: string,
+    place: 'project' | 'other',
+  ): Promise<Result<TodayView>>
   /** The other projects a meeting held here can be moved to. */
   meetingDestinations(projectId: string): Promise<Result<Array<{ id: string; name: string }>>>
   /**

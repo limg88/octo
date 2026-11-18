@@ -15,7 +15,7 @@ execFileSync(
   'bash',
   [
     '-c',
-    `cd "${root}" && source demo/lib/project.sh && source demo/lib/today-project.sh && OCTO_DEMO_MEETING_IN_MINUTES=40 make_today_project "${work}"`,
+    `cd "${root}" && source demo/lib/project.sh && source demo/lib/today-project.sh && OCTO_DEMO_DOUBTFUL_MEETING=1 OCTO_DEMO_MEETING_IN_MINUTES=40 make_today_project "${work}"`,
   ],
   { stdio: 'inherit' },
 )
@@ -74,6 +74,37 @@ try {
   await page.screenshot({ path: `${work}/adesso.png`, fullPage: true })
   await row.click()
   assert.equal(await detail.count(), 0)
+
+  // I2. A meeting nobody can tell as of the project is not on the agenda: it waits aside, with
+  // what Claude said, and enters when the PM says it is of the project.
+  const today = page.getByRole('region', { name: 'Oggi' })
+  const aside = page.getByText('1 riunione da assegnare')
+  await aside.waitFor({ timeout: TIMEOUT_MS })
+  assert.equal(await page.getByText('Comitato di direzione').locator('visible=true').count(), 0)
+  await aside.click()
+  const waiting = page.getByRole('list', { name: 'Riunioni da assegnare' })
+  await waiting.getByText('Comitato di direzione').waitFor()
+  await waiting.getByText(/Claude: non so dirlo/).waitFor({ timeout: TIMEOUT_MS })
+  await page.screenshot({ path: `${work}/da-assegnare.png`, fullPage: true })
+  await waiting.getByRole('button', { name: 'È di questo progetto', exact: true }).click()
+  await aside.waitFor({ state: 'detached', timeout: TIMEOUT_MS })
+  await today.getByText('Comitato di direzione').first().waitFor({ timeout: TIMEOUT_MS })
+  // The critical things of the week read as a list; the long words on Claude are behind a click.
+  await page
+    .getByRole('region', { name: 'Criticità della settimana' })
+    .getByRole('list')
+    .first()
+    .waitFor()
+  assert.equal(
+    await page
+      .getByText(/Che una mail aspetti lo calcola Octo/)
+      .locator('visible=true')
+      .count(),
+    0,
+  )
+  await page.getByText('Dettagli: che cosa valuta Claude e che cosa calcola Octo').click()
+  await page.getByText(/Che una mail aspetti lo calcola Octo/).waitFor()
+  await page.screenshot({ path: `${work}/oggi.png`, fullPage: true })
 
   // A request that takes its time, left behind: the list says where Claude works.
   await section('Chiedi').click()

@@ -30,6 +30,7 @@ import {
   type ProposedJudgement,
   type ProposedRisk,
   type ProposedSentence,
+  SMALL_MODEL,
   settingsOwnedBy,
   type TodayDeps,
   type TodayEvaluation,
@@ -394,6 +395,7 @@ describe('the page of the day', () => {
         view: async () => ({ config: null }) as never,
         unassigned: async () => [],
         imported: async () => [recorded],
+        assign: async () => {},
       },
       reader: {
         prep: async (request) => {
@@ -1528,6 +1530,136 @@ describe('whose turn a mail is, on the page of the day', () => {
     // Not said whom it is for: it is still to be read, the next time Claude is asked.
     await today.evaluate(project)
     expect(requests).toHaveLength(2)
+  })
+
+  it('leaves aside the meetings nobody can tell as of the project, asks Claude once, and keeps the PM’s word', async () => {
+    // A project the title does not name, with a person who is not invited: the rule cannot tell.
+    const zeta = { ...project, name: 'Zeta' }
+    const person = {
+      role: '',
+      side: 'supplier' as const,
+      from: '',
+      to: '',
+      allocation: null,
+      note: '',
+    }
+    const asked: Array<{ model: string | null | undefined; ids: string[] }> = []
+    let place: 'project' | 'other' | 'unknown' = 'unknown'
+    const moved: string[] = []
+    const recording = {
+      id: 'rec-1',
+      title: 'Comitato',
+      started: '2026-11-13T09:00:00.000Z',
+      timezone: 'Europe/Rome',
+      durationSeconds: 1800,
+      participants: ['Ospite'],
+      calendarEventUID: null,
+      onlineMeetingURL: null,
+      exportRevision: null,
+      exportedAt: null,
+      elsewhere: 'Boreale',
+    }
+    let unassigned = [recording]
+    const { today, store } = setup({
+      sources: {
+        mail: async () =>
+          ({ config: { ...mailConfig, keywords: ['Zeta'] }, state: NEVER_READ }) as never,
+      },
+      team: { get: async () => ({ people: [{ ...person, name: 'Ugo Neri' }], periods: [] }) },
+      meetings: {
+        view: async () => ({ config: null }) as never,
+        unassigned: async () => unassigned,
+        imported: async () => [],
+        assign: async (_project, id) => {
+          moved.push(`in:${id}`)
+          unassigned = []
+        },
+      },
+      judge: {
+        ...scriptedJudge(),
+        meetings: async (request) => {
+          asked.push({ model: request.model, ids: request.meetings.map((meeting) => meeting.id) })
+          return [
+            ...request.meetings.map((meeting) => ({
+              id: meeting.id,
+              place,
+              reason: ' Il titolo parla di un altro progetto. ',
+            })),
+            { id: 'mai-chiesta', place: 'project' as const, reason: '' },
+          ]
+        },
+      },
+    })
+    const before = await today.view(zeta)
+    // Neither on the agenda nor among the signals: they wait aside, and Claude is to be asked.
+    expect(before.agenda.today).toEqual([])
+    expect(before.items.some((item) => item.facts.kind === 'meeting')).toBe(false)
+    expect(before.toAssign.map((meeting) => [meeting.id, meeting.recorded, meeting.said])).toEqual([
+      ['uid-1', false, null],
+      ['rec-1', true, null],
+    ])
+    expect(before.toAssign[1]?.elsewhere).toBe('Boreale')
+    expect(before.evaluationDue).toBe(true)
+
+    // Claude cannot tell either: they stay aside with what it said, and it is not asked again.
+    const unsure = await today.evaluate(zeta)
+    expect(asked).toEqual([{ model: SMALL_MODEL, ids: ['uid-1', 'rec-1'] }])
+    expect(unsure.toAssign.map((meeting) => meeting.said)).toEqual([
+      { place: 'unknown', reason: 'Il titolo parla di un altro progetto.' },
+      { place: 'unknown', reason: 'Il titolo parla di un altro progetto.' },
+    ])
+    expect(store.settings.meetings?.['mai-chiesta']).toBeUndefined()
+    await today.evaluate(zeta)
+    expect(asked).toHaveLength(1)
+
+    // The PM's word: the invitation enters the agenda, the recording is taken in or let go.
+    const mine = await today.placeMeeting(zeta, 'uid-1', 'project')
+    expect(mine.agenda.today.map((meeting) => meeting.subject)).toEqual(['Collaudo di Aurora'])
+    expect(mine.toAssign.map((meeting) => meeting.id)).toEqual(['rec-1'])
+    const letGo = await today.placeMeeting(zeta, 'rec-1', 'other')
+    expect(letGo.toAssign).toEqual([])
+    expect(moved).toEqual([])
+    await expect(today.placeMeeting(zeta, 'rec-1', 'other')).rejects.toMatchObject({
+      code: 'meeting_not_found',
+    })
+
+    // What Claude gives to the project enters by itself: a recording is taken in.
+    store.settings = { ...store.settings, meetings: {} }
+    unassigned = [recording]
+    place = 'project'
+    const given = await today.evaluate(zeta)
+    expect(given.agenda.today).toHaveLength(1)
+    expect(moved).toEqual(['in:rec-1'])
+    // Said not of the project by the PM: gone from the page and from the list, for good.
+    store.settings = { ...store.settings, meetings: {} }
+    const gone = await today.placeMeeting(zeta, 'uid-1', 'other')
+    expect(gone.agenda.today).toEqual([])
+    expect(gone.toAssign).toEqual([])
+  })
+
+  it('keeps in the queue the points of the PM, and counts apart those of other people', async () => {
+    let register: OpenPointRegister = NO_OPEN_POINTS
+    const points = createOpenPoints({
+      store: {
+        load: async () => register,
+        save: async (_folder, next) => {
+          register = next
+        },
+      },
+      writer: memoryWriter(),
+      clock: { now: () => new Date('2026-11-13T09:00:00.000Z') },
+    })
+    await points.add(project, { title: 'Mio' })
+    await points.add(project, { title: 'Anche mio', owner: 'Verdi Paola' })
+    await points.add(project, { title: 'Di Carla', owner: 'Carla Bianchi', due: '2026-11-13' })
+    const view = await setup({ points }).today.view(project)
+    expect(view.points.queued.map((entry) => entry.point.title).sort()).toEqual([
+      'Anche mio',
+      'Mio',
+    ])
+    expect(view.points.others.map((entry) => entry.point.title)).toEqual(['Di Carla'])
+    // A point of somebody else past its day asks nothing of the PM: the meeting and the mail do.
+    expect(view.count).toBe(2)
   })
 
   it('keeps the PM’s word on whose turn a conversation is, and takes it back', async () => {

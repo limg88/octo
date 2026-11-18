@@ -52,6 +52,7 @@ import {
   backupFileName,
   DomainError,
   firstEntered,
+  identityAddresses,
   meetingKey,
   meetingNotices,
   type Project,
@@ -559,6 +560,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     // Both are wired below: a meeting is moved long after the composition is done.
     team: (project) => team.get(project),
     forget: (project, meeting) => points.forget(project, meeting),
+    pm: () => [identity()?.name ?? '', ...identityAddresses(identity())],
   })
   const devWarehouse =
     process.env[DEV_WAREHOUSE_VARIABLE] === '1'

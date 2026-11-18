@@ -140,16 +140,6 @@ export type TodayFacts =
       inDays: number
     }
   | { kind: 'meeting'; subject: string; start: string; location: string; path: string }
-  | {
-      kind: 'meeting_unassigned'
-      id: string
-      title: string
-      start: string
-      minutes: number
-      days: number
-      /** The other project whose people took part, by its name; null when none stands out. */
-      elsewhere: string | null
-    }
   | { kind: 'risk'; id: string; title: string; since: string }
   | { kind: 'risk_candidates'; count: number }
 
@@ -170,7 +160,6 @@ export const TODAY_KINDS = [
   'draft',
   'calendar',
   'meeting',
-  'meeting_unassigned',
   'risk',
   'risk_candidates',
 ] as const satisfies readonly TodayKind[]
@@ -252,6 +241,16 @@ export function orderToday(items: readonly TodayItem[]): TodayItem[] {
       a.key.localeCompare(b.key),
   )
 }
+
+/** A mail followed that somebody else is to answer, or that asks nobody: not the PM's. */
+const NOT_THE_PMS: readonly MailFollowWhy[] = ['someone_else', 'answered_by_own', 'nobody']
+
+/**
+ * Whether a thing only watched touches the PM. Everything of the project does, but a mail that
+ * another person is to answer, that a colleague already took up, or that asks nothing.
+ */
+export const touchesPm = (item: TodayItem): boolean =>
+  !(item.facts.kind === 'mail_follow' && NOT_THE_PMS.includes(item.facts.why))
 
 /** Signals shown before «the others»: few enough to be read every morning. */
 export const TODAY_LIMIT = 7

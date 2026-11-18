@@ -1,3 +1,4 @@
+import type { MeetingChoice } from '../meetings/place.ts'
 import { workdaysBetween } from '../workdays.ts'
 import {
   COUNTED_KINDS,
@@ -43,6 +44,11 @@ export type TodaySettings = {
   seen: PresentSignal[]
   /** Whether the system tells the PM when a signal comes first. */
   notify: boolean
+  /**
+   * The words on the meetings the rule leaves in doubt, by the id of the invitation or of the
+   * recording: whether each is of the project, as the PM or Claude said.
+   */
+  meetings?: Record<string, MeetingChoice> | undefined
 }
 
 /** A signal as the page last computed it. */
@@ -289,6 +295,7 @@ export function cleanTodaySettings(settings: TodaySettings): TodaySettings {
     lastSeenAt: settings.lastSeenAt ?? null,
     seen: (settings.seen ?? []).slice(-MAX_PRESENT),
     notify: settings.notify ?? true,
+    ...(settings.meetings ? { meetings: settings.meetings } : {}),
     mutedKinds: [...new Set(settings.mutedKinds)],
     ownAddresses: [
       ...new Set(

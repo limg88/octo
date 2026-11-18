@@ -4,19 +4,23 @@ import {
   certainProject,
   cleanMeetingsSource,
   likelierProject,
+  MAX_MEETING_REASON,
   MEETINGS_FOLDER,
   type MeetingCandidate,
   type MeetingReading,
   meetingFolderName,
   meetingMeta,
   meetingOwner,
+  meetingPeople,
   meetingsReadingNote,
   parseMeetingMeta,
+  placeMeeting,
+  projectByPeople,
   projectKeywords,
   type RecordedMeeting,
   readMeetingManifest,
   sameExport,
-  unassignedMeetingItems,
+  withMeetingChoice,
 } from '../src/index.ts'
 
 const ID = 'AB12CD34-0000-4000-8000-000000000001'
@@ -329,31 +333,75 @@ describe('whose a recorded meeting is', () => {
   })
 })
 
-describe('a recorded meeting without a project on the page of the day', () => {
-  it('waits for the PM, heavier the longer it waits', () => {
-    const [item] = unassignedMeetingItems([kickoff], new Date('2026-11-12T10:00:00.000Z'))
-    expect(item).toEqual({
-      key: `meeting-unassigned:${kickoff.id}`,
-      band: 'waiting',
-      facts: {
-        kind: 'meeting_unassigned',
-        id: kickoff.id,
-        title: 'Kickoff Aurora',
-        start: kickoff.started,
-        minutes: 45,
-        days: 2,
-        elsewhere: null,
-      },
-      weight: 2,
-      target: 'sources',
-      asOf: null,
+describe('whether a meeting is of a project', () => {
+  const pm = ['Paola Verdi', 'pm@example.test']
+  const rule = {
+    people: meetingPeople(['Paola Verdi', 'Rossi Mario', 'Carla Bianchi', ' '], pm),
+    keywords: ['Aurora', 'collaudo ordini'],
+  }
+  const meeting = (title: string, participants: string[]) => ({ title, participants })
+
+  it('is told by one of its people taking part, the PM left out, or by its name in the title', () => {
+    // The PM is in every meeting: alone, they tell nothing.
+    expect(rule.people).toEqual(['Rossi Mario', 'Carla Bianchi'])
+    expect(
+      placeMeeting(meeting('Allineamento', ['Paola Verdi <pm@example.test>']), rule, undefined),
+    ).toEqual({ place: 'unknown', why: null, reason: '' })
+    expect(
+      placeMeeting(meeting('Allineamento', ['mario.rossi@example.test']), rule, undefined),
+    ).toMatchObject({ place: 'project', why: 'person' })
+    expect(placeMeeting(meeting('Aurora: stato', ['Ugo Neri']), rule, undefined)).toMatchObject({
+      place: 'project',
+      why: 'keyword',
     })
-    // The project its people point to goes with it, for the PM to read before assigning it.
-    const [told] = unassignedMeetingItems(
-      [{ ...kickoff, elsewhere: 'Borea' }],
-      new Date('2026-11-12T10:00:00.000Z'),
-    )
-    expect(told?.facts).toMatchObject({ kind: 'meeting_unassigned', elsewhere: 'Borea' })
+  })
+
+  it('is as Claude said where the rule cannot tell, and as the PM says before anything else', () => {
+    const doubtful = meeting('Comitato', ['Ugo Neri'])
+    const claude = { place: 'other', by: 'claude', reason: 'Parla del budget di Boreale.' } as const
+    expect(placeMeeting(doubtful, rule, claude)).toEqual({
+      place: 'other',
+      why: 'claude',
+      reason: 'Parla del budget di Boreale.',
+    })
+    // The rule comes before Claude; the PM before the rule.
+    expect(placeMeeting(meeting('Aurora', []), rule, claude).why).toBe('keyword')
+    const mine = { place: 'other', by: 'pm', reason: '' } as const
+    expect(placeMeeting(meeting('Aurora', ['Rossi Mario']), rule, mine)).toMatchObject({
+      place: 'other',
+      why: 'pm',
+    })
+  })
+
+  it('keeps every meeting while the project names no person to tell it by', () => {
+    const bare = { people: [], keywords: ['Aurora'] }
+    expect(placeMeeting(meeting('Comitato', ['Ugo Neri']), bare, undefined)).toMatchObject({
+      place: 'project',
+      why: 'no_people',
+    })
+  })
+
+  it('keeps the words on the meetings short and not for ever', () => {
+    const long = 'x'.repeat(MAX_MEETING_REASON + 50)
+    const kept = withMeetingChoice({ a: { place: 'unknown', by: 'claude', reason: '' } }, 'b', {
+      place: 'project',
+      by: 'claude',
+      reason: ` ${long}`,
+    })
+    expect(Object.keys(kept)).toEqual(['a', 'b'])
+    expect(kept.b?.reason).toHaveLength(MAX_MEETING_REASON)
+    const again = withMeetingChoice(kept, 'a', { place: 'other', by: 'pm', reason: '' })
+    expect(Object.keys(again)).toEqual(['b', 'a'])
+  })
+
+  it('gives a recording to the only project with one of its people there', () => {
+    const teams = [
+      { projectId: 'p-a', people: ['Rossi Mario'] },
+      { projectId: 'p-b', people: ['Carla Neri', 'Luca Verdi'] },
+    ]
+    expect(projectByPeople(['Mario Rossi', 'Ospite'], teams)).toBe('p-a')
+    expect(projectByPeople(['Mario Rossi', 'Luca Verdi'], teams)).toBeNull()
+    expect(projectByPeople(['Ospite'], teams)).toBeNull()
   })
 })
 

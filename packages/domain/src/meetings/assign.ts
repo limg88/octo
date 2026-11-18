@@ -103,6 +103,19 @@ export function certainProject(
 }
 
 /**
+ * The project a meeting is of because one of its people took part: the only one of which that
+ * can be said. `people` are those a project is told by, the PM left out. Null when no project
+ * or more than one has somebody there.
+ */
+export function projectByPeople(
+  participants: readonly string[],
+  teams: readonly MeetingTeam[],
+): string | null {
+  const present = teams.filter((team) => peopleShared(participants, team) > 0)
+  return present.length === 1 ? (present[0]?.projectId ?? null) : null
+}
+
+/**
  * The other project a meeting looks to be of, by who took part: the only one whose team has more
  * of its participants than the team of this project. Null when this project has as many, or two
  * others have the most. It is a warning for the PM, never a way to give a meeting away.

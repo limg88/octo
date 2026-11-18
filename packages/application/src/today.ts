@@ -26,7 +26,10 @@ import {
   type MailJudgement,
   type MailThreads,
   type MailTurn,
+  MEETING_PLACES,
+  type MeetingChoice,
   type MeetingPrep,
+  type MeetingRule,
   type ModelSettings,
   mailItems,
   mailThreads,
@@ -34,6 +37,7 @@ import {
   marksOf,
   meetingItems,
   meetingKey,
+  meetingPeople,
   meetingPrep,
   meetingsOn,
   monthDueItems,
@@ -48,10 +52,12 @@ import {
   type PrepNote,
   type Project,
   parseMailDocument,
+  placeMeeting,
   pointBrief,
   pointsCount,
   previousMonth,
   previousWorkday,
+  projectKeywords,
   RISK_PROPOSAL_DAYS,
   type Risk,
   reconcileSignals,
@@ -73,11 +79,11 @@ import {
   todayCount,
   trackerAgeItems,
   trackerSourceName,
-  unassignedMeetingItems,
   type WeekView,
   weekItems,
   withDecision,
   withMailTurn,
+  withMeetingChoice,
   withoutDecision,
   withVisit,
 } from '@octo/domain'
@@ -114,7 +120,7 @@ export type TodayDeps = {
   sources: Pick<Sources, 'mail'>
   feeds: Pick<Feeds, 'view'>
   /** With the meetings, those recorded that no project could be told for wait on the page. */
-  meetings?: Pick<Meetings, 'view' | 'unassigned' | 'imported'>
+  meetings?: Pick<Meetings, 'view' | 'unassigned' | 'imported' | 'assign'>
   /** With who reads the meetings, Claude adds to each card of the day what to bring. */
   reader?: Pick<MeetingReader, 'prep'>
   team: Pick<Team, 'get'>
@@ -181,10 +187,27 @@ export type TodayView = {
    * and it has not read, or signals that come first and it has not said why.
    */
   evaluationDue: boolean
+  /**
+   * The meetings of these days and the recordings nobody could tell as of the project: they are
+   * not on the page, and wait here for the PM's word.
+   */
+  toAssign: MeetingAside[]
   /** The addresses Octo takes as the PM's: those of the sign-in and those added by hand. */
   ownAddresses: string[]
   /** The addresses added by hand, as they are kept. */
   addedAddresses: string[]
+}
+
+/** A meeting left out of the page: of the calendar or recorded, with what Claude said of it. */
+export type MeetingAside = {
+  id: string
+  title: string
+  start: string
+  recorded: boolean
+  /** What Claude said when it was asked, with the sentence it stands on; null when not asked. */
+  said: Pick<MeetingChoice, 'place' | 'reason'> | null
+  /** The other project its people point to, when one stands out. */
+  elsewhere: string | null
 }
 
 /** The meetings the PM prepares: those of today, and those of the next working day. */
@@ -242,6 +265,8 @@ export type Today = {
   visited(project: Project): Promise<void>
   /** Whether the system tells the PM when a signal comes first. */
   setNotify(project: Project, notify: boolean): Promise<TodayView>
+  /** The PM's word on a meeting left aside: it is of the project, or it is not. */
+  placeMeeting(project: Project, id: string, place: 'project' | 'other'): Promise<TodayView>
   /** Asks Claude to weigh the mail that waits; once a week also for the risks. */
   evaluate(project: Project, input?: EvaluateInput): Promise<TodayView>
   /** Asks Claude what the recorded meetings not yet read did to the open points. */
@@ -262,6 +287,14 @@ export const MEETINGS_SOURCE = 'Riunioni (Verbale)'
 type LastFiles = (StoredMeeting & { files: string[] }) | null
 const NOTHING = (): void => {}
 
+/** The model that tells whose a meeting is: a small one, for a question of one line. */
+export const SMALL_MODEL = 'claude-haiku-5-5'
+/** Meetings asked about in one run at most. */
+const MAX_MEETINGS_PER_RUN = 20
+
+/** What a word on a meeting of the calendar is kept by: its series, so it is asked once. */
+const asideId = (meeting: DayMeeting): string => meeting.uid || meetingKey(meeting)
+
 /** How far back an invitation is looked for: a series called longer ago is called again. */
 export const INVITE_MONTHS = 12
 const DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -275,7 +308,6 @@ const HOURS_KINDS: readonly TodayKind[] = ['hours']
 const FORECAST_KINDS: readonly TodayKind[] = ['forecast', 'month_due']
 const DRAFT_KINDS: readonly TodayKind[] = ['draft']
 const RISK_KINDS: readonly TodayKind[] = ['risk', 'risk_candidates']
-const UNASSIGNED_KINDS: readonly TodayKind[] = ['meeting_unassigned']
 /** The kinds told only while the sprint ends, and only while the month is being closed. */
 const SPRINT_END_KINDS: readonly TodayKind[] = ['requirements']
 const MONTH_CLOSING_KINDS: readonly TodayKind[] = ['month_due']
@@ -405,10 +437,73 @@ export function createToday(deps: TodayDeps): Today {
       ...mails,
     ]
     const nextDay = nextWorkday(today)
-    const agenda: TodayAgenda = {
-      today: meetingsOn(invites, today),
-      next: { day: nextDay, meetings: meetingsOn(invites, nextDay) },
+    // A meeting is of the project when one of its people takes part or its title names it; the
+    // rest is as the PM or Claude said, and what nobody can tell waits aside, off the page.
+    const rule: MeetingRule = {
+      people: meetingPeople(
+        team.people.map((person) => person.name),
+        [deps.identity()?.name ?? '', ...own],
+      ),
+      keywords: projectKeywords(
+        project.name,
+        (await deps.sources.mail(project)).config?.keywords ?? [],
+      ),
     }
+    const said = saved.meetings ?? {}
+    const placed = (meeting: DayMeeting) =>
+      placeMeeting(
+        { title: meeting.subject, participants: meeting.attendees },
+        rule,
+        said[asideId(meeting)],
+      )
+    const ofProject = (meetings: DayMeeting[]): DayMeeting[] =>
+      meetings.filter((meeting) => placed(meeting).place === 'project')
+    const invited = { today: meetingsOn(invites, today), next: meetingsOn(invites, nextDay) }
+    const agenda: TodayAgenda = {
+      today: ofProject(invited.today),
+      next: { day: nextDay, meetings: ofProject(invited.next) },
+    }
+    const recordedAside = await attempt(
+      async () => (await deps.meetings?.unassigned(project)) ?? [],
+      NOTHING,
+    )
+    const toAssign: MeetingAside[] = [
+      ...[...invited.today, ...invited.next].flatMap((meeting): MeetingAside[] => {
+        const { place, why, reason } = placed(meeting)
+        // What the PM said is not of the project is not asked again.
+        if (place === 'project' || why === 'pm') return []
+        return [
+          {
+            id: asideId(meeting),
+            title: meeting.subject,
+            start: meeting.start,
+            recorded: false,
+            said: why === 'claude' ? { place, reason } : null,
+            elsewhere: null,
+          },
+        ]
+      }),
+      ...recordedAside.flatMap((meeting): MeetingAside[] => {
+        const choice = said[meeting.id]
+        if (choice?.by === 'pm') return []
+        return [
+          {
+            id: meeting.id,
+            title: meeting.title,
+            start: meeting.started,
+            recorded: true,
+            said: choice ? { place: choice.place, reason: choice.reason } : null,
+            elsewhere: meeting.elsewhere,
+          },
+        ]
+      }),
+    ]
+    const asideParticipants = new Map<string, readonly string[]>([
+      ...[...invited.today, ...invited.next].map(
+        (meeting) => [asideId(meeting), meeting.attendees] as const,
+      ),
+      ...recordedAside.map((meeting) => [meeting.id, meeting.participants] as const),
+    ])
     const sprint = await deps.sprint(project).catch((error: unknown) => {
       if (!isDomainError(error)) throw error
       return ''
@@ -453,10 +548,6 @@ export function createToday(deps: TodayDeps): Today {
         openRisks.push(...risks.risks)
         return riskItems(risks)
       }, unread(RISK_KINDS)),
-      attempt(
-        async () => unassignedMeetingItems((await deps.meetings?.unassigned(project)) ?? [], now),
-        unread(UNASSIGNED_KINDS),
-      ),
     ])
     const computed = groups.flat()
     /** The signals of the day under some settings: only the mail depends on the PM's word. */
@@ -475,10 +566,13 @@ export function createToday(deps: TodayDeps): Today {
       (await deps.points?.settle(project, signalsFor(saved), unsettled)) ?? NO_OPEN_POINTS
     // The meetings of the days being closed: those of the working day before, and today's.
     const since = previousWorkday(today)
-    const held = [...meetingsOn(invites, since), ...agenda.today]
+    const held = [...ofProject(meetingsOn(invites, since)), ...agenda.today]
     const closing = await deps.closing?.look(project, held)
     const register = closing?.register ?? settled
-    const points = pointBrief(register, today, since, agenda.today, now)
+    const points = pointBrief(register, today, since, agenda.today, now, [
+      deps.identity()?.name ?? '',
+      ...own,
+    ])
     // The last time each meeting of today was recorded: what was left open there is brought.
     const recorded = await attempt(
       async () => (await deps.meetings?.imported(project)) ?? [],
@@ -515,6 +609,9 @@ export function createToday(deps: TodayDeps): Today {
       page: pageFor(settings),
       pageFor,
       agenda,
+      toAssign,
+      asideParticipants,
+      rule,
       points,
       register,
       lasts,
@@ -546,7 +643,7 @@ export function createToday(deps: TodayDeps): Today {
     return computed.agenda.today.map((meeting, index) => {
       const last = computed.lasts[index] ?? null
       return meetingPrep(meeting, {
-        points: computed.points.queued,
+        points: [...computed.points.queued, ...computed.points.others],
         allPoints: computed.register.points,
         last: last && { ...last, file: last.files[0] ?? null },
         items: computed.page.items,
@@ -610,8 +707,10 @@ export function createToday(deps: TodayDeps): Today {
         !computed.judgedToday &&
         (first.length > 0 ||
           computed.closing.unread > 0 ||
+          computed.toAssign.some((meeting) => meeting.said === null) ||
           (deps.reader !== undefined && upcoming(computed).length > 0) ||
           computed.unjudged.some((mail) => visible.has(mail.id))),
+      toAssign: computed.toAssign,
       ownAddresses: computed.own,
       addedAddresses: computed.settings.ownAddresses,
     }
@@ -790,8 +889,67 @@ export function createToday(deps: TodayDeps): Today {
     return notes
   }
 
+  /**
+   * Asks Claude, with a small model, whose the meetings the rule leaves in doubt are. What it
+   * says is kept with the sentence it stands on; a recording it gives to the project is taken in.
+   */
+  async function placeDoubtful(
+    project: Project,
+    computed: Computed,
+    input: EvaluateInput,
+  ): Promise<void> {
+    const doubtful = computed.toAssign.filter((meeting) => meeting.said === null)
+    if (doubtful.length === 0 || !deps.judge.meetings) return
+    const proposed = await deps.judge.meetings({
+      projectFolder: project.folder,
+      project: { name: project.name, ...computed.rule },
+      meetings: doubtful.slice(0, MAX_MEETINGS_PER_RUN).map((meeting) => ({
+        id: meeting.id,
+        title: meeting.title,
+        start: meeting.start,
+        participants: computed.asideParticipants.get(meeting.id) ?? [],
+      })),
+      model: SMALL_MODEL,
+      liveSources: [],
+      ...(input.signal ? { signal: input.signal } : {}),
+    })
+    let choices = computed.settings.meetings ?? {}
+    for (const verdict of proposed) {
+      const meeting = doubtful.find((candidate) => candidate.id === verdict.id)
+      if (!meeting || !MEETING_PLACES.includes(verdict.place)) continue
+      choices = withMeetingChoice(choices, meeting.id, {
+        place: verdict.place,
+        by: 'claude',
+        reason: verdict.reason,
+      })
+      if (meeting.recorded && verdict.place === 'project') {
+        await deps.meetings?.assign(project, meeting.id)
+      }
+    }
+    const settings = await deps.store.load(project.folder)
+    await deps.store.save(project.folder, { ...settings, meetings: choices })
+  }
+
   return {
     view,
+
+    async placeMeeting(project, id, place) {
+      const computed = await compute(project)
+      const meeting = computed.toAssign.find((candidate) => candidate.id === id)
+      if (!meeting) throw new DomainError('meeting_not_found', id)
+      // A recording of the project is taken in; one that is not is only no longer asked about.
+      if (meeting.recorded && place === 'project') {
+        await deps.meetings?.assign(project, id)
+        return view(project)
+      }
+      const meetings = withMeetingChoice(computed.settings.meetings ?? {}, id, {
+        place,
+        by: 'pm',
+        reason: '',
+      })
+      await deps.store.save(project.folder, { ...computed.settings, meetings })
+      return view(project)
+    },
 
     async decide(project, input) {
       const computed = await compute(project)
@@ -872,6 +1030,10 @@ export function createToday(deps: TodayDeps): Today {
       if (evaluating.has(project.id)) throw new DomainError('source_busy', 'today')
       evaluating.add(project.id)
       try {
+        // Whose the meetings in doubt are comes first: the rest is asked on the right agenda.
+        await placeDoubtful(project, await compute(project), input).catch((error: unknown) => {
+          if (!isDomainError(error)) throw error
+        })
         const { threads, unjudged, evaluation, own } = await compute(project)
         const mails = input.all ? threads.awaitingMe : unjudged
         // With nothing to weigh the run is skipped, but the day is marked as judged.

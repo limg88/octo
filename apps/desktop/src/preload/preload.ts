@@ -54,8 +54,8 @@ const api: OctoApi = {
   syncMeetings: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsSync, { projectId }),
   chooseMeetingsRoot: () => ipcRenderer.invoke(CHANNELS.meetingsChooseRoot),
   importedMeetings: (projectId) => ipcRenderer.invoke(CHANNELS.meetingsImported, { projectId }),
-  assignMeeting: (projectId, meetingId) =>
-    ipcRenderer.invoke(CHANNELS.meetingsAssign, { projectId, meetingId }),
+  placeMeeting: (projectId, meetingId, place) =>
+    ipcRenderer.invoke(CHANNELS.meetingsPlace, { projectId, meetingId, place }),
   meetingDestinations: (projectId) =>
     ipcRenderer.invoke(CHANNELS.meetingsDestinations, { projectId }),
   moveMeeting: (projectId, meetingId, targetProjectId) =>

@@ -26,6 +26,7 @@ import type {
   LiveSource,
   MailJudgement,
   MailMessage,
+  MeetingPlace,
   MeetingReading,
   ModelSettings,
   NowRule,
@@ -739,7 +740,27 @@ export interface TodayJudge {
   summary(
     request: JudgeRequest & { day: string; items: readonly NowToExplain[] },
   ): Promise<ProposedSentence[]>
+  /**
+   * Whether each meeting the rule of Octo leaves in doubt is of the project, with the sentence
+   * that says why. Without it nothing is asked and the meetings wait for the PM.
+   */
+  meetings?(
+    request: JudgeRequest & {
+      project: { name: string; people: readonly string[]; keywords: readonly string[] }
+      meetings: readonly MeetingToPlace[]
+    },
+  ): Promise<ProposedPlace[]>
 }
+
+/** A meeting as Claude is told it, to say whose it is. */
+export type MeetingToPlace = {
+  id: string
+  title: string
+  start: string
+  participants: readonly string[]
+}
+/** What Claude said of it: of the project, of something else, or it cannot tell. */
+export type ProposedPlace = { id: string; place: MeetingPlace; reason: string }
 
 /** An open point as Claude is told it, to look for it in the meetings of a day. */
 export type PointToCheck = { id: string; title: string; owner: string; due: string | null }

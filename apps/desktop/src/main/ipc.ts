@@ -160,6 +160,7 @@ const meetingsSaveInput = byProject.extend({
     .nullable(),
 })
 const meetingAssignInput = byProject.extend({ meetingId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const meetingPlaceInput = meetingAssignInput.extend({ place: z.enum(['project', 'other']) })
 const meetingMoveInput = meetingAssignInput.extend({
   targetProjectId: z.string().min(1).max(MAX_RULE_LENGTH).nullable(),
 })
@@ -800,11 +801,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps.meetings.imported(await deps.projects.get(projectId)),
   )
 
-  handle(CHANNELS.meetingsAssign, meetingAssignInput, async ({ projectId, meetingId }) => {
-    const project = await deps.projects.get(projectId)
-    await deps.meetings.assign(project, meetingId)
+  handle(CHANNELS.meetingsPlace, meetingPlaceInput, async ({ projectId, meetingId, place }) => {
+    const view = await deps.today.placeMeeting(await deps.projects.get(projectId), meetingId, place)
     sourcesChanged(projectId)
-    return deps.today.view(project)
+    return view
   })
 
   handle(CHANNELS.meetingsDestinations, byProject, async ({ projectId }) =>

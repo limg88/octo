@@ -62,21 +62,20 @@ function WeekList(
       {props.entries.length === 0 ? (
         <p className="today-empty">{props.empty}</p>
       ) : (
-        <ul className="today-point-list" aria-label={props.label}>
+        <ul className="entries" aria-label={props.label}>
           {props.entries.map((entry) => {
             const words = wordsOf(entry)
             const { what } = entry
             return (
-              <li key={entry.key} className="today-point">
-                <span
-                  className={
-                    entry.overdueDays > 0 ? 'today-week-when today-week-late' : 'today-week-when'
-                  }
-                >
-                  {whenOf(entry)}
-                </span>
-                <div className="today-point-what">
-                  <span className="pill">{words.label}</span> <strong>{words.title}</strong>
+              <li key={entry.key} className="week-entry">
+                <div className="week-entry-what">
+                  <span className="entry-meta">
+                    <span className={entry.overdueDays > 0 ? 'pill pill-warning' : 'pill'}>
+                      {whenOf(entry)}
+                    </span>
+                    <span className="pill pill-source">{words.label}</span>
+                  </span>{' '}
+                  <strong className="entry-title">{words.title}</strong>
                   {words.detail !== '' && (
                     <span className="hint today-point-facts">{words.detail}</span>
                   )}

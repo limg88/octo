@@ -69,6 +69,28 @@ function addresseeOf(line, pmName) {
 /** A mail that only thanks, confirms or informs asks nothing of who reads it. */
 const ASKS_NOTHING = /\b(grazie|per conoscenza|vi informo|confermo che|ricevuto)\b/i
 
+// A run that says whose the meetings in doubt are: a title that names another project is of
+// something else, and the rest cannot be told.
+if (args.join(' ').includes('You say whether some meetings are of one project')) {
+  const { meetings } = JSON.parse(question)
+  emit({
+    type: 'result',
+    is_error: false,
+    structured_output: {
+      meetings: meetings.map((meeting) =>
+        /zefiro|boreale/i.test(meeting.title)
+          ? { id: meeting.id, place: 'other', reason: 'Il titolo nomina un altro progetto.' }
+          : {
+              id: meeting.id,
+              place: 'unknown',
+              reason: 'Il titolo non nomina il progetto e nessun partecipante è del progetto.',
+            },
+      ),
+    },
+  })
+  process.exit(0)
+}
+
 // A run of the judge of the mail: every mail given is weighed, with words copied from its file.
 if (args.join(' ').includes('You read the mail a Project Manager is written to')) {
   const { mails, pm } = JSON.parse(question)

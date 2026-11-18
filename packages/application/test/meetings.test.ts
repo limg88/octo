@@ -535,14 +535,17 @@ describe('the recorded meetings on the page of the day', () => {
       identity: () => null,
     })
 
-  it('shows the meeting without a project, and the source when it was never read', async () => {
+  it('keeps aside the meeting without a project, and shows the source when it was never read', async () => {
     const { meetings } = setup({ readings: [complete(3, 'Varie')] })
 
     const view = await pageWith(meetings).view(aurora)
 
+    // Not a signal of the page: it waits aside, for the PM to place.
     expect(view.items.map((item) => [item.band, item.key])).toEqual([
       ['alert', `source:${MEETINGS_SOURCE}`],
-      ['waiting', 'meeting-unassigned:00000003-0000-4000-8000-000000000000'],
+    ])
+    expect(view.toAssign.map((aside) => [aside.id, aside.recorded])).toEqual([
+      ['00000003-0000-4000-8000-000000000000', true],
     ])
     await meetings.assign(aurora, meeting(3, '').id)
     await meetings.sync(aurora)

@@ -110,7 +110,7 @@ const view = (overrides: Partial<View> = {}): View => ({
   day: '2026-11-16',
   items: [source, hours, mail, bugs, risk],
   agenda: { today: [], next: { day: '2026-11-17', meetings: [] } },
-  points: { since: '2026-11-13', queued: [], closed: [], toConfirm: [] },
+  points: { since: '2026-11-13', queued: [], others: [], closed: [], toConfirm: [] },
   prep: [],
   closing: { unread: 0, key: '', at: null, model: null },
   week: { until: '2026-11-22', ongoing: [], coming: [] },
@@ -131,6 +131,7 @@ const view = (overrides: Partial<View> = {}): View => ({
   ],
   evaluation: { at: '2026-11-16T09:02:00.000Z', model: 'claude-fake' },
   evaluationDue: false,
+  toAssign: [],
   ownAddresses: ['pm@example.test'],
   addedAddresses: [],
   ...overrides,
@@ -160,7 +161,7 @@ function todayApi(first: View = view(), overrides: Partial<OctoApi> = {}) {
     nextReading: vi.fn(async () => ok<string | null>(null)),
     fill: vi.fn(async () => ok([])),
     openEvidence: vi.fn(async () => ok(null)),
-    assignMeeting: vi.fn(async () => ok(first)),
+    placeMeeting: vi.fn(async () => ok(first)),
     addOpenPoint: vi.fn(async () => ok(first)),
     updateOpenPoint: vi.fn(async () => ok(first)),
     confirmOpenPoint: vi.fn(async () => ok(first)),
@@ -271,6 +272,7 @@ describe('the brief of the open points', () => {
         },
       }),
     ],
+    others: [],
     toConfirm: [],
     ...more,
   })
@@ -1467,31 +1469,6 @@ describe('the page of the day', () => {
         path: '',
       }).detail,
     ).toBe('Dove: Sala 2')
-    const waiting = item('k', 'waiting', {
-      kind: 'meeting_unassigned',
-      id: 'm-1',
-      title: 'Allineamento',
-      start: '2026-11-13T14:00:00.000Z',
-      minutes: 30,
-      days: 3,
-      elsewhere: null,
-    })
-    expect(signalText(waiting).title).toBe('«Allineamento» è registrata ma non ha un progetto')
-    expect(signalText(waiting).detail).toContain('venerdì 13 novembre, 30 minuti')
-    expect(signalText(waiting).detail).toContain('se è di questo, assegnala')
-    // The people of the meeting are of another project: the PM is told before assigning it here.
-    const others = item('k', 'waiting', {
-      kind: 'meeting_unassigned',
-      id: 'm-2',
-      title: 'Daily',
-      start: '2026-11-13T14:00:00.000Z',
-      minutes: 15,
-      days: 3,
-      elsewhere: 'Borea',
-    })
-    expect(signalText(others).detail).toContain('i partecipanti sono persone del progetto «Borea»')
-    expect(signalText(others).detail).not.toContain('se è di questo, assegnala')
-    expect(ageText(waiting)).toBe('da 3 giorni')
     expect(
       words({ kind: 'risk', id: 'r', title: 'Consegna stretta', since: '2026-11-16' }).detail,
     ).toContain('16/11/2026')
@@ -1951,38 +1928,92 @@ describe('the day as a list with its detail', () => {
     expect(rows()).toHaveLength(1)
   })
 
-  it('gives a recorded meeting without a project to this one, when the PM says so', async () => {
-    const waiting = item(
-      'meeting-unassigned:m-1',
-      'waiting',
+  it('keeps in view only what touches the PM, and counts apart the mail of others', async () => {
+    const follow = (key: string, why: 'someone_else' | 'everyone') =>
+      item(
+        key,
+        'watch',
+        {
+          kind: 'mail_follow',
+          id: key,
+          path: `Posta/${key}.md`,
+          from: 'Carla <carla@cliente.example>',
+          subject: key === 'di-luca' ? 'Ambiente di prova' : 'Recap del collaudo',
+          days: 1,
+          judgement: null,
+          why,
+          who: why === 'someone_else' ? 'Luca' : null,
+          conversation: key,
+          mails: 1,
+          recipients: 3,
+        },
+        { target: 'mail' },
+      )
+    const { api } = todayApi(
+      view({ items: [follow('di-luca', 'someone_else'), follow('a-tutti', 'everyone')] }),
+    )
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const watched = await screen.findByRole('table', { name: text.watch })
+    expect(watched.textContent).toContain('Recap del collaudo')
+    expect(watched.textContent).not.toContain('Ambiente di prova')
+    // The mail somebody else is to answer is one line, and a click away.
+    expect(screen.getByText(text.watchOthers(1))).toBeTruthy()
+    const others = screen.getByRole('table', { name: text.watchOthersList, hidden: true })
+    expect(others.textContent).toContain('Ambiente di prova')
+    // What Claude judges and what Octo computes is explained behind «Dettagli», not in view.
+    const details = screen.getByText(text.judgement.details).closest('details')
+    expect(details?.open).toBe(false)
+    expect(details?.textContent).toContain(text.judgement.explain)
+  })
+
+  it('keeps aside the meetings nobody can tell as of the project, for the PM to place', async () => {
+    const aside = [
       {
-        kind: 'meeting_unassigned',
+        id: 'uid-9',
+        title: 'Comitato',
+        start: '2026-11-16T14:00:00.000Z',
+        recorded: false,
+        said: { place: 'other' as const, reason: 'Parla del budget di Boreale.' },
+        elsewhere: null,
+      },
+      {
         id: 'm-1',
         title: 'Allineamento',
         start: '2026-11-13T14:00:00.000Z',
-        minutes: 30,
-        days: 3,
-        elsewhere: null,
+        recorded: true,
+        said: null,
+        elsewhere: 'Borea',
       },
-      { target: 'sources' },
-    )
-    const assignMeeting = vi
-      .fn<OctoApi['assignMeeting']>()
+    ]
+    const placeMeeting = vi
+      .fn<OctoApi['placeMeeting']>()
       .mockResolvedValueOnce({ ok: false, code: 'meeting_not_found' })
-      .mockResolvedValue(ok(view({ items: [] })))
-    const { api } = todayApi(view({ items: [waiting] }), { assignMeeting })
+      .mockResolvedValue(ok(view({ items: [], toAssign: aside.slice(0, 1) })))
+    const { api } = todayApi(view({ items: [], toAssign: aside }), { placeMeeting })
     const onOpenSection = vi.fn()
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={onOpenSection} />)
 
-    const assign = await screen.findByRole('button', { name: text.assignMeeting })
-    expect(screen.getByRole('button', { name: text.notThisProject })).toBeTruthy()
-    fireEvent.click(assign)
+    // A line that counts them, with what Claude said and the project their people point to.
+    expect(await screen.findByText(text.aside.title(2))).toBeTruthy()
+    const list = screen.getByRole('list', { name: text.aside.list, hidden: true })
+    expect(list.textContent).toContain(
+      `${text.aside.claude.other} («Parla del budget di Boreale.»)`,
+    )
+    expect(list.textContent).toContain(text.aside.elsewhere('Borea'))
+    const mine = within(list).getAllByRole('button', { name: text.aside.mine, hidden: true })
+    fireEvent.click(mine[1] as HTMLElement)
     expect(await screen.findByText(errorText('meeting_not_found'))).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: text.assignMeeting }))
-
+    fireEvent.click(
+      within(list).getAllByRole('button', {
+        name: text.aside.mine,
+        hidden: true,
+      })[1] as HTMLElement,
+    )
     await waitFor(() => expect(screen.queryByText(/Allineamento/)).toBeNull())
-    expect(assignMeeting).toHaveBeenCalledWith('p-1', 'm-1')
-    // The meeting is placed from the page itself: no other section is opened.
+    expect(placeMeeting).toHaveBeenLastCalledWith('p-1', 'm-1', 'project')
+    fireEvent.click(screen.getByRole('button', { name: text.aside.notMine, hidden: true }))
+    expect(placeMeeting).toHaveBeenLastCalledWith('p-1', 'uid-9', 'other')
+    // The meetings are placed from the page itself: no other section is opened.
     expect(onOpenSection).not.toHaveBeenCalled()
   })
 

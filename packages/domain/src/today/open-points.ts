@@ -1,3 +1,4 @@
+import { attends } from '../attends.ts'
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { shortHash } from '../mail/document.ts'
 import type { DayMeeting } from '../mail/thread.ts'
@@ -469,8 +470,10 @@ export type BriefPoint = {
 export type PointBrief = {
   /** The working day before today: «yesterday», Friday on a Monday. */
   since: string
-  /** The open points, those past their day first, then those due, then the oldest. */
+  /** The PM's open points, those past their day first, then those due, then the oldest. */
   queued: BriefPoint[]
+  /** Those of other people, in the same order: counted on the page, and a click away. */
+  others: BriefPoint[]
   /** Those closed since that day, the last closed first. */
   closed: OpenPoint[]
   /** Those that wait for a word of the PM. */
@@ -480,23 +483,6 @@ export type PointBrief = {
 const DAY_MS = 24 * 60 * 60 * 1000
 const daysFrom = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
-
-const normalizedName = (name: string): string[] =>
-  name
-    .replace(/<[^<>]*>/g, ' ')
-    .toLowerCase()
-    .split(/[^\p{L}]+/u)
-    .filter((word) => word.length > 1)
-
-/** Whether a person is among those a meeting invites: every word of the name is in one of them. */
-export function attends(owner: string, attendees: readonly string[]): boolean {
-  const words = normalizedName(owner)
-  if (words.length === 0) return false
-  return attendees.some((attendee) => {
-    const invited = new Set(normalizedName(attendee))
-    return words.every((word) => invited.has(word))
-  })
-}
 
 /** The points a meeting is the place for: those of its series, and those of who is invited. */
 export function pointsFor(
@@ -522,7 +508,13 @@ export function pointBrief(
   since: string,
   meetings: readonly DayMeeting[],
   now: Date,
+  /** The name and the addresses of the PM: a point of somebody else is not in their queue. */
+  pm: readonly string[] = [],
 ): PointBrief {
+  // Without a name to tell the PM by, every point is taken as theirs.
+  const known = pm.some((word) => word.trim() !== '')
+  const mine = (point: OpenPoint): boolean =>
+    !known || point.owner.trim() === '' || attends(point.owner, pm)
   const ahead = meetings.filter((meeting) => Date.parse(meeting.start) > now.getTime())
   const queued = register.points
     .filter((point) => point.state === 'open')
@@ -545,7 +537,8 @@ export function pointBrief(
     )
   return {
     since,
-    queued,
+    queued: queued.filter((entry) => mine(entry.point)),
+    others: queued.filter((entry) => !mine(entry.point)),
     closed: register.points
       .filter((point) => point.state === 'resolved' && (point.closedOn ?? '') >= since)
       .sort((a, b) => (b.closedOn ?? '').localeCompare(a.closedOn ?? '')),

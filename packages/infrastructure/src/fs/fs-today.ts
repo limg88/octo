@@ -12,6 +12,7 @@ import {
   IMPORTANCES,
   MAIL_ADDRESSEES,
   MAIL_TURNS,
+  MEETING_PLACES,
   NO_OPEN_POINTS,
   NO_RISKS,
   NO_TODAY_SETTINGS,
@@ -64,6 +65,16 @@ const settingsSchema = z.object({
   lastSeenAt: z.string().nullable().default(null),
   seen: z.array(z.object({ key: z.string(), kind: z.string(), weight: z.number() })).default([]),
   notify: z.boolean().default(true),
+  meetings: z
+    .record(
+      z.string(),
+      z.object({
+        place: z.enum(MEETING_PLACES),
+        by: z.enum(['pm', 'claude']),
+        reason: z.string().default(''),
+      }),
+    )
+    .optional(),
 })
 
 const evaluationSchema = z.object({

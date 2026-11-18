@@ -105,8 +105,18 @@ export const messages = {
     },
     undo: 'Annulla',
     askAboutMail: 'Chiedi di questa mail',
-    assignMeeting: 'Assegna a questo progetto',
-    notThisProject: 'Non è di questo progetto',
+    aside: {
+      title: (count: number) =>
+        count === 1 ? '1 riunione da assegnare' : `${count} riunioni da assegnare`,
+      hint: 'Non sono in «Oggi»: Octo non sa dire se sono di questo progetto. Una riunione è del progetto quando partecipa una sua persona o il titolo lo nomina.',
+      list: 'Riunioni da assegnare',
+      recorded: 'registrata con Verbale',
+      invited: 'dal calendario',
+      claude: { other: 'Claude: non è di questo progetto', unknown: 'Claude: non so dirlo' },
+      elsewhere: (project: string) => `I partecipanti sono persone del progetto «${project}».`,
+      mine: 'È di questo progetto',
+      notMine: 'Non è di questo progetto',
+    },
     mailSeed: (who: string, subject: string) =>
       `Che cosa chiede ${who} nella mail «${subject}», entro quando, e che cosa serve per rispondere? Cita le fonti.`,
     showing: (shown: number, all: number) =>
@@ -130,6 +140,9 @@ export const messages = {
       fold: 'Riduci',
       unfold: 'Espandi',
       none: 'Nessun open point in coda.',
+      others: (count: number) =>
+        count === 1 ? '1 punto di un’altra persona' : `${count} punti di altre persone`,
+      othersList: 'Open point di altre persone',
       mine: 'tuo',
       of: (owner: string) => `di ${owner}`,
       openFor: (workdays: number) =>
@@ -266,6 +279,8 @@ export const messages = {
     notifyLabel: 'Avvisami con una notifica del sistema quando una voce entra in «Adesso»',
     notifyHint:
       'Una notifica al più per ogni lettura delle fonti, e nessuna mentre stai guardando «Oggi» di questo progetto.',
+    notifyRefused:
+      'Il sistema non permette a Octo di mostrare notifiche: aprile da Impostazioni di Sistema → Notifiche → Octo.',
     countLabel: (count: number) => (count === 1 ? '1 cosa da fare' : `${count} cose da fare`),
     nowSource: 'Apri la fonte',
     nowWhy: {
@@ -288,6 +303,11 @@ export const messages = {
     nothingElse: 'Nient’altro da fare oggi.',
     toDoCount: (shown: number, all: number) => (shown === all ? `${all}` : `${shown} di ${all}`),
     watch: 'Da tenere d’occhio',
+    watchOthers: (count: number) =>
+      count === 1
+        ? '1 conversazione che non tocca a te'
+        : `${count} conversazioni che non toccano a te`,
+    watchOthersList: 'Conversazioni che non toccano a te',
     watchWhat: 'Che cosa',
     watchDetail: 'Dettaglio',
     watchActions: 'Azioni',
@@ -366,6 +386,7 @@ export const messages = {
           ? `Valutazione di Claude del ${when} (${model})`
           : `Valutazione di Claude del ${when}`,
       never: 'Claude non ha ancora valutato le mail di questo progetto.',
+      details: 'Dettagli: che cosa valuta Claude e che cosa calcola Octo',
       running: 'Claude sta valutando le mail…',
       update: 'Aggiorna la valutazione',
       all: 'Valuta di nuovo tutte',
@@ -396,7 +417,6 @@ export const messages = {
       draft: 'Deliverable in bozza',
       calendar: 'Calendario',
       meeting: 'Riunioni',
-      meeting_unassigned: 'Riunioni da assegnare',
       risk: 'Rischi',
       risk_candidates: 'Rischi proposti',
     },

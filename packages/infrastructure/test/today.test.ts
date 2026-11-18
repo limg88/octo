@@ -248,6 +248,7 @@ describe('what the page of the day keeps', () => {
       lastSeenAt: '2026-11-16T09:00:00.000Z',
       seen: [{ key: 'bugs-stuck', kind: 'bugs_stuck' as const, weight: 2 }],
       notify: false,
+      meetings: { 'uid-1': { place: 'other' as const, by: 'pm' as const, reason: '' } },
     }
     await store.save(folder, settings)
     expect(await store.load(folder)).toEqual(settings)
@@ -433,6 +434,35 @@ describe('Claude as the one who judges', () => {
       },
     ])
     expect(await judge.risks({ projectFolder: folder, known: [risks[0]?.title ?? ''] })).toEqual([])
+  })
+
+  it('says whose the meetings in doubt are, with the sentence it stands on, without reading files', async () => {
+    const request = {
+      projectFolder: folder,
+      project: { name: 'Aurora', people: ['Rossi Mario'], keywords: ['Aurora'] },
+      model: 'claude-haiku-5-5',
+    }
+    const meeting = (id: string, title: string) => ({
+      id,
+      title,
+      start: '2026-11-16T14:00:00.000Z',
+      participants: ['Ospite'],
+    })
+    expect(
+      await judge.meetings?.({
+        ...request,
+        meetings: [meeting('a', 'Zefiro: preventivo'), meeting('b', 'Comitato')],
+      }),
+    ).toEqual([
+      { id: 'a', place: 'other', reason: 'Il titolo nomina un altro progetto.' },
+      {
+        id: 'b',
+        place: 'unknown',
+        reason: 'Il titolo non nomina il progetto e nessun partecipante è del progetto.',
+      },
+    ])
+    // Nothing to ask: Claude is not started.
+    expect(await judge.meetings?.({ ...request, meetings: [] })).toEqual([])
   })
 
   it('says of a mail that only thanks that it asks nothing, with the words that show it', async () => {

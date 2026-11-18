@@ -16,11 +16,13 @@ import {
   meetingFolderName,
   meetingMeta,
   meetingOwner,
+  meetingPeople,
   meetingsReadingNote,
   type Project,
   type ProjectTeam,
   parseMailDocument,
   parseMeetingMeta,
+  projectByPeople,
   projectKeywords,
   type Reader,
   type RecordedMeeting,
@@ -54,6 +56,8 @@ export type MeetingsDeps = {
   clock: Clock
   /** The people of a project: a meeting whose people are of another project is said so. */
   team?: (project: Project) => Promise<ProjectTeam>
+  /** The name and the addresses of who uses Octo: in every meeting, so they tell no project. */
+  pm?: () => readonly string[]
   /** What else of a project came from a meeting, to take away with it: its open points. */
   forget?: (project: Project, meeting: { id: string; folder: string }) => Promise<unknown>
 }
@@ -252,12 +256,19 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
           // Neither the calendar nor the words tell: the people do, when they are of one project.
           teams ??= await teamsOf(project)
           const asked = new Set(willing.map((candidate) => candidate.projectId))
-          owner = certainProject(
-            reading.meeting.participants,
-            teams
-              .filter((team) => asked.has(team.id))
-              .map(({ id, people }) => ({ projectId: id, people })),
-          )
+          const known = teams
+            .filter((team) => asked.has(team.id))
+            .map(({ id, people }) => ({ projectId: id, people }))
+          // All the known people on one team; else one project only with somebody there.
+          owner =
+            certainProject(reading.meeting.participants, known) ??
+            projectByPeople(
+              reading.meeting.participants,
+              known.map((team) => ({
+                ...team,
+                people: meetingPeople(team.people, deps.pm?.() ?? []),
+              })),
+            )
         }
       }
       if (owner === null) found.unassigned.push(reading)

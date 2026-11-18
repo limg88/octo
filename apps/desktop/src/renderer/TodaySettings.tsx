@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { messages } from './messages.ts'
+import { notifyRefused } from './notify.ts'
 import { useSavedNote } from './SavedNote.tsx'
 
 type TodaySettingsApi = Pick<
@@ -106,6 +107,11 @@ export function TodaySettings({ api, project }: Props) {
           {text.notifyLabel}
         </label>
         <span className="hint">{text.notifyHint}</span>
+        {view.notify && notifyRefused() && (
+          <span className="warning" role="status">
+            {text.notifyRefused}
+          </span>
+        )}
       </div>
       <h4>{text.mutedTitle}</h4>
       {view.mutedKinds.length === 0 ? (

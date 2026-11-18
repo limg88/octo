@@ -2468,10 +2468,6 @@ details.advanced[open] > summary {
   color: var(--danger);
 }
 
-.today-week-when.today-week-late {
-  color: var(--danger);
-}
-
 .today-week {
   display: flex;
   flex-direction: column;
@@ -2485,19 +2481,46 @@ details.advanced[open] > summary {
 }
 
 .today-week-sides {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 6px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .today-week-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
-.today-week-when {
-  flex: 0 0 120px;
-  font-variant-numeric: tabular-nums;
+/* A critical thing reads as the other lists do: when and what above, the title, the way out. */
+.week-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+}
+
+.week-entry-what {
+  flex: 1;
+  min-width: 0;
+}
+
+/* What is counted and a click away: the meetings to assign, what is of other people. */
+.today-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.today-aside[open] {
+  color: inherit;
+}
+
+.today-aside-row {
+  justify-content: space-between;
 }
 
 .today-agenda {

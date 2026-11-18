@@ -12,6 +12,7 @@ import {
   type TodayMark,
   type TodayTarget,
   TRACKER_SOURCE_NAMES,
+  touchesPm,
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi, TodayDecisionChoice } from '../shared/api.ts'
@@ -65,7 +66,7 @@ type TodayApi = Pick<
   | 'dismissRisk'
   | 'addRisk'
   | 'updateRisk'
-  | 'assignMeeting'
+  | 'placeMeeting'
   | 'addOpenPoint'
   | 'updateOpenPoint'
   | 'confirmOpenPoint'
@@ -375,20 +376,19 @@ export function TodayView({
     if (!result.ok) setError(result.code)
   }
 
-  /** Takes into the project a recorded meeting that had none: the PM says whose it is. */
-  async function assign(key: string, meetingId: string) {
+  /** The PM's word on a meeting left aside: of this project, or not. */
+  async function place(meetingId: string, where: 'project' | 'other') {
     const projectId = project.id
-    setOpening(key)
+    setOpening(meetingId)
     setError(null)
-    const result = await api.assignMeeting(projectId, meetingId)
+    const result = await api.placeMeeting(projectId, meetingId, where)
     if (live.current !== projectId) return
-    setOpening((current) => (current === key ? null : current))
+    setOpening((current) => (current === meetingId ? null : current))
     if (result.ok) show(result.value)
     else setError(result.code)
   }
 
   function open(item: TodayItem) {
-    if (item.facts.kind === 'meeting_unassigned') return void assign(item.key, item.facts.id)
     const section = SECTION_OF[item.target]
     const path = pathOf(item)
     if (item.facts.kind === 'bugs_stuck' && onOpenBugs) onOpenBugs('stuck')
@@ -536,13 +536,16 @@ export function TodayView({
       entry.what.kind === 'signal' ? [entry.what.item.key] : [],
     ),
   )
-  const watch = view.items.filter(
+  const watched = view.items.filter(
     (item) =>
       item.band === 'watch' &&
       !firstKeys.has(item.key) &&
       !inWeek.has(item.key) &&
       item.facts.kind !== 'risk',
   )
+  // Only what touches the PM is in view: the mail of others is counted, and a click away.
+  const watch = watched.filter(touchesPm)
+  const watchOthers = watched.filter((item) => !touchesPm(item))
   const groups = TODAY_GROUPS.map((group) => ({
     group,
     count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
@@ -570,7 +573,9 @@ export function TodayView({
       }
       onAskLater={() => setLater(later === item.key ? null : item.key)}
       onPoint={
-        view.points.queued.some((entry) => entry.point.signalKey === item.key)
+        [...view.points.queued, ...view.points.others].some(
+          (entry) => entry.point.signalKey === item.key,
+        )
           ? undefined
           : () =>
               void changePoints(() =>
@@ -806,16 +811,25 @@ export function TodayView({
         </>
       )}
 
+      {watched.length > 0 && <h4 className="today-title">{text.watch}</h4>}
       {watch.length > 0 && (
-        <>
-          <h4 className="today-title">{text.watch}</h4>
+        <DataTable
+          label={text.watch}
+          columns={watchColumns}
+          rows={watch}
+          rowKey={(item) => item.key}
+        />
+      )}
+      {watchOthers.length > 0 && (
+        <details className="today-aside">
+          <summary>{text.watchOthers(watchOthers.length)}</summary>
           <DataTable
-            label={text.watch}
+            label={text.watchOthersList}
             columns={watchColumns}
-            rows={watch}
+            rows={watchOthers}
             rowKey={(item) => item.key}
           />
-        </>
+        </details>
       )}
 
       {view.muteOffers.length === 1 &&
@@ -875,6 +889,53 @@ export function TodayView({
             />
           )}
         </>
+      )}
+
+      {view.toAssign.length > 0 && (
+        <details className="today-aside">
+          <summary>{text.aside.title(view.toAssign.length)}</summary>
+          <p className="hint">{text.aside.hint}</p>
+          <ul className="today-muted" aria-label={text.aside.list}>
+            {view.toAssign.map((meeting) => (
+              <li key={meeting.id} className="today-aside-row">
+                <span>
+                  <strong>{meeting.title}</strong>{' '}
+                  <span className="hint">
+                    {dateTimeText(meeting.start)} ·{' '}
+                    {meeting.recorded ? text.aside.recorded : text.aside.invited}
+                    {meeting.said && meeting.said.place !== 'project' && (
+                      <>
+                        {' '}
+                        · {text.aside.claude[meeting.said.place]}
+                        {meeting.said.reason !== '' && ` («${meeting.said.reason}»)`}
+                      </>
+                    )}
+                    {meeting.elsewhere !== null && (
+                      <> · {text.aside.elsewhere(meeting.elsewhere)}</>
+                    )}
+                  </span>
+                </span>
+                <span className="actions">
+                  <BusyButton
+                    className="quiet"
+                    busy={opening === meeting.id}
+                    busyLabel={messages.wait.assigning}
+                    onClick={() => void place(meeting.id, 'project')}
+                  >
+                    {text.aside.mine}
+                  </BusyButton>
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => void place(meeting.id, 'other')}
+                  >
+                    {text.aside.notMine}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       <Judgement
@@ -1095,7 +1156,6 @@ function SignalDetail(props: DetailProps) {
   const facts = item.facts
   const asOf = asOfText(item)
   const returned = item.returned
-  const unassigned = facts.kind === 'meeting_unassigned'
   return (
     <>
       <div className="panel-head">
@@ -1162,10 +1222,10 @@ function SignalDetail(props: DetailProps) {
           <BusyButton
             className="primary"
             busy={props.opening}
-            busyLabel={unassigned ? messages.wait.assigning : messages.wait.opening}
+            busyLabel={messages.wait.opening}
             onClick={props.onOpen}
           >
-            {unassigned ? text.assignMeeting : text.open[item.target]}
+            {text.open[item.target]}
           </BusyButton>
           {facts.kind === 'mail_reply' && props.onAsk && (
             <button
@@ -1209,11 +1269,7 @@ function SignalDetail(props: DetailProps) {
             </button>
           )}
           <button type="button" className="quiet" onClick={() => props.onDecide('muted')}>
-            {facts.kind === 'mail_reply'
-              ? text.noAnswerNeeded
-              : unassigned
-                ? text.notThisProject
-                : text.mute}
+            {facts.kind === 'mail_reply' ? text.noAnswerNeeded : text.mute}
           </button>
         </div>
         {props.choosingLater && (
@@ -1279,9 +1335,12 @@ function Judgement({ view, canJudge, judging, step, hasMail, ...actions }: Judge
       <p>
         <strong>{at ? text.judgement.when(dateTimeText(at), model) : text.judgement.never}</strong>
       </p>
-      <p className="hint">{text.judgement.explain}</p>
-      <p className="hint">{text.judgement.filterToo}</p>
-      <p className="hint">{text.judgement.risksToo}</p>
+      <details>
+        <summary className="hint">{text.judgement.details}</summary>
+        <p className="hint">{text.judgement.explain}</p>
+        <p className="hint">{text.judgement.filterToo}</p>
+        <p className="hint">{text.judgement.risksToo}</p>
+      </details>
       {judging ? (
         <>
           <Waiting>{step ? progressText(step) : text.judgement.running}</Waiting>

@@ -225,16 +225,6 @@ export function signalText(item: TodayItem): SignalText {
         title: `Alle ${HOUR.format(new Date(facts.start))}: ${facts.subject}`,
         detail: facts.location === '' ? 'Dall’invito nella posta.' : `Dove: ${facts.location}`,
       }
-    case 'meeting_unassigned': {
-      const recorded = `Registrata con Verbale ${dayText(facts.start.slice(0, 10))}, ${count(facts.minutes, 'minuto', 'minuti')}.`
-      return {
-        title: `«${facts.title}» è registrata ma non ha un progetto`,
-        detail:
-          facts.elsewhere === null
-            ? `${recorded} Nessun invito e nessuna parola chiave la legano a un solo progetto: se è di questo, assegnala.`
-            : `${recorded} Attenzione: i partecipanti sono persone del progetto «${facts.elsewhere}». Se è di quel progetto, assegnala da lì e non qui.`,
-      }
-    }
     case 'risk':
       return {
         title: facts.title,
@@ -263,7 +253,6 @@ export function ageText(item: TodayItem): string {
     case 'mail_follow':
     case 'mail_waiting':
     case 'draft':
-    case 'meeting_unassigned':
       return since(facts.days)
     case 'tracker_old':
       return `${count(facts.days, 'giorno', 'giorni')} fa`

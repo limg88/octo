@@ -68,6 +68,24 @@ const invitation = [
   'END:VCALENDAR',
 ].join('\n')
 
+/**
+ * Demo of the meetings left aside: with `OCTO_DEMO_DOUBTFUL_MEETING` the mail holds a second
+ * invitation for today whose title does not name the project and where nobody of it takes part.
+ */
+const doubtful = [
+  'BEGIN:VCALENDAR',
+  'METHOD:REQUEST',
+  'BEGIN:VEVENT',
+  'UID:comitato@altro.example',
+  'SUMMARY:Comitato di direzione',
+  `DTSTART;TZID=Europe/Rome:${romeDay}T170000`,
+  `DTEND;TZID=Europe/Rome:${romeDay}T180000`,
+  'ORGANIZER;CN=Marta Rosa:mailto:marta@altro.example',
+  'ATTENDEE;ROLE=REQ-PARTICIPANT;CN=Paola Verdi:mailto:pm@example.test',
+  'END:VEVENT',
+  'END:VCALENDAR',
+].join('\n')
+
 const MAILS: FakeMail[] = [
   {
     id: 1,
@@ -159,6 +177,24 @@ const MAILS: FakeMail[] = [
       html: '<p>In allegato il preventivo.</p>',
     },
   },
+  ...(process.env.OCTO_DEMO_DOUBTFUL_MEETING
+    ? [
+        {
+          id: 8,
+          folder: 'Posta in arrivo',
+          receivedAt: hoursAgo(6),
+          message: {
+            messageId: 'comitato@altro.example',
+            from: 'Marta Rosa <marta@altro.example>',
+            to: PM,
+            // It enters the mail of the project because it names it; the meeting does not.
+            subject: 'Comitato di direzione (anche Aurora)',
+            calendarMethod: 'REQUEST',
+            calendar: doubtful,
+          },
+        },
+      ]
+    : []),
 ]
 addFakeMail(mailRoot, MAILS)
 

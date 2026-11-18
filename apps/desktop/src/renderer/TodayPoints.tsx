@@ -291,6 +291,18 @@ export function TodayPoints(props: Props) {
               {all ? text.fewer : text.more(brief.queued.length - POINTS_LIMIT)}
             </button>
           )}
+          {brief.others.length > 0 && (
+            <details className="today-aside">
+              <summary>{text.others(brief.others.length)}</summary>
+              <ul className="today-point-list" aria-label={text.othersList}>
+                {brief.others.map((entry) => (
+                  <li key={entry.point.id}>
+                    <PointRow entry={entry} onUpdate={onUpdate} onOpenFile={onOpenFile} />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {brief.closed.length > 0 && (
             <>
               <button
