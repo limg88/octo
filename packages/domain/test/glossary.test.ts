@@ -4,14 +4,14 @@ import { applyGlossary, cleanGlossary, MAX_GLOSSARY_WORD } from '../src/index.ts
 describe('the glossary of a project', () => {
   it('writes in its right form what a transcript heard badly, whole words only', () => {
     const entries = [
-      { heard: 'dim', right: 'DEEM' },
+      { heard: 'sal', right: 'SAL' },
       { heard: 'aurora uan', right: 'Aurora ONE' },
       { heard: 'c++ (vecchio)', right: 'C++' },
       { heard: ' ', right: 'niente' },
     ]
-    const said = 'Il Dim parte lunedì; aurora uan no. Dimmi se il dim-2 regge, e il c++ (vecchio).'
+    const said = 'Il Sal parte lunedì; aurora uan no. Salta se il sal-2 regge, e il c++ (vecchio).'
     expect(applyGlossary(said, entries)).toBe(
-      'Il DEEM parte lunedì; Aurora ONE no. Dimmi se il DEEM-2 regge, e il C++.',
+      'Il SAL parte lunedì; Aurora ONE no. Salta se il SAL-2 regge, e il C++.',
     )
     // A right form with a sign of a pattern in it is written as it is.
     expect(applyGlossary('costa uno', [{ heard: 'uno', right: '$1' }])).toBe('costa $1')
@@ -23,23 +23,23 @@ describe('the glossary of a project', () => {
     expect(
       cleanGlossary({
         entries: [
-          { heard: ' dim ', right: 'Deem' },
-          { heard: 'DIM', right: ' DEEM ' },
+          { heard: ' sal ', right: 'Sal.' },
+          { heard: 'SAL', right: ' Stato avanzamento ' },
           { heard: 'uguale', right: 'uguale' },
           { heard: '', right: 'vuota' },
           { heard: long, right: 'lunga' },
         ],
         proposed: [
-          { heard: 'Dim', right: 'DEEM' },
-          { heard: 'esse a elle', right: 'SAL' },
+          { heard: 'Sal', right: 'SAL' },
+          { heard: 'esse a elle', right: 'S.A.L.' },
         ],
       }),
     ).toEqual({
       entries: [
-        { heard: 'DIM', right: 'DEEM' },
+        { heard: 'SAL', right: 'Stato avanzamento' },
         { heard: 'x'.repeat(MAX_GLOSSARY_WORD), right: 'lunga' },
       ],
-      proposed: [{ heard: 'esse a elle', right: 'SAL' }],
+      proposed: [{ heard: 'esse a elle', right: 'S.A.L.' }],
     })
   })
 })

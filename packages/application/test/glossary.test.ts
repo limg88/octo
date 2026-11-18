@@ -20,7 +20,7 @@ function setup(advised = true) {
             propose: async (request) => {
               asked.push({ known: request.known.length, model: request.model })
               return [
-                { heard: 'dim', right: 'DEEM' },
+                { heard: 'sal', right: 'SAL' },
                 { heard: 'aurora uan', right: 'Aurora ONE' },
               ]
             },
@@ -36,13 +36,13 @@ describe('the glossary of a project, kept and proposed', () => {
   it('keeps what the PM approved, and proposes without applying', async () => {
     const { glossary, asked } = setup()
     expect(await glossary.get(project)).toEqual(NO_GLOSSARY)
-    await glossary.save(project, { entries: [{ heard: ' dim ', right: 'DEEM' }], proposed: [] })
-    expect(await glossary.entries(project)).toEqual([{ heard: 'dim', right: 'DEEM' }])
+    await glossary.save(project, { entries: [{ heard: ' sal ', right: 'SAL' }], proposed: [] })
+    expect(await glossary.entries(project)).toEqual([{ heard: 'sal', right: 'SAL' }])
     // Claude is told what is already known; what it gives again is not proposed twice.
     const proposed = await glossary.propose(project)
     expect(asked).toEqual([{ known: 1, model: 'sonnet' }])
     expect(proposed.proposed).toEqual([{ heard: 'aurora uan', right: 'Aurora ONE' }])
-    expect(await glossary.entries(project)).toEqual([{ heard: 'dim', right: 'DEEM' }])
+    expect(await glossary.entries(project)).toEqual([{ heard: 'sal', right: 'SAL' }])
   })
 
   it('proposes nothing where nobody reads the project', async () => {

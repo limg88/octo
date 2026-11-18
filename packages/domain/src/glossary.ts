@@ -42,7 +42,7 @@ const LETTER = '[\\p{L}\\p{N}]'
 
 /**
  * A text with every word heard badly written in its right form. Whole words only, whatever
- * their case: «deem» inside «redeem» is left alone. The longer forms are put right first.
+ * their case: «sal» inside «salta» is left alone. The longer forms are put right first.
  */
 export function applyGlossary(text: string, entries: readonly GlossaryEntry[]): string {
   const ordered = [...entries].sort((a, b) => b.heard.length - a.heard.length)

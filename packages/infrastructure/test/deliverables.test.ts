@@ -257,10 +257,10 @@ describe('what the writer and the red team are told', () => {
     expect(prompt).toContain(ADDRESS_PROMPT)
     // The right forms the PM approved are told to the writer; without a glossary nothing is said.
     const spelled = writerSystemPrompt(
-      { ...request, glossary: [{ heard: 'dim', right: 'DEEM' }] },
+      { ...request, glossary: [{ heard: 'sal', right: 'SAL' }] },
       null,
     )
-    expect(spelled).toContain('- "dim" is "DEEM"')
+    expect(spelled).toContain('- "sal" is "SAL"')
     expect(prompt).not.toContain('<project_glossary>')
     expect(ADDRESS_PROMPT).toContain('_octo/progetto/persone-e-calendario.md')
     expect(redTeamSystemPrompt(request.kind, null)).toContain(`${MAX_FINDING_SENTENCE} characters`)

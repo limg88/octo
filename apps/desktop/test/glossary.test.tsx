@@ -9,7 +9,7 @@ import type { Result } from '../src/shared/api.ts'
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
 const text = messages.glossary
-const kept: Glossary = { entries: [{ heard: 'dim', right: 'DEEM' }], proposed: [] }
+const kept: Glossary = { entries: [{ heard: 'sal', right: 'SAL' }], proposed: [] }
 const field = (column: string, row: number) =>
   screen.getByLabelText<HTMLInputElement>(text.cell(column, row))
 
@@ -25,16 +25,16 @@ describe('the glossary of a project, in its settings', () => {
         .fn()
         .mockResolvedValueOnce({ ok: false, code: 'agent_not_installed' })
         .mockResolvedValue(
-          ok({ ...kept, proposed: [proposal, { heard: 'esse a elle', right: 'SAL' }] }),
+          ok({ ...kept, proposed: [proposal, { heard: 'esse a elle', right: 'S.A.L.' }] }),
         ),
     }
     render(<GlossarySection api={api} project={project} />)
-    await waitFor(() => expect(field(text.heard, 1).value).toBe('dim'))
-    fireEvent.change(field(text.right, 1), { target: { value: 'Deem' } })
+    await waitFor(() => expect(field(text.heard, 1).value).toBe('sal'))
+    fireEvent.change(field(text.right, 1), { target: { value: 'Sal.' } })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveGlossary).toHaveBeenCalledWith('p-1', {
-        entries: [{ heard: 'dim', right: 'Deem' }],
+        entries: [{ heard: 'sal', right: 'Sal.' }],
         proposed: [],
       }),
     )
@@ -49,8 +49,8 @@ describe('the glossary of a project, in its settings', () => {
     fireEvent.click(screen.getByRole('button', { name: text.acceptOf('aurora uan') }))
     await waitFor(() =>
       expect(api.saveGlossary).toHaveBeenLastCalledWith('p-1', {
-        entries: [{ heard: 'dim', right: 'DEEM' }, proposal],
-        proposed: [{ heard: 'esse a elle', right: 'SAL' }],
+        entries: [{ heard: 'sal', right: 'SAL' }, proposal],
+        proposed: [{ heard: 'esse a elle', right: 'S.A.L.' }],
       }),
     )
     fireEvent.click(await screen.findByRole('button', { name: text.dismissOf('esse a elle') }))
