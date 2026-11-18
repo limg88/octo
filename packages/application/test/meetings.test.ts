@@ -336,15 +336,44 @@ describe('a meeting given to the wrong project', () => {
     check: null,
   })
 
-  it('says whose people took part before it is assigned by hand', async () => {
+  it('enters by itself the only project all its known people are of', async () => {
     const { meetings } = setup({ readings: dailies, teams })
-    // Nothing ties the two dailies to a project: they wait in both. Their people are of Aurora.
+    // Nothing ties the two dailies to a project but their people: all those known are of Aurora.
+    expect(await meetings.unassigned(borea)).toEqual([])
+    expect(await meetings.unassigned(aurora)).toEqual([])
+    expect(await meetings.sync(borea)).toMatchObject({ written: 0 })
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 2, error: null })
+    expect(await meetings.imported(aurora)).toHaveLength(2)
+    // It cannot be given by hand to a project it is not waiting in.
+    const id = dailies[0]?.status === 'complete' ? dailies[0].meeting.id : ''
+    await expect(meetings.assign(borea, id)).rejects.toMatchObject({ code: 'meeting_not_found' })
+  })
+
+  it('waits for the PM when its people are of more projects, and says whose most of them are', async () => {
+    // Carla Neri is of Borea: no team has all three, so nothing is certain.
+    const mixed = dailies.map((reading) =>
+      reading.status === 'complete'
+        ? {
+            ...reading,
+            meeting: {
+              ...reading.meeting,
+              participants: [...reading.meeting.participants, 'Carla Neri'],
+            },
+          }
+        : reading,
+    )
+    const { meetings } = setup({ readings: mixed, teams })
     expect((await meetings.unassigned(borea)).map((held) => held.elsewhere)).toEqual([
       'Aurora',
       'Aurora',
     ])
     expect((await meetings.unassigned(aurora)).map((held) => held.elsewhere)).toEqual([null, null])
-    // Without the teams nothing is said.
+    // Everybody on both teams: two projects could claim it, so neither gets it.
+    const both = { [aurora.id]: teams[aurora.id] ?? [], [borea.id]: teams[aurora.id] ?? [] }
+    expect(
+      await setup({ readings: dailies, teams: both }).meetings.unassigned(aurora),
+    ).toHaveLength(2)
+    // Without the teams nothing is said, and nothing is given.
     const bare = setup({ readings: dailies })
     expect((await bare.meetings.unassigned(borea)).map((held) => held.elsewhere)).toEqual([
       null,
@@ -352,8 +381,20 @@ describe('a meeting given to the wrong project', () => {
     ])
   })
 
+  it('stays out of a project that gave it away, whoever took part', async () => {
+    const { meetings } = setup({ readings: dailies, teams })
+    await meetings.sync(aurora)
+    const [first] = await meetings.imported(aurora)
+    await meetings.move(aurora, first?.id ?? '', null)
+    // Its people are still of Aurora, but Aurora gave it away: it waits, and is not taken back.
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 0 })
+    expect(await meetings.imported(aurora)).toHaveLength(1)
+    expect((await meetings.unassigned(aurora)).map((held) => held.id)).toEqual([first?.id])
+  })
+
   it('moves to its project with the open points that came from it, and is not taken back', async () => {
-    const { meetings, points, disk, configs } = setup({ readings: dailies, teams })
+    // Before the teams were written nothing told whose the dailies were: assigned by hand.
+    const { meetings, points, disk, configs } = setup({ readings: dailies })
     const ids = dailies.flatMap((reading) =>
       reading.status === 'complete' ? [reading.meeting.id] : [],
     )

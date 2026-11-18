@@ -72,11 +72,34 @@ export type MeetingTeam = { projectId: string; people: readonly string[] }
 
 const ADDRESS = /<[^>]*>/g
 
+const keysOf = (team: MeetingTeam): Set<string> =>
+  new Set(team.people.map(personKey).filter((key) => key !== ''))
+const presentIn = (participants: readonly string[]): Set<string> =>
+  new Set(participants.map((name) => personKey(name.replace(ADDRESS, ''))))
+
 /** How many of the people of a meeting are on the team of a project. */
 function peopleShared(participants: readonly string[], team: MeetingTeam): number {
-  const known = new Set(team.people.map(personKey).filter((key) => key !== ''))
-  const present = new Set(participants.map((name) => personKey(name.replace(ADDRESS, ''))))
-  return [...present].filter((key) => known.has(key)).length
+  const known = keysOf(team)
+  return [...presentIn(participants)].filter((key) => known.has(key)).length
+}
+
+/**
+ * The project a meeting is certainly of, by who took part: the only one whose team has every
+ * participant known to a team. Somebody on two teams tells nothing alone, and somebody no team
+ * knows (a guest) is not counted. Null when nobody is known, when the known people are spread
+ * over teams none of which has them all, or when two teams have them all: then the PM is asked.
+ */
+export function certainProject(
+  participants: readonly string[],
+  teams: readonly MeetingTeam[],
+): string | null {
+  const keys = teams.map((team) => ({ projectId: team.projectId, known: keysOf(team) }))
+  const known = [...presentIn(participants)].filter((key) =>
+    keys.some((team) => team.known.has(key)),
+  )
+  if (known.length === 0) return null
+  const whole = keys.filter((team) => known.every((key) => team.known.has(key)))
+  return whole.length === 1 ? (whole[0]?.projectId ?? null) : null
 }
 
 /**

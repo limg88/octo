@@ -15,8 +15,8 @@ Durata: 4 minuti. Mostra che una riunione finita nel progetto sbagliato si ripor
    Atteso: si apre Octo su «Aurora».
 
 2. **Passa a «Boreale»** dal nome del progetto in alto, e guarda «Oggi».
-   Atteso: «Il punto» ha 4 punti («Il certificato dell’ambiente di collaudo scade venerdì…», «Sara chiude il report dei test…» e altri due): nessuno è di Boreale. Più sotto il segnale «"Daily Standup Fornitori" è registrata ma non ha un progetto», con la frase «Attenzione: i partecipanti sono persone del progetto «Aurora». Se è di quel progetto, assegnala da lì e non qui.»
-   Dimostra: l'errore di oggi (punti di un altro progetto) e l'avviso che lo previene: prima il pulsante «Assegna a questo progetto» compariva uguale in ogni progetto, senza guardare chi c'era.
+   Atteso: «Il punto» ha 4 punti («Il certificato dell’ambiente di collaudo scade venerdì…», «Sara chiude il report dei test…» e altri due): nessuno è di Boreale. Più sotto il segnale «"Allineamento ambienti" è registrata ma non ha un progetto»: ci hanno partecipato persone dei due progetti, quindi decide il PM. «Daily Standup Fornitori» non compare: tutte le sue persone sono di Aurora ed entra in Aurora da sola (dal 18/11/2026, demo 61).
+   Dimostra: l'errore di oggi (punti di un altro progetto). Quando i partecipanti sono in maggioranza di un altro progetto il segnale lo dice: «Attenzione: i partecipanti sono persone del progetto …».
 
 3. **Apri «Impostazioni» → «Riunioni».** In fondo c'è «Riunioni di questo progetto».
    Atteso: «Daily Standup Cliente» e «Daily Standup Interna», ciascuna con un elenco «Nessun progetto / Aurora» e il pulsante «Togli dal progetto».
@@ -45,7 +45,7 @@ Durata: 4 minuti. Mostra che una riunione finita nel progetto sbagliato si ripor
 - Il progetto che ha dato via una riunione non la riprende più da solo, qualunque cosa dicano inviti e parole chiave.
 
 ## Che cosa non fa
-- Non assegna da solo una riunione al progetto dei partecipanti: avvisa soltanto. Una riunione non viene mai data per somiglianza.
+- Una riunione non viene mai data per somiglianza. Dal 18/11/2026 entra da sola nel progetto solo quando tutti i partecipanti noti sono di quel progetto e di nessun altro (demo 61); negli altri casi avvisa soltanto.
 - Il progetto che riceve la riunione non eredita i punti aperti: li rilegge Claude alla chiusura della giornata.
 
 ## Test

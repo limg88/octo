@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   beforeFirstDay,
+  certainProject,
   cleanMeetingsSource,
   likelierProject,
   MEETINGS_FOLDER,
@@ -377,5 +378,29 @@ describe('the project the people of a meeting point to', () => {
     expect(likelierProject([], 'p-b', teams)).toBeNull()
     expect(likelierProject(['Luca Verdi'], 'p-c', teams)).toBeNull()
     expect(likelierProject(people, 'p-altro', teams)).toBe('p-a')
+  })
+})
+
+describe('the project a meeting is certainly of, by who took part', () => {
+  const teams = [
+    { projectId: 'p-a', people: ['Rossi Mario', 'Anna Bianchi', 'Paola Verdi'] },
+    { projectId: 'p-b', people: ['Carla Neri', 'Paola Verdi'] },
+    { projectId: 'p-c', people: [] },
+  ]
+
+  it('is the only project whose team has every participant a team knows', () => {
+    // The PM is of both projects and tells nothing alone; the guest is of none and is not counted.
+    const daily = ['Mario Rossi <mario@example.test>', 'BIANCHI, Anna', 'Paola Verdi', 'Ospite']
+    expect(certainProject(daily, teams)).toBe('p-a')
+    expect(certainProject(['Carla Neri', 'Paola Verdi'], teams)).toBe('p-b')
+    expect(certainProject(['Carla Neri'], teams)).toBe('p-b')
+  })
+
+  it('is none when the people are of more projects, of two that both have them all, or unknown', () => {
+    expect(certainProject(['Mario Rossi', 'Carla Neri'], teams)).toBeNull()
+    expect(certainProject(['Paola Verdi'], teams)).toBeNull()
+    expect(certainProject(['Ospite Esterno'], teams)).toBeNull()
+    expect(certainProject([], teams)).toBeNull()
+    expect(certainProject(['Mario Rossi'], [])).toBeNull()
   })
 })

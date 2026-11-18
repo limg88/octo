@@ -1,6 +1,7 @@
 // Two synthetic projects that read the same folder of Verbale, with the mistake demo 47 puts
 // right: the two dailies of Aurora were assigned by hand to Boreale, and the open points Claude
-// read in them are in the register of Boreale. A third daily still waits for a project.
+// read in them are in the register of Boreale. A third daily has only people of Aurora: it
+// enters Aurora by itself (demo 61). A fourth has people of both projects: it waits for the PM.
 // Usage: node demo/lib/fake-moved-meetings.ts <work folder>
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -57,10 +58,18 @@ const WRONG: FakeExport[] = [
     'Serve un secondo ambiente di prova per il multi-database.',
   ]),
 ]
-/** Still without a project: its people are of Aurora. */
+/** Tied to no project by calendar or words: all its people are of Aurora. */
 const WAITING = daily('C9C9C9C9-0000-4000-8000-000000000003', 'Daily Standup Fornitori', '09:00', [
   'Nessuna novità dai fornitori.',
 ])
+
+/** People of both projects: no team has them all, so nothing is certain. */
+const SHARED: FakeExport = {
+  ...daily('CACACACA-0000-4000-8000-000000000004', 'Allineamento ambienti', '10:00', [
+    'I due progetti condividono l’ambiente di collaudo fino a gennaio.',
+  ]),
+  participants: [{ name: 'Luca Verdi' }, { name: 'Elena Costa' }],
+}
 
 const write = (file: string, content: string) => {
   mkdirSync(dirname(file), { recursive: true })
@@ -72,6 +81,7 @@ const person = (name: string) => ({ name, role: 'Team', side: 'supplier' })
 mkdirSync(verbale, { recursive: true })
 await publishDestination(join(work, 'VerbaleDati'), verbale)
 await writeExport(verbale, WAITING)
+await writeExport(verbale, SHARED)
 
 const points: OpenPoint[] = []
 const read: string[] = []

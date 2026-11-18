@@ -92,6 +92,8 @@ try {
   assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
   // «Ore» and «Previsionale» are parts of «Commessa», the summary of the money of the project.
   assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Commessa', 'Avanzamento'])
+  // A source is read from its row when closed, from its form when open (demo 56).
+  const READ_NOW = /^(Leggi ora|Leggi con le impostazioni salvate)$/
   const openSheetPart = async (name) => {
     await page.getByRole('tab', { name: 'Commessa', exact: true }).click()
     await page
@@ -170,7 +172,7 @@ try {
   await mail.getByRole('button', { name: 'Salva', exact: true }).click()
   await mail.getByText('Mai letta.').waitFor({ timeout: TIMEOUT_MS })
   await guide.getByText(/^1 su 6 collegati/).waitFor({ timeout: TIMEOUT_MS })
-  await mail.getByRole('button', { name: 'Leggi ora' }).click()
+  await mail.getByRole('button', { name: READ_NOW }).click()
   // The periodic reading may have run just before the click: either way two mails are there.
   await mail.getByText(/(2 nuove, 0|0 nuove, 2) già presenti/).waitFor({ timeout: TIMEOUT_MS })
   const month = new Date(Date.now() - 30 * 3600 * 1000).toISOString().slice(0, 7)
@@ -180,7 +182,7 @@ try {
   assert.match(first, /oggetto: "Aurora: data del collaudo"/)
   assert.match(first, /spostato a giovedì 17 dicembre 2026/)
   fakeMail('extra')
-  await mail.getByRole('button', { name: 'Leggi ora' }).click()
+  await mail.getByRole('button', { name: READ_NOW }).click()
   await mail.getByText('1 nuove, 2 già presenti').waitFor({ timeout: TIMEOUT_MS })
 
   // Demo 03: Office files of the project become text beside them, again only when they change.
@@ -238,7 +240,7 @@ try {
     readFileSync(`${work}/Aurora/_octo/.impostazioni/sources.json`, 'utf8'),
     /demo-pat/,
   )
-  await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
+  await adoSection.getByRole('button', { name: READ_NOW }).click()
   await adoSection
     .getByText(/Ultima lettura .* aggiornati, \d+ invariati/)
     .waitFor({ timeout: TIMEOUT_MS })
@@ -255,7 +257,7 @@ try {
     /fonte: "Azure DevOps"/,
   )
   ado.options.items.push(extraItem())
-  await adoSection.getByRole('button', { name: 'Leggi ora' }).click()
+  await adoSection.getByRole('button', { name: READ_NOW }).click()
   await assertEventually(() => workItems().length === 4)
 
   // Demo 05: one button reads everything that is linked.
@@ -453,7 +455,7 @@ try {
   assert.equal(await wiki.getByLabel(/^Spazi/).inputValue(), DEMO_CONFLUENCE.space)
   await wiki.getByRole('button', { name: 'Prova e salva' }).click()
   await wiki.getByText('Collegamento riuscito e salvato.').waitFor({ timeout: TIMEOUT_MS })
-  await wiki.getByRole('button', { name: 'Leggi ora' }).click()
+  await wiki.getByRole('button', { name: READ_NOW }).click()
   await wiki
     .getByText(/Ultima lettura .* aggiornati, \d+ invariati/)
     .waitFor({ timeout: TIMEOUT_MS })

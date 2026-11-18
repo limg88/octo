@@ -1,5 +1,6 @@
 import {
   beforeFirstDay,
+  certainProject,
   cleanMeetingsSource,
   DomainError,
   isDomainError,
@@ -228,6 +229,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       }
     }
     let candidates: MeetingCandidate[] | null = null
+    let teams: Awaited<ReturnType<typeof teamsOf>> | null = null
     const found: Scan = { mine: [], unassigned: [], skipped: [] }
     for (const reading of readings) {
       if (reading.status === 'skipped') {
@@ -246,6 +248,17 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
           (candidate) => !released.get(candidate.projectId)?.has(reading.meeting.id),
         )
         owner = meetingOwner(reading.meeting, notes, willing)
+        if (owner === null) {
+          // Neither the calendar nor the words tell: the people do, when they are of one project.
+          teams ??= await teamsOf(project)
+          const asked = new Set(willing.map((candidate) => candidate.projectId))
+          owner = certainProject(
+            reading.meeting.participants,
+            teams
+              .filter((team) => asked.has(team.id))
+              .map(({ id, people }) => ({ projectId: id, people })),
+          )
+        }
       }
       if (owner === null) found.unassigned.push(reading)
       if (owner !== project.id) continue
