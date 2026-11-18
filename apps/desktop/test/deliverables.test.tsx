@@ -111,6 +111,9 @@ type DeliverablesApi = Pick<
   | 'importedMeetings'
 >
 
+// The deliverables with a script stand under the catalog and have their own tests.
+vi.mock('../src/renderer/ScriptedDeliverables.tsx', () => ({ ScriptedDeliverables: () => null }))
+
 function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
   let progress: (projectId: string, step: AgentProgress) => void = () => {}
   const api: DeliverablesApi = {

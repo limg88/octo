@@ -25,6 +25,7 @@ import type {
   Projects,
   QuestionLog,
   Risks,
+  ScriptedDeliverables,
   Session,
   Sources,
   Team,
@@ -68,6 +69,7 @@ export type IpcDeps = {
   evidence: EvidenceReader
   askQuestion: AskQuestion
   keepWork: KeepWork
+  scripted: ScriptedDeliverables
   sources: Sources
   meetings: Meetings
   documents: Documents
@@ -133,6 +135,14 @@ const askInput = byProject.extend({
   compute: z.boolean().default(false),
 })
 const keepWorkInput = byProject.extend({ questionId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const scriptedInput = byProject.extend({ slug: z.string().min(1).max(MAX_RULE_LENGTH) })
+const scriptedRunInput = scriptedInput.extend({
+  parameters: z
+    .record(z.string().max(MAX_RULE_LENGTH), z.string().max(MAX_RULE_LENGTH))
+    .refine((asked) => Object.keys(asked).length <= MAX_RULES),
+})
+const scriptedOfRunInput = scriptedInput.extend({ runId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const scriptedWordsInput = scriptedInput.extend({ words: z.string().max(MAX_QUESTION_LENGTH) })
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
 const MAX_RULES = 200
 const ruleList = z.array(z.string().max(MAX_RULE_LENGTH)).max(MAX_RULES)
@@ -758,6 +768,39 @@ export function registerIpc(deps: IpcDeps): void {
   handle(CHANNELS.questionsKeepWork, keepWorkInput, async ({ projectId, questionId }) =>
     deps.keepWork(await deps.projects.get(projectId), questionId),
   )
+
+  /** A run of a script tells what it is doing where the deliverables do. */
+  const scriptedOptions = async (project: Awaited<ReturnType<typeof deps.projects.get>>) => ({
+    model: (await deps.models.get(project)).write,
+    onProgress: writingProgress(project.id),
+  })
+
+  handle(CHANNELS.scriptedList, byProject, async ({ projectId }) =>
+    deps.scripted.list(await deps.projects.get(projectId)),
+  )
+
+  handle(CHANNELS.scriptedInstall, scriptedInput, async ({ projectId, slug }) =>
+    deps.scripted.install(await deps.projects.get(projectId), slug),
+  )
+
+  handle(CHANNELS.scriptedRun, scriptedRunInput, async ({ projectId, slug, parameters }) => {
+    const project = await deps.projects.get(projectId)
+    return deps.scripted.run(project, slug, parameters, await scriptedOptions(project))
+  })
+
+  handle(CHANNELS.scriptedKeep, scriptedOfRunInput, async ({ projectId, slug, runId }) =>
+    deps.scripted.keep(await deps.projects.get(projectId), slug, runId),
+  )
+
+  handle(CHANNELS.scriptedCorrect, scriptedWordsInput, async ({ projectId, slug, words }) => {
+    const project = await deps.projects.get(projectId)
+    return deps.scripted.correct(project, slug, words, await scriptedOptions(project))
+  })
+
+  handle(CHANNELS.scriptedApprove, scriptedOfRunInput, async ({ projectId, slug, runId }) => {
+    await deps.scripted.approve(await deps.projects.get(projectId), slug, runId)
+    return null
+  })
 
   handle(CHANNELS.questionsCancel, byProject, async ({ projectId }) => {
     running.get(projectId)?.abort()

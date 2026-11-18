@@ -30,6 +30,7 @@ import {
   createProjects,
   createReadings,
   createRisks,
+  createScriptedDeliverables,
   createSession,
   createSourceMap,
   createSources,
@@ -65,6 +66,7 @@ import {
   createClaudeCliRunner,
   createClaudeDeliverableWriter,
   createClaudeMeetingReader,
+  createClaudeScriptRunner,
   createClaudeTodayJudge,
   createClaudeTrackerAdvisor,
   createConnectorFeedReader,
@@ -79,6 +81,7 @@ import {
   createFsFolderProbe,
   createFsForecastSettings,
   createFsHoursSettings,
+  createFsKeptSettings,
   createFsMeetingExports,
   createFsMemoryWriter,
   createFsModelSettings,
@@ -88,6 +91,7 @@ import {
   createFsProjectScaffold,
   createFsRetiredSheetPlans,
   createFsRiskRegisterStore,
+  createFsScriptedTemplates,
   createFsSharedReadings,
   createFsSourceSettings,
   createFsTeamStore,
@@ -241,6 +245,10 @@ function shippedInterpreter(): string | null {
   ]
   return candidates.find((path) => path !== undefined && path !== '' && existsSync(path)) ?? null
 }
+
+/** A folder that travels with the app: among its resources once installed, beside the sources before. */
+const shippedFolder = (name: string): string =>
+  app.isPackaged ? join(process.resourcesPath, name) : join(here, '..', '..', 'resources', name)
 
 /** Built beside this file by scripts/build.mjs. */
 const EXTRACT_WORKER_FILE = 'extract-worker.mjs'
@@ -788,6 +796,21 @@ function start(seatEnv: Record<string, string | undefined>): void {
       work,
     }),
     keepWork: createKeepWork({ questions, work, writer }),
+    scripted: createScriptedDeliverables({
+      files,
+      writer,
+      work,
+      runner: createClaudeScriptRunner(claude),
+      templates: createFsScriptedTemplates(shippedFolder('deliverable')),
+      ids,
+      sheets,
+      kept: createFsKeptSettings(),
+      exports: trackerExports,
+      dashboard: dashboardSettings,
+      sources: settings,
+      records: createFeedRecords(files),
+      team: (project) => team.get(project),
+    }),
     models,
     preferences: createPreferences({ store: createJsonPreferences(dataFolder) }),
     folderDialogTitle: FOLDER_DIALOG_TITLE,

@@ -28,6 +28,17 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question, conversationId, compute }),
   keepWork: (projectId, questionId) =>
     ipcRenderer.invoke(CHANNELS.questionsKeepWork, { projectId, questionId }),
+  scriptedDeliverables: (projectId) => ipcRenderer.invoke(CHANNELS.scriptedList, { projectId }),
+  installScripted: (projectId, slug) =>
+    ipcRenderer.invoke(CHANNELS.scriptedInstall, { projectId, slug }),
+  runScripted: (projectId, slug, parameters) =>
+    ipcRenderer.invoke(CHANNELS.scriptedRun, { projectId, slug, parameters }),
+  keepScripted: (projectId, slug, runId) =>
+    ipcRenderer.invoke(CHANNELS.scriptedKeep, { projectId, slug, runId }),
+  correctScripted: (projectId, slug, words) =>
+    ipcRenderer.invoke(CHANNELS.scriptedCorrect, { projectId, slug, words }),
+  approveScripted: (projectId, slug, runId) =>
+    ipcRenderer.invoke(CHANNELS.scriptedApprove, { projectId, slug, runId }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),
   openEvidence: (projectId, path) => ipcRenderer.invoke(CHANNELS.evidenceOpen, { projectId, path }),
   mailSource: (projectId) => ipcRenderer.invoke(CHANNELS.mailGet, { projectId }),

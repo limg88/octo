@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -183,7 +183,17 @@ describe('the work folders of the app', () => {
     await writeFile(join(folder, 'dentro.txt'), 'dentro')
     await symlink(join(root, 'segreto.txt'), join(folder, 'link.txt')).catch(() => undefined)
     expect(await work.files('p-9', 'q-2')).toEqual(['dentro.txt'])
-    for (const name of ['../../../segreto.txt', 'assente.txt']) {
+    expect(new TextDecoder().decode(await work.read('p-9', 'q-2', 'dentro.txt'))).toBe('dentro')
+    // A folder that is a link, and a second name for a file outside: neither is a file of the run.
+    await symlink(root, join(folder, 'via')).catch(() => undefined)
+    await link(join(root, 'segreto.txt'), join(folder, 'doppio.txt')).catch(() => undefined)
+    for (const name of [
+      '../../../segreto.txt',
+      'assente.txt',
+      'link.txt',
+      'via/segreto.txt',
+      'doppio.txt',
+    ]) {
       await expect(work.read('p-9', 'q-2', name)).rejects.toMatchObject({ code: 'work_not_found' })
     }
     await expect(work.create('../fuori', 'q-1')).rejects.toMatchObject({ code: 'work_not_found' })

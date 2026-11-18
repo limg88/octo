@@ -20,6 +20,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The interpreter the scripts of the deliverables are tested with; Windows has none.
+      - if: runner.os == 'macOS'
+        run: node apps/desktop/scripts/fetch-python.mjs
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test:coverage

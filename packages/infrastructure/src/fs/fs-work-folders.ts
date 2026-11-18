@@ -1,13 +1,17 @@
-import { mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { type FileHandle, mkdir, open, readdir, realpath, rm } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import type { WorkFolders } from '@octo/application'
 import { DomainError } from '@octo/domain'
-import { isMissing } from './json-file.ts'
+import { isMissing, writeAtomic } from './json-file.ts'
 
 const WORK_AREA = 'lavoro'
 /** A run that wrote more files than this did something else than a calculation. */
 const MAX_FILES = 200
 const SAFE_NAME = /^[A-Za-z0-9._-]+$/
+/** What the system answers when the last part of a path opened without following is a link. */
+const isLink = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'ELOOP'
 
 /**
  * The folders the agent writes in when it computes, among the state of the app on this
@@ -48,15 +52,32 @@ export function createFsWorkFolders(dataFolder: string): WorkFolders {
         throw error
       }
     },
+    async write(projectId, runId, name, content) {
+      const root = folderOf(projectId, runId)
+      const file = resolve(root, name)
+      if (!file.startsWith(`${root}${sep}`)) throw new DomainError('work_not_found')
+      await writeAtomic(file, content)
+    },
     async read(projectId, runId, name) {
       const root = folderOf(projectId, runId)
       const file = resolve(root, name)
       if (!file.startsWith(`${root}${sep}`)) throw new DomainError('work_not_found')
+      let handle: FileHandle | undefined
       try {
-        return await readFile(file)
+        // What a run left may be a link, or lie behind one: only a plain file of its own,
+        // whose real place is inside the folder and that no other name shares, is given back.
+        const [realRoot, realFile] = await Promise.all([realpath(root), realpath(file)])
+        if (!realFile.startsWith(`${realRoot}${sep}`)) throw new DomainError('work_not_found')
+        handle = await open(realFile, constants.O_RDONLY | constants.O_NOFOLLOW)
+        const info = await handle.stat()
+        if (!info.isFile() || info.nlink !== 1) throw new DomainError('work_not_found')
+        return await handle.readFile()
       } catch (error) {
-        if (isMissing(error)) throw new DomainError('work_not_found')
+        if (error instanceof DomainError) throw error
+        if (isMissing(error) || isLink(error)) throw new DomainError('work_not_found')
         throw error
+      } finally {
+        await handle?.close()
       }
     },
   }

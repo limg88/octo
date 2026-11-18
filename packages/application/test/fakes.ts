@@ -115,22 +115,29 @@ export function agentAnswering(
   }
 }
 
-/** Work folders kept in memory: what a run left is whatever the test puts there. */
+/** Work folders kept in memory: what a run left is whatever the test, or Octo, puts there. */
 export function memoryWorkFolders(
   left: Record<string, string> = {},
-): WorkFolders & { created: string[] } {
+): WorkFolders & { created: string[]; left: Map<string, Uint8Array> } {
   const created: string[] = []
+  const files = new Map<string, Uint8Array>(
+    Object.entries(left).map(([name, text]) => [name, new TextEncoder().encode(text)]),
+  )
   return {
     created,
+    left: files,
     create: async (projectId, runId) => {
       created.push(`${projectId}/${runId}`)
       return `/lavoro/${projectId}/${runId}`
     },
-    files: async () => Object.keys(left).sort(),
+    files: async () => [...files.keys()].sort(),
     read: async (_projectId, _runId, name) => {
-      const text = left[name]
-      if (text === undefined) throw new DomainError('work_not_found')
-      return new TextEncoder().encode(text)
+      const bytes = files.get(name)
+      if (bytes === undefined) throw new DomainError('work_not_found')
+      return bytes
+    },
+    write: async (_projectId, _runId, name, content) => {
+      files.set(name, content)
     },
   }
 }

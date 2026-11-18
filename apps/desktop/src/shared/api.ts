@@ -23,6 +23,10 @@ import type {
   ProjectOverview,
   ReadingView,
   Reminder,
+  ScriptedCorrection,
+  ScriptedKept,
+  ScriptedRun,
+  ScriptedSummary,
   SessionView,
   TodayView,
   TrackerHoursRun,
@@ -111,6 +115,12 @@ export const CHANNELS = {
   deliverablesRevise: 'deliverables:revise',
   deliverablesApprove: 'deliverables:approve',
   deliverablesProgress: 'deliverables:progress',
+  scriptedList: 'scripted:list',
+  scriptedInstall: 'scripted:install',
+  scriptedRun: 'scripted:run',
+  scriptedKeep: 'scripted:keep',
+  scriptedCorrect: 'scripted:correct',
+  scriptedApprove: 'scripted:approve',
   instructionsGet: 'deliverables:instructions:get',
   instructionsSave: 'deliverables:instructions:save',
   kindTemplates: 'deliverables:templates:list',
@@ -265,6 +275,25 @@ export type OctoApi = {
   ): Promise<Result<QuestionRecord>>
   /** Copies into the project the files a question with calculations left in its work folder. */
   keepWork(projectId: string, questionId: string): Promise<Result<QuestionRecord>>
+  /** The deliverables with a script: those of the project, then those the app ships. */
+  scriptedDeliverables(projectId: string): Promise<Result<ScriptedSummary[]>>
+  /** Starts in the project a deliverable with a script the app ships. */
+  installScripted(projectId: string, slug: string): Promise<Result<ScriptedSummary[]>>
+  /** Runs the script inside the fence; its files stay in a work folder until they are kept. */
+  runScripted(
+    projectId: string,
+    slug: string,
+    parameters: Record<string, string>,
+  ): Promise<Result<ScriptedRun>>
+  keepScripted(projectId: string, slug: string, runId: string): Promise<Result<ScriptedKept>>
+  /** Has Claude change script, data or instructions as asked in words, in a work folder. */
+  correctScripted(
+    projectId: string,
+    slug: string,
+    words: string,
+  ): Promise<Result<ScriptedCorrection>>
+  /** Writes in the project what a correction changed. */
+  approveScripted(projectId: string, slug: string, runId: string): Promise<Result<null>>
   cancelAsk(projectId: string): Promise<Result<null>>
   openEvidence(projectId: string, path: string): Promise<Result<null>>
   mailSource(projectId: string): Promise<Result<MailSourceView>>

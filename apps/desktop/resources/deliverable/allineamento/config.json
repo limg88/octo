@@ -1,0 +1,11 @@
+{
+  "sprint": "",
+  "period": "",
+  "tags": [],
+  "referencePrefixes": ["AZDO", "ADO"],
+  "stateGroups": [],
+  "typeMap": [
+    { "item": "User Story", "ticket": "Story" },
+    { "item": "Bug", "ticket": "Bug" }
+  ]
+}

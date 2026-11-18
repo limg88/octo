@@ -182,6 +182,14 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
     ask: vi.fn(async () => ok(answered)),
     cancelAsk: vi.fn(async () => ok(null)),
     keepWork: vi.fn(async () => ok(answered)),
+    scriptedDeliverables: vi.fn(async () => ok([])),
+    installScripted: vi.fn(async () => ok([])),
+    runScripted: vi.fn(async () => ok({ runId: 'r', ok: true, messages: [], files: [] })),
+    keepScripted: vi.fn(async () => ok({ folder: '', files: [] })),
+    correctScripted: vi.fn(async () =>
+      ok({ runId: 'r', ok: true, messages: [], files: [], summary: '', changed: [] }),
+    ),
+    approveScripted: vi.fn(async () => ok(null)),
     openEvidence: vi.fn(async () => ok(null)),
     onProgress: (listener) => {
       emit = listener

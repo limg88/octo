@@ -108,6 +108,41 @@ export interface WorkFolders {
   /** The files a run left, by name, the folders inside it included as `folder/name`. */
   files(projectId: string, runId: string): Promise<string[]>
   read(projectId: string, runId: string, name: string): Promise<Uint8Array>
+  /** Lays a file in the folder of a run: what Octo prepares for it, or makes of its result. */
+  write(projectId: string, runId: string, name: string, content: Uint8Array): Promise<void>
+}
+
+/** The deliverables with a script that travel with the app, to start one in a project from. */
+export interface ScriptedTemplates {
+  slugs(): Promise<string[]>
+  /** The files of one, by name; none for a name the app does not ship. */
+  files(slug: string): Promise<Array<{ name: string; content: Uint8Array }>>
+}
+
+export type ScriptRequest = {
+  projectFolder: string
+  workFolder: string
+  model?: string | null
+  onProgress?: (progress: AgentProgress) => void
+  signal?: AbortSignal
+}
+
+/**
+ * Runs and corrects the script of a deliverable inside the fence: the agent reads the project,
+ * runs the interpreter Octo ships on the script laid in the work folder, and writes only there.
+ * Throws `fence_unavailable` where there is no sandbox.
+ */
+export interface ScriptRunner {
+  /** Runs the script as it is; what it printed. */
+  run(request: ScriptRequest): Promise<{ said: string }>
+  /** Changes the files of the work folder as the PM asks in words, and runs the script to check. */
+  correct(request: ScriptRequest & { words: string }): Promise<{ summary: string }>
+}
+
+/** A file of Octo's settings of a project as it is written, for what no longer has a store. */
+export interface KeptSettings {
+  /** The JSON of a file of the settings folder; null when it is not there or is not JSON. */
+  read(projectFolder: string, name: string): Promise<unknown | null>
 }
 
 /** Opens a cited file so the code can check the quote. Never reads outside the project. */

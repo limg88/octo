@@ -1,6 +1,7 @@
 // Stands in for the Claude Code executable in tests. The question, read from standard input,
 // chooses the behaviour; the events have the shape of `claude -p --output-format stream-json`.
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -527,6 +528,35 @@ const workAt = args.indexOf('--add-dir')
 if (workAt >= 0 && args.includes('Bash')) {
   const work = args[workAt + 1]
   const settings = JSON.parse(args[args.indexOf('--settings') + 1])
+  const prompt = args.join(' ')
+  // The script of a deliverable: run for real, with the interpreter the fence allows.
+  if (
+    prompt.includes('You run the script of a deliverable') ||
+    prompt.includes('You maintain the script of a deliverable')
+  ) {
+    const python = /^Bash\((.+) \*\)$/.exec(args.find((arg) => arg.startsWith('Bash(')) ?? '')?.[1]
+    const correcting = prompt.includes('You maintain the script')
+    if (correcting) {
+      // A correction in words, as far as a fake goes: `chiave=valore` changes the configuration.
+      const config = JSON.parse(readFileSync(join(work, 'config.json'), 'utf8'))
+      for (const [, key, value] of question.matchAll(/([a-zA-Z]+)=([^;\n]+)/g))
+        config[key] = value.trim()
+      writeFileSync(join(work, 'config.json'), JSON.stringify(config, null, 1))
+      appendFileSync(join(work, 'istruzioni.md'), `\nCorrezione del PM: ${question.trim()}\n`)
+    }
+    toolUse('Bash', { command: `${python} ${work}/script.py` })
+    const ran = spawnSync(python, [join(work, 'script.py')], { encoding: 'utf8' })
+    const said = `${ran.stdout ?? ''}${ran.stderr ?? ''}`.trim()
+    emit({
+      type: 'result',
+      is_error: false,
+      result: 'ok',
+      structured_output: correcting
+        ? { summary: `Ho aggiornato la configurazione come chiesto. Lo script ora dice: ${said}` }
+        : { said },
+    })
+    process.exit(0)
+  }
   if (question.includes('#sandbox')) {
     emit({
       type: 'result',

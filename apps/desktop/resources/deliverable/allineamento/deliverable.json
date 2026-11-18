@@ -1,0 +1,11 @@
+{
+  "title": "Allineamento dello sprint",
+  "about": "Le voci del tracker del cliente in uno sprint confrontate con i ticket del tracker interno, e il file dei ticket mancanti da importare a mano.",
+  "parameters": [
+    { "name": "sprint", "label": "Sprint (vuoto: quello della configurazione)" }
+  ],
+  "inputs": {
+    "voci": { "kind": "tracker", "path": "", "ownPeopleOnly": false },
+    "ticket": { "kind": "records", "folder": "" }
+  }
+}

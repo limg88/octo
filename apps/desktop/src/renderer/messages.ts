@@ -567,6 +567,29 @@ export const messages = {
   askPlaceholder: 'Chiedi qualcosa su questo progetto…',
   askSubmit: 'Chiedi',
   askCancel: 'Ferma',
+  scripted: {
+    title: 'Deliverable del progetto, con script',
+    intro:
+      'Lo script e i suoi dati sono file del progetto. Claude li esegue dentro il recinto: legge il progetto, scrive solo in una cartella di lavoro. Nel progetto entra solo ciò che salvi o approvi.',
+    install: 'Aggiungi al progetto',
+    run: 'Esegui',
+    running: 'Eseguo…',
+    files: (names: string) => `Prodotti, nella cartella di lavoro: ${names}.`,
+    keep: 'Salva nel progetto',
+    kept: (folder: string) => `Salvati nel progetto, in ${folder}.`,
+    correct: 'Correggi a parole',
+    correctHint:
+      'Scrivi che cosa cambiare: un dato («aggiungi la richiesta 3, dal 1 al 31 maggio, 12.000 euro, fattura 104») o una regola. Claude prova la modifica nella cartella di lavoro e ti dice che cosa ha cambiato.',
+    correctLabel: (title: string) => `Che cosa cambiare in «${title}»`,
+    tryCorrection: 'Prova la correzione',
+    correcting: 'Correggo…',
+    correctionTitle: 'Correzione proposta',
+    changed: (files: string) => `File cambiati: ${files}.`,
+    nothingChanged: 'Nessun file è cambiato.',
+    approve: 'Approva la correzione',
+    approveHint: 'Solo allora i file del deliverable nel progetto cambiano.',
+    approved: 'Correzione approvata: da ora ogni esecuzione usa i file nuovi.',
+  },
   computed: {
     option: 'Con calcoli',
     optionHint:
@@ -2052,6 +2075,15 @@ const errors: Record<ErrorCode, string> = {
   fence_interpreter_missing:
     'Manca l’interprete che Octo usa per i calcoli: reinstalla Octo. Intanto chiedi senza «Con calcoli».',
   work_not_found: 'Non trovo più i file di questo calcolo su questo computer.',
+  scripted_not_found: 'Questo deliverable non c’è, né nel progetto né fra quelli di Octo.',
+  scripted_invalid:
+    'Il file che descrive questo deliverable (deliverable.json) non è leggibile, o nomina un percorso fuori dal progetto.',
+  scripted_input_missing:
+    'Manca un dato che lo script si aspetta: l’esportazione del tracker del cliente o i ticket letti dalla fonte Jira. Controlla il Cruscotto e le fonti.',
+  scripted_result_invalid:
+    'Lo script non ha lasciato un esito leggibile: non uso niente di ciò che ha scritto. Prova «Correggi a parole» dicendo che cosa è successo.',
+  scripted_model_missing:
+    'Il modulo da compilare non è nel progetto, al percorso scritto nella configurazione.',
   agent_cancelled: 'Domanda fermata.',
   source_not_configured: 'Questa fonte non è ancora configurata.',
   source_config_invalid: 'Controlla il giorno di inizio e la cartella: uno dei due non è valido.',

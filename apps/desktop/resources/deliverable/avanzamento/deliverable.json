@@ -1,0 +1,8 @@
+{
+  "title": "Modulo di avanzamento",
+  "about": "Il modulo del cliente per chiedere il riconoscimento di una quota dell'ordine, compilato posizione per posizione.",
+  "parameters": [
+    { "name": "richiesta", "label": "Numero della richiesta (vuoto: l'ultima)" }
+  ],
+  "inputs": {}
+}

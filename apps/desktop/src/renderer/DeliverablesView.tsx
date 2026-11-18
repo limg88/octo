@@ -29,6 +29,7 @@ import { citedPaths, handoffField, handoffText } from './handoff-text.ts'
 import { KindTemplate, type KindTemplateApi } from './KindTemplate.tsx'
 import { MeetingField } from './MeetingField.tsx'
 import { dateText, errorText, messages, progressText } from './messages.ts'
+import { ScriptedDeliverables } from './ScriptedDeliverables.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
 
 type Props = {
@@ -193,6 +194,7 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
                 void changeCatalog(() => api.removeDeliverableKind(project.id, kindId))
               }
             />
+            <ScriptedDeliverables api={api} project={project} />
           </>
         )}
         {shown.view === 'register' && (

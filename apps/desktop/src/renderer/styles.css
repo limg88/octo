@@ -3688,3 +3688,15 @@ span.marker-warning {
   font-size: 14px;
   margin: 16px 0 8px;
 }
+
+/* The deliverables with a script: one box each, under the catalog. */
+.scripted-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.scripted textarea {
+  width: 100%;
+}
