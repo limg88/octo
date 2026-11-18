@@ -712,7 +712,22 @@ if (question.includes('#lento')) {
   toolUse('Read', { file_path: join(process.cwd(), 'wiki', 'stato.md') })
   toolUse('Bash', { command: 'ignored' })
   toolUse('StructuredOutput', answer)
-  if (question.includes('#inventa')) {
+  // A writer told how to address a person follows the text of the project on its people: the
+  // PM's word on the recipient when there is one, else the formal form.
+  if (args.join(' ').includes('choose how to\naddress them')) {
+    let people = ''
+    try {
+      people = readFileSync(
+        join(process.cwd(), '_octo', 'progetto', 'persone-e-calendario.md'),
+        'utf8',
+      )
+    } catch {
+      // No text on the people: nobody fixed how they are addressed.
+    }
+    answer.text = `${people.includes('dà del tu') ? 'Ciao Carla,' : 'Gentile dottoressa Bianchi,'}\n\n${answer.text}`
+  }
+  // The passage of a finding written again alone: what the reading contested is gone.
+  if (question.includes('#inventa') && !question.includes('Riscrivi solo questo passo')) {
     answer.text += ' Il budget residuo è di 99.000 euro [2].'
     answer.citations.push({ n: 2, path: 'wiki/stato.md', quote: 'budget residuo di 99.000 euro' })
   }

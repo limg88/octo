@@ -31,6 +31,7 @@ import {
   PLAN_GROUPS,
   PRIVATE_FOLDER,
   RETIRED_PLANS_FILE,
+  TEAM_ADDRESSES,
   TEAM_SIDES,
 } from '@octo/domain'
 import { z } from 'zod'
@@ -297,6 +298,7 @@ const teamSchema = z.object({
         allocation: z.number().nullable().default(null),
         note: z.string().default(''),
         capDays: z.number().nullable().optional(),
+        address: z.enum(TEAM_ADDRESSES).optional(),
       }),
     )
     .default([]),

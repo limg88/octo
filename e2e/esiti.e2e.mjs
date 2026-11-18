@@ -4,6 +4,7 @@
 // Run with `pnpm e2e:esiti` (it builds first; it needs the test Postgres, `pnpm db:setup`).
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 
@@ -29,6 +30,15 @@ await new Promise((resolve, reject) => {
   dwsi.stdout.once('data', resolve)
   dwsi.once('exit', () => reject(new Error('the fake NetSuite did not start: pnpm db:setup')))
 })
+
+/** Waits until a file of the project says something: the app writes it a moment after a save. */
+async function assertFile(path, pattern) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (existsSync(path) && pattern.test(readFileSync(path, 'utf8'))) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  assert.fail(`${path} never matched ${pattern}`)
+}
 
 const app = await electron.launch({
   args: [`${root}apps/desktop`],
@@ -106,6 +116,44 @@ try {
   await page.getByText(/Che una mail aspetti lo calcola Octo/).waitFor()
   await page.screenshot({ path: `${work}/oggi.png`, fullPage: true })
 
+  // I3. The PM fixes that a person is addressed as «tu»: the email is written so, whatever the
+  // kind said before. A finding of the critical reading is corrected alone, in its passage.
+  await section('Impostazioni').click()
+  await page.getByRole('tab', { name: 'Persone e calendario' }).click()
+  const team = page.getByRole('region', { name: 'Persone e calendario' })
+  await team.getByRole('button', { name: 'Aggiungi una persona' }).click()
+  await team.getByLabel('Nome, persona 4').fill('Carla Bianchi')
+  await team.getByLabel('Parte, persona 4').selectOption('client')
+  await team.getByLabel('Tu / lei, persona 4').selectOption('tu')
+  await team.getByRole('button', { name: 'Salva' }).first().click()
+  await assertFile(
+    `${work}/Aurora/_octo/progetto/persone-e-calendario.md`,
+    /Il PM gli o le dà del tu\./,
+  )
+  await section('Deliverable').click()
+  const drafts = page.getByRole('region', { name: 'Deliverable' })
+  await drafts.getByRole('button', { name: /^Email al cliente/ }).click()
+  await drafts.getByLabel('A chi scrivi').fill('Carla Bianchi')
+  await drafts.getByLabel(/^Di che cosa/).fill('Collaudo #inventa')
+  await drafts.getByLabel(/^Che cosa chiedi/).fill('Conferma la data')
+  await drafts.getByRole('button', { name: 'Scrivi la bozza' }).click()
+  await drafts.getByText('Ciao Carla,').first().waitFor({ timeout: TIMEOUT_MS })
+  await drafts.getByText('Il budget non ha una fonte').first().waitFor({ timeout: TIMEOUT_MS })
+  // The general change is proposed from the finding; the finding has a change of its own.
+  assert.match(
+    await drafts.getByLabel('Che cosa vuoi cambiare?').inputValue(),
+    /^Correggi i rilievi della rilettura critica:\n- Il budget non ha una fonte$/,
+  )
+  await page.screenshot({ path: `${work}/rilettura.png`, fullPage: true })
+  await drafts.getByRole('button', { name: 'Correggi questo' }).click()
+  await drafts.getByLabel(/^Che cosa cambiare in questo passo/).fill('Togli la cifra')
+  await drafts.getByRole('button', { name: 'Riscrivi solo questo passo' }).click()
+  await drafts.getByText('Può uscire: nessun punto contestabile trovato.').waitFor({
+    timeout: TIMEOUT_MS,
+  })
+  assert.equal(await drafts.getByText(/99\.000/).count(), 0)
+  await drafts.getByText('Ciao Carla,').first().waitFor()
+
   // A request that takes its time, left behind: the list says where Claude works.
   await section('Chiedi').click()
   await page
@@ -121,7 +169,11 @@ try {
     .getByRole('img', { name: 'Claude sta lavorando qui' })
     .waitFor({ state: 'detached', timeout: TIMEOUT_MS })
   await section('Chiedi').click()
-  await page.getByText('12 dicembre').first().waitFor({ timeout: TIMEOUT_MS })
+  await page
+    .getByText('12 dicembre')
+    .locator('visible=true')
+    .first()
+    .waitFor({ timeout: TIMEOUT_MS })
   await page.screenshot({ path: `${work}/risposta.png`, fullPage: true })
   console.log('e2e esiti: ok')
 } catch (error) {

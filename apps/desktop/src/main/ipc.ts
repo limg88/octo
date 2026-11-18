@@ -46,6 +46,7 @@ import {
   PHASES,
   pathInProject,
   RISK_STATES,
+  TEAM_ADDRESSES,
   TEAM_SIDES,
   TEMPLATE_FORMATS,
   THEME_CHOICES,
@@ -341,6 +342,7 @@ const teamInput = byProject.extend({
           allocation: z.number().positive().max(FULL_ALLOCATION).nullable(),
           note: z.string().max(MAX_INPUT_LENGTH),
           capDays: z.number().positive().nullable().optional(),
+          address: z.enum(TEAM_ADDRESSES).optional(),
         }),
       )
       .max(MAX_RULES),

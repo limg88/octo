@@ -244,6 +244,11 @@ describe('DeliverablesView', () => {
     const change = screen.getByRole<HTMLButtonElement>('button', {
       name: messages.deliverableChangeSubmit,
     })
+    // The general change is proposed from what the reading found: sent as it is, or written over.
+    const field = screen.getByLabelText<HTMLTextAreaElement>(messages.deliverableChange)
+    expect(field.value).toBe(messages.review.proposed(['Il budget non ha una fonte']))
+    expect(change.disabled).toBe(false)
+    type(messages.deliverableChange, ' ')
     expect(change.disabled).toBe(true)
     type(messages.deliverableChange, 'Togli il budget')
     fireEvent.click(change)
@@ -263,6 +268,38 @@ describe('DeliverablesView', () => {
     expect(within(panel).getByText('posta/a.md')).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: messages.citation.open }))
     await waitFor(() => expect(api.openEvidence).toHaveBeenCalledWith('p-1', 'posta/a.md'))
+  })
+
+  it('writes again the passage of one finding only, with what the PM says of it', async () => {
+    const { api } = fakeApi({ listDeliverables: vi.fn(async () => ok([review])) })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
+    const finding = review.redTeam?.findings[0]
+    fireEvent.click(screen.getByRole('button', { name: messages.review.fix }))
+    // Changing one's mind closes the field and asks nothing.
+    fireEvent.click(screen.getByRole('button', { name: messages.cancel }))
+    expect(api.reviseDeliverable).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: messages.review.fix }))
+    type(messages.review.fixWhat, ' Cita il verbale del 10 novembre ')
+    fireEvent.click(screen.getByRole('button', { name: messages.review.fixSubmit }))
+    await waitFor(() =>
+      expect(api.reviseDeliverable).toHaveBeenCalledWith(
+        'p-1',
+        'd-1',
+        messages.review.fixRequest(
+          finding?.where ?? '',
+          finding?.finding ?? '',
+          'Cita il verbale del 10 novembre',
+        ),
+      ),
+    )
+    // The request names the passage and tells to leave the rest as it is.
+    const asked = vi.mocked(api.reviseDeliverable).mock.calls[0]?.[2] ?? ''
+    expect(asked).toContain(`«${finding?.where}»`)
+    expect(asked).toContain('Lascia tutto il resto')
+    // With nothing typed, how to correct is left to Claude.
+    expect(messages.review.fixRequest('a', 'b', '')).not.toContain('Che cosa cambiare')
+    expect(messages.review.proposed([])).toBe('')
   })
 
   it('says in the past what the reading asked to correct, once the PM approved', async () => {

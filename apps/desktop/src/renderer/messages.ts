@@ -727,7 +727,8 @@ export const messages = {
       'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Octo li scrive anche come testo del progetto: risposte e deliverable li leggono e li citano. Chi non era sul progetto in un periodo non viene segnalato per le ore che mancano.',
     people: 'Persone',
     peopleHint:
-      'Solo il nome è obbligatorio. L’allocazione è la parte del suo tempo che la persona dà al progetto, in percentuale: vuota se non la sai. Le date si lasciano vuote se la persona c’è dall’inizio o c’è ancora. In «Come scrivergli» va ciò che un’email deve rispettare, per esempio «dare del lei, prima la richiesta».',
+      'Solo il nome è obbligatorio. L’allocazione è la parte del suo tempo che la persona dà al progetto, in percentuale: vuota se non la sai. Le date si lasciano vuote se la persona c’è dall’inizio o c’è ancora. In «Come scrivergli» va ciò che un’email deve rispettare, per esempio «prima la richiesta». «Tu / lei» fissa come ci si rivolge alla persona; lasciato su «come nelle mail», chi scrive segue le mail che le hai già mandato, e dà del lei se non ce ne sono.',
+    addressAuto: 'come nelle mail',
     periods: 'Calendario: periodi e sprint',
     columns: {
       name: 'Nome',
@@ -738,6 +739,7 @@ export const messages = {
       from: 'Dal',
       to: 'Al',
       note: 'Come scrivergli',
+      address: 'Tu / lei',
       period: 'Periodo',
     },
     personN: (n: number) => `persona ${n}`,
@@ -1826,6 +1828,22 @@ export const messages = {
           : `${count} rilievi da rivedere`,
     reset: 'La bozza è cambiata: i rilievi sono da rivedere di nuovo.',
     pending: 'La rilettura critica è in corso: i rilievi arrivano qui.',
+    fix: 'Correggi questo',
+    fixWhat: 'Che cosa cambiare in questo passo (vuoto: decide Claude come correggerlo)',
+    fixSubmit: 'Riscrivi solo questo passo',
+    fixRequest: (where: string, finding: string, words: string) =>
+      [
+        `Riscrivi solo questo passo della bozza: «${where}».`,
+        `Il rilievo della rilettura critica: ${finding}`,
+        ...(words === '' ? [] : [`Che cosa cambiare: ${words}`]),
+        'Lascia tutto il resto del testo esattamente com’è, parola per parola.',
+      ].join('\n'),
+    proposed: (findings: readonly string[]) =>
+      findings.length === 0
+        ? ''
+        : ['Correggi i rilievi della rilettura critica:', ...findings.map((f) => `- ${f}`)].join(
+            '\n',
+          ),
     phases: (write: number, check: number, review: number) =>
       `ultimo giro: scrittura ${write} s, controllo delle fonti ${check} s, rilettura critica ${review} s`,
   },

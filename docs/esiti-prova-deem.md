@@ -87,6 +87,10 @@ Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sez
 
 **Rilettura critica (17, 18, 19).** Rilievi di una frase, con il limite nello schema. Su ogni rilievo «Correggi questo», con un campo per dire che cosa cambiare: rigenera solo quel passo della bozza. Il campo generale resta, precompilato con una richiesta costruita dai rilievi.
 
+**Esito di I3 (18/11/2026): codice chiuso, criterio da verificare** (R6c.8, R6c.9 in `verifiche-da-fare.md`). Demo `demo/70-deliverable-tu-e-rilettura`, `pnpm e2e:esiti`.
+- *Tu o lei*: sulla persona c'è «Tu / lei» (vuoto: «come nelle mail»); Octo lo scrive in `persone-e-calendario.md`, che chi scrive legge. La regola sta nelle istruzioni di chi scrive, per ogni tipo: parola del PM, poi le mail già mandate a quella persona, poi il lei. Dal tipo «Email al cliente» è uscito il registro formale fisso. Il secondo gradino è un'istruzione a Claude, non un calcolo di Octo: va provato con Claude vero.
+- *Rilettura critica*: rilievo, motivo e «che cosa regge» di una frase, 220 caratteri al massimo, nelle istruzioni e nello schema. Su ogni rilievo «Correggi questo» apre un campo e manda una modifica che nomina il passo, il rilievo, ciò che il PM chiede e l'ordine di lasciare il resto parola per parola. È una modifica con un perimetro, non una sostituzione fatta dal codice: il resto lo lascia intatto Claude, e la rilettura riparte. Il campo generale resta ed è precompilato con i rilievi non ancora rivisti.
+
 ## I4 — Chiedi
 
 **«Con calcoli» (14).** Spiegato accanto all'opzione con `InfoTip` (che cosa fa, quando serve) e spostato vicino al pulsante di invio. Il comportamento non cambia.

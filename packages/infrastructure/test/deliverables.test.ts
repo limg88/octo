@@ -10,6 +10,7 @@ import { CATALOG_FOLDER, deliverableKind } from '../../domain/test/support/catal
 import { askInput, askSystemPrompt, liveSourcesPrompt } from '../src/claude/ask-prompt.ts'
 import { extract } from '../src/extract/extract.ts'
 import {
+  ADDRESS_PROMPT,
   createClaudeDeliverableWriter,
   createFsEvidenceReader,
   createFsMemoryWriter,
@@ -17,6 +18,7 @@ import {
   createFsShippedCatalog,
   createWordRenderer,
   kindCorrectionPrompt,
+  MAX_FINDING_SENTENCE,
   redTeamSystemPrompt,
   writerInput,
   writerSystemPrompt,
@@ -241,6 +243,11 @@ describe('what the writer and the red team are told', () => {
     expect(continued.endsWith('New question: E dopo?')).toBe(true)
     expect(continued.match(/<\/earlier_in_this_conversation>/g)).toHaveLength(1)
     const prompt = writerSystemPrompt(request, 'Niente numeri oltre 72 ore.')
+    // How a person is addressed is a rule of the writer, not of a kind: the PM's word, then the
+    // mail already sent, then «lei».
+    expect(prompt).toContain(ADDRESS_PROMPT)
+    expect(ADDRESS_PROMPT).toContain('_octo/progetto/persone-e-calendario.md')
+    expect(redTeamSystemPrompt(request.kind, null)).toContain(`${MAX_FINDING_SENTENCE} characters`)
     expect(prompt).not.toContain('<live_sources>')
 
     expect(prompt).toContain('Email al cliente')

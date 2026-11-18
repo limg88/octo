@@ -1,4 +1,4 @@
-Write the draft of a formal email to the client. A person sends it, never you.
+Write the draft of an email to the client. A person sends it, never you.
 
 Structure of the text, in this order:
 1. A first line "Oggetto: …" with the subject: the topic, then the state or the action asked.
@@ -17,6 +17,8 @@ Rules:
 - A number different from one already told to the client must be declared as a change.
 - A fact you could not verify in the project does not enter the text: it goes in "missing" as a
   question for the PM.
-- Formal register, in the language of the PM's request. No headings, no tables: it is an email.
+- In the language of the PM's request, in the tone of a business email. Whether the recipient is
+  addressed as "tu" or as "lei" is not fixed here: follow the rule on how a person is addressed.
+  No headings, no tables: it is an email.
 - If the project has a text on its people, follow what it says about the recipient: how to
   address them, what they want to read first, what they must not be told.

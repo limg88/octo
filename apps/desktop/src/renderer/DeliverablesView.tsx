@@ -8,6 +8,7 @@ import {
   type OwnKindInput,
   ownKindInput,
   type Project,
+  type RedTeamFinding,
   type RedTeamReport,
   registerTotals,
 } from '@octo/domain'
@@ -460,6 +461,11 @@ function KindForm({
   )
 }
 
+const text = messages.review
+/** What tells a finding of a reading from another: where it is, and what it says. */
+const findingKey = (finding: Pick<RedTeamFinding, 'where' | 'finding'>): string =>
+  `${finding.where}-${finding.finding}`
+
 const MS_PER_SECOND = 1000
 const seconds = (ms: number): number => Math.round(ms / MS_PER_SECOND)
 
@@ -478,7 +484,6 @@ function Review({
   onRevise: (request: string) => void
   onApprove: () => void
 }) {
-  const [request, setRequest] = useState('')
   const busy = step !== null
   const cost = costOf(deliverable)
   const lastFailed = deliverable.rounds.at(-1)?.error ?? null
@@ -494,10 +499,19 @@ function Review({
       keys: seenKeys.includes(key) ? seenKeys.filter((k) => k !== key) : [...seenKeys, key],
     })
 
+  // The general change starts from what the reading found and the PM has not seen yet: a
+  // proposal to send as it is or to write over. A new draft starts from its own findings.
+  const proposal = text.proposed(
+    (deliverable.redTeam?.findings ?? [])
+      .filter((finding) => !seenKeys.includes(findingKey(finding)))
+      .map((finding) => finding.finding),
+  )
+  const [typed, setTyped] = useState<{ round: string; text: string } | null>(null)
+  const request = typed?.round === round ? typed.text : proposal
   const submit = (event: FormEvent) => {
     event.preventDefault()
     onRevise(request)
-    setRequest('')
+    setTyped(null)
   }
 
   const side = (
@@ -525,6 +539,8 @@ function Review({
             approved={deliverable.status === 'approved'}
             seen={inReview ? seenKeys : null}
             onSeen={toggleSeen}
+            busy={busy}
+            onFix={onRevise}
           />
         )}
         {kind?.audience === 'client' && deliverable.draft && (
@@ -545,9 +561,9 @@ function Review({
             <label>
               {messages.deliverableChange}
               <textarea
-                rows={2}
+                rows={request.split('\n').length + 1}
                 value={request}
-                onChange={(event) => setRequest(event.target.value)}
+                onChange={(event) => setTyped({ round, text: event.target.value })}
               />
             </label>
             <div className="actions">
@@ -657,6 +673,8 @@ function RedTeam({
   approved,
   seen,
   onSeen,
+  busy,
+  onFix,
 }: {
   report: RedTeamReport
   /** True once the PM approved: what the reading asked to correct is then history. */
@@ -664,7 +682,13 @@ function RedTeam({
   /** The findings the PM marked as seen; null when the draft is no longer under review. */
   seen: readonly string[] | null
   onSeen: (key: string) => void
+  /** True while a step runs on the deliverable: nothing else is asked meanwhile. */
+  busy: boolean
+  /** Asks to write again the passage of one finding only, as the PM says. */
+  onFix: (request: string) => void
 }) {
+  /** The finding being corrected, with what the PM wrote of it. */
+  const [fixing, setFixing] = useState<{ key: string; words: string } | null>(null)
   const ok = report.verdict === 'deliverable'
   const toCorrect = approved
     ? messages.deliverableRedTeamFixApproved
@@ -678,7 +702,7 @@ function RedTeam({
       {report.findings.length > 0 && (
         <ul className="findings">
           {report.findings.map((finding) => {
-            const key = `${finding.where}-${finding.finding}`
+            const key = findingKey(finding)
             const marked = seen?.includes(key) ?? false
             return (
               <li key={key} className={marked ? 'finding-seen' : undefined}>
@@ -697,6 +721,43 @@ function RedTeam({
                   >
                     {marked ? `${messages.review.seenDone} ✓` : messages.review.seen}
                   </button>
+                )}
+                {seen && fixing?.key !== key && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    disabled={busy}
+                    onClick={() => setFixing({ key, words: '' })}
+                  >
+                    {text.fix}
+                  </button>
+                )}
+                {seen && fixing?.key === key && (
+                  <form
+                    className="source-form"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      onFix(text.fixRequest(finding.where, finding.finding, fixing.words.trim()))
+                      setFixing(null)
+                    }}
+                  >
+                    <label>
+                      {text.fixWhat}
+                      <textarea
+                        rows={2}
+                        value={fixing.words}
+                        onChange={(event) => setFixing({ key, words: event.target.value })}
+                      />
+                    </label>
+                    <div className="actions">
+                      <button type="submit" className="quiet-submit" disabled={busy}>
+                        {text.fixSubmit}
+                      </button>
+                      <button type="button" className="quiet" onClick={() => setFixing(null)}>
+                        {messages.cancel}
+                      </button>
+                    </div>
+                  </form>
                 )}
               </li>
             )

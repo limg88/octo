@@ -2,6 +2,7 @@ import {
   FULL_ALLOCATION,
   type Project,
   type ProjectTeam,
+  TEAM_ADDRESSES,
   TEAM_SIDES,
   type TeamPerson,
 } from '@octo/domain'
@@ -16,7 +17,16 @@ type Props = { api: Pick<OctoApi, 'team' | 'saveTeam'>; project: Project }
 
 const text = messages.team
 
-type PersonKey = 'name' | 'role' | 'side' | 'allocation' | 'capDays' | 'from' | 'to' | 'note'
+type PersonKey =
+  | 'name'
+  | 'role'
+  | 'side'
+  | 'allocation'
+  | 'capDays'
+  | 'from'
+  | 'to'
+  | 'note'
+  | 'address'
 type PeriodKey = 'name' | 'from' | 'to'
 const SIDES: readonly TeamPerson['side'][] = TEAM_SIDES
 
@@ -35,6 +45,16 @@ const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
   { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
   { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
   { key: 'note', label: text.columns.note, width: 'minmax(130px, 1fr)' },
+  {
+    key: 'address',
+    label: text.columns.address,
+    kind: 'select',
+    width: '120px',
+    options: [
+      { value: '', label: text.addressAuto },
+      ...TEAM_ADDRESSES.map((address) => ({ value: address, label: address })),
+    ],
+  },
 ]
 const PERIOD_COLUMNS: RowsColumn<PeriodKey>[] = [
   { key: 'name', label: text.columns.period, width: 'minmax(200px, 1fr)' },
@@ -56,7 +76,7 @@ function allocationRight(typed: string): boolean {
 }
 
 /** A row where only the side is set holds nothing yet: the side always has a value. */
-const emptyPerson = (row: Row<PersonKey>): boolean => blankRow({ ...row, side: '' })
+const emptyPerson = (row: Row<PersonKey>): boolean => blankRow({ ...row, side: '', address: '' })
 
 /** The people and the calendar of the project, typed once and read by everything else. */
 export function TeamSection({ api, project }: Props) {
@@ -70,8 +90,9 @@ export function TeamSection({ api, project }: Props) {
   const show = useCallback((team: ProjectTeam) => {
     setPeople(
       orOneRow(
-        team.people.map(({ capDays, ...person }) => ({
+        team.people.map(({ capDays, address, ...person }) => ({
           ...person,
+          address: address ?? '',
           allocation: amountText(person.allocation),
           capDays: amountText(capDays ?? null),
         })),
@@ -127,6 +148,10 @@ export function TeamSection({ api, project }: Props) {
           note: row.note.trim(),
           // Written only when there is one: a person without a cap is kept as before.
           ...(amountOf(row.capDays) === null ? {} : { capDays: amountOf(row.capDays) }),
+          // Written only when the PM fixed it: else who writes follows the mail already sent.
+          ...TEAM_ADDRESSES.filter((address) => address === row.address).map((address) => ({
+            address,
+          }))[0],
         })),
       periods: periods
         .filter((row) => !blankRow(row))

@@ -11,6 +11,10 @@ export type TeamSide = (typeof TEAM_SIDES)[number]
 /** Whether a person works on the supplier's side: its own people and its consultants. */
 export const onOurSide = (person: Pick<TeamPerson, 'side'>): boolean => person.side !== 'client'
 
+/** How a person is addressed in what is written to them: informally, or formally. */
+export const TEAM_ADDRESSES = ['tu', 'lei'] as const
+export type TeamAddress = (typeof TEAM_ADDRESSES)[number]
+
 /** Someone who works on the project or reads what it produces. */
 export type TeamPerson = {
   name: string
@@ -28,6 +32,11 @@ export type TeamPerson = {
   capDays?: number | null | undefined
   /** How to write to them, what they want to read first, what never to tell them. */
   note: string
+  /**
+   * Whether they are addressed as «tu» or «lei», when the PM fixed it; absent: who writes follows
+   * the mail the PM already sent them, and «lei» when there is none.
+   */
+  address?: TeamAddress | undefined
 }
 
 /** A stretch of the project's calendar: a planning period, a sprint, a phase. */
@@ -93,6 +102,9 @@ export function cleanTeam(team: ProjectTeam): ProjectTeam {
       allocation: allocationOf(person.allocation),
       note: person.note.trim(),
       ...(capOf(person.capDays) === null ? {} : { capDays: capOf(person.capDays) }),
+      ...(person.address && TEAM_ADDRESSES.includes(person.address)
+        ? { address: person.address }
+        : {}),
     })
   }
   const periods = new Map<string, TeamPeriod>()
@@ -170,7 +182,9 @@ function personLine(person: TeamPerson): string {
       ? ''
       : `, tetto di ${(person.capDays ?? 0).toLocaleString('it-IT')} giorni`
   const note = person.note === '' ? '' : `\n  - Come scrivergli o scriverle: ${person.note}`
-  return `- **${person.name}**${role}${allocation}${cap}${stay}${note}`
+  // Fixed by the PM: whoever writes to the person follows it before anything else.
+  const address = person.address ? `\n  - Il PM gli o le dà del ${person.address}.` : ''
+  return `- **${person.name}**${role}${allocation}${cap}${stay}${note}${address}`
 }
 
 /**

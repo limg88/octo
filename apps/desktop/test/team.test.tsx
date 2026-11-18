@@ -181,6 +181,31 @@ describe('the section of people and calendar', () => {
     expect(saved?.people[1]).not.toHaveProperty('capDays')
   })
 
+  it('fixes how a person is addressed only when the PM says so', async () => {
+    const api = {
+      team: vi.fn(async () =>
+        ok({
+          ...team,
+          people: team.people.map((entry, n) =>
+            n === 0 ? { ...entry, address: 'tu' as const } : entry,
+          ),
+        }),
+      ),
+      saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
+    }
+    render(<TeamSection api={api} project={project} />)
+    await screen.findByRole('group', { name: text.people })
+    expect(cell(text.personN(1), columns.address).value).toBe('tu')
+    expect(cell(text.personN(2), columns.address).value).toBe('')
+    set(text.personN(1), columns.address, 'lei')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() => expect(api.saveTeam).toHaveBeenCalled())
+    const saved = api.saveTeam.mock.calls[0]?.[1]
+    expect(saved?.people[0]).toMatchObject({ address: 'lei' })
+    // Left as in the mail: no field, and who writes follows the mail already sent.
+    expect(saved?.people[1]).not.toHaveProperty('address')
+  })
+
   it('says why it cannot read or save', async () => {
     const failing = { ok: false as const, code: 'team_invalid' as const }
     const { unmount } = render(

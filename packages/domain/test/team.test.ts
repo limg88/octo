@@ -144,6 +144,17 @@ describe('the people and the calendar of a project', () => {
     expect(text).toContain(
       '## Dal cliente\n\n- **Carla Bianchi**, referente\n  - Come scrivergli o scriverle: dare del lei, prima la richiesta\n',
     )
+    // How the PM addresses a person is said only when the PM fixed it, and kept only if it is one.
+    const fixed = cleanTeam({
+      people: [
+        { ...team.people[0], name: 'Carla Bianchi', address: 'tu' },
+        { ...team.people[0], name: 'Ugo Neri', address: 'voi' as never },
+      ] as ProjectTeam['people'],
+      periods: [],
+    })
+    expect(teamMarkdown(fixed)).toContain('  - Il PM gli o le dà del tu.')
+    expect(fixed.people[1]).not.toHaveProperty('address')
+    expect(text).not.toContain('Il PM gli o le dà del')
     expect(text).toContain('| Sprint 28 | 26/10/2026 | 13/11/2026 |')
     const empty = teamMarkdown(NO_TEAM)
     expect(empty).toContain('# Persone e calendario del progetto')
