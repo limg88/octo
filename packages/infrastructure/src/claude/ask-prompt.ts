@@ -151,8 +151,13 @@ const HISTORY_CLOSE = '</earlier_in_this_conversation>'
  * not what is true: every statement of the new answer is found again in the files and cited from
  * there, never from an earlier answer.
  */
-export function askInput(question: string, history: readonly ConversationTurn[] = []): string {
-  if (history.length === 0) return question
+export function askInput(
+  question: string,
+  history: readonly ConversationTurn[] = [],
+  attachments: readonly string[] = [],
+): string {
+  const asked = `${attachedPrompt(attachments)}${question}`
+  if (history.length === 0) return asked
   const turns = history
     .map((turn) => `Question: ${turn.question}\nAnswer: ${turn.answer}`)
     .join('\n\n')
@@ -165,5 +170,24 @@ again in the files of the project anything you take from them.
 ${turns}
 ${HISTORY_CLOSE}
 
-New question: ${question}`
+New question: ${asked}`
+}
+
+const ATTACHED_OPEN = '<attached_to_this_conversation>'
+const ATTACHED_CLOSE = '</attached_to_this_conversation>'
+
+/**
+ * The files the PM attached to the conversation. Their folder is otherwise never a source: these
+ * paths, and only these, are read and cited like any other file of the project.
+ */
+function attachedPrompt(attachments: readonly string[]): string {
+  if (attachments.length === 0) return ''
+  return `${ATTACHED_OPEN}
+The Project Manager attached these files to this conversation. Read them: the question may be
+about them. They are sources: cite them by these paths, with a quote copied word for word. Their
+folder is otherwise not a source, and this exception holds for these paths only.
+${attachments.map((path) => `- ${path.replaceAll(ATTACHED_CLOSE, '')}`).join('\n')}
+${ATTACHED_CLOSE}
+
+`
 }

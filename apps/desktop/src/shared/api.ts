@@ -31,6 +31,7 @@ import type {
 } from '@octo/application'
 import type {
   Assignment,
+  ChatAttachment,
   DashboardSettings,
   Deliverable,
   DeliverableKind,
@@ -82,6 +83,8 @@ export const CHANNELS = {
   questionsList: 'questions:list',
   questionsAsk: 'questions:ask',
   questionsKeepWork: 'questions:keep-work',
+  questionsAttach: 'questions:attach',
+  questionsAttached: 'questions:attached',
   questionsCancel: 'questions:cancel',
   questionsProgress: 'questions:progress',
   evidenceOpen: 'evidence:open',
@@ -260,6 +263,13 @@ export type OctoApi = {
     conversationId: string | null,
     compute?: boolean,
   ): Promise<Result<QuestionRecord>>
+  /**
+   * Lets the PM choose a file and attaches it to a conversation: who answers reads it. Null when
+   * nothing was chosen; a format Octo does not read is refused with the reason.
+   */
+  attachToChat(projectId: string, conversationId: string): Promise<Result<ChatAttachment | null>>
+  /** What is attached to a conversation. */
+  chatFiles(projectId: string, conversationId: string): Promise<Result<ChatAttachment[]>>
   /** Copies into the project the files a question with calculations left in its work folder. */
   keepWork(projectId: string, questionId: string): Promise<Result<QuestionRecord>>
   /** The deliverables with a script: those of the project, then those the app ships. */

@@ -97,6 +97,10 @@ Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sez
 
 **File nella chat (15).** «Allega» copia il file nella cartella della conversazione, dentro `_octo/.lavori/`, e lo passa a chi risponde con i lettori di documenti che Octo ha già. Un formato che Octo non legge è rifiutato con il motivo.
 
+**Esito di I4 (18/11/2026): codice chiuso, criterio da verificare** (R6c.11, R6c.12 in `verifiche-da-fare.md`). Demo `demo/71-chiedi-allega`, `pnpm e2e:esiti`.
+- *«Con calcoli»*: sta subito prima di «Chiedi», con una «i» che dice che cosa succede senza, che cosa con, e quando accenderlo. Il comportamento non è cambiato.
+- *Allega*: il file è copiato in `_octo/.lavori/chiedi/<conversazione>/`; md, txt, csv e json si leggono come sono, Word, Excel, PowerPoint e PDF attraverso il testo fatto dai lettori di documenti di Octo; ogni altro formato è rifiutato con il motivo, e così un file oltre i 100 MB. A chi risponde Octo dice quali file sono allegati a quella conversazione; solo quei percorsi fanno eccezione alla regola che `_octo/.lavori/` non è una fonte, e una loro citazione viene controllata come le altre. Una conversazione nuova prende il suo identificativo al primo allegato.
+
 ## I5 — Trasversali
 
 **Lettore delle fonti (1).** Aprendo una citazione o una fonte markdown, un pannello di Octo mostra il file impaginato e posizionato sulla riga citata, evidenziata (`CitationPanel.tsx`, `openEvidence` in `ipc.ts`). «Apri con il sistema» resta. Nessuna libreria nuova se basta ciò che `AnswerView.tsx` usa già.

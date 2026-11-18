@@ -74,6 +74,8 @@ export const DOMAIN_ERROR_CODES = [
   'backup_invalid',
   'backup_not_written',
   'letterhead_invalid',
+  'attachment_unsupported',
+  'attachment_too_large',
   'secret_value_invalid',
   'private_host_invalid',
   'private_host_unknown',

@@ -609,10 +609,20 @@ export const messages = {
     approveHint: 'Nel progetto entra ciò che vedi qui sopra, e solo allora.',
     approved: 'Correzione approvata: da ora ogni esecuzione usa i file nuovi.',
   },
+  attach: {
+    button: 'Allega…',
+    hint: 'Copia un file nella conversazione: chi risponde lo legge insieme al progetto.',
+    list: 'File allegati a questa conversazione',
+  },
   computed: {
     option: 'Con calcoli',
-    optionHint:
-      'Claude può eseguire calcoli sui file del progetto. Legge il progetto senza poterlo modificare e scrive solo in una cartella di lavoro di Octo, senza rete.',
+    help: 'Che cosa fa «Con calcoli»',
+    steps: [
+      'Senza: Claude legge i file del progetto e risponde citandoli. Non fa conti: una somma la riporta solo se un file la scrive.',
+      'Con: Claude può anche calcolare sui file (somme, confronti, conteggi su un Excel o un CSV) e ti dà una tabella con le fonti e il file prodotto.',
+      'Accendilo quando la domanda chiede un numero che nessun file scrive già. Vale per la prossima domanda soltanto.',
+    ],
+    note: 'Claude legge il progetto senza poterlo modificare e scrive solo in una cartella di lavoro di Octo, senza rete. Nel progetto entra solo ciò che scegli di tenere.',
     computedFrom: 'Calcolata da:',
     inFile: (file: string) => `Per intero nel file ${file}.`,
     sourceMissing: (path: string) => `${path}: non trovato nel progetto`,
@@ -1970,6 +1980,9 @@ const errors: Record<ErrorCode, string> = {
   deck_model_invalid:
     'Questo file non è una presentazione che posso usare come modello: serve almeno una slide, dopo la copertina, con un titolo.',
   letterhead_invalid: 'Questo file non è un documento Word che posso usare come carta intestata.',
+  attachment_unsupported:
+    'Non so leggere questo formato. Posso allegare Word, Excel, PowerPoint, PDF e file di testo (md, txt, csv, json).',
+  attachment_too_large: 'Questo file è troppo grande per essere allegato: il limite è 100 MB.',
   update_check_failed:
     'Non riesco a controllare se c’è una versione nuova di Octo. Riprovo più tardi.',
   update_unavailable: 'Non c’è una versione più nuova per questo computer.',

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import {
   createAskQuestion,
   createBackups,
+  createChatFiles,
   createDashboard,
   createDashboardAdvice,
   createDayClosing,
@@ -586,12 +587,10 @@ function start(seatEnv: Record<string, string | undefined>): void {
     clock,
     identity,
   })
-  const documents = createDocuments({
-    files,
-    extractor: createWorkerTextExtractor(join(here, EXTRACT_WORKER_FILE)),
-    writer,
-    readings,
-  })
+  const extractor = createWorkerTextExtractor(join(here, EXTRACT_WORKER_FILE))
+  const documents = createDocuments({ files, extractor, writer, readings })
+  // What the PM attaches to a conversation is read by the same readers of documents.
+  const chatFiles = createChatFiles({ files, extractor, writer, clock })
   const folderMigration = createFolderMigration({
     legacy: createLegacyFeedIndexes(dataFolder),
     indexes,
@@ -811,7 +810,9 @@ function start(seatEnv: Record<string, string | undefined>): void {
       models: chosenModels,
       liveSources,
       work,
+      attachments: (project, conversationId) => chatFiles.of(project, conversationId),
     }),
+    chatFiles,
     keepWork: createKeepWork({ questions, work, writer }),
     scripted: createScriptedDeliverables({
       files,

@@ -21,6 +21,23 @@ export const UNCITABLE_FOLDERS = [
   `${OCTO_FOLDER}/.lavori`,
 ] as const
 
+/**
+ * Where the files the PM attaches to a conversation of «Chiedi» are kept. It is inside a folder
+ * that is never a source, and it is the exception: what is attached is read and cited, in the
+ * conversation it was attached to.
+ */
+export const CHAT_FILES_FOLDER = `${OCTO_FOLDER}/.lavori/chiedi`
+const CONVERSATION_ID = /^[\w-]{1,80}$/
+/** The folder of the attachments of a conversation; an id that could name another place is refused. */
+export function chatFilesFolder(conversationId: string): string {
+  if (!CONVERSATION_ID.test(conversationId)) throw new DomainError('attachment_unsupported')
+  return `${CHAT_FILES_FOLDER}/${conversationId}`
+}
+/** The formats read as they are; the documents go through the readers Octo has. */
+export const PLAIN_ATTACHMENTS: readonly string[] = ['md', 'txt', 'csv', 'json']
+/** A file attached to a conversation: its name, and the path of what who answers reads of it. */
+export type ChatAttachment = { name: string; path: string }
+
 /** One question of the PM with its outcome: a checked answer or the reason it failed. */
 export type QuestionRecord = {
   id: string

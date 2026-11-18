@@ -1,5 +1,6 @@
 import {
   ANALYSIS_FOLDER,
+  type ChatAttachment,
   type CheckedAnswer,
   type ConversationTurn,
   checkAnswer,
@@ -40,6 +41,8 @@ export type AskQuestionDeps = {
   work?: WorkFolders
   /** Writes in the project what the PM keeps of a calculation. */
   writer?: MemoryWriter
+  /** What the PM attached to a conversation: read by who answers, with the rest of the project. */
+  attachments?: (project: Project, conversationId: string) => Promise<ChatAttachment[]>
 }
 
 export type AskQuestionInput = {
@@ -90,14 +93,17 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
     question: string,
     history: ConversationTurn[],
     id: string,
+    conversationId: string,
   ): Promise<Pick<QuestionRecord, 'answer' | 'error' | 'model' | 'work'>> {
     let model: string | null = null
     try {
       const chosen = (await deps.models?.(input.project))?.ask ?? null
+      const attached = (await deps.attachments?.(input.project, conversationId)) ?? []
       const request = {
         projectFolder: input.project.folder,
         question,
         history,
+        attachments: attached.map((file) => file.path),
         model: chosen,
         liveSources: (await deps.liveSources?.(input.project)) ?? [],
         onModel: (used: string) => {
@@ -138,7 +144,7 @@ export function createAskQuestion(deps: AskQuestionDeps): AskQuestion {
     const history = input.conversationId
       ? earlierTurns(await deps.questions.list(input.project.folder), conversationId)
       : []
-    const result = await outcome(input, question, history, id)
+    const result = await outcome(input, question, history, id, conversationId)
     const record: QuestionRecord = {
       id,
       projectId: input.project.id,

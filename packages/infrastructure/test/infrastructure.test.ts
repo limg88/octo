@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
 import {
   mkdir,
   mkdtemp,
@@ -246,6 +247,18 @@ describe('evidence reader', () => {
   it('says when a cited file is too large to check', async () => {
     const tiny = createFsEvidenceReader(STATE_TEXT.length - 1)
     expect(await tiny.read(project, 'wiki/stato.md')).toEqual({ kind: 'too_large' })
+  })
+
+  it('never verifies what is not a source, but what the PM attached to a conversation', async () => {
+    const jobs = join(project, '_octo', '.lavori')
+    mkdirSync(join(jobs, 'chiedi', 'c-1'), { recursive: true })
+    writeFileSync(join(jobs, 'bozza.md'), 'Una bozza in lavorazione.')
+    writeFileSync(join(jobs, 'chiedi', 'c-1', 'appunti.txt'), 'Da chiarire: ambiente di prova.')
+    expect(await reader.read(project, '_octo/.lavori/bozza.md')).toEqual({ kind: 'missing' })
+    expect(await reader.read(project, '_octo/.lavori/chiedi/c-1/appunti.txt')).toMatchObject({
+      kind: 'found',
+      text: 'Da chiarire: ambiente di prova.',
+    })
   })
 
   it('reports a missing file and refuses a folder', async () => {

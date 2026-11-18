@@ -1,7 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import type { EvidenceReader } from '@octo/application'
-import { type Evidence, UNCITABLE_FOLDERS } from '@octo/domain'
+import { CHAT_FILES_FOLDER, type Evidence, UNCITABLE_FOLDERS } from '@octo/domain'
 
 /** Tracker exports reach tens of megabytes; beyond this a file is reported as too large. */
 export const MAX_EVIDENCE_BYTES = 200 * 1024 * 1024
@@ -20,7 +20,12 @@ export function createFsEvidenceReader(maxBytes = MAX_EVIDENCE_BYTES): EvidenceR
       }
       if (!isInside(root, target)) return { kind: 'outside' }
       // Earlier answers, settings and costs are not sources: a citation of them is never verified.
-      if (UNCITABLE_FOLDERS.some((folder) => isInside(resolve(root, folder), target))) {
+      // What the PM attached to a conversation is the exception: it was given to be read.
+      const attached = isInside(resolve(root, CHAT_FILES_FOLDER), target)
+      if (
+        !attached &&
+        UNCITABLE_FOLDERS.some((folder) => isInside(resolve(root, folder), target))
+      ) {
         return { kind: 'missing' }
       }
       const info = await stat(target)

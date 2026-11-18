@@ -1,5 +1,6 @@
 import type { AgentProgress } from '@octo/application'
 import {
+  type ChatAttachment,
   type Conversation,
   conversationOf,
   conversationsOf,
@@ -12,12 +13,20 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import type { Handoff } from './context.ts'
+import { InfoTip } from './InfoTip.tsx'
 import { dateTimeText, errorText, messages, progressText } from './messages.ts'
 import { BusyButton, Waiting } from './Spinner.tsx'
 
 type AskApi = Pick<
   OctoApi,
-  'listQuestions' | 'ask' | 'keepWork' | 'cancelAsk' | 'openEvidence' | 'onProgress'
+  | 'listQuestions'
+  | 'ask'
+  | 'keepWork'
+  | 'cancelAsk'
+  | 'openEvidence'
+  | 'onProgress'
+  | 'attachToChat'
+  | 'chatFiles'
 >
 
 type Props = {
@@ -77,6 +86,8 @@ export function AskView({
   viewing.current = chatId
   const [progress, setProgress] = useState<AgentProgress | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
+  /** What is attached to the conversation in view. */
+  const [attached, setAttached] = useState<ChatAttachment[]>([])
   const end = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLTextAreaElement>(null)
   /** The project on the page now: an answer that comes back for another one is not shown here. */
@@ -119,6 +130,33 @@ export function AskView({
       stop()
     }
   }, [api, project.id])
+
+  // The files of a conversation are those attached to it: another conversation has its own.
+  useEffect(() => {
+    setAttached([])
+    if (chatId === null) return
+    let current = true
+    void api.chatFiles(project.id, chatId).then((result) => {
+      if (current && result.ok) setAttached(result.value)
+    })
+    return () => {
+      current = false
+    }
+  }, [api, project.id, chatId])
+
+  /** Attaches a file the PM chooses; a conversation not yet started gets its id now. */
+  async function attach() {
+    setError(null)
+    const chat = chatId ?? crypto.randomUUID()
+    const projectId = project.id
+    const result = await api.attachToChat(projectId, chat)
+    if (live.current !== projectId) return
+    if (!result.ok) return setError(result.code)
+    const file = result.value
+    if (file === null) return
+    if (viewing.current === chatId) setChatId(chat)
+    setAttached((known) => [...known.filter((other) => other.name !== file.name), file])
+  }
 
   // The page follows the conversation when it grows, not when a source is looked at.
   // biome-ignore lint/correctness/useExhaustiveDependencies: what is watched is how much there is to read.
@@ -271,6 +309,15 @@ export function AskView({
             ))}
           </div>
         )}
+        {attached.length > 0 && (
+          <ul className="chips" aria-label={messages.attach.list}>
+            {attached.map((file) => (
+              <li key={file.name} className="chip">
+                {file.name}
+              </li>
+            ))}
+          </ul>
+        )}
         <form className="composer" onSubmit={(event) => void submit(event)}>
           <textarea
             ref={field}
@@ -283,6 +330,32 @@ export function AskView({
               if (event.key === 'Enter' && !event.shiftKey) void submit(event)
             }}
           />
+          <button
+            type="button"
+            className="quiet"
+            title={messages.attach.hint}
+            disabled={pending !== null}
+            onClick={() => void attach()}
+          >
+            {messages.attach.button}
+          </button>
+          {canCompute && (
+            <span className="composer-option">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={compute}
+                  onChange={(event) => setCompute(event.target.checked)}
+                />
+                {messages.computed.option}
+              </label>
+              <InfoTip
+                title={messages.computed.help}
+                steps={messages.computed.steps}
+                note={messages.computed.note}
+              />
+            </span>
+          )}
           <BusyButton
             type="submit"
             busy={pending !== null}
@@ -291,16 +364,6 @@ export function AskView({
           >
             {messages.askSubmit}
           </BusyButton>
-          {canCompute && (
-            <label className="check" title={messages.computed.optionHint}>
-              <input
-                type="checkbox"
-                checked={compute}
-                onChange={(event) => setCompute(event.target.checked)}
-              />
-              {messages.computed.option}
-            </label>
-          )}
           {pending !== null && (
             <button type="button" onClick={() => void api.cancelAsk(project.id)}>
               {messages.askCancel}

@@ -1,5 +1,6 @@
 export * from './ask-question.ts'
 export * from './backup.ts'
+export * from './chat-files.ts'
 export * from './dashboard.ts'
 export * from './dashboard-advice.ts'
 export * from './day-closing.ts'

@@ -42,7 +42,7 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
     ask: async (request) =>
       runStructured(config, {
         projectFolder: request.projectFolder,
-        input: askInput(request.question, request.history),
+        input: askInput(request.question, request.history, request.attachments),
         systemPrompt: askSystemPrompt(
           await projectRules(request.projectFolder),
           request.liveSources,
@@ -60,7 +60,7 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
         config,
         {
           projectFolder: request.projectFolder,
-          input: askInput(request.question, request.history),
+          input: askInput(request.question, request.history, request.attachments),
           systemPrompt: `${askSystemPrompt(rules, request.liveSources)}${COMPUTE_PROMPT}`,
           schema: computedAnswerSchema,
           onProgress: request.onProgress,

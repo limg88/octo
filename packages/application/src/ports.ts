@@ -75,6 +75,8 @@ export type AskRequest = {
   question: string
   /** The earlier questions of the same conversation with their answers: context, not sources. */
   history?: readonly ConversationTurn[]
+  /** What the PM attached to the conversation, as paths of the project to read: they are sources. */
+  attachments?: readonly string[]
   /** The model to use; absent or null: the default of Claude Code on this seat. */
   model?: string | null
   /** What Octo reads directly for the project: the freshest data of each system. */

@@ -26,6 +26,10 @@ const api: OctoApi = {
   openDiskAccessSettings: () => ipcRenderer.invoke(CHANNELS.diskAccessOpen),
   ask: (projectId, question, conversationId, compute) =>
     ipcRenderer.invoke(CHANNELS.questionsAsk, { projectId, question, conversationId, compute }),
+  attachToChat: (projectId, conversationId) =>
+    ipcRenderer.invoke(CHANNELS.questionsAttach, { projectId, conversationId }),
+  chatFiles: (projectId, conversationId) =>
+    ipcRenderer.invoke(CHANNELS.questionsAttached, { projectId, conversationId }),
   keepWork: (projectId, questionId) =>
     ipcRenderer.invoke(CHANNELS.questionsKeepWork, { projectId, questionId }),
   scriptedDeliverables: (projectId) => ipcRenderer.invoke(CHANNELS.scriptedList, { projectId }),

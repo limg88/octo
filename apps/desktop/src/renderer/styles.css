@@ -3725,6 +3725,14 @@ span.marker-warning {
 }
 
 /* The option beside the question: said each time, so it sits by the button that asks. */
+/* The option of the next question and its guide stay together, right before the button. */
+.composer-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+}
+
 .composer .check {
   display: inline-flex;
   align-items: center;

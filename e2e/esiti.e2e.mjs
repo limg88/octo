@@ -4,7 +4,7 @@
 // Run with `pnpm e2e:esiti` (it builds first; it needs the test Postgres, `pnpm db:setup`).
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 
@@ -153,6 +153,36 @@ try {
   })
   assert.equal(await drafts.getByText(/99\.000/).count(), 0)
   await drafts.getByText('Ciao Carla,').first().waitFor()
+
+  // I4. «Con calcoli» says what it does, right beside the button that asks; a file is attached
+  // to the conversation and copied in its folder, and a format Octo does not read is refused.
+  // The dialog of the system is answered here in its place.
+  await section('Chiedi').click()
+  const composer = page.locator('form.composer')
+  const choose = (path) =>
+    app.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosen] })
+    }, path)
+  writeFileSync(`${work}/foto.heic`, 'x')
+  writeFileSync(`${work}/nota.txt`, 'Da chiarire: ambiente di prova.')
+  await choose(`${work}/foto.heic`)
+  await composer.getByRole('button', { name: 'Allega…' }).click({ timeout: TIMEOUT_MS })
+  await page.getByText(/^Non so leggere questo formato/).waitFor({ timeout: TIMEOUT_MS })
+  await choose(`${work}/nota.txt`)
+  await composer.getByRole('button', { name: 'Allega…' }).click()
+  await page
+    .getByRole('list', { name: 'File allegati a questa conversazione' })
+    .getByText('nota.txt')
+    .waitFor({ timeout: TIMEOUT_MS })
+  const chats = `${work}/Aurora/_octo/.lavori/chiedi`
+  const [chat] = readdirSync(chats)
+  assert.equal(readFileSync(`${chats}/${chat}/nota.txt`, 'utf8'), 'Da chiarire: ambiente di prova.')
+  if ((await composer.getByLabel('Con calcoli').count()) > 0) {
+    await composer.getByRole('button', { name: 'Che cosa fa «Con calcoli»' }).click()
+    await composer.getByText(/Accendilo quando la domanda chiede un numero/).waitFor()
+    await page.screenshot({ path: `${work}/chiedi.png`, fullPage: true })
+    await composer.getByRole('button', { name: 'Che cosa fa «Con calcoli»' }).click()
+  }
 
   // A request that takes its time, left behind: the list says where Claude works.
   await section('Chiedi').click()

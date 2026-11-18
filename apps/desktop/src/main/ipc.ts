@@ -5,6 +5,7 @@ import type {
   AppPreferences,
   AskQuestion,
   Backups,
+  ChatFiles,
   Dashboard,
   DashboardAdvice,
   Deliverables,
@@ -67,6 +68,7 @@ export type IpcDeps = {
   evidence: EvidenceReader
   askQuestion: AskQuestion
   keepWork: KeepWork
+  chatFiles: ChatFiles
   scripted: ScriptedDeliverables
   sources: Sources
   meetings: Meetings
@@ -129,6 +131,7 @@ const askInput = byProject.extend({
   conversationId: z.string().max(MAX_RULE_LENGTH).nullable().default(null),
   compute: z.boolean().default(false),
 })
+const chatInput = byProject.extend({ conversationId: z.string().min(1).max(MAX_RULE_LENGTH) })
 const keepWorkInput = byProject.extend({ questionId: z.string().min(1).max(MAX_RULE_LENGTH) })
 const scriptedInput = byProject.extend({ slug: z.string().min(1).max(MAX_RULE_LENGTH) })
 const scriptedRunInput = scriptedInput.extend({
@@ -711,6 +714,21 @@ export function registerIpc(deps: IpcDeps): void {
       if (running.get(projectId) === controller) running.delete(projectId)
     }
   })
+
+  handle(CHANNELS.questionsAttach, chatInput, async ({ projectId, conversationId }) => {
+    const project = await deps.projects.get(projectId)
+    const choice = await dialog.showOpenDialog(deps.window, { properties: ['openFile'] })
+    const chosen = choice.filePaths[0]
+    if (choice.canceled || !chosen) return null
+    return deps.chatFiles.attach(project, conversationId, {
+      name: chosen,
+      bytes: await readFile(chosen),
+    })
+  })
+
+  handle(CHANNELS.questionsAttached, chatInput, async ({ projectId, conversationId }) =>
+    deps.chatFiles.of(await deps.projects.get(projectId), conversationId),
+  )
 
   handle(CHANNELS.questionsKeepWork, keepWorkInput, async ({ projectId, questionId }) =>
     deps.keepWork(await deps.projects.get(projectId), questionId),

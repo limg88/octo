@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { CheckedAnswer, Project, QuestionRecord } from '@octo/domain'
+import type { ChatAttachment, CheckedAnswer, Project, QuestionRecord } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AnswerView } from '../src/renderer/AnswerView.tsx'
@@ -56,7 +56,14 @@ const record: QuestionRecord = {
 
 type AskApi = Pick<
   OctoApi,
-  'listQuestions' | 'ask' | 'keepWork' | 'cancelAsk' | 'openEvidence' | 'onProgress'
+  | 'listQuestions'
+  | 'ask'
+  | 'keepWork'
+  | 'cancelAsk'
+  | 'openEvidence'
+  | 'onProgress'
+  | 'attachToChat'
+  | 'chatFiles'
 >
 
 const askApi = (overrides: Partial<AskApi> = {}): AskApi => ({
@@ -66,6 +73,8 @@ const askApi = (overrides: Partial<AskApi> = {}): AskApi => ({
   cancelAsk: vi.fn(async () => ok(null)),
   openEvidence: vi.fn(async () => ok(null)),
   onProgress: () => () => {},
+  attachToChat: vi.fn(async () => ok<ChatAttachment | null>(null)),
+  chatFiles: vi.fn(async () => ok<ChatAttachment[]>([])),
   ...overrides,
 })
 
@@ -299,6 +308,37 @@ describe('the conversation with a project', () => {
     expect(screen.getByText('E poi?', { selector: '.question' })).toBeTruthy()
   })
 
+  it('attaches a file to the conversation, which is then asked in, and explains a refusal', async () => {
+    const brief = { name: 'capitolato.docx', path: '_octo/.lavori/chiedi/c-9/capitolato.docx.md' }
+    const attachToChat = vi
+      .fn<OctoApi['attachToChat']>()
+      .mockResolvedValueOnce(ok(null))
+      .mockResolvedValueOnce({ ok: false, code: 'attachment_unsupported' })
+      .mockResolvedValue(ok(brief))
+    const api = askApi({ listQuestions: vi.fn(async () => ok([])), attachToChat })
+    render(<AskView api={api} project={aurora} />)
+    const attach = await screen.findByRole('button', { name: messages.attach.button })
+    // Nothing chosen: nothing changes. A format Octo does not read is refused with the reason.
+    fireEvent.click(attach)
+    await waitFor(() => expect(attachToChat).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('list', { name: messages.attach.list })).toBeNull()
+    fireEvent.click(attach)
+    expect(await screen.findByText(errorText('attachment_unsupported'))).toBeTruthy()
+    fireEvent.click(attach)
+    const list = await screen.findByRole('list', { name: messages.attach.list })
+    expect(list.textContent).toBe('capitolato.docx')
+    // The conversation not yet started got an id with its first file: the question goes there.
+    const chat = attachToChat.mock.calls[2]?.[1] ?? ''
+    expect(chat).not.toBe('')
+    fireEvent.change(screen.getByPlaceholderText(messages.askPlaceholder), {
+      target: { value: 'Che cosa chiede il capitolato?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    await waitFor(() =>
+      expect(api.ask).toHaveBeenCalledWith('p-1', 'Che cosa chiede il capitolato?', chat, false),
+    )
+  })
+
   it('says so when no conversation was had yet', async () => {
     render(<AskView api={askApi({ listQuestions: vi.fn(async () => ok([])) })} project={aurora} />)
     expect(await screen.findByText(chats.none)).toBeTruthy()
@@ -371,6 +411,10 @@ describe('a question answered with calculations', () => {
     unmount()
     render(<AskView api={api} project={aurora} canCompute />)
     const field = await screen.findByLabelText(messages.askPlaceholder)
+    // What the option does and when it is worth it is a click away, beside it.
+    fireEvent.click(screen.getByRole('button', { name: words.help }))
+    expect(screen.getByText(words.steps[0])).toBeTruthy()
+    expect(screen.getByText(words.note)).toBeTruthy()
     fireEvent.change(field, { target: { value: 'Quando consegniamo?' } })
     fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
     await waitFor(() =>
