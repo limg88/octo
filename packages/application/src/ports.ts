@@ -110,6 +110,12 @@ export interface WorkFolders {
   write(projectId: string, runId: string, name: string, content: Uint8Array): Promise<void>
 }
 
+/** The kinds of deliverable that travel with the app, read from its files. */
+export interface ShippedCatalog {
+  /** The kinds in the order of the catalog. Throws `catalog_invalid` naming what is broken. */
+  kinds(): Promise<DeliverableKind[]>
+}
+
 /** The deliverables with a script that travel with the app, to start one in a project from. */
 export interface ScriptedTemplates {
   slugs(): Promise<string[]>

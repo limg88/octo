@@ -12,6 +12,7 @@ export const DOMAIN_ERROR_CODES = [
   'fence_unavailable',
   'fence_interpreter_missing',
   'work_not_found',
+  'catalog_invalid',
   'scripted_not_found',
   'scripted_invalid',
   'scripted_input_missing',

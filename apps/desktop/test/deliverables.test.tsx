@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import type { AgentProgress } from '@octo/application'
-import {
-  DELIVERABLE_CATALOG,
-  type Deliverable,
-  type DeliverableKind,
-  type Project,
-  type StoredMeeting,
-  type TemplateFormat,
+import type {
+  Deliverable,
+  DeliverableKind,
+  Project,
+  StoredMeeting,
+  TemplateFormat,
 } from '@octo/domain'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DELIVERABLE_CATALOG } from '../../../packages/domain/test/support/catalog.ts'
 import { SOURCES_SHOWN } from '../src/renderer/AnswerView.tsx'
 import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'

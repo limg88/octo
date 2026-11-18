@@ -1,0 +1,34 @@
+{
+  "title": "Modifiche da applicare al tracker",
+  "summary": "L’elenco delle modifiche da fare a mano sul tracker: voce, azione, testo di oggi, testo nuovo, decisione.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Che cosa va sistemato",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: esiti della riunione di pianificazione del 12/11"
+    },
+    {
+      "key": "origine",
+      "label": "Da dove vengono le modifiche",
+      "kind": "text",
+      "required": false,
+      "hint": "La riunione, la mail o il documento che le decide"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni modifica è un solo campo di una sola voce, con il testo di oggi e il testo nuovo",
+    "Il testo di oggi è quello del tracker, parola per parola",
+    "Ogni modifica ha la decisione da cui viene e chi l’ha presa",
+    "La data dei dati del tracker è dichiarata",
+    "Nessuna modifica che nessuno ha deciso"
+  ]
+}

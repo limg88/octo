@@ -1,0 +1,34 @@
+{
+  "title": "Technical proposal",
+  "summary": "La parte narrativa di una proposta: contesto, perimetro, attività, approccio, assunzioni. Senza cifre.",
+  "audience": "client",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Per quale fase o progetto",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: fase 3, da gennaio a marzo"
+    },
+    {
+      "key": "perimetro",
+      "label": "Quale perimetro",
+      "kind": "long",
+      "required": true,
+      "hint": "Dove è deciso che cosa è dentro: la presentazione di pianificazione, un elenco, una mail"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Nessuna cifra: né giornate, né costi, né capacità, nemmeno nelle tabelle",
+    "Il perimetro è quello deciso nella fonte indicata, non l’elenco del tracker",
+    "Le esclusioni sono riportate parola per parola",
+    "Nessun residuo della fase precedente",
+    "Assunzioni e dipendenze dal cliente sono esplicite"
+  ]
+}

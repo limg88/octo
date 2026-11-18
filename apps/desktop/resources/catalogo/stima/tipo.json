@@ -1,0 +1,34 @@
+{
+  "title": "Stima",
+  "summary": "Giornate per attività con intervallo: tu confermi le righe, i totali li calcola Octo.",
+  "audience": "internal",
+  "calculation": "pert",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Che cosa va stimato",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: migrazione del modulo ordini"
+    },
+    {
+      "key": "perimetro",
+      "label": "Che cosa è dentro e che cosa è fuori",
+      "kind": "long",
+      "required": false
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni riga dice da che cosa dipende lo sforzo, con la sua fonte",
+    "Lo stato dell’informazione è onesto: dove manca, l’intervallo è largo",
+    "La contingenza è una riga a sé",
+    "Ci sono allineamento con il cliente, revisioni e consegna",
+    "Gli avvisi sotto il totale sono risolti o motivati"
+  ]
+}

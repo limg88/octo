@@ -16,6 +16,9 @@ mac:
     # The deliverables with a script a project starts its own copy from.
     - from: resources/deliverable
       to: deliverable
+    # The kinds of the catalog of deliverables: what each is and how it is written.
+    - from: resources/catalogo
+      to: catalogo
   category: public.app-category.productivity
   artifactName: Octo-${version}-mac-${arch}.${ext}
   target:

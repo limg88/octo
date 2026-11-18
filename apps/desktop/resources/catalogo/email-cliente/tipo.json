@@ -1,0 +1,39 @@
+{
+  "title": "Email al cliente",
+  "summary": "Recap, escalation o richiesta di decisione: una richiesta chiara, con chi e per quando.",
+  "audience": "client",
+  "fields": [
+    {
+      "key": "destinatario",
+      "label": "A chi scrivi",
+      "kind": "text",
+      "required": true
+    },
+    {
+      "key": "tema",
+      "label": "Di che cosa",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: spostamento del collaudo"
+    },
+    {
+      "key": "richiesta",
+      "label": "Che cosa chiedi o comunichi",
+      "kind": "long",
+      "required": true,
+      "hint": "La decisione o l’azione che ti serve, e per quando"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Una sola richiesta, con chi deve rispondere e per quando",
+    "Nessun dato interno (giornate, costi, tariffe, codici commessa)",
+    "I numeri sono quelli già comunicati al cliente, oppure il cambiamento è dichiarato",
+    "Il tono è quello che usi con questo destinatario"
+  ]
+}

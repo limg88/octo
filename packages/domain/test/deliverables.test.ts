@@ -4,9 +4,7 @@ import {
   cleanInputs,
   clientFilter,
   costOf,
-  DELIVERABLE_CATALOG,
   type Deliverable,
-  deliverableKind,
   ESTIMATE_PLACEHOLDER,
   estimate,
   estimateMarkdown,
@@ -15,6 +13,8 @@ import {
   ownKind,
   ownKindInput,
   ownKindPath,
+  parseCatalogIndex,
+  parseCatalogKind,
   registerMarkdown,
   registerTotals,
   reviewTimeSince,
@@ -22,6 +22,7 @@ import {
   withEstimate,
   withoutMarkers,
 } from '../src/index.ts'
+import { DELIVERABLE_CATALOG, deliverableKind } from './support/catalog.ts'
 
 const email = DELIVERABLE_CATALOG[0]
 if (!email) throw new Error('empty catalog')
@@ -304,5 +305,71 @@ describe('the filter on what goes to the client', () => {
     expect(clientFilter('| Fase | gg |\n|---|---|\n| **Totale** | 9,0 gg |')[0]?.excerpt).toBe(
       'Fase gg Totale 9,0 gg',
     )
+  })
+})
+
+describe('a kind of the catalog read from its files', () => {
+  const kind = {
+    title: 'Email al cliente',
+    summary: 'Una richiesta chiara.',
+    audience: 'client',
+    fields: [
+      { key: 'tema', label: 'Di che cosa', kind: 'text', required: true, hint: ' Un tema ' },
+    ],
+    checklist: ['Una sola richiesta'],
+  }
+  const instructions = 'Write the draft of a formal email to the client. '.repeat(6)
+  const broken = (change: object, text = instructions) => {
+    const parsed = parseCatalogKind('email', { ...kind, ...change }, text)
+    return parsed.ok ? null : parsed.why
+  }
+
+  it('is whole or is not a kind: what is wrong is named, never mended', () => {
+    expect(parseCatalogKind('email', kind, instructions)).toEqual({
+      ok: true,
+      kind: {
+        id: 'email',
+        title: 'Email al cliente',
+        summary: 'Una richiesta chiara.',
+        audience: 'client',
+        fields: [
+          { key: 'tema', label: 'Di che cosa', kind: 'text', required: true, hint: 'Un tema' },
+        ],
+        instructions,
+        checklist: ['Una sola richiesta'],
+      },
+    })
+    expect(broken({ title: ' ' })).toBe('title')
+    expect(broken({ audience: 'tutti' })).toBe('audience')
+    expect(broken({ fields: [] })).toBe('fields')
+    expect(broken({ fields: [{ ...kind.fields[0], kind: 'numero' }] })).toBe('fields')
+    expect(broken({ fields: [kind.fields[0], kind.fields[0]] })).toBe('fields')
+    expect(broken({ fields: ['tema'] })).toBe('fields')
+    expect(broken({ checklist: ['x', ''] })).toBe('checklist')
+    expect(broken({ checklist: 'x' })).toBe('checklist')
+    expect(broken({ calculation: 'somma' })).toBe('calculation')
+    expect(broken({ deck: 'si' })).toBe('deck')
+    expect(broken({}, 'Scrivi bene.')).toBe('istruzioni.md')
+    const notAKind = parseCatalogKind('email', ['x'], instructions)
+    expect(notAKind.ok ? null : notAKind.why).toBe('tipo.json')
+  })
+
+  it('keeps what only some kinds have, and wants the place of the figures in an estimate', () => {
+    const shown = parseCatalogKind('stato', { ...kind, deck: true }, instructions)
+    expect(shown.ok && shown.kind.deck).toBe(true)
+    expect(broken({ calculation: 'pert' })).toBe('istruzioni.md')
+    const estimated = parseCatalogKind(
+      'stima',
+      { ...kind, calculation: 'pert' },
+      `${instructions}${ESTIMATE_PLACEHOLDER}`,
+    )
+    expect(estimated.ok && estimated.kind.calculation).toBe('pert')
+  })
+
+  it('is named by an index of distinct ids, in the order of the catalog', () => {
+    expect(parseCatalogIndex(['email-cliente', 'verbale'])).toEqual(['email-cliente', 'verbale'])
+    for (const wrong of [[], 'email', ['email', 'email'], ['Email'], ['email', 3], ['../fuori']]) {
+      expect(parseCatalogIndex(wrong)).toBeNull()
+    }
   })
 })

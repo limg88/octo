@@ -1,0 +1,34 @@
+{
+  "title": "Stato di avanzamento",
+  "summary": "Il report di periodo per il cliente: avanzamento, fatto, prossimi passi, rischi, decisioni.",
+  "audience": "client",
+  "deck": true,
+  "fields": [
+    {
+      "key": "periodo",
+      "label": "Periodo",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: Sprint 28, dal 26/10 al 13/11"
+    },
+    {
+      "key": "destinatario",
+      "label": "A chi è destinato",
+      "kind": "text",
+      "required": false
+    },
+    {
+      "key": "note",
+      "label": "Che cosa mettere in evidenza",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni numero ha la sua fonte, e la data dei dati del tracker è dichiarata",
+    "I numeri sono coerenti con il report precedente, o lo scarto è dichiarato",
+    "Rischi e blocchi hanno un responsabile",
+    "Le decisioni richieste hanno una scadenza",
+    "Nessun dato interno (giornate, costi, tariffe, codici commessa)"
+  ]
+}

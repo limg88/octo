@@ -80,7 +80,10 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
     setStep(null)
     setProgress(null)
     void api.deliverableCatalog(project.id).then((result) => {
-      if (current && result.ok) setCatalog(result.value)
+      if (!current) return
+      // A catalog that cannot be read offers no kind, and says why.
+      if (result.ok) setCatalog(result.value)
+      else setError(result.code)
     })
     void api.listDeliverables(project.id).then((result) => {
       if (!current) return

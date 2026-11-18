@@ -1,0 +1,33 @@
+{
+  "title": "Scenari di test",
+  "summary": "I casi da provare per una funzione, dai requisiti: passi, dati, esito atteso, casi limite.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Che cosa va provato",
+      "kind": "text",
+      "required": true,
+      "hint": "La funzione, la voce di backlog o il requisito"
+    },
+    {
+      "key": "livello",
+      "label": "Che tipo di prova",
+      "kind": "text",
+      "required": false,
+      "hint": "Per esempio: collaudo con il cliente, regressione, integrazione"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni scenario dice quale requisito o criterio di accettazione copre",
+    "Gli esiti attesi vengono dai requisiti, non sono inventati",
+    "Ci sono i casi negativi e i casi limite, non solo il percorso principale",
+    "Ciò che non è coperto è dichiarato"
+  ]
+}

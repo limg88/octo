@@ -5,7 +5,6 @@ import {
   checkAnswer,
   cleanInputs,
   DECK_MODEL_PATH,
-  DELIVERABLE_CATALOG,
   type DeckOutline,
   type Deliverable,
   type DeliverableDraft,
@@ -54,9 +53,12 @@ import type {
   IdGenerator,
   MemoryWriter,
   ProjectFiles,
+  ShippedCatalog,
 } from './ports.ts'
 
 export type DeliverablesDeps = {
+  /** The kinds that travel with the app. */
+  shipped: ShippedCatalog
   writer: DeliverableWriter
   renderer: DocumentRenderer
   evidence: EvidenceReader
@@ -142,7 +144,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
   }
 
   const catalog = async (project: Project): Promise<DeliverableKind[]> => [
-    ...DELIVERABLE_CATALOG,
+    ...(await deps.shipped.kinds()),
     ...(await ownKinds(project)),
   ]
 

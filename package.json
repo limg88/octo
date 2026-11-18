@@ -27,6 +27,7 @@
     "e2e:riunioni": "pnpm build && node e2e/riunioni.e2e.mjs",
     "e2e:recinto": "pnpm build && node e2e/recinto.e2e.mjs",
     "e2e:script": "pnpm build && node e2e/script.e2e.mjs",
+    "e2e:catalogo": "pnpm build && node e2e/catalogo.e2e.mjs",
     "e2e:condivisa": "pnpm build && node e2e/condivisa.e2e.mjs"
   },
   "devDependencies": {

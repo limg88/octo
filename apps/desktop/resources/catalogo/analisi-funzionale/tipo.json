@@ -1,0 +1,33 @@
+{
+  "title": "Analisi funzionale da riunione",
+  "summary": "Dalla trascrizione di una riunione con il cliente: requisiti, regole, voci di backlog proposte.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "riunione",
+      "label": "Quale riunione",
+      "kind": "text",
+      "required": true,
+      "hint": "Titolo e data, o il nome del file della trascrizione"
+    },
+    {
+      "key": "ambito",
+      "label": "Quale funzione o area",
+      "kind": "text",
+      "required": false
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "La fonte è la trascrizione o gli appunti, non il riepilogo automatico",
+    "Ogni requisito ha chi l’ha chiesto e il passaggio da cui viene",
+    "Nessuna soluzione che in riunione non è stata discussa",
+    "Le contraddizioni sono riportate, non risolte",
+    "Le voci proposte dicono se nel progetto c’è già qualcosa che le copre"
+  ]
+}

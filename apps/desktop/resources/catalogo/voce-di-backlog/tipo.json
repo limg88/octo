@@ -1,0 +1,33 @@
+{
+  "title": "Voce di backlog",
+  "summary": "Una storia pronta da copiare nel tracker: perché, che cosa, criteri di accettazione.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Quale bisogno",
+      "kind": "text",
+      "required": true,
+      "hint": "Per esempio: esportazione degli ordini in Excel"
+    },
+    {
+      "key": "origine",
+      "label": "Da dove viene",
+      "kind": "text",
+      "required": false,
+      "hint": "La riunione, la mail o il documento che lo chiede"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Un solo bisogno, con la fonte della richiesta",
+    "I criteri di accettazione si possono provare uno per uno",
+    "Non duplica una voce che c’è già",
+    "Nessuna stima, priorità o assegnatario decisi al posto della squadra"
+  ]
+}

@@ -1813,6 +1813,8 @@ const errors: Record<ErrorCode, string> = {
   fence_interpreter_missing:
     'Manca l’interprete che Octo usa per i calcoli: reinstalla Octo. Intanto chiedi senza «Con calcoli».',
   work_not_found: 'Non trovo più i file di questo calcolo su questo computer.',
+  catalog_invalid:
+    'Il catalogo dei deliverable di Octo non è leggibile: un suo file manca o è stato modificato male. Reinstalla Octo.',
   scripted_not_found: 'Questo deliverable non c’è, né nel progetto né fra quelli di Octo.',
   scripted_invalid:
     'Il file che descrive questo deliverable (deliverable.json) non è leggibile, o nomina un percorso fuori dal progetto.',

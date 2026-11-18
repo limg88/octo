@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createDeliverables } from '@octo/application'
-import { deliverableKind, type ModelSettings, type Project } from '@octo/domain'
+import type { ModelSettings, Project } from '@octo/domain'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { CATALOG_FOLDER, deliverableKind } from '../../domain/test/support/catalog.ts'
 import { askInput, askSystemPrompt, liveSourcesPrompt } from '../src/claude/ask-prompt.ts'
 import { extract } from '../src/extract/extract.ts'
 import {
@@ -13,6 +14,7 @@ import {
   createFsEvidenceReader,
   createFsMemoryWriter,
   createFsProjectFiles,
+  createFsShippedCatalog,
   createWordRenderer,
   redTeamSystemPrompt,
   writerInput,
@@ -46,6 +48,7 @@ afterAll(async () => {
 function deliverables(models?: ModelSettings) {
   let tick = 0
   return createDeliverables({
+    shipped: createFsShippedCatalog(CATALOG_FOLDER),
     ...(models ? { models: async () => models } : {}),
     writer: createClaudeDeliverableWriter({
       command: process.execPath,
@@ -363,5 +366,61 @@ describe('a Word document on the letterhead of the PM', () => {
     const bytes = await createWordRenderer().word('x', 'a < b & c\u0001 > d')
     const document = strFromU8(unzipSync(bytes)['word/document.xml'] ?? new Uint8Array())
     expect(document).toContain('a &lt; b &amp; c &gt; d')
+  })
+})
+
+describe('the catalog the app ships', () => {
+  it('is read from its files, whole and in order, once', async () => {
+    const catalog = createFsShippedCatalog(CATALOG_FOLDER)
+    const kinds = await catalog.kinds()
+    expect(kinds.map((kind) => kind.id)).toEqual([
+      'email-cliente',
+      'stato-avanzamento',
+      'verbale',
+      'stima',
+      'analisi-funzionale',
+      'voce-di-backlog',
+      'modifiche-al-tracker',
+      'scenari-di-test',
+      'note-di-rilascio',
+      'technical-proposal',
+    ])
+    expect(await catalog.kinds()).toBe(kinds)
+  })
+
+  it('stops whole, naming the file to put right, and is read again once it is', async () => {
+    const { cp, mkdtemp, rm, writeFile } = await import('node:fs/promises')
+    const copy = await mkdtemp(join(tmpdir(), 'octo-catalogo-'))
+    try {
+      await cp(CATALOG_FOLDER, copy, { recursive: true })
+      const catalog = createFsShippedCatalog(copy)
+      const good = await readFile(join(copy, 'verbale', 'tipo.json'), 'utf8')
+      await writeFile(join(copy, 'verbale', 'tipo.json'), good.replace('"internal"', '"tutti"'))
+      await expect(createFsShippedCatalog(copy).kinds()).rejects.toMatchObject({
+        code: 'catalog_invalid',
+        message: expect.stringContaining('verbale: audience'),
+      })
+      await writeFile(join(copy, 'verbale', 'tipo.json'), '{ non json')
+      await expect(createFsShippedCatalog(copy).kinds()).rejects.toMatchObject({
+        code: 'catalog_invalid',
+      })
+      // Put right, the same catalog reads again: nothing was kept of the failure.
+      const failing = createFsShippedCatalog(copy)
+      await expect(failing.kinds()).rejects.toMatchObject({ code: 'catalog_invalid' })
+      await writeFile(join(copy, 'verbale', 'tipo.json'), good)
+      expect(await failing.kinds()).toHaveLength(10)
+      expect(await catalog.kinds()).toHaveLength(10)
+      await rm(join(copy, 'stima', 'istruzioni.md'))
+      await expect(createFsShippedCatalog(copy).kinds()).rejects.toMatchObject({
+        code: 'catalog_invalid',
+        message: expect.stringContaining('stima/istruzioni.md'),
+      })
+      await writeFile(join(copy, 'indice.json'), '["email-cliente","email-cliente"]')
+      await expect(createFsShippedCatalog(copy).kinds()).rejects.toMatchObject({
+        code: 'catalog_invalid',
+      })
+    } finally {
+      await rm(copy, { recursive: true, force: true })
+    }
   })
 })

@@ -1,0 +1,26 @@
+{
+  "title": "Verbale di riunione",
+  "summary": "Decisioni, azioni con responsabile e scadenza, questioni aperte, dalla trascrizione.",
+  "audience": "internal",
+  "fields": [
+    {
+      "key": "riunione",
+      "label": "Quale riunione",
+      "kind": "meeting",
+      "required": true,
+      "hint": "Una riunione importata da Verbale; oppure titolo e data, o il nome del file della trascrizione"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "La fonte è la trascrizione o gli appunti, non il riepilogo automatico",
+    "Ogni decisione e ogni azione ha la sua fonte",
+    "Responsabili e scadenze sono quelli detti in riunione; il resto è «DA CONFERMARE»",
+    "I disaccordi non risolti sono riportati come tali"
+  ]
+}

@@ -90,6 +90,7 @@ import {
   createFsRiskRegisterStore,
   createFsScriptedTemplates,
   createFsSharedReadings,
+  createFsShippedCatalog,
   createFsSourceSettings,
   createFsTeamStore,
   createFsTrackerExports,
@@ -220,6 +221,8 @@ function secretCipher(): SecretCipher {
 }
 
 const INTERPRETER_VARIABLE = 'OCTO_PYTHON_PATH'
+/** A folder to read the catalog of deliverables from instead of the one shipped: demos and tests. */
+const CATALOG_FOLDER_VARIABLE = 'OCTO_CATALOG_DIR'
 const INTERPRETER = join('bin', 'python3')
 /** The systems an interpreter is shipped for, as the installers name them. */
 const INTERPRETER_SYSTEMS: Partial<Record<NodeJS.Platform, string>> = {
@@ -621,7 +624,13 @@ function start(seatEnv: Record<string, string | undefined>): void {
       setTimeout(periodic, FIRST_SYNC_DELAY_MS)
     })
   setInterval(periodic, syncIntervalMs)
+  const shippedCatalog = createFsShippedCatalog(
+    process.env[CATALOG_FOLDER_VARIABLE] || shippedFolder('catalogo'),
+  )
+  // Checked when Octo starts: a kind that is not whole is said at once, with its file.
+  shippedCatalog.kinds().catch((error: unknown) => console.error('catalog of deliverables:', error))
   const deliverables = createDeliverables({
+    shipped: shippedCatalog,
     writer: createClaudeDeliverableWriter(claude),
     renderer: createWordRenderer(),
     evidence,

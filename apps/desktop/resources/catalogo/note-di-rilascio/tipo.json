@@ -1,0 +1,39 @@
+{
+  "title": "Note di rilascio",
+  "summary": "Che cosa cambia per chi usa il sistema: novità, correzioni, problemi noti.",
+  "audience": "client",
+  "fields": [
+    {
+      "key": "tema",
+      "label": "Quale rilascio",
+      "kind": "text",
+      "required": true,
+      "hint": "Versione o nome, per esempio: 2.4 di novembre"
+    },
+    {
+      "key": "data",
+      "label": "Data del rilascio",
+      "kind": "date",
+      "required": false
+    },
+    {
+      "key": "perimetro",
+      "label": "Che cosa contiene",
+      "kind": "long",
+      "required": false,
+      "hint": "Lo sprint, il periodo o l’elenco delle voci rilasciate"
+    },
+    {
+      "key": "note",
+      "label": "Altro da sapere",
+      "kind": "long",
+      "required": false
+    }
+  ],
+  "checklist": [
+    "Ogni voce risulta rilasciata o chiusa nel tracker, con la data dei dati",
+    "Ogni voce parte dal beneficio per chi usa il sistema, senza gergo né numeri di ticket",
+    "I problemi noti hanno il loro modo di aggirarli",
+    "Nessun dato interno (giornate, costi, tariffe, codici commessa)"
+  ]
+}

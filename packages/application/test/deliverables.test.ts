@@ -13,6 +13,7 @@ import {
   type RedTeamReport,
 } from '@octo/domain'
 import { describe, expect, it } from 'vitest'
+import { DELIVERABLE_CATALOG } from '../../domain/test/support/catalog.ts'
 import { createDeliverables, type DraftRequest } from '../src/index.ts'
 import { countingIds, evidenceFrom, memoryWriter, removerOf } from './fakes.ts'
 
@@ -55,6 +56,7 @@ function setup(options: { fails?: Error; redTeamFails?: Error; deck?: DeckDraft 
   let now = START
   const base = removerOf(memory.files)
   const service = createDeliverables({
+    shipped: { kinds: async () => [...DELIVERABLE_CATALOG] },
     writer: {
       draft: async (request) => {
         requests.push(request)
