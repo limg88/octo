@@ -264,7 +264,7 @@ describe('hours', () => {
     await screen.findByRole('region', { name: text.setupTitle })
     const path = screen.getByLabelText(text.timesheetPath) as HTMLInputElement
     await waitFor(() => expect(path.value).toBe('ore/Timesheets'))
-    fireEvent.change(screen.getByLabelText(text.projects), { target: { value: 'P1, P2' } })
+    fireEvent.change(screen.getByLabelText(text.projects), { target: { value: 'P1\nP2' } })
     fireEvent.change(screen.getByLabelText(text.threshold), { target: { value: '30' } })
     // The day the comparison stops at says what it does, and what leaving it empty means.
     const cutoff = screen.getByLabelText<HTMLInputElement>(text.cutoff)

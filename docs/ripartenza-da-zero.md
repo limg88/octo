@@ -54,7 +54,7 @@ Per rifare il foglio dei valori dopo un cambio delle impostazioni: `python3 ~/Do
 5. «Aggiungi un progetto…» → «Scegli la cartella…» → `~/Documents/Projects/DEEM-da-zero`.
    Atteso: si apre «Impostazioni» sul pannello «Avvio del progetto», con «Niente è ancora collegato».
 6. **Posta.** «Collega: Posta». Parole chiave, mittenti da escludere e giorno di inizio dal foglio dei valori. «Anteprima» prima di salvare: guarda quante mail entrerebbero e se fra i primi oggetti c'è rumore.
-   Le parole chiave vanno **una per riga**: incollate su una riga sola con le virgole diventano un'unica parola che nessuna mail contiene, e l'anteprima dice «0 mail entrerebbero con queste regole». Il foglio dei valori le dà già una per riga; per gli altri campi vale ciò che dice l'etichetta (alcuni vogliono le virgole).
+   Le parole chiave vanno **una per riga**: incollate su una riga sola con le virgole diventano un'unica parola che nessuna mail contiene, e l'anteprima dice «0 mail entrerebbero con queste regole». Il foglio dei valori dà ogni elenco già uno per riga, e tutti i campi a elenco di Octo si scrivono così (dal 18/11/2026: prima alcuni volevano le virgole, e un nome scritto «Cognome, Nome» diventava due persone).
    Se Octo dice che non riesce a leggere Mail: Impostazioni di Sistema › Privacy e sicurezza › Accesso completo al disco, abilita Octo e riaprilo (con il comando del passo 3). Con una build nuova non firmata il permesso va quasi sempre ridato.
 7. **Azure DevOps**, **Jira**, **Confluence**, **NetSuite**: per ciascuno «Collega», i valori dal foglio, la credenziale a mano, «Prova e salva».
    Atteso per ciascuno: «Collegamento riuscito e salvato.»

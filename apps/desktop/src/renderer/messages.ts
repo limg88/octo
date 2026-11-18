@@ -453,7 +453,7 @@ export const messages = {
     project: 'Progetto',
   },
   choosePath: 'Scegli…',
-  commaList: 'Più valori si separano con la virgola.',
+  lineList: 'Un valore per riga.',
   monthBefore: 'Mese precedente',
   monthAfter: 'Mese successivo',
   sourceLink: 'Collega',

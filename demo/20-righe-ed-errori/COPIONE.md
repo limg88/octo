@@ -44,6 +44,6 @@ Durata: 4 minuti. Mostra che una riga scritta male non sparisce più al salvatag
 - Gli errori stanno sotto il campo o accanto al pulsante che li ha provocati, e dicono che cosa manca e dove andare.
 
 ## Limiti
-- I campi a righe con i separatori non ci sono più (incremento 6): restano liste separate da virgola per tag, persone attese e codici, che diventeranno selezioni.
+- I campi a righe con i separatori non ci sono più (incremento 6): restano liste con un valore per riga (fino al 18/11/2026 separate da virgola) per tag, persone attese e codici, che diventeranno selezioni.
 - Un «Salva» riuscito non dà ancora una conferma uguale in tutte le schede.
 - Gli errori che arrivano dai sistemi (credenziale rifiutata, sistema che non risponde) sono quelli di prima.

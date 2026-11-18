@@ -511,7 +511,7 @@ describe('dashboard', () => {
       ),
     )
     expect(api.chooseProjectPath).toHaveBeenLastCalledWith('p-1', 'file', ['json'])
-    fireEvent.change(screen.getByLabelText(text.tags), { target: { value: 'Team, Altro' } })
+    fireEvent.change(screen.getByLabelText(text.tags), { target: { value: 'Team\nAltro' } })
     // Only the items of the supplier's own people: a tick, off until the PM asks.
     const own = screen.getByLabelText<HTMLInputElement>(messages.ownPeopleOnly.label)
     expect(own.checked).toBe(false)

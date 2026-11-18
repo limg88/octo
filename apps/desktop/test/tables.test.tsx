@@ -137,6 +137,23 @@ describe('a list of known values', () => {
   }
   const MANY = Array.from({ length: 40 }, (_unused, at) => `CAES-${3000 + at}`)
 
+  it('takes typed values one per line while nothing is known, commas and all', () => {
+    const seen: string[][] = []
+    function People() {
+      const [chosen, setChosen] = useState<string[]>(['Rossi, Mario'])
+      seen.push(chosen)
+      return <KnownList label="Persone" known={[]} chosen={chosen} onChange={setChosen} />
+    }
+    render(<People />)
+    const field = screen.getByLabelText<HTMLTextAreaElement>('Persone')
+    expect(field.value).toBe('Rossi, Mario')
+    expect(screen.getByText(messages.lineList)).toBeTruthy()
+
+    fireEvent.change(field, { target: { value: ' Rossi, Mario \n\nBianchi, Anna\n' } })
+
+    expect(seen.at(-1)).toEqual(['Rossi, Mario', 'Bianchi, Anna'])
+  })
+
   it('keeps many values in a list that is searched, with the chosen ones above it', () => {
     render(<Tags known={MANY} start={['CAES-3001', 'vecchio']} />)
     const chosen = screen.getByRole('list', { name: messages.knownList.chosen('Tag') })
