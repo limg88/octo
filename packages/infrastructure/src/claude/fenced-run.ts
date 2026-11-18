@@ -33,6 +33,8 @@ const FENCE_TOOLS = [...READ_ONLY_TOOLS, 'Write', 'Edit', 'Bash'] as const
 /** What the CLI says when the sandbox of the system cannot start. */
 const SANDBOX_HINT = /sandbox/i
 const HOME = '~/'
+/** What a run inside WSL2 may not read, but for the project, the work folder and the interpreter. */
+export const WSL_CLOSED = ['/mnt', '/run/WSL'] as const
 
 /**
  * The settings of the sandbox of a run (configuration D4 of docs/revisione-roadmap.md §6): the
@@ -40,7 +42,12 @@ const HOME = '~/'
  * needs, the network is closed. A run whose sandbox does not start fails, and a command never
  * runs outside it.
  */
-export function fenceSettings(projectFolder: string, fence: Fence): object {
+export function fenceSettings(
+  projectFolder: string,
+  fence: Fence,
+  /** What else the run must not read: inside WSL2, the disks of Windows and its way out. */
+  closed: readonly string[] = [],
+): object {
   // A path of the distribution is of Linux whatever system Octo runs on.
   const up = fence.interpreter.startsWith('/') ? posix.dirname : dirname
   const runtime = up(up(fence.interpreter))
@@ -52,7 +59,7 @@ export function fenceSettings(projectFolder: string, fence: Fence): object {
       filesystem: {
         denyWrite: [projectFolder],
         allowWrite: [fence.workFolder],
-        denyRead: [HOME],
+        denyRead: [HOME, ...closed],
         allowRead: [projectFolder, fence.workFolder, runtime],
       },
       network: { allowedDomains: [] },
@@ -67,7 +74,11 @@ const absoluteRule = (path: string): string => `/${path.replaceAll('\\', '/')}`
  * What a fenced run is granted: the file tools write in the work folder only, and the only
  * command is the interpreter. The rules alone are not the fence: the sandbox is.
  */
-export function fenceGrant(projectFolder: string, fence: Fence): RunGrant {
+export function fenceGrant(
+  projectFolder: string,
+  fence: Fence,
+  closed: readonly string[] = [],
+): RunGrant {
   return {
     tools: FENCE_TOOLS,
     allowed: [
@@ -80,7 +91,7 @@ export function fenceGrant(projectFolder: string, fence: Fence): RunGrant {
       '--add-dir',
       fence.workFolder,
       '--settings',
-      JSON.stringify(fenceSettings(projectFolder, fence)),
+      JSON.stringify(fenceSettings(projectFolder, fence, closed)),
       // Whatever would ask for a permission is refused: nobody is there to answer.
       '--permission-prompts',
       'none',
@@ -137,7 +148,9 @@ export async function runFenced<Output>(
   return runStructured(
     launcher ? { ...config, launcher } : config,
     { ...run, projectFolder, systemPrompt: `${run.systemPrompt}${fencePrompt(real)}` },
-    fenceGrant(seen(projectFolder), real),
+    // Inside WSL2 the home of Linux is not all there is to hide: the disks of Windows, with the
+    // profile of the person, and the socket Windows programs are started through.
+    fenceGrant(seen(projectFolder), real, launcher ? WSL_CLOSED : []),
     fenceFailure,
   )
 }

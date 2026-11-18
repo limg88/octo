@@ -42,8 +42,17 @@ export const shellQuote = (word: string): string => `'${word.replaceAll("'", `'\
  */
 export function launcherScript(command: readonly string[], args: readonly string[]): string {
   const words = [...command, ...args].map(shellQuote).join(' ')
-  return `#!/bin/sh\nPATH="$HOME/.local/bin:$PATH"\nexport PATH\nexec ${words}\n`
+  return `#!/bin/sh\n${NO_INTEROP}\nPATH="$HOME/.local/bin:$PATH"\nexport PATH\nexec ${words}\n`
 }
+
+/**
+ * Inside the fence nothing of Windows is to be started: the folders of Windows leave the PATH and
+ * the way programs of Windows are reached is forgotten. The sandbox closes the rest.
+ */
+const NO_INTEROP = [
+  'unset WSL_INTEROP WSLENV',
+  `PATH="$(printf '%s' "$PATH" | tr ':' '\\n' | grep -v '^/mnt/' | paste -sd ':' -)"`,
+].join('\n')
 
 export type WslDistro = { name: string; version: number; isDefault: boolean }
 

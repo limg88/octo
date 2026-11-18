@@ -79,6 +79,9 @@ def child_shell():
 attempt('child_shell', child_shell)
 attempt('network', lambda: urllib.request.urlopen('https://example.com', timeout=10).read())
 attempt('list_home', lambda: os.listdir(HOME))
+# Inside WSL2: a program of Windows would run outside every fence.
+attempt('windows_program', lambda: subprocess.run(['/mnt/c/Windows/System32/cmd.exe', '/c', 'echo', 'x'], check=True))
+attempt('windows_profile', lambda: os.listdir('/mnt/c/Users'))
 # The one thing that must work: the work folder.
 attempt('work_folder', write(os.path.join(W, 'permesso.txt')))
 json.dump(done, open(os.path.join(W, 'esito.json'), 'w'))
@@ -182,6 +185,8 @@ Report in "steps" what happened at each step.`,
         child_shell: false,
         network: false,
         list_home: false,
+        windows_program: false,
+        windows_profile: false,
         work_folder: true,
       })
 

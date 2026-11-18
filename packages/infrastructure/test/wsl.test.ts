@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { fenceGrant, fenceSettings } from '../src/claude/fenced-run.ts'
+import { fenceGrant, fenceSettings, WSL_CLOSED } from '../src/claude/fenced-run.ts'
 import {
   createClaudeCliRunner,
   createFsWorkFolders,
@@ -49,9 +49,11 @@ describe('a path of Windows as the distribution sees it', () => {
       workFolder: wslPath('C:\\Users\\paola\\AppData\\Roaming\\Octo\\lavoro\\p-1\\q-1') ?? '',
       interpreter: wslPath('C:\\Program Files\\Octo\\resources\\python-linux\\bin\\python3') ?? '',
     }
-    expect(fenceSettings(project, fence)).toMatchObject({
+    expect(fenceSettings(project, fence, WSL_CLOSED)).toMatchObject({
       sandbox: {
         filesystem: {
+          // The disks of Windows are closed but for the three folders the run needs.
+          denyRead: ['~/', '/mnt', '/run/WSL'],
           denyWrite: ['/mnt/c/Progetti/Aurora'],
           allowWrite: ['/mnt/c/Users/paola/AppData/Roaming/Octo/lavoro/p-1/q-1'],
           allowRead: [
@@ -81,6 +83,9 @@ describe('the script that starts Claude Code inside the distribution', () => {
     const script = launcherScript(['claude'], ['-p', '--settings', '{"sandbox":{"enabled":true}}'])
     expect(script.split('\n')).toEqual([
       '#!/bin/sh',
+      // Nothing of Windows is to be started from inside the fence.
+      'unset WSL_INTEROP WSLENV',
+      `PATH="$(printf '%s' "$PATH" | tr ':' '\\n' | grep -v '^/mnt/' | paste -sd ':' -)"`,
       'PATH="$HOME/.local/bin:$PATH"',
       'export PATH',
       "exec 'claude' '-p' '--settings' '{\"sandbox\":{\"enabled\":true}}'",
