@@ -24,6 +24,7 @@ import type {
   ScriptedRun,
   ScriptedSummary,
   SessionView,
+  SheetStep,
   TodayView,
   TrackerHoursRun,
   TrackerSnapshotRun,
@@ -108,6 +109,7 @@ export const CHANNELS = {
   deliverablesRevise: 'deliverables:revise',
   deliverablesApprove: 'deliverables:approve',
   deliverablesProgress: 'deliverables:progress',
+  deliverablesDraft: 'deliverables:draft',
   scriptedList: 'scripted:list',
   scriptedInstall: 'scripted:install',
   scriptedRun: 'scripted:run',
@@ -154,6 +156,7 @@ export const CHANNELS = {
   forecastCompile: 'forecast:compile',
   forecastOrdersRead: 'forecast:orders-read',
   projectSheets: 'sheet:list',
+  sheetStep: 'sheet:step',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   updateProgress: 'update:progress',
@@ -452,6 +455,8 @@ export type OctoApi = {
   readForecastOrders(projectId: string): Promise<Result<ForecastOrdersRun>>
   /** Every project code of the project over its whole life, up to the month that runs. */
   projectSheets(projectId: string): Promise<Result<Lifetime[]>>
+  /** What the reading of the sheets is doing, step by step: it may ask a year of months. */
+  onSheetStep(listener: (projectId: string, step: SheetStep) => void): () => void
   /** The people and the calendar of the project. */
   team(projectId: string): Promise<Result<ProjectTeam>>
   saveTeam(projectId: string, team: ProjectTeam): Promise<Result<ProjectTeam>>
@@ -474,6 +479,8 @@ export type OctoApi = {
    */
   restoreBackup(): Promise<Result<RestoreOutcome | null>>
   /** Tells what the writer is doing. Returns the function that stops listening. */
+  /** The draft of a deliverable, shown as soon as it is written: its critical reading follows. */
+  onDeliverableDraft(listener: (projectId: string, deliverable: Deliverable) => void): () => void
   onDeliverableProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void
   /** Returns the function that stops listening. */
   onProgress(listener: (projectId: string, progress: AgentProgress) => void): () => void

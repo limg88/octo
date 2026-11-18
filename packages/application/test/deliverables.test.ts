@@ -130,14 +130,33 @@ describe('writing a deliverable', () => {
 
   it('drafts with the sources checked and the red team done, and measures the writing', async () => {
     const { service, requests } = setup()
+    const told: string[] = []
+    const drafts: Deliverable[] = []
 
-    const made = await service.start(project, { kindId: 'email-cliente', inputs })
+    const made = await service.start(project, {
+      kindId: 'email-cliente',
+      inputs,
+      onProgress: (step) => told.push(step.kind),
+      onDraft: (drafted) => drafts.push(drafted),
+    })
 
     expect(made).toMatchObject({ id: 'd-1', status: 'review', title: 'Collaudo', redTeam: clean })
     expect(made.draft?.citations[0]?.status).toBe('verified')
+    // Where the time went is kept with the round: here the writer took it all.
     expect(made.rounds).toEqual([
-      { at: new Date(START).toISOString(), request: null, durationMs: 2 * MINUTE, error: null },
+      {
+        at: new Date(START).toISOString(),
+        request: null,
+        durationMs: 2 * MINUTE,
+        error: null,
+        phases: { writeMs: 2 * MINUTE, checkMs: 0, reviewMs: 0 },
+      },
     ])
+    // The draft is told before its critical reading, still being worked on, and the phases are said.
+    expect(told).toEqual(['checking', 'reviewing'])
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0]).toMatchObject({ status: 'writing', redTeam: null })
+    expect(drafts[0]?.draft).toEqual(made.draft)
     expect(requests[0]).toMatchObject({ revision: null, projectInstructions: null })
     expect(await service.get(project, 'd-1')).toEqual(made)
   })

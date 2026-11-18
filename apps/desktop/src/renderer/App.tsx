@@ -1,9 +1,10 @@
 import type { AgentStatus, SessionView } from '@octo/application'
 import type { Assignment, Project, RestoreOutcome } from '@octo/domain'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AllProjectsView } from './AllProjectsView.tsx'
 import { AskView } from './AskView.tsx'
+import { watchedApi } from './busy-api.ts'
 import {
   type DashboardFocus,
   type Handoff,
@@ -22,7 +23,7 @@ import { ProjectSheetView } from './ProjectSheetView.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
 import { SignIn } from './SignIn.tsx'
-import { SECTION_LABELS, type Section } from './sections.ts'
+import { KEPT_SECTIONS, listedSection, SECTION_LABELS, type Section } from './sections.ts'
 import { ThemeToggle } from './ThemeToggle.tsx'
 import { TodayView } from './TodayView.tsx'
 import { signalText } from './today-text.ts'
@@ -37,6 +38,11 @@ type Props = {
 
 /** How many projects the number keys reach. */
 const SHORTCUT_PROJECTS = 9
+
+/** The sections of a project the PM already opened: they stay as they were left, out of sight. */
+type Opened = { projectId: string | null; sections: readonly Section[] }
+const NONE_OPENED: Opened = { projectId: null, sections: [] }
+const busyKey = (projectId: string, section: Section): string => `${projectId}/${section}`
 
 export function App({ api, notify = systemNotify }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
@@ -65,6 +71,25 @@ export function App({ api, notify = systemNotify }: Props) {
   const [dashboardFocus, setDashboardFocus] = useState<DashboardFocus>(NO_DASHBOARD_FOCUS)
   /** The part of the settings a page sent the PM to; null: the settings open as usual. */
   const [settingsPart, setSettingsPart] = useState<SettingsPart | null>(null)
+  const [opened, setOpened] = useState<Opened>(NONE_OPENED)
+  /** The part of «Commessa» last in view: it stays the same while the PM is elsewhere. */
+  const sheetPlace = useRef<'sheet' | 'hours' | 'forecast'>('sheet')
+  /** Where Claude is working now, as project and section. */
+  const [busy, setBusy] = useState<readonly string[]>([])
+  /** One api for each section that stays open: it tells when Claude works for that section. */
+  const apis = useMemo(
+    () =>
+      Object.fromEntries(
+        KEPT_SECTIONS.map((section) => [
+          section,
+          watchedApi(api, (projectId, working) => {
+            const key = busyKey(projectId, section)
+            setBusy((now) => (working ? [...now, key] : now.filter((other) => other !== key)))
+          }),
+        ]),
+      ) as Record<Section, OctoApi>,
+    [api],
+  )
 
   // Nothing of a project follows the PM into another one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the project is what is watched.
@@ -298,6 +323,98 @@ export function App({ api, notify = systemNotify }: Props) {
     setTab('ask')
   }
 
+  // A section opened once stays mounted while the project is the same: a request to Claude that
+  // runs there is still received when the PM comes back. Another project starts from nothing.
+  const section = listedSection(tab)
+  if (tab === 'sheet' || tab === 'hours' || tab === 'forecast') sheetPlace.current = tab
+  const sameProject = opened.projectId === selectedId
+  if (
+    selected &&
+    KEPT_SECTIONS.includes(section) &&
+    !(sameProject && opened.sections.includes(section))
+  ) {
+    setOpened({
+      projectId: selected.id,
+      sections: sameProject ? [...opened.sections, section] : [section],
+    })
+  }
+
+  /** A section of the project in view; `active` is false while it waits out of sight. */
+  function sectionView(project: Project, name: Section, active: boolean): ReactNode {
+    if (name === 'today') {
+      return (
+        <TodayView
+          api={apis.today}
+          project={project}
+          active={active}
+          canJudge={agent?.available === true}
+          onOpenSection={setTab}
+          onOpenBugs={(filter) => {
+            setDashboardFocus({ ...NO_DASHBOARD_FOCUS, filter })
+            setTab('dashboard')
+          }}
+          onAsk={askAbout}
+          focus={todayFocus}
+          onFocus={setTodayFocus}
+          onCount={setTodayCount}
+          onOpenSettings={() => {
+            setSettingsPart('today')
+            setTab('sources')
+          }}
+        />
+      )
+    }
+    if (name === 'ask') {
+      return (
+        <AskView
+          api={apis.ask}
+          project={project}
+          canCompute={agent?.available === true && agent.computes === true}
+          seed={askSeed}
+          onSeedUsed={() => setAskSeed(null)}
+          onDraft={(next) => {
+            setHandoff(next)
+            setTab('deliverables')
+          }}
+        />
+      )
+    }
+    if (name === 'deliverables') {
+      return (
+        <DeliverablesView
+          api={apis.deliverables}
+          project={project}
+          active={active}
+          handoff={handoff}
+          onHandoffDone={() => setHandoff(null)}
+        />
+      )
+    }
+    if (name === 'dashboard') {
+      return (
+        <DashboardView
+          api={apis.dashboard}
+          project={project}
+          active={active}
+          canAsk={agent?.available === true}
+          onOpenSources={() => setTab('sources')}
+          onAsk={askAbout}
+          focus={dashboardFocus}
+          onFocus={setDashboardFocus}
+        />
+      )
+    }
+    return (
+      <ProjectSheetView
+        api={api}
+        project={project}
+        active={active}
+        place={sheetPlace.current}
+        onOpenSection={setTab}
+      />
+    )
+  }
+
   if (!signedIn) {
     return (
       <SignIn
@@ -336,6 +453,7 @@ export function App({ api, notify = systemNotify }: Props) {
             counts={{
               today: { count: todayCount, label: messages.today.countLabel(todayCount) },
             }}
+            working={KEPT_SECTIONS.filter((name) => busy.includes(busyKey(selected.id, name)))}
           />
         )}
         <div className="sidebar-foot">
@@ -387,7 +505,7 @@ export function App({ api, notify = systemNotify }: Props) {
             </button>
           </div>
         )}
-        {overview ? (
+        {overview && (
           <AllProjectsView
             api={api}
             onOpen={(projectId) => {
@@ -395,8 +513,9 @@ export function App({ api, notify = systemNotify }: Props) {
               setTab('today')
             }}
           />
-        ) : selected ? (
-          <>
+        )}
+        {selected ? (
+          <div className="section-view" hidden={overview}>
             <header className="project-header">
               <div className="page-title">
                 <h2 className="eyebrow">{selected.name}</h2>
@@ -412,70 +531,32 @@ export function App({ api, notify = systemNotify }: Props) {
                 {messages.assignment.notAssigned}
               </p>
             )}
-            {tab === 'today' ? (
-              <TodayView
-                api={api}
-                project={selected}
-                canJudge={agent?.available === true}
-                onOpenSection={setTab}
-                onOpenBugs={(filter) => {
-                  setDashboardFocus({ ...NO_DASHBOARD_FOCUS, filter })
-                  setTab('dashboard')
-                }}
-                onAsk={askAbout}
-                focus={todayFocus}
-                onFocus={setTodayFocus}
-                onCount={setTodayCount}
-                onOpenSettings={() => {
-                  setSettingsPart('today')
-                  setTab('sources')
-                }}
-              />
-            ) : tab === 'ask' ? (
-              <AskView
-                api={api}
-                project={selected}
-                canCompute={agent?.available === true && agent.computes === true}
-                seed={askSeed}
-                onSeedUsed={() => setAskSeed(null)}
-                onDraft={(next) => {
-                  setHandoff(next)
-                  setTab('deliverables')
-                }}
-              />
-            ) : tab === 'deliverables' ? (
-              <DeliverablesView
-                api={api}
-                project={selected}
-                handoff={handoff}
-                onHandoffDone={() => setHandoff(null)}
-              />
-            ) : tab === 'dashboard' ? (
-              <DashboardView
-                api={api}
-                project={selected}
-                canAsk={agent?.available === true}
-                onOpenSources={() => setTab('sources')}
-                onAsk={askAbout}
-                focus={dashboardFocus}
-                onFocus={setDashboardFocus}
-              />
-            ) : tab === 'sheet' || tab === 'hours' || tab === 'forecast' ? (
-              <ProjectSheetView api={api} project={selected} place={tab} onOpenSection={setTab} />
-            ) : (
+            {opened.projectId === selected.id &&
+              opened.sections.map((name) => (
+                <div
+                  key={`${selected.id}/${name}`}
+                  className="section-view"
+                  hidden={name !== section}
+                >
+                  {sectionView(selected, name, name === section && !overview)}
+                </div>
+              ))}
+            {section === 'sources' && (
               <ProjectSettings api={api} project={selected} part={settingsPart} />
             )}
-          </>
-        ) : (
-          <div className="notice">
-            <h2>{messages.noProjectTitle}</h2>
-            <p>{messages.noProjectBody}</p>
-            <div className="actions">
-              <button type="button" className="primary" onClick={() => openDialog('add')}>
-                {messages.addProject}
-              </button>
-            </div>
           </div>
+        ) : (
+          !overview && (
+            <div className="notice">
+              <h2>{messages.noProjectTitle}</h2>
+              <p>{messages.noProjectBody}</p>
+              <div className="actions">
+                <button type="button" className="primary" onClick={() => openDialog('add')}>
+                  {messages.addProject}
+                </button>
+              </div>
+            </div>
+          )
         )}
       </main>
       {dialog === 'add' && (

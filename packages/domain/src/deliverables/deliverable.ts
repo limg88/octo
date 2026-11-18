@@ -78,6 +78,8 @@ export type DeliverableRound = {
   request: string | null
   durationMs: number
   error: DomainErrorCode | null
+  /** Where the time went: the writing, the check of the sources, the critical reading. */
+  phases?: { writeMs: number; checkMs: number; reviewMs: number }
 }
 
 export const DELIVERABLE_STATUSES = ['writing', 'review', 'approved', 'failed'] as const

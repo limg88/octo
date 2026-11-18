@@ -59,7 +59,8 @@ import type {
 
 /** What the agent is doing right now, in terms a PM can read. */
 export type AgentProgress = {
-  kind: 'reading' | 'searching' | 'listing' | 'writing' | 'computing'
+  /** `checking` and `reviewing` are what Octo does after the agent wrote: the phases of a draft. */
+  kind: 'reading' | 'searching' | 'listing' | 'writing' | 'computing' | 'checking' | 'reviewing'
   target: string
 }
 

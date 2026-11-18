@@ -32,6 +32,7 @@ import { MeetingField } from './MeetingField.tsx'
 import { dateText, errorText, messages, progressText } from './messages.ts'
 import { ScriptedDeliverables } from './ScriptedDeliverables.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
+import { useReentry } from './use-reentry.ts'
 
 type Props = {
   api: OctoApi
@@ -40,6 +41,8 @@ type Props = {
   handoff?: Handoff | null
   /** Told when the context was used, or put aside by the PM. */
   onHandoffDone?: () => void
+  /** False while the page stays mounted out of sight: back in sight, kinds and list are read again. */
+  active?: boolean
 }
 
 /** Which step on a deliverable is running: the button that started it says so. */
@@ -54,7 +57,13 @@ type Shown =
   | { view: 'one'; id: string }
 
 /** The deliverables of a project: the catalog, the ones in the making, the approved ones. */
-export function DeliverablesView({ api, project, handoff = null, onHandoffDone }: Props) {
+export function DeliverablesView({
+  api,
+  project,
+  handoff = null,
+  onHandoffDone,
+  active = true,
+}: Props) {
   const [catalog, setCatalog] = useState<DeliverableKind[]>([])
   const [all, setAll] = useState<Deliverable[]>([])
   const [shown, setShown] = useState<Shown>({ view: 'catalog' })
@@ -94,11 +103,30 @@ export function DeliverablesView({ api, project, handoff = null, onHandoffDone }
     const stop = api.onDeliverableProgress((projectId, step) => {
       if (projectId === project.id) setProgress(step)
     })
+    // The draft is shown as soon as it is written: the critical reading goes on meanwhile.
+    const stopDraft = api.onDeliverableDraft((projectId, drafted) => {
+      if (projectId !== project.id) return
+      setAll((previous) => [drafted, ...previous.filter((other) => other.id !== drafted.id)])
+      setShown({ view: 'one', id: drafted.id })
+    })
     return () => {
       current = false
       stop()
+      stopDraft()
     }
   }, [api, project.id])
+
+  // Back in sight: the kinds may have been corrected in the settings. What runs is left alone.
+  useReentry(active, () => {
+    const projectId = project.id
+    void api.deliverableCatalog(projectId).then((result) => {
+      if (live.current === projectId && result.ok) setCatalog(result.value)
+    })
+    if (busy) return
+    void api.listDeliverables(projectId).then((result) => {
+      if (live.current === projectId && result.ok) setAll(result.value)
+    })
+  })
 
   /** Runs one step on a deliverable and puts what comes back in the list. */
   const run = useCallback(
@@ -432,6 +460,9 @@ function KindForm({
   )
 }
 
+const MS_PER_SECOND = 1000
+const seconds = (ms: number): number => Math.round(ms / MS_PER_SECOND)
+
 function Review({
   deliverable,
   kind,
@@ -451,6 +482,7 @@ function Review({
   const busy = step !== null
   const cost = costOf(deliverable)
   const lastFailed = deliverable.rounds.at(-1)?.error ?? null
+  const phases = deliverable.rounds.at(-1)?.phases
   const inReview = deliverable.status === 'review'
   // What the PM marked as seen holds for the draft it was marked on: a new draft starts unmarked.
   const round = `${deliverable.id}:${deliverable.rounds.length}`
@@ -484,6 +516,9 @@ function Review({
         )}
       </div>
       <div className="panel-body">
+        {deliverable.status === 'writing' && deliverable.draft && !deliverable.redTeam && (
+          <Waiting>{messages.review.pending}</Waiting>
+        )}
         {deliverable.redTeam && (
           <RedTeam
             report={deliverable.redTeam}
@@ -557,6 +592,8 @@ function Review({
         {messages.deliverableCost(cost.draftMinutes, cost.reviewMinutes, cost.rounds)}
         {deliverable.models?.write &&
           ` · ${messages.models.wroteAndReviewed(deliverable.models.write, deliverable.models.review)}`}
+        {phases &&
+          ` · ${messages.review.phases(seconds(phases.writeMs), seconds(phases.checkMs), seconds(phases.reviewMs))}`}
       </p>
       {deliverable.status === 'failed' && (
         <p className="warning" role="alert">

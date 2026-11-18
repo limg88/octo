@@ -41,6 +41,7 @@ import {
   shortDayText,
   signalText,
 } from './today-text.ts'
+import { useReentry } from './use-reentry.ts'
 import { useSelection } from './use-selection.ts'
 
 type TodayApi = Pick<
@@ -89,6 +90,8 @@ type Props = {
   onCount?: (count: number) => void
   /** How long the page stays open before the PM is taken to have looked at it. */
   visitAfterMs?: number
+  /** False while the page stays mounted out of sight: nothing is seen, and it reads again after. */
+  active?: boolean
 }
 
 const text = messages.today
@@ -142,6 +145,7 @@ export function TodayView({
   onOpenSettings,
   onCount,
   visitAfterMs = VISIT_AFTER_MS,
+  active = true,
 }: Props) {
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
@@ -206,7 +210,7 @@ export function TodayView({
   // The PM is taken to have looked at the page when it stayed open for a while: then what is
   // on it is no longer new. Once when the page opens, and again whenever something is marked.
   useEffect(() => {
-    if (view === null) return
+    if (view === null || !active) return
     const projectId = project.id
     if (visited.current === projectId && Object.keys(view.marks).length === 0) return
     const timer = setTimeout(() => {
@@ -215,7 +219,7 @@ export function TodayView({
       void api.markTodaySeen(projectId)
     }, visitAfterMs)
     return () => clearTimeout(timer)
-  }, [api, project.id, view, visitAfterMs])
+  }, [api, project.id, view, visitAfterMs, active])
 
   /** Asks Claude something about the page, one thing at a time, and shows the page it gives back. */
   const askClaude = useCallback(
@@ -294,6 +298,7 @@ export function TodayView({
       }),
     [api, project.id, load],
   )
+  useReentry(active, () => void load())
 
   useEffect(
     () =>
@@ -404,8 +409,9 @@ export function TodayView({
     focus.group === 'all' ? toDo : toDo.filter((item) => GROUP_OF[item.facts.kind] === focus.group)
   const shown = all ? inGroup : inGroup.slice(0, TODAY_LIMIT)
   const inView = [...first.map((entry) => entry.item), ...shown]
+  // The list has always a row in view; a thing that comes first opens under itself when chosen.
   const selectedKey = useSelection(
-    inView.map((item) => item.key),
+    shown.map((item) => item.key),
     focus.key,
   )
 
@@ -542,11 +548,40 @@ export function TodayView({
     count: toDo.filter((item) => GROUP_OF[item.facts.kind] === group).length,
   })).filter((entry) => entry.count > 0)
   const byClaude = view.hiddenItems.filter((hidden) => hidden.state === 'claude').length
-  const selected = inView.find((item) => item.key === selectedKey) ?? null
+  const selected = shown.find((item) => item.key === selectedKey) ?? null
   const select = (key: string) => {
     setLater(null)
     setFocus({ ...focus, key })
   }
+  /** The signal in view with everything the PM can do about it, wherever it is shown. */
+  const detailOf = (item: TodayItem) => (
+    <SignalDetail
+      item={item}
+      day={view.day}
+      sprintEnd={view.sprintEnd}
+      judging={judging}
+      opening={opening === item.key}
+      choosingLater={later === item.key}
+      onOpen={() => open(item)}
+      onAsk={onAsk}
+      onNotMine={() => void mailTurn(item.key, 'not_mine')}
+      onDecide={(state, until) =>
+        void decide({ key: item.key, title: signalText(item).title }, state, until)
+      }
+      onAskLater={() => setLater(later === item.key ? null : item.key)}
+      onPoint={
+        view.points.queued.some((entry) => entry.point.signalKey === item.key)
+          ? undefined
+          : () =>
+              void changePoints(() =>
+                api.addOpenPoint(project.id, {
+                  title: signalText(item).title,
+                  signal: { key: item.key, kind: item.facts.kind },
+                }),
+              )
+      }
+    />
+  )
 
   return (
     <section className="today" aria-label={messages.todayTab} aria-busy={reading || undefined}>
@@ -662,16 +697,25 @@ export function TodayView({
                   item={entry.item}
                   mark={view.marks[entry.item.key]}
                   why={nowText(entry)}
-                  selected={entry.item.key === selectedKey}
+                  selected={entry.item.key === focus.key}
                   judging={judging}
-                  onSelect={() => select(entry.item.key)}
+                  onSelect={() =>
+                    entry.item.key === focus.key
+                      ? setFocus({ ...focus, key: null })
+                      : select(entry.item.key)
+                  }
                 />
+                {entry.item.key === focus.key && (
+                  <section className="panel today-now-detail" aria-label={text.detailTitle}>
+                    {detailOf(entry.item)}
+                  </section>
+                )}
               </li>
             ))}
           </ul>
           {view.nowSummary.length > 0 && (
-            <section className="today-now-summary" aria-label={text.nowSummary}>
-              <span className="eyebrow">{text.nowSummary}</span>
+            <details className="today-now-summary" aria-label={text.nowSummary}>
+              <summary className="eyebrow today-now-why">{text.nowSummary}</summary>
               {view.nowSummary.map((sentence) => (
                 <p key={sentence.key}>
                   {sentence.text}{' '}
@@ -686,7 +730,7 @@ export function TodayView({
                   </button>
                 </p>
               ))}
-            </section>
+            </details>
           )}
         </section>
       )}
@@ -753,36 +797,7 @@ export function TodayView({
             </div>
             <section className="panel split-detail" aria-label={text.detailTitle}>
               {selected ? (
-                <SignalDetail
-                  item={selected}
-                  day={view.day}
-                  sprintEnd={view.sprintEnd}
-                  judging={judging}
-                  opening={opening === selected.key}
-                  choosingLater={later === selected.key}
-                  onOpen={() => open(selected)}
-                  onAsk={onAsk}
-                  onNotMine={() => void mailTurn(selected.key, 'not_mine')}
-                  onDecide={(state, until) =>
-                    void decide(
-                      { key: selected.key, title: signalText(selected).title },
-                      state,
-                      until,
-                    )
-                  }
-                  onAskLater={() => setLater(later === selected.key ? null : selected.key)}
-                  onPoint={
-                    view.points.queued.some((entry) => entry.point.signalKey === selected.key)
-                      ? undefined
-                      : () =>
-                          void changePoints(() =>
-                            api.addOpenPoint(project.id, {
-                              title: signalText(selected).title,
-                              signal: { key: selected.key, kind: selected.facts.kind },
-                            }),
-                          )
-                  }
-                />
+                detailOf(selected)
               ) : (
                 <p className="hint panel-body">{messages.detail.none}</p>
               )}

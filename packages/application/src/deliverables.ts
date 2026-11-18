@@ -75,16 +75,21 @@ export type DeliverablesDeps = {
   liveSources?: (project: Project) => Promise<LiveSource[]>
 }
 
-export type StartInput = {
-  kindId: string
-  inputs: Readonly<Record<string, string>>
+/** What a writing tells while it runs. */
+export type WritingListeners = {
   onProgress?: (progress: AgentProgress) => void
+  /** The draft with its sources checked, as soon as it is there: the critical reading follows. */
+  onDraft?: (deliverable: Deliverable) => void
 }
 
-export type ReviseInput = {
+export type StartInput = WritingListeners & {
+  kindId: string
+  inputs: Readonly<Record<string, string>>
+}
+
+export type ReviseInput = WritingListeners & {
   deliverableId: string
   request: string
-  onProgress?: (progress: AgentProgress) => void
 }
 
 /** How a kind would be written after a correction: shown to the PM, kept only if approved. */
@@ -261,7 +266,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     project: Project,
     deliverable: Deliverable,
     request: string | null,
-    onProgress: ((progress: AgentProgress) => void) | undefined,
+    { onProgress, onDraft }: WritingListeners,
   ): Promise<Deliverable> {
     if (running.has(deliverable.id)) throw new DomainError('deliverable_busy')
     running.add(deliverable.id)
@@ -299,7 +304,21 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       const written = outline && given.deck ? onOutline(deliverable.title, outline, given) : given
       // Numbers only the code may compute are put in the text before anything is checked.
       const text = kind.calculation ? withEstimate(written.text, written.wbs ?? []) : written.text
+      const writtenAt = deps.clock.now()
+      onProgress?.({ kind: 'checking', target: '' })
       const checked = await check(project, { ...written, text })
+      const checkedAt = deps.clock.now()
+      // The draft is kept and shown now: the critical reading takes its time without holding it.
+      const drafted: Deliverable = {
+        ...deliverable,
+        draft: checked,
+        written,
+        redTeam: null,
+        models,
+      }
+      await save(project, drafted)
+      onDraft?.(drafted)
+      onProgress?.({ kind: 'reviewing', target: '' })
       const redTeam = await deps.writer.redTeam({
         projectFolder: project.folder,
         kind,
@@ -318,7 +337,17 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
         redTeam,
         models,
         readyAt: readyAt.toISOString(),
-        rounds: [...deliverable.rounds, roundOf(startedAt, readyAt, request, null)],
+        rounds: [
+          ...deliverable.rounds,
+          {
+            ...roundOf(startedAt, readyAt, request, null),
+            phases: {
+              writeMs: writtenAt.getTime() - startedAt.getTime(),
+              checkMs: checkedAt.getTime() - writtenAt.getTime(),
+              reviewMs: readyAt.getTime() - checkedAt.getTime(),
+            },
+          },
+        ],
       }
     } catch (error) {
       if (!isDomainError(error)) throw error
@@ -378,7 +407,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       files: [],
     }
     await save(project, created)
-    const written = await write(project, created, null, input.onProgress)
+    const written = await write(project, created, null, input)
     await save(project, written)
     return written
   }
@@ -396,7 +425,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
       reviewMs: current.reviewMs + reviewTimeSince(current.readyAt, deps.clock.now()),
     }
     await save(project, reviewed)
-    const written = await write(project, reviewed, request, input.onProgress)
+    const written = await write(project, reviewed, request, input)
     await save(project, written)
     return written
   }
@@ -406,6 +435,7 @@ export function createDeliverables(deps: DeliverablesDeps): Deliverables {
     if (current.status !== 'review' || !current.draft) {
       throw new DomainError('deliverable_not_ready', current.status)
     }
+    if (running.has(deliverableId)) throw new DomainError('deliverable_busy')
     const now = deps.clock.now()
     const approved: Deliverable = {
       ...current,

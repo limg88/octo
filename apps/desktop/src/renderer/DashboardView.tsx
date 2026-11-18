@@ -32,6 +32,7 @@ import { dateTimeText, messages } from './messages.ts'
 import { useSavedNote } from './SavedNote.tsx'
 import { BusyButton, Waiting } from './Spinner.tsx'
 import { Unlinked } from './Unlinked.tsx'
+import { useReentry } from './use-reentry.ts'
 
 type DashboardApi = Pick<
   OctoApi,
@@ -63,6 +64,8 @@ type Props = {
   /** Which bugs are listed and which one is in view, kept by who shows the page. */
   focus?: DashboardFocus
   onFocus?: (focus: DashboardFocus) => void
+  /** False while the page stays mounted out of sight: back in sight, it reads again. */
+  active?: boolean
 }
 
 const text = messages.dashboard
@@ -84,6 +87,7 @@ export function DashboardView({
   onAsk,
   focus: givenFocus,
   onFocus,
+  active = true,
 }: Props) {
   const [ownFocus, setOwnFocus] = useState<DashboardFocus>(NO_DASHBOARD_FOCUS)
   const focus = givenFocus ?? ownFocus
@@ -197,6 +201,15 @@ export function DashboardView({
     },
     [],
   )
+
+  // Back in sight: the settings may have changed elsewhere, and the figures with them.
+  useReentry(active, () => {
+    void api.dashboardSettings(project.id).then((result) => {
+      if (!result.ok) return
+      setSettings(result.value)
+      if (result.value.exportPath !== '') void loadView(shownRange.current)
+    })
+  })
 
   /** Saves the settings; a decision on an item says so by itself, with the way back. */
   async function save(next: DashboardSettings, decision = false): Promise<boolean> {

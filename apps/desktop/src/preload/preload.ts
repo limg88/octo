@@ -1,5 +1,5 @@
-import type { AgentProgress, FeedingStep } from '@octo/application'
-import type { UpdateProgress } from '@octo/domain'
+import type { AgentProgress, FeedingStep, SheetStep } from '@octo/application'
+import type { Deliverable, UpdateProgress } from '@octo/domain'
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS, type OctoApi } from '../shared/api.ts'
 
@@ -131,6 +131,12 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.forecastCompile, { projectId, month }),
   readForecastOrders: (projectId) => ipcRenderer.invoke(CHANNELS.forecastOrdersRead, { projectId }),
   projectSheets: (projectId) => ipcRenderer.invoke(CHANNELS.projectSheets, { projectId }),
+  onSheetStep: (listener) => {
+    const handler = (_event: unknown, projectId: string, step: SheetStep) =>
+      listener(projectId, step)
+    ipcRenderer.on(CHANNELS.sheetStep, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.sheetStep, handler)
+  },
   team: (projectId) => ipcRenderer.invoke(CHANNELS.teamGet, { projectId }),
   saveTeam: (projectId, team) => ipcRenderer.invoke(CHANNELS.teamSave, { projectId, team }),
   modelSettings: (projectId) => ipcRenderer.invoke(CHANNELS.modelsGet, { projectId }),
@@ -161,6 +167,12 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.dashboardReminder, { projectId, id }),
   refreshTrackerSnapshot: (projectId) =>
     ipcRenderer.invoke(CHANNELS.dashboardRefresh, { projectId }),
+  onDeliverableDraft: (listener) => {
+    const handler = (_event: unknown, projectId: string, deliverable: Deliverable) =>
+      listener(projectId, deliverable)
+    ipcRenderer.on(CHANNELS.deliverablesDraft, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.deliverablesDraft, handler)
+  },
   onDeliverableProgress: (listener) => {
     const handler = (_event: unknown, projectId: string, progress: AgentProgress) =>
       listener(projectId, progress)

@@ -112,3 +112,14 @@ Che cosa ne segue:
 Deciso dal PM il 18/11/2026: **non si costruisce nulla finché l'IT non risponde.** La strada di Graph rimetterebbe in discussione una scelta scritta in `docs/identita-e-login.md` («all'IT si chiede la sola identità: nessun permesso su posta o calendario»): la si riapre solo con la risposta in mano.
 
 Esito che chiude: la risposta dell'IT scritta qui, con la strada scelta. Solo allora si stima il lettore. Fino ad allora su Windows la posta non si legge, e con lei mancano le mail e le riunioni di «Oggi».
+
+## R6c — Esiti della prova da zero
+
+Ciò che il codice chiude e solo la prossima prova sul progetto reale può confermare. I rilievi sono in `docs/esiti-prova-deem.md`.
+
+| # | Che cosa | Come | Esito atteso | Stato |
+|---|---|---|---|---|
+| R6c.1 | Una richiesta a Claude sopravvive al cambio di sezione (rilievi 4, 20) | In «Chiedi» una domanda lunga, poi «Commessa» e ritorno; lo stesso con una stima in «Deliverable» | Accanto alla sezione la rotella «Claude sta lavorando qui»; al rientro la risposta o la bozza ci sono | da fare |
+| R6c.2 | «Sintesi» e «Fatturazione» si caricano su una commessa che parte da zero (rilievi 21, 22) | Stato dell'app vuoto, apri «Commessa» con il cronometro | La riga di attesa nomina il mese e il conto («mese 3 di 12»); alla fine le cifre. **Scrivere quanto dura**: sul progetto reale non è stato misurato, perché la lettura passa dalla credenziale di NetSuite. Se si ferma, la pagina dice perché e «Riprendi la lettura» chiede solo i mesi che mancano | da fare |
+| R6c.3 | Il dettaglio di una voce di «Adesso» si apre sotto la voce (rilievi 8, 9) | Clic su una voce di «Adesso» | Il dettaglio compare sotto la riga; «Perché contano oggi» è chiuso all'apertura | da fare |
+| R6c.4 | Dove va il tempo di una stima (rilievo 20) | Scrivi una stima vera; leggi accanto ai tempi «ultimo giro: scrittura … s, controllo delle fonti … s, rilettura critica … s» | La bozza si legge prima dei rilievi. **Scrivere i tre tempi**: dicono se la lentezza è di chi scrive o della rilettura, e se serve altro | da fare |

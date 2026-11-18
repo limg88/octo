@@ -12,8 +12,10 @@
 // Octo proposes them from the caps.
 // `summary` is `suppliers` with how far the work is as the company's system tells it, and with
 // the plan the sheet kept before the plans left Octo: it is handed back at the first reading.
+// `year` is `summary` for a code that began a year ago, of which Octo holds one month only: twelve
+// months to read, and a warehouse that takes a moment for each, so the progress can be seen.
 // It needs the test Postgres: `pnpm db:setup` once.
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { startFakeDwsi } from '../../packages/connectors/test/support/fake-dwsi.ts'
 import { worklogCsv } from '../../packages/domain/src/index.ts'
@@ -48,7 +50,10 @@ const monthsAgo = (count: number): string => {
     .toISOString()
     .slice(0, 7)
 }
-const firstMonth = monthsAgo(2)
+const year = mode === 'year'
+/** How long the slow warehouse takes for each reading of timesheets, in seconds. */
+const SLOW_READING_SECONDS = 0.7
+const firstMonth = monthsAgo(year ? 12 : 2)
 const lastMonth = monthsAgo(1)
 const budget = mode === 'budget'
 const estimate = mode === 'estimate' || budget
@@ -59,7 +64,7 @@ const CAPS: Array<[name: string, days: number]> = [
   ['Verdi Sara', 1.5],
 ]
 /** `suppliers` is `lifetime` with an order to a supplier, what it delivered and its invoice. */
-const summary = mode === 'summary'
+const summary = mode === 'summary' || year
 const suppliers = mode === 'suppliers' || summary
 /** How far the work is at the end of last month, as the company's system says. */
 const PROGRESS = 0.62
@@ -126,14 +131,30 @@ await fake.exec(`
     ${row(LAST, `${lastMonth}-06`, lifetime ? SECOND_PERSON : PERSON)};
 `)
 
+if (year) {
+  // Every reading of the timesheets waits a moment, as a warehouse far away does.
+  await fake.exec(`
+    ALTER VIEW dwsi.v_timesheet_all RENAME TO v_timesheet_all_rows;
+    CREATE VIEW dwsi.v_timesheet_all AS
+      SELECT * FROM dwsi.v_timesheet_all_rows
+      WHERE (SELECT pg_sleep(${SLOW_READING_SECONDS}) IS NOT NULL);
+    GRANT SELECT ON dwsi.v_timesheet_all TO "${fake.reader.user}";
+  `)
+}
+
 const write = (file: string, value: unknown) => {
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, JSON.stringify(value, null, 1))
 }
 const settings = join(project, '_octo', '.impostazioni')
 
-write(join(settings, 'sources.json'), {
-  mail: null,
+// What the project already reads (its mail, its calendar) stays: the warehouse is added to it.
+const sourcesFile = join(settings, 'sources.json')
+const linked = existsSync(sourcesFile)
+  ? (JSON.parse(readFileSync(sourcesFile, 'utf8')) as Record<string, unknown>)
+  : { mail: null }
+write(sourcesFile, {
+  ...linked,
   dwsi: {
     since: `${firstMonth}-01`,
     targetFolder: '_octo/fonti/NetSuite',

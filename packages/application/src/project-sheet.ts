@@ -10,6 +10,7 @@ import {
   teamCaps,
 } from '@octo/domain'
 import {
+  type CatchUpStep,
   createForecastReadings,
   type ForecastDeps,
   type ForecastReadings,
@@ -22,8 +23,11 @@ export type ProjectSheets = {
    * much and at what cost, what was invoiced and recognised, how far it is, the margins today
    * and at the end. Octo shows it: the sheet of the administration is where it is kept.
    */
-  list(project: Project): Promise<Lifetime[]>
+  list(project: Project, tell?: (step: SheetStep) => void): Promise<Lifetime[]>
 }
+
+/** What the reading of a sheet is doing: asking the orders, a month of timesheets, or why it stopped. */
+export type SheetStep = { kind: 'orders' } | CatchUpStep
 
 /**
  * The summary of each project code of a project over its whole life. It reads what the monthly
@@ -46,9 +50,10 @@ export function createProjectSheets(
     }
   }
 
-  async function list(project: Project): Promise<Lifetime[]> {
+  async function list(project: Project, tell?: (step: SheetStep) => void): Promise<Lifetime[]> {
     const month = today().slice(0, MONTH_LENGTH)
     // What was invoiced and recognised changes month by month: asked again, without a word.
+    tell?.({ kind: 'orders' })
     const economics = await economicsOf(project)
     const settings = await deps.settings.load(project.folder)
     const all = async (): Promise<Lifetime[]> => {
@@ -76,7 +81,7 @@ export function createProjectSheets(
     }
     const first = await all()
     const unread = [...new Set(first.flatMap((sheet) => sheet.unreadMonths))].sort()
-    return unread.length > 0 && (await readings.readMissing(project, unread)) ? all() : first
+    return unread.length > 0 && (await readings.readMissing(project, unread, tell)) ? all() : first
   }
 
   return { list }

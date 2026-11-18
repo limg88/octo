@@ -648,6 +648,10 @@ if (workAt >= 0 && args.includes('Bash')) {
   process.exit(0)
 }
 
+// A long request that ends: the answer comes after a while, as with the real one.
+const WAIT_MS = 8000
+if (question.includes('#attesa')) await new Promise((resolve) => setTimeout(resolve, WAIT_MS))
+
 if (question.includes('#lento')) {
   await new Promise((resolve) => setTimeout(resolve, 60_000))
 } else if (question.includes('#accesso')) {

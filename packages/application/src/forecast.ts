@@ -2,6 +2,7 @@ import {
   cleanForecastSettings,
   compileForecast,
   DomainError,
+  type DomainErrorCode,
   FORECAST_MONTH,
   type Forecast,
   type ForecastCell,
@@ -98,8 +99,6 @@ export type Forecasts = {
   readOrders(project: Project): Promise<ForecastOrdersRun>
 }
 
-/** Months of timesheets asked to the company's system in one go: the most a reading takes. */
-const MONTHS_PER_READING = 12
 /** The characters of a month in a day written `YYYY-MM-DD`. */
 export const MONTH_LENGTH = 7
 
@@ -118,6 +117,11 @@ function checkedPath(path: string): string {
 
 const fileName = (path: string): string => path.split('/').pop() ?? path
 
+/** How far a reading of the months that miss got, or why it stopped. */
+export type CatchUpStep =
+  | { kind: 'month'; month: string; done: number; total: number }
+  | { kind: 'missed'; code: DomainErrorCode }
+
 /**
  * What the monthly forecast and the sheet of a project code both read: the codes of the project,
  * the months of timesheets held, the hours of the tracker, the orders of the company's system.
@@ -125,7 +129,15 @@ const fileName = (path: string): string => path.split('/').pop() ?? path
 export type ForecastReadings = {
   codesOf(project: Project, timesheet: readonly HoursEntry[]): Promise<string[]>
   monthsRead(project: Project, month: string): Promise<string[] | null>
-  readMissing(project: Project, months: readonly string[]): Promise<boolean>
+  /**
+   * Reads the months of timesheets that miss, one at a time, telling each as it starts. True when
+   * at least one was read: what was read is kept, so the next reading goes on from there.
+   */
+  readMissing(
+    project: Project,
+    months: readonly string[],
+    tell?: (step: CatchUpStep) => void,
+  ): Promise<boolean>
   worklogOf(project: Project, codes: readonly string[]): Promise<ForecastWorklog>
   readOrders(project: Project): Promise<ForecastOrdersRead>
 }
@@ -150,41 +162,57 @@ export function createForecastReadings(deps: ForecastDeps): ForecastReadings {
    * Reads the months of timesheets the forecast misses, without a word: a system that is not
    * linked or does not answer changes nothing, and the forecast keeps saying what it misses.
    */
-  const catchingUp = new Map<string, { months: ReadonlySet<string>; done: Promise<boolean> }>()
+  const catchingUp = new Map<
+    string,
+    { months: ReadonlySet<string>; done: Promise<boolean>; tells: Set<(step: CatchUpStep) => void> }
+  >()
 
   /**
-   * One reading per project at a time: who asks while it runs waits for it, and asks again only
-   * for the months it did not cover.
+   * One reading per project at a time: who asks while it runs is told its steps too, waits for
+   * it, and asks again only for the months it did not cover.
    */
-  async function readMissing(project: Project, months: readonly string[]): Promise<boolean> {
+  async function readMissing(
+    project: Project,
+    months: readonly string[],
+    tell?: (step: CatchUpStep) => void,
+  ): Promise<boolean> {
     const running = catchingUp.get(project.id)
     if (running) {
+      if (tell) running.tells.add(tell)
       const read = await running.done
       const left = months.filter((month) => !running.months.has(month))
-      return left.length === 0 ? read : readMissing(project, left)
+      return left.length === 0 ? read : readMissing(project, left, tell)
     }
-    const done = readMonths(project, months).finally(() => catchingUp.delete(project.id))
-    catchingUp.set(project.id, { months: new Set(months), done })
+    const tells = new Set(tell ? [tell] : [])
+    const done = readMonths(project, months, (step) => {
+      for (const each of tells) each(step)
+    }).finally(() => catchingUp.delete(project.id))
+    catchingUp.set(project.id, { months: new Set(months), done, tells })
     return done
   }
 
-  async function readMonths(project: Project, months: readonly string[]): Promise<boolean> {
-    const first = months[0]
-    const last = months.at(-1)
-    if (deps.readTimesheets === undefined || first === undefined || last === undefined) return false
-    const wanted = monthsOf({ from: `${first}-01`, to: `${last}-01` })
+  /** A month at a time: each is kept as it comes, so a reading that stops lost only its month. */
+  async function readMonths(
+    project: Project,
+    months: readonly string[],
+    tell: (step: CatchUpStep) => void,
+  ): Promise<boolean> {
+    if (deps.readTimesheets === undefined) return false
+    let done = 0
     try {
-      for (let at = 0; at < wanted.length; at += MONTHS_PER_READING) {
-        const chunk = wanted.slice(at, at + MONTHS_PER_READING)
-        const from = chunk[0]?.from
-        const to = chunk.at(-1)?.to
-        if (from !== undefined && to !== undefined) await deps.readTimesheets(project, { from, to })
+      for (const month of months) {
+        tell({ kind: 'month', month, done, total: months.length })
+        const [whole] = monthsOf({ from: `${month}-01`, to: `${month}-01` })
+        if (whole !== undefined) {
+          await deps.readTimesheets(project, { from: whole.from, to: whole.to })
+        }
+        done += 1
       }
-      return true
     } catch (error) {
       if (!isDomainError(error)) throw error
-      return false
+      tell({ kind: 'missed', code: error.code })
     }
+    return done > 0
   }
 
   /**

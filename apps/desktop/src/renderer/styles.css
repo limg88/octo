@@ -530,6 +530,15 @@ main {
   height: 100vh;
 }
 
+/* A section the PM left stays mounted, unseen: the wrapper takes no part in the layout. */
+.section-view {
+  display: contents;
+}
+
+.section-view[hidden] {
+  display: none;
+}
+
 .project-header {
   display: flex;
   justify-content: space-between;
@@ -832,7 +841,8 @@ blockquote {
   padding-inline-start: 20px;
 }
 
-main > .warning {
+main > .warning,
+.section-view > .warning {
   margin: 12px 24px 0;
 }
 
@@ -2077,6 +2087,12 @@ details.advanced[open] > summary {
   font-weight: 600;
 }
 
+.nav-working {
+  margin-left: 8px;
+  color: var(--accent);
+  vertical-align: middle;
+}
+
 .nav-item-selected,
 .nav-item-selected:hover:not(:disabled) {
   background: var(--accent-soft);
@@ -2575,6 +2591,15 @@ details.advanced[open] > summary {
 
 .today-now-summary p {
   margin: 0;
+}
+
+.today-now-why {
+  cursor: pointer;
+}
+
+/* The thing chosen among those that come first opens right under its row. */
+.today-now-detail {
+  margin: 4px 0 8px;
 }
 
 .today-hidden {

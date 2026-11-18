@@ -1,15 +1,18 @@
+import type { SheetStep } from '@octo/application'
 import { type Lifetime, NO_ROW_INPUTS, type Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { ForecastView } from './ForecastView.tsx'
 import { HoursView } from './HoursView.tsx'
-import { messages } from './messages.ts'
+import { errorText, messages } from './messages.ts'
 import { ProjectSheetBilling } from './ProjectSheetBilling.tsx'
 import { ProjectSheetSummary } from './ProjectSheetSummary.tsx'
 import { useSavedNote } from './SavedNote.tsx'
 import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
+import { monthText } from './today-text.ts'
+import { useReentry } from './use-reentry.ts'
 
 type Props = {
   api: OctoApi
@@ -18,6 +21,8 @@ type Props = {
   place: 'sheet' | 'hours' | 'forecast'
   /** Takes the PM to another part of the page, or to the section where an error is put right. */
   onOpenSection: (section: Section) => void
+  /** False while the page stays mounted out of sight: back in sight, it reads again. */
+  active?: boolean
 }
 
 const text = messages.sheet.summary
@@ -38,24 +43,53 @@ function firstCode(sheets: readonly Lifetime[], wanted: string | undefined): str
   return (sheets.find((sheet) => sheet.kind === 'fixed_price') ?? sheets[0])?.code ?? ''
 }
 
+/** What the reading is doing, in words: the months are many in a project that starts from nothing. */
+function stepText(step: SheetStep | 'start' | null): string {
+  if (step === null || step === 'start') return text.loading
+  if (step.kind === 'orders') return text.readingOrders
+  if (step.kind === 'month') {
+    return text.readingMonth(monthText(step.month), step.done + 1, step.total)
+  }
+  return text.loading
+}
+
 /** The figures of the project codes over their whole life, one code at a time. */
 function CodeSheets({
   api,
   project,
   billing,
   onOpenSection,
+  active = true,
 }: Omit<Props, 'place'> & { billing: boolean }) {
   const [sheets, setSheets] = useState<Lifetime[] | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<ErrorCode | null>(null)
+  /** What the reading is doing now; null when nothing is being read. */
+  const [step, setStep] = useState<SheetStep | 'start' | null>(null)
+  /** Why the months that miss were not all read, when the company's system said no. */
+  const [missed, setMissed] = useState<ErrorCode | null>(null)
   const savedNote = useSavedNote()
 
   async function load() {
+    setStep('start')
+    setMissed(null)
     const read = await api.projectSheets(project.id)
+    setStep(null)
     if (!read.ok) return setError(read.code)
     setSheets(read.value)
-    setCode(firstCode(read.value, lastCode.get(project.id)))
+    setCode((current) => firstCode(read.value, lastCode.get(project.id) ?? current))
   }
+
+  useEffect(
+    () =>
+      api.onSheetStep((projectId, next) => {
+        if (projectId !== project.id) return
+        if (next.kind === 'missed') setMissed(next.code)
+        else setStep(next)
+      }),
+    [api, project.id],
+  )
+  useReentry(active, () => void load())
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new project starts from its own codes.
   useEffect(() => {
@@ -97,14 +131,25 @@ function CodeSheets({
     return error ? (
       <Failure code={error} onOpen={onOpenSection} />
     ) : (
-      <Waiting>{text.loading}</Waiting>
+      <Waiting>{stepText(step)}</Waiting>
     )
   }
+  const reading = step !== null && <Waiting>{stepText(step)}</Waiting>
+  const stopped = missed !== null && step === null && (
+    <p className="warning" role="alert">
+      {text.missed(errorText(missed))}{' '}
+      <button type="button" className="quiet" onClick={() => void load()}>
+        {text.resume}
+      </button>
+    </p>
+  )
   const sheet = sheets.find((entry) => entry.code === code)
   if (sheet === undefined) {
     return (
       <>
         {error && <Failure code={error} onOpen={onOpenSection} />}
+        {reading}
+        {stopped}
         <p className="hint">{messages.forecast.noRows}</p>
       </>
     )
@@ -112,6 +157,8 @@ function CodeSheets({
   return (
     <>
       {error && <Failure code={error} onOpen={onOpenSection} />}
+      {reading}
+      {stopped}
       {savedNote.note}
       <p className="badge badge-warning">{messages.forecast.internal}</p>
       <header className="sheet-header">
@@ -154,8 +201,11 @@ function CodeSheets({
  * tracker, the forecast of the month for the administration. Octo shows and exports: budget,
  * months and plans are kept in the sheets of the administration.
  */
-export function ProjectSheetView({ api, project, place, onOpenSection }: Props) {
+export function ProjectSheetView({ api, project, place, onOpenSection, active = true }: Props) {
   const [billing, setBilling] = useState(false)
+  /** How many times the page came back in sight: hours and forecast start again each time. */
+  const [entries, setEntries] = useState(0)
+  useReentry(active, () => setEntries((count) => count + 1))
   const part: SheetPart = place === 'sheet' ? (billing ? 'billing' : 'summary') : place
 
   function open(next: SheetPart) {
@@ -180,15 +230,21 @@ export function ProjectSheetView({ api, project, place, onOpenSection }: Props) 
         ))}
       </div>
       {part === 'hours' ? (
-        <HoursView api={api} project={project} onOpenSources={() => onOpenSection('sources')} />
+        <HoursView
+          key={entries}
+          api={api}
+          project={project}
+          onOpenSources={() => onOpenSection('sources')}
+        />
       ) : part === 'forecast' ? (
-        <ForecastView api={api} project={project} onOpenSection={onOpenSection} />
+        <ForecastView key={entries} api={api} project={project} onOpenSection={onOpenSection} />
       ) : (
         <CodeSheets
           api={api}
           project={project}
           billing={part === 'billing'}
           onOpenSection={onOpenSection}
+          active={active}
         />
       )}
     </div>

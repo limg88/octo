@@ -1,4 +1,6 @@
 import type { KeyboardEvent } from 'react'
+import { messages } from './messages.ts'
+import { Spinner } from './Spinner.tsx'
 import {
   LISTED_SECTIONS,
   listedSection,
@@ -12,6 +14,8 @@ type Props = {
   onSelect: (section: Section) => void
   /** How many things wait in a section, said beside its name; nothing is said of zero. */
   counts?: Partial<Record<Section, { count: number; label: string }>>
+  /** The sections where Claude is working now: each says so, wherever the PM is. */
+  working?: readonly Section[]
 }
 
 /** Where the arrow keys go from a section: the one before or after it, round the list. */
@@ -21,7 +25,7 @@ const STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 }
  * The sections of a project in the sidebar, grouped by how often they are used. One list for the
  * keyboard: the arrows move through all of it, whatever the group.
  */
-export function SectionNav({ current: place, onSelect, counts = {} }: Props) {
+export function SectionNav({ current: place, onSelect, counts = {}, working = [] }: Props) {
   const current = listedSection(place)
   const shown = LISTED_SECTIONS
   function onKey(event: KeyboardEvent<HTMLButtonElement>, section: Section) {
@@ -64,6 +68,16 @@ export function SectionNav({ current: place, onSelect, counts = {} }: Props) {
                 onKeyDown={(event) => onKey(event, section)}
               >
                 {SECTION_LABELS[section]}
+                {working.includes(section) && (
+                  <span
+                    className="nav-working"
+                    role="img"
+                    aria-label={messages.nav.working}
+                    title={messages.nav.working}
+                  >
+                    <Spinner />
+                  </span>
+                )}
                 {(counts[section]?.count ?? 0) > 0 && (
                   <span className="nav-count" title={counts[section]?.label}>
                     {counts[section]?.count}

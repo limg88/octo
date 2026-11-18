@@ -24,6 +24,7 @@ import {
   type ProjectFiles,
   type ProjectOrder,
   type RetiredSheetPlans,
+  type SheetStep,
   type SheetWrite,
   type SpreadsheetModel,
 } from '../src/index.ts'
@@ -466,7 +467,7 @@ describe('the monthly forecast', () => {
     await expect(broken.forecasts.view(project, '2026-10')).rejects.toThrow('disk full')
   })
 
-  it('asks no timesheets of the months to come, and a long stretch a year at a time', async () => {
+  it('asks no timesheets of the months to come, and a long stretch a month at a time', async () => {
     const asked: Array<{ from: string; to: string }> = []
     const since = (startMonth: string): Partial<ForecastSettings> => ({
       projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price', startMonth } },
@@ -488,10 +489,10 @@ describe('the monthly forecast', () => {
 
     const long = setup(since('2025-01'), { ...options, readMonths: [] })
     await long.forecasts.view(project, '2026-03')
-    expect(asked).toEqual([
-      { from: '2025-01-01', to: '2025-12-31' },
-      { from: '2026-01-01', to: '2026-03-31' },
-    ])
+    // Fifteen months, each asked alone: what was read stays if a later one fails.
+    expect(asked).toHaveLength(15)
+    expect(asked[0]).toEqual({ from: '2025-01-01', to: '2025-01-31' })
+    expect(asked.at(-1)).toEqual({ from: '2026-03-01', to: '2026-03-31' })
     // Files kept by hand: nothing can be said to miss, nothing is asked.
     asked.length = 0
     const byHand = setup(since('2025-01'), { ...options, readMonths: null })
@@ -592,6 +593,16 @@ describe('the monthly forecast', () => {
     ])
     expect(month.forecast.unreadMonths).toEqual([])
     expect(lives[0]).toMatchObject({ unreadMonths: [], invoiced: 7500, recognized: 6000 })
+    // Who comes while a reading runs is told its steps too, not left before a still page.
+    read.clear()
+    busy.readMonths = []
+    const late: SheetStep[] = []
+    const again = setup(fixed, busy)
+    await Promise.all([
+      again.forecasts.view(project, '2026-10'),
+      again.projectSheets.list(project, (step) => late.push(step)),
+    ])
+    expect(late.some((step) => step.kind === 'month')).toBe(true)
 
     // NetSuite cannot be asked: the life of the code is told with what is there, and says so.
     const alone = setup(fixed, { codes: ['P1'], timesheet: [october], readMonths: ['2026-10'] })
@@ -603,6 +614,49 @@ describe('the monthly forecast', () => {
     await expect(
       setup(fixed, { timesheet: null }).projectSheets.list(project),
     ).rejects.toMatchObject({ code: 'forecast_timesheet_not_set' })
+  })
+
+  it('tells the months it reads one by one, and goes on from where a reading stopped', async () => {
+    const year: Partial<ForecastSettings> = {
+      projects: { P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price', startMonth: '2025-12' } },
+    }
+    const read = new Set<string>()
+    let failAt: string | null = '2026-06'
+    const options: NonNullable<Parameters<typeof setup>[1]> = {
+      codes: ['P1'],
+      timesheet: [],
+      readMonths: [],
+      today: '2026-11-17',
+      readTimesheets: async (period) => {
+        const month = period.from.slice(0, 7)
+        if (month === failAt) throw new DomainError('source_busy')
+        read.add(month)
+        options.readMonths = [...read]
+      },
+    }
+    const sheets = setup(year, options).projectSheets
+    const steps: SheetStep[] = []
+    const [stopped] = await sheets.list(project, (step) => steps.push(step))
+    // The orders first, then twelve months to read: the seventh fails and is said.
+    expect(steps[0]).toEqual({ kind: 'orders' })
+    expect(steps[1]).toEqual({ kind: 'month', month: '2025-12', done: 0, total: 12 })
+    expect(steps.at(-1)).toEqual({ kind: 'missed', code: 'source_busy' })
+    expect(stopped?.unreadMonths).toEqual([
+      '2026-06',
+      '2026-07',
+      '2026-08',
+      '2026-09',
+      '2026-10',
+      '2026-11',
+    ])
+
+    // Asked again: only the six months that miss, down to the last.
+    failAt = null
+    steps.length = 0
+    const [whole] = await sheets.list(project, (step) => steps.push(step))
+    expect(steps[1]).toEqual({ kind: 'month', month: '2026-06', done: 0, total: 6 })
+    expect(steps.at(-1)).toEqual({ kind: 'month', month: '2026-11', done: 5, total: 6 })
+    expect(whole?.unreadMonths).toEqual([])
   })
 
   it('counts the hours of the tracker only when the project has one code they can be of', async () => {

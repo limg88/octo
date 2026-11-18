@@ -451,6 +451,7 @@ export const messages = {
     work: 'Lavoro',
     monthly: 'Ogni mese',
     project: 'Progetto',
+    working: 'Claude sta lavorando qui',
   },
   choosePath: 'Scegli…',
   lineList: 'Un valore per riga.',
@@ -832,6 +833,12 @@ export const messages = {
     summary: {
       title: 'La commessa dall’inizio a oggi',
       loading: 'Leggo la commessa…',
+      readingOrders: 'Chiedo a NetSuite ordini e fatture della commessa…',
+      readingMonth: (month: string, at: number, total: number) =>
+        `Leggo da NetSuite i timesheet di ${month}: mese ${at} di ${total}…`,
+      missed: (why: string) =>
+        `La lettura dei timesheet si è fermata: ${why} I mesi già letti restano.`,
+      resume: 'Riprendi la lettura',
       code: 'Commessa',
       through: (month: string) =>
         `Dall’inizio della commessa a ${month}. Per i mesi ancora da leggere in NetSuite, le ore del tracker sono una stima.`,
@@ -1798,6 +1805,9 @@ export const messages = {
           ? '1 rilievo da rivedere'
           : `${count} rilievi da rivedere`,
     reset: 'La bozza è cambiata: i rilievi sono da rivedere di nuovo.',
+    pending: 'La rilettura critica è in corso: i rilievi arrivano qui.',
+    phases: (write: number, check: number, review: number) =>
+      `ultimo giro: scrittura ${write} s, controllo delle fonti ${check} s, rilettura critica ${review} s`,
   },
 } as const
 
@@ -1946,6 +1956,8 @@ const progress: Record<AgentProgress['kind'], string> = {
   listing: 'Guardo i file',
   computing: 'Calcolo',
   writing: 'Scrivo la risposta',
+  checking: 'Bozza scritta: controllo le fonti una per una',
+  reviewing: 'Rilettura critica in corso: la bozza si può già leggere',
 }
 
 export const citationStatusText = (status: CitationStatus): string => citationStatus[status]

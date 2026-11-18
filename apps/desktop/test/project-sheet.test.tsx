@@ -7,10 +7,10 @@ import {
   NO_ROW_INPUTS,
   type Project,
 } from '@octo/domain'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lifetimeMail } from '../src/renderer/forecast-text.ts'
-import { messages } from '../src/renderer/messages.ts'
+import { errorText, messages } from '../src/renderer/messages.ts'
 import { ProjectSheetView } from '../src/renderer/ProjectSheetView.tsx'
 import type { Section } from '../src/renderer/sections.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
@@ -32,26 +32,32 @@ vi.mock('../src/renderer/ForecastView.tsx', () => ({
   ForecastView: (props: { project: Project }) => <p>forecast of {props.project.id}</p>,
 }))
 
-type Api = Pick<OctoApi, 'projectSheets' | 'forecastSettings' | 'saveForecastSettings'>
+type Api = Pick<
+  OctoApi,
+  'projectSheets' | 'onSheetStep' | 'forecastSettings' | 'saveForecastSettings'
+>
 type SheetProps = {
   api: Api
   project: Project
   place?: 'sheet' | 'hours' | 'forecast'
   onOpenSection?: (section: Section) => void
+  active?: boolean
 }
 /** The page as the app holds it: on its figures, unless a test says where the PM is. */
-const Sheet = ({ api, project, place = 'sheet', onOpenSection = () => {} }: SheetProps) => (
+const Sheet = ({ api, project, place = 'sheet', onOpenSection = () => {}, active }: SheetProps) => (
   <ProjectSheetView
     api={api as OctoApi}
     project={project}
     place={place}
     onOpenSection={onOpenSection}
+    {...(active === undefined ? {} : { active })}
   />
 )
 
 function fakeApi(overrides: Partial<Api> = {}) {
   const api: Api = {
     projectSheets: vi.fn(async () => ok<Lifetime[]>([])),
+    onSheetStep: () => () => {},
     forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)),
     saveForecastSettings: vi.fn(async (_id: string, settings: ForecastSettings) => ok(settings)),
     ...overrides,
@@ -511,6 +517,42 @@ describe('the sheet of a project code', () => {
     expect(bare).toContain(text.unreadMonths('2026-09'))
     // An amount invoiced with no order to compare it with is said as it is.
     expect(lifetimeMail({ ...days, invoiced: 100 })).toContain(`${words.invoiced}: 100,00`)
+  })
+
+  it('says month by month what it reads, why a reading stopped, and goes on from there', async () => {
+    let tell: Parameters<OctoApi['onSheetStep']>[0] = () => {}
+    let finish: (sheets: Lifetime[]) => void = () => {}
+    const api = fakeApi({
+      projectSheets: vi.fn(
+        () => new Promise<Result<Lifetime[]>>((done) => (finish = (v) => done(ok(v)))),
+      ),
+      onSheetStep: (listener) => {
+        tell = listener
+        return () => {}
+      },
+    })
+    const { rerender } = render(<Sheet api={api} project={project} />)
+    expect(screen.getByRole('status').textContent).toBe(words.loading)
+    act(() => tell('altro', { kind: 'orders' }))
+    expect(screen.getByRole('status').textContent).toBe(words.loading)
+    act(() => tell(project.id, { kind: 'orders' }))
+    expect(screen.getByRole('status').textContent).toBe(words.readingOrders)
+    act(() => tell(project.id, { kind: 'month', month: '2026-06', done: 6, total: 12 }))
+    expect(screen.getByRole('status').textContent).toBe(words.readingMonth('giugno 2026', 7, 12))
+    act(() => tell(project.id, { kind: 'missed', code: 'source_busy' }))
+    await act(async () => finish([life]))
+    // The figures of what was read are there, with why the rest is not and the way to go on.
+    await screen.findByRole('table', { name: words.people })
+    expect(screen.getByRole('alert').textContent).toContain(words.missed(errorText('source_busy')))
+    fireEvent.click(screen.getByRole('button', { name: words.resume }))
+    expect(api.projectSheets).toHaveBeenCalledTimes(2)
+    await act(async () => finish([life]))
+    expect(screen.queryByRole('alert')).toBeNull()
+    // Left out of sight and come back to: read again, without losing what is shown.
+    rerender(<Sheet api={api} project={project} active={false} />)
+    rerender(<Sheet api={api} project={project} active />)
+    expect(api.projectSheets).toHaveBeenCalledTimes(3)
+    expect(screen.getByRole('table', { name: words.people })).toBeTruthy()
   })
 
   it('holds the hours and the forecast of the month as parts of the page, each a place of its own', async () => {

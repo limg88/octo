@@ -309,6 +309,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       code: 'tracker_export_not_set' as const,
     })),
     onDeliverableProgress: () => () => {},
+    onDeliverableDraft: () => () => {},
+    onSheetStep: () => () => {},
     session: vi.fn(async () => ok(signedIn)),
     signIn: vi.fn(async () => ok(signedIn)),
     cancelSignIn: vi.fn(async () => ok(null)),
@@ -649,7 +651,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: messages.manage.undo }))
     expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
     expect(api.restoreProject).toHaveBeenCalledWith('p-2')
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText(messages.manage.removed('Boreale'))).toBeNull()
   })
 
   it('opens another project when the open one is taken off, and says when undo fails', async () => {
@@ -890,6 +892,35 @@ describe('answer text', () => {
 })
 
 describe('project tabs', () => {
+  it('keeps a question to Claude running while the PM is in another section, and says where', async () => {
+    let finish: (result: Result<QuestionRecord>) => void = () => {}
+    const { api } = fakeApi({
+      listProjects: vi.fn(async () => ok([aurora, boreale])),
+      ask: () => new Promise<Result<QuestionRecord>>((resolve) => (finish = resolve)),
+    })
+    render(<App api={api} />)
+
+    await askQuestion('Quando consegniamo?')
+    expect(await screen.findByText(messages.working)).toBeTruthy()
+    // Elsewhere in the project: the list says where Claude is working.
+    fireEvent.click(screen.getByRole('tab', { name: messages.sourcesTab }))
+    expect(await screen.findByText(messages.mailNotConfigured)).toBeTruthy()
+    const askTab = screen.getByRole('tab', { name: new RegExp(`^${messages.ask}`) })
+    expect(within(askTab).getByRole('img', { name: messages.nav.working })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: messages.todayTab }))
+
+    // The answer comes while the PM is away: it is there at the return, and the mark is gone.
+    await act(async () => finish(ok(answered)))
+    expect(within(askTab).queryByRole('img', { name: messages.nav.working })).toBeNull()
+    fireEvent.click(askTab)
+    expect(await screen.findByText('12 dicembre')).toBeTruthy()
+
+    // Another project starts from nothing: nothing of the first one stays behind.
+    fireEvent.keyDown(window, { key: '2', metaKey: true })
+    expect(await screen.findByRole('heading', { name: 'Boreale' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('12 dicembre')).toBeNull())
+  })
+
   it('switches between asking and the sources of the project', async () => {
     const { api } = fakeApi()
     render(<App api={api} />)

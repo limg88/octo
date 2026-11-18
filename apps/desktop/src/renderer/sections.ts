@@ -41,3 +41,15 @@ export const SECTION_GROUPS: ReadonlyArray<{ title: string; sections: readonly S
   { title: messages.nav.monthly, sections: ['sheet'] },
   { title: messages.nav.project, sections: ['sources'] },
 ]
+
+/**
+ * The sections that stay mounted once opened, while the project is the same: a request to Claude
+ * or a long reading goes on there while the PM is elsewhere. The settings start again each time.
+ */
+export const KEPT_SECTIONS: readonly Section[] = [
+  'today',
+  'ask',
+  'deliverables',
+  'dashboard',
+  'sheet',
+]

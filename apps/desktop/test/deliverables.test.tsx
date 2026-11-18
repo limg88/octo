@@ -15,7 +15,7 @@ import type { Handoff } from '../src/renderer/context.ts'
 import { DeliverablesView } from '../src/renderer/DeliverablesView.tsx'
 import { handoffField, handoffText } from '../src/renderer/handoff-text.ts'
 import { DECK_MODEL_TEXT, LETTERHEAD_TEXT, ModelFile } from '../src/renderer/ModelFile.tsx'
-import { errorText, messages } from '../src/renderer/messages.ts'
+import { errorText, messages, progressText } from '../src/renderer/messages.ts'
 import { DELIVERABLE_INPUT_LIMIT, type OctoApi, type Result } from '../src/shared/api.ts'
 
 const project: Project = { id: 'p-1', name: 'Aurora', folder: '/progetti/Aurora', addedAt: '' }
@@ -105,6 +105,7 @@ type DeliverablesApi = Pick<
   | 'approveKindCorrection'
   | 'restoreKind'
   | 'onDeliverableProgress'
+  | 'onDeliverableDraft'
   | 'saveDeliverableKind'
   | 'removeDeliverableKind'
   | 'kindTemplates'
@@ -119,6 +120,7 @@ vi.mock('../src/renderer/ScriptedDeliverables.tsx', () => ({ ScriptedDeliverable
 
 function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
   let progress: (projectId: string, step: AgentProgress) => void = () => {}
+  let drafted: (projectId: string, deliverable: Deliverable) => void = () => {}
   const api: DeliverablesApi = {
     deliverableCatalog: vi.fn(async () => ok([...DELIVERABLE_CATALOG])),
     listDeliverables: vi.fn(async () => ok<Deliverable[]>([])),
@@ -136,6 +138,10 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
       progress = listener
       return () => {}
     },
+    onDeliverableDraft: (listener) => {
+      drafted = listener
+      return () => {}
+    },
     saveDeliverableKind: vi.fn(async () => ok(OWN_KIND)),
     removeDeliverableKind: vi.fn(async () => ok(null)),
     kindTemplates: vi.fn(async () => ok<Record<string, TemplateFormat[]>>({})),
@@ -145,7 +151,11 @@ function fakeApi(overrides: Partial<DeliverablesApi> = {}) {
     importedMeetings: vi.fn(async () => ok<StoredMeeting[]>([])),
     ...overrides,
   }
-  return { api: api as OctoApi, progress: (id: string, step: AgentProgress) => progress(id, step) }
+  return {
+    api: api as OctoApi,
+    progress: (id: string, step: AgentProgress) => progress(id, step),
+    drafted: (id: string, deliverable: Deliverable) => drafted(id, deliverable),
+  }
 }
 
 const type = (label: string | RegExp, value: string) =>
@@ -195,6 +205,35 @@ describe('DeliverablesView', () => {
     expect(screen.getByText('Chi firma il verbale')).toBeTruthy()
     expect(screen.getByText(DELIVERABLE_CATALOG[0]?.checklist[0] ?? '')).toBeTruthy()
     expect(screen.getByText(/Scrittura 2 min · Revisione 0 min · 1 giro/)).toBeTruthy()
+  })
+
+  it('shows the draft as soon as it is written, while its critical reading goes on', async () => {
+    let finish: (result: Result<Deliverable>) => void = () => {}
+    const { api, progress, drafted } = fakeApi({
+      startDeliverable: vi.fn(
+        () => new Promise<Result<Deliverable>>((resolve) => (finish = resolve)),
+      ),
+    })
+    render(<DeliverablesView api={api} project={project} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Email al cliente/ }))
+    type('A chi scrivi', 'Carla Bianchi')
+    type(/^Di che cosa/, 'Collaudo')
+    type(/^Che cosa chiedi/, 'Conferma la data')
+    fireEvent.click(screen.getByRole('button', { name: messages.deliverableWrite }))
+    act(() => progress('p-1', { kind: 'checking', target: '' }))
+    expect(screen.getByText(progressText({ kind: 'checking', target: '' }))).toBeTruthy()
+
+    act(() => drafted('altro', { ...review, id: 'd-9', status: 'writing', redTeam: null }))
+    expect(screen.queryByText(messages.review.pending)).toBeNull()
+    act(() => drafted('p-1', { ...review, status: 'writing', redTeam: null }))
+    // The text can be read; what the review will find is still to come, and nothing is approved.
+    expect(screen.getByText(messages.review.pending)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: messages.deliverableApprove })).toBeNull()
+    expect(screen.queryByText('Il budget non ha una fonte')).toBeNull()
+
+    await act(async () => finish(ok(review)))
+    expect(screen.queryByText(messages.review.pending)).toBeNull()
+    expect(screen.getByText('Il budget non ha una fonte')).toBeTruthy()
   })
 
   it('asks a change in words and approves, then offers the files', async () => {

@@ -862,6 +862,12 @@ export function registerIpc(deps: IpcDeps): void {
 
   const writingProgress = (projectId: string) => (progress: unknown) =>
     deps.window.webContents.send(CHANNELS.deliverablesProgress, projectId, progress)
+  /** What a writing tells the page while it runs: its steps, and the draft before its review. */
+  const writingListeners = (projectId: string) => ({
+    onProgress: writingProgress(projectId),
+    onDraft: (deliverable: unknown) =>
+      deps.window.webContents.send(CHANNELS.deliverablesDraft, projectId, deliverable),
+  })
 
   handle(CHANNELS.deliverablesCatalog, byProject, async ({ projectId }) =>
     deps.deliverables.catalog(await deps.projects.get(projectId)),
@@ -884,7 +890,7 @@ export function registerIpc(deps: IpcDeps): void {
     deps.deliverables.start(await deps.projects.get(input.projectId), {
       kindId: input.kindId,
       inputs: input.inputs,
-      onProgress: writingProgress(input.projectId),
+      ...writingListeners(input.projectId),
     }),
   )
 
@@ -892,7 +898,7 @@ export function registerIpc(deps: IpcDeps): void {
     deps.deliverables.revise(await deps.projects.get(input.projectId), {
       deliverableId: input.deliverableId,
       request: input.request,
-      onProgress: writingProgress(input.projectId),
+      ...writingListeners(input.projectId),
     }),
   )
 
@@ -1099,7 +1105,9 @@ export function registerIpc(deps: IpcDeps): void {
   )
 
   handle(CHANNELS.projectSheets, byProject, async ({ projectId }) =>
-    deps.projectSheets.list(await deps.projects.get(projectId)),
+    deps.projectSheets.list(await deps.projects.get(projectId), (step) =>
+      deps.window.webContents.send(CHANNELS.sheetStep, projectId, step),
+    ),
   )
 
   handle(CHANNELS.forecastOrdersRead, byProject, async ({ projectId }) =>

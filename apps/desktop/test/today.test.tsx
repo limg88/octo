@@ -923,16 +923,24 @@ describe('the page of the day', () => {
     const [row] = within(first).getAllByRole('button') as [HTMLElement]
     expect(row.textContent).toContain(text.nowWhy.due.month_end)
     expect(row.textContent).toContain('Ottobre 2026: le ore di 3 persone non tornano')
-    // It is the one in view, with everything that can be done about it.
+    // Closed until it is chosen: a click opens it right under its row, with what can be done.
+    expect(row.getAttribute('aria-pressed')).toBe('false')
+    expect(within(first).queryByRole('region', { name: text.detailTitle })).toBeNull()
+    fireEvent.click(row)
     expect(row.getAttribute('aria-pressed')).toBe('true')
-    const detail = screen.getByRole('region', { name: text.detailTitle })
+    const detail = within(first).getByRole('region', { name: text.detailTitle })
     expect(within(detail).getByRole('button', { name: text.done })).toBeTruthy()
-    // The list below goes on without it.
+    // The list below goes on without it, and keeps a row of its own in view.
     const list = screen.getByRole('list', { name: text.list })
     expect(list.textContent).not.toContain('Ottobre 2026')
     expect(list.textContent).toContain('Rispondi a Carla Bianchi')
     fireEvent.click(within(list).getByText(/Rispondi a Carla Bianchi/))
     expect(row.getAttribute('aria-pressed')).toBe('false')
+    expect(within(first).queryByRole('region', { name: text.detailTitle })).toBeNull()
+    // A second click on the row closes it again.
+    fireEvent.click(row)
+    fireEvent.click(row)
+    expect(within(first).queryByRole('region', { name: text.detailTitle })).toBeNull()
   })
 
   it('says each rule of what comes first in the words of a PM', () => {
@@ -1055,7 +1063,13 @@ describe('the page of the day', () => {
       }),
     )
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const summary = await screen.findByRole('region', { name: text.nowSummary })
+    // Closed when the page loads: the PM opens it when the reasons are wanted.
+    const summary = (await screen.findByText(text.nowSummary)).closest(
+      'details',
+    ) as HTMLDetailsElement
+    expect(summary.open).toBe(false)
+    fireEvent.click(screen.getByText(text.nowSummary))
+    summary.open = true
     expect(summary.textContent).toContain('Il cliente aspetta la conferma del budget.')
     fireEvent.click(
       within(summary).getByRole('button', { name: `${text.nowSource}: Posta/2026-11/budget.md` }),

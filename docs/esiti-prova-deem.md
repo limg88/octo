@@ -55,6 +55,12 @@ Stato: tutti **aperti**.
 
 Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sezione e risposta ritrovata al rientro; «Sintesi» che mostra l'avanzamento e arriva in fondo su dati sintetici con dodici mesi non letti; e2e del clic in «Adesso».
 
+**Esito di I1 (18/11/2026): codice chiuso, criterio da verificare** (R6c.1-R6c.4 in `verifiche-da-fare.md`). Demo `demo/68-richieste-che-restano`, `pnpm e2e:esiti`.
+- *Richieste perse*: «Oggi», «Chiedi», «Deliverable», «Cruscotto» e «Commessa» restano montate e nascoste dopo la prima apertura, finché il progetto è lo stesso; al rientro rileggono i dati senza perdere ciò che mostrano. «Impostazioni» riparte ogni volta. Accanto alla sezione in cui Claude lavora c'è una rotella.
+- *«Sintesi» e «Fatturazione»*: riprodotto solo in parte. Su una copia delle sole impostazioni del progetto reale (contando, senza contenuti): sei codici, tutti con il mese di inizio, il più vecchio dodici mesi prima; con lo stato vuoto Octo chiedeva quindi dodici mesi di timesheet in una sola lettura, senza dire nulla, dopo aver chiesto ordini e fatture; uscendo dalla sezione il risultato andava perso. **I tempi veri non sono misurati**: la lettura passa dalla credenziale di NetSuite, che non ho aperto (R6c.2). Non è un codice senza mese di inizio, e non ho trovato un errore taciuto diverso dal fallimento della lettura, che ora è detto. Correzione: un mese alla volta, ognuno tenuto appena letto; la pagina dice il mese e il conto; chi arriva mentre una lettura è in corso vede gli stessi passi; se si ferma la pagina dice perché e «Riprendi la lettura» chiede solo ciò che manca. Sui dati sintetici (dodici mesi, NetSuite finto lento) arriva in fondo.
+- *«Adesso»*: riprodotto. Il clic sceglieva la voce, ma il dettaglio compariva nel riquadro accanto a «Da fare oggi», più in basso e fuori vista. Ora si apre sotto la voce; «Perché contano oggi» è chiuso all'apertura.
+- *Stime lente*: non misurabili con Claude finto. Ora la riga di attesa dice la fase, la bozza si mostra appena le fonti sono controllate e la rilettura critica continua da sola; accanto ai tempi resta scritto dove è andato l'ultimo giro (R6c.4). La parte del codice, il controllo delle fonti, non era il collo di bottiglia nei test.
+
 ## I2 — «Oggi» senza rumore
 
 **Solo ciò che tocca al PM (7, 12).** «Il punto» e «Da tenere d'occhio» tengono le voci rivolte o assegnate al PM, con una regola di Octo (`ownPeopleKeys`, indirizzi del PM). Il resto esce, o sta in una riga di conteggio che si apre.
