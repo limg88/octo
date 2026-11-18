@@ -89,7 +89,7 @@ Verifica: demo con una richiesta lunga (Claude finto con ritardo), cambio di sez
 
 **Sigle (3).** Glossario del progetto in `_octo/.impostazioni/glossario.json` (forma sentita → forma giusta), applicato alle trascrizioni all'ingresso e dato a chi scrive. Claude propone le coppie candidate, il PM approva. Una sezione piccola nelle impostazioni.
 
-**Logo (2).** **Da confermare con il PM** quale file: nel progetto precedente indicato non c'è un file di logo; in quello prima c'è un PNG del polpo, usato dal componente `Brand`. Sostituisce `Logo.tsx` e l'icona dell'app.
+**Logo (2).** Confermato dal PM il 18/11/2026: è il PNG del polpo del progetto `octobrief` (fuori dal repository, in `apps/studio/public/octobrief.png`, usato dal componente `Brand`). Va copiato nelle risorse di Octo; sostituisce `Logo.tsx` e l'icona dell'app.
 
 **Previsionale (23, 24).** «Calcolo e dettagli» compatto, non a tutta larghezza; «Dati che mancano» come elenco ordinato (`ForecastMonth.tsx`, `ForecastView.tsx`, `FieldProblems.tsx`).
 
