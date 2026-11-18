@@ -334,6 +334,35 @@ describe('hours', () => {
     ).toBe('no_worklog')
   })
 
+  it('offers, to be named in the settings, who has hours and who is on our side without any', async () => {
+    const person = (name: string, side: 'supplier' | 'consultant' | 'client') => ({
+      name,
+      role: '',
+      side,
+      from: '',
+      to: '',
+      allocation: null,
+      note: '',
+    })
+    const paths = { timesheetPath: 'ore/Timesheets', worklogPath: 'ore/jira/' }
+    const plain = await setup(paths).view(project, JUNE)
+    const withTeam = await setup(paths, {
+      team: {
+        people: [
+          // Already among the hours, written the other way round: listed once, as the hours say.
+          person('Anna Bianchi', 'supplier'),
+          person('Studio Blu', 'consultant'),
+          person('Carla Neri', 'client'),
+        ],
+        periods: [],
+      },
+    }).view(project, JUNE)
+
+    expect(plain.people).toEqual(plain.reconciliation.rows.map((row) => row.person).sort())
+    expect(plain.people).toContain('Bianchi Anna')
+    expect(withTeam.people).toEqual([...plain.people, 'Studio Blu'].sort())
+  })
+
   it('reads the timesheets from the company system, one file per month, and compares from them', async () => {
     const hours = setup(
       { worklogPath: 'ore/jira', timesheetPath: 'raw/vecchi' },

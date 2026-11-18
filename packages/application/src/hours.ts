@@ -7,6 +7,7 @@ import {
   monthsOf,
   NO_TEAM,
   OCTO_FOLDER,
+  onOurSide,
   PRIVATE_FOLDER,
   type Project,
   type ProjectTeam,
@@ -15,6 +16,7 @@ import {
   parseWorklogExport,
   parseWorklogIssues,
   peopleAway,
+  personKey,
   type Reconciliation,
   reconcileHours,
   romeDateString,
@@ -99,6 +101,11 @@ export type HoursView = {
   }
   /** Every project code the timesheets of the period carry, to choose which are of this project. */
   projectCodes: string[]
+  /**
+   * Who can be named in the settings: the people the hours of the period show, and the people
+   * of the project on our side, consultants included, who may have no hours anywhere.
+   */
+  people: string[]
 }
 
 export type Hours = {
@@ -314,7 +321,8 @@ export function createHours(deps: HoursDeps): Hours {
       const timesheet = await timesheetRows(project, timesheetFiles, unreadable)
       const worklog = await read(project, worklogFiles, parseWorklogExport, unreadable)
       // Who left before the period or joined after it is expected to have no hours in it.
-      const away = peopleAway((await deps.team?.(project)) ?? NO_TEAM, period.from, period.to)
+      const team = (await deps.team?.(project)) ?? NO_TEAM
+      const away = peopleAway(team, period.from, period.to)
       const withAway = {
         ...settings,
         noWorklogExpected: [...settings.noWorklogExpected, ...away],
@@ -326,9 +334,15 @@ export function createHours(deps: HoursDeps): Hours {
           codes.add(row.project)
         }
       }
+      const reconciliation = reconcileHours(timesheet, worklog, withAway, period)
+      // A person of the team written another way round is the one the hours already show.
+      const people = new Map(reconciliation.rows.map((row) => [personKey(row.person), row.person]))
+      for (const person of team.people.filter(onOurSide)) {
+        if (!people.has(personKey(person.name))) people.set(personKey(person.name), person.name)
+      }
       return {
         period,
-        reconciliation: reconcileHours(timesheet, worklog, withAway, period),
+        reconciliation,
         sources: {
           timesheetFiles: timesheetFiles.length,
           worklogFiles: worklogFiles.length,
@@ -337,6 +351,7 @@ export function createHours(deps: HoursDeps): Hours {
           lastWorklogDay: lastDay(worklog, period),
         },
         projectCodes: [...codes].sort(),
+        people: [...people.values()].sort((a, b) => a.localeCompare(b, 'it')),
       }
     },
 

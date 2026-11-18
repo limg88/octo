@@ -298,7 +298,7 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
           settings={settings}
           candidates={candidates}
           codes={view?.projectCodes ?? []}
-          people={view?.reconciliation.rows.map((row) => row.person) ?? []}
+          people={view?.people ?? []}
           onSave={save}
           onChooseFolder={chooseFolder}
         />

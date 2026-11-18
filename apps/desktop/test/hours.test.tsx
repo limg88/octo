@@ -23,6 +23,7 @@ const configured: HoursSettings = {
 
 const view: View = {
   period: JUNE,
+  people: [],
   reconciliation: {
     rows: [
       {
@@ -73,6 +74,8 @@ const view: View = {
   },
   projectCodes: ['P1', 'P9'],
 }
+// The people to choose among: who has hours, and a consultant of the team who has none.
+view.people = [...view.reconciliation.rows.map((row) => row.person), 'Studio Blu']
 
 type Api = Pick<
   OctoApi,
