@@ -1,4 +1,10 @@
-import { FULL_ALLOCATION, type Project, type ProjectTeam, type TeamPerson } from '@octo/domain'
+import {
+  FULL_ALLOCATION,
+  type Project,
+  type ProjectTeam,
+  TEAM_SIDES,
+  type TeamPerson,
+} from '@octo/domain'
 import { useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
@@ -12,7 +18,7 @@ const text = messages.team
 
 type PersonKey = 'name' | 'role' | 'side' | 'allocation' | 'capDays' | 'from' | 'to' | 'note'
 type PeriodKey = 'name' | 'from' | 'to'
-const SIDES: TeamPerson['side'][] = ['supplier', 'client']
+const SIDES: readonly TeamPerson['side'][] = TEAM_SIDES
 
 const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
   { key: 'name', label: text.columns.name, width: 'minmax(150px, 1.2fr)' },
@@ -21,7 +27,7 @@ const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
     key: 'side',
     label: text.columns.side,
     kind: 'select',
-    width: '110px',
+    width: '130px',
     options: SIDES.map((side) => ({ value: side, label: text.sides[side] })),
   },
   { key: 'allocation', label: text.columns.allocation, kind: 'amount', width: '110px' },
@@ -114,7 +120,7 @@ export function TeamSection({ api, project }: Props) {
         .map((row) => ({
           name: row.name.trim(),
           role: row.role.trim(),
-          side: row.side === 'client' ? 'client' : 'supplier',
+          side: SIDES.find((side) => side === row.side) ?? 'supplier',
           from: row.from,
           to: row.to,
           allocation: amountOf(row.allocation),

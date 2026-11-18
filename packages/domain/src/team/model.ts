@@ -1,8 +1,15 @@
 import { OCTO_FOLDER } from '../extracted-document.ts'
 import { personKey } from '../hours/model.ts'
 
-export const TEAM_SIDES = ['supplier', 'client'] as const
+/**
+ * Whose a person is: of the supplier, a consultant who works with the supplier without being
+ * one of its people, or of the client.
+ */
+export const TEAM_SIDES = ['supplier', 'consultant', 'client'] as const
 export type TeamSide = (typeof TEAM_SIDES)[number]
+
+/** Whether a person works on the supplier's side: its own people and its consultants. */
+export const onOurSide = (person: Pick<TeamPerson, 'side'>): boolean => person.side !== 'client'
 
 /** Someone who works on the project or reads what it produces. */
 export type TeamPerson = {
@@ -63,10 +70,10 @@ export function capDaysOf(person: Pick<TeamPerson, 'role' | 'capDays'>): number 
 /** The most days a person is to spend on the project. */
 export type PersonCap = { person: string; days: number }
 
-/** The caps of the supplier's people who have one: what the project was planned to take. */
+/** The caps of the people on the supplier's side who have one: what the project was planned to take. */
 export function teamCaps(team: ProjectTeam): PersonCap[] {
   return team.people.flatMap((person) => {
-    const days = person.side === 'supplier' ? capDaysOf(person) : null
+    const days = onOurSide(person) ? capDaysOf(person) : null
     return days === null ? [] : [{ person: person.name, days }]
   })
 }
@@ -107,13 +114,9 @@ export function cleanTeam(team: ProjectTeam): ProjectTeam {
  * The people who were not on the project on any day of a stretch of time: they left before it
  * or joined after it. Their missing hours in that stretch are no anomaly.
  */
-/** The people of the project on the supplier's side, each as a name read in any order. */
+/** The people of the project on the supplier's side, consultants included, each as a name read in any order. */
 export function ownPeopleKeys(team: ProjectTeam): Set<string> {
-  return new Set(
-    team.people
-      .filter((person) => person.side === 'supplier')
-      .map((person) => personKey(person.name)),
-  )
+  return new Set(team.people.filter(onOurSide).map((person) => personKey(person.name)))
 }
 
 /**
@@ -148,6 +151,7 @@ const italianDay = (value: string): string => value.split('-').reverse().join('/
 
 const SIDE_TITLES: Readonly<Record<TeamSide, string>> = {
   supplier: 'Dalla nostra parte',
+  consultant: 'Consulenti (lavorano dalla nostra parte, non sono nostri dipendenti)',
   client: 'Dal cliente',
 }
 

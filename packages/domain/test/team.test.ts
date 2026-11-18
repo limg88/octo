@@ -4,6 +4,7 @@ import {
   capDaysOf,
   cleanTeam,
   NO_TEAM,
+  onOurSide,
   ownPeopleKeys,
   type ProjectTeam,
   peopleAway,
@@ -44,6 +45,34 @@ const team: ProjectTeam = {
     { name: 'Sprint 29', from: '2026-11-16', to: '2026-12-04' },
   ],
 }
+
+describe('a consultant among the people', () => {
+  const withConsultant: ProjectTeam = {
+    people: [
+      person('Rossi Mario'),
+      person('Studio Blu', { side: 'consultant', role: 'architetto', capDays: 5 }),
+      person('Carla Bianchi', { side: 'client' }),
+    ],
+    periods: [],
+  }
+
+  it('is kept as one, and told apart in the text of the project', () => {
+    expect(cleanTeam(withConsultant).people[1]?.side).toBe('consultant')
+    const text = teamMarkdown(withConsultant)
+    expect(text).toContain(
+      '## Consulenti (lavorano dalla nostra parte, non sono nostri dipendenti)\n\n- **Studio Blu**, architetto',
+    )
+    expect(text.indexOf('## Dalla nostra parte')).toBeLessThan(text.indexOf('## Consulenti'))
+    expect(text.indexOf('## Consulenti')).toBeLessThan(text.indexOf('## Dal cliente'))
+  })
+
+  it('works on our side: its tickets are ours, its days have a cap, the client is not', () => {
+    expect(onOurSide({ side: 'consultant' })).toBe(true)
+    expect(onOurSide({ side: 'client' })).toBe(false)
+    expect(ownPeopleKeys(withConsultant).size).toBe(2)
+    expect(teamCaps(withConsultant)).toEqual([{ person: 'Studio Blu', days: 5 }])
+  })
+})
 
 describe('the people and the calendar of a project', () => {
   it('are made tidy: one entry per person and per name, real days, periods in order', () => {

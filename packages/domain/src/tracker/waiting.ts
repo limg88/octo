@@ -1,5 +1,5 @@
 import { personKey } from '../hours/model.ts'
-import type { ProjectTeam } from '../team/model.ts'
+import { onOurSide, type ProjectTeam } from '../team/model.ts'
 import { workdaysBetween } from '../workdays.ts'
 import {
   type DashboardSettings,
@@ -62,7 +62,7 @@ function names(text: string, person: string): boolean {
  * nothing tells, and the answer is taken as anybody's.
  */
 function isFromClient(item: TrackerItem, askedBy: string, text: string, team: ProjectTeam) {
-  const supplier = team.people.filter((person) => person.side === 'supplier')
+  const supplier = team.people.filter(onOurSide)
   const client = team.people.filter((person) => person.side === 'client')
   if (!supplier.some((person) => personKey(person.name) === personKey(askedBy))) return false
   const assignee = item.assignee === null ? null : personKey(item.assignee)
@@ -71,8 +71,7 @@ function isFromClient(item: TrackerItem, askedBy: string, text: string, team: Pr
 
 /** Whether the team tells the two sides apart: only then «waits for the client» means something. */
 export const tellsSides = (team: ProjectTeam): boolean =>
-  team.people.some((person) => person.side === 'supplier') &&
-  team.people.some((person) => person.side === 'client')
+  team.people.some(onOurSide) && team.people.some((person) => person.side === 'client')
 
 /**
  * The bugs and the stories still to be closed whose last comment asks something and has waited at

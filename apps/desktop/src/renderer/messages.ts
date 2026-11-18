@@ -734,7 +734,7 @@ export const messages = {
     save: 'Salva persone e calendario',
     saved: (people: number, periods: number) =>
       `Salvati: ${people === 1 ? '1 persona' : `${people} persone`} e ${periods === 1 ? '1 periodo' : `${periods} periodi`}.`,
-    sides: { supplier: 'nostra', client: 'cliente' },
+    sides: { supplier: 'nostra', consultant: 'consulente', client: 'cliente' },
   },
   backup: {
     title: 'Se cambi computer',

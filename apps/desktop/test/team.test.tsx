@@ -130,6 +130,29 @@ describe('the section of people and calendar', () => {
     })
   })
 
+  it('lets a person be marked as a consultant, and keeps it', async () => {
+    const api = {
+      team: vi.fn(async () => ok(NO_TEAM)),
+      saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
+    }
+    render(<TeamSection api={api} project={project} />)
+    await screen.findByRole('group', { name: text.people })
+    const side = cell(text.personN(1), columns.side) as unknown as HTMLSelectElement
+    expect([...side.options].map((option) => option.text)).toEqual([
+      text.sides.supplier,
+      text.sides.consultant,
+      text.sides.client,
+    ])
+    set(text.personN(1), columns.name, 'Studio Blu')
+    set(text.personN(1), columns.side, 'consultant')
+    fireEvent.click(screen.getByRole('button', { name: text.save }))
+    await waitFor(() => expect(api.saveTeam).toHaveBeenCalled())
+    expect(api.saveTeam.mock.calls[0]?.[1].people[0]).toMatchObject({
+      name: 'Studio Blu',
+      side: 'consultant',
+    })
+  })
+
   it('keeps the most days a person is to spend on the project, when the PM writes them', async () => {
     const api = {
       team: vi.fn(async () =>
