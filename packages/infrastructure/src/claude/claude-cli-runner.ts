@@ -28,7 +28,10 @@ export function createClaudeCliRunner(config: ClaudeCliConfig): AgentRunner {
   async function status(): Promise<AgentStatus> {
     try {
       const version = await firstLine(config.command, [...prefix, '--version'], env)
-      return { available: true, version, computes: canFence(config.interpreter ?? null) }
+      const launcher = config.fenceLauncher ?? config.launcher
+      const inWsl = launcher !== undefined && (launcher.ready ? await launcher.ready() : true)
+      const computes = canFence(config.interpreter ?? null, process.platform, inWsl)
+      return { available: true, version, computes }
     } catch {
       return { available: false, reason: 'not_installed' }
     }

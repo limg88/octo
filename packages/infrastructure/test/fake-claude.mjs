@@ -563,7 +563,9 @@ if (workAt >= 0 && args.includes('Bash')) {
     prompt.includes('You run the script of a deliverable') ||
     prompt.includes('You maintain the script of a deliverable')
   ) {
-    const python = /^Bash\((.+) \*\)$/.exec(args.find((arg) => arg.startsWith('Bash(')) ?? '')?.[1]
+    const python = /^Bash\("(.+)" \*\)$/.exec(
+      args.find((arg) => arg.startsWith('Bash(')) ?? '',
+    )?.[1]
     const correcting = prompt.includes('You maintain the script')
     if (correcting) {
       // A correction in words, as far as a fake goes: `chiave=valore` changes the configuration.

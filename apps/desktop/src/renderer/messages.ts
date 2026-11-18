@@ -1809,7 +1809,7 @@ const errors: Record<ErrorCode, string> = {
     'Hai raggiunto il limite d’uso del tuo account Claude. Riprova quando il limite si azzera.',
   agent_output_invalid: 'La risposta di Claude non era leggibile. Riprova.',
   fence_unavailable:
-    'Su questo computer Claude non può fare calcoli in sicurezza: la protezione del sistema che lo tiene dentro la cartella di lavoro non parte. Octo non lo fa calcolare senza. Chiedi senza «Con calcoli».',
+    'Su questo computer Claude non può fare calcoli in sicurezza: la protezione del sistema che lo tiene dentro la cartella di lavoro non parte. Octo non lo fa calcolare senza. Su Windows serve WSL2, con Claude Code installato dentro la distribuzione, e il progetto su un disco del PC (non su una condivisione di rete). Chiedi senza «Con calcoli».',
   fence_interpreter_missing:
     'Manca l’interprete che Octo usa per i calcoli: reinstalla Octo. Intanto chiedi senza «Con calcoli».',
   work_not_found: 'Non trovo più i file di questo calcolo su questo computer.',

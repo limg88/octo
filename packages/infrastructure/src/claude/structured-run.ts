@@ -16,6 +16,21 @@ export type ClaudeCliConfig = {
   askTimeoutMs?: number
   /** The interpreter Octo ships for calculations, as an absolute path; null when it has none. */
   interpreter?: string | null
+  /** How the CLI is started when not directly: inside WSL2 on Windows. Absent: directly. */
+  launcher?: Launcher
+  /** The same for the runs that need the sandbox, where only those go through it. */
+  fenceLauncher?: Launcher
+}
+
+/** A process to start for a run, and what to tidy once it has ended. */
+export type Launch = { command: string; args: string[]; cwd: string; done: () => Promise<void> }
+
+/** Starts the CLI somewhere the folders have other names: it says how a folder is called there. */
+export type Launcher = {
+  path(path: string): string
+  /** Whether it can start anything on this computer; absent: it always can. */
+  ready?(): Promise<boolean>
+  launch(command: string, args: string[], cwd: string): Promise<Launch>
 }
 
 /** One run of the agent: what it is told, what it reads from, the shape of what it gives back. */
@@ -134,9 +149,14 @@ export async function runStructured<Output>(
   ]
   const timeout = AbortSignal.timeout(config.askTimeoutMs ?? DEFAULT_TIMEOUT_MS)
   const signal = run.signal ? AbortSignal.any([run.signal, timeout]) : timeout
+  const launch: Launch = config.launcher
+    ? await config.launcher.launch(config.command, args, run.projectFolder)
+    : { command: config.command, args, cwd: run.projectFolder, done: async () => {} }
+  // The files the run names are told as the place it runs in calls the project.
+  const shownFolder = config.launcher?.path(run.projectFolder) ?? run.projectFolder
   const output = await new Promise<RunOutput>((resolve, reject) => {
-    const child = spawn(config.command, args, {
-      cwd: run.projectFolder,
+    const child = spawn(launch.command, launch.args, {
+      cwd: launch.cwd,
       env: seatEnvironment(config.env),
       signal,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -145,7 +165,7 @@ export async function runStructured<Output>(
     let result: ResultEvent | null = null
     let stderr = ''
     createInterface({ input: child.stdout }).on('line', (line) => {
-      const event = parseStreamLine(line, run.projectFolder)
+      const event = parseStreamLine(line, shownFolder)
       if (event.kind === 'result') result = event.result
       if (event.kind === 'model') run.onModel?.(event.model)
       if (event.kind !== 'progress') return
@@ -162,7 +182,7 @@ export async function runStructured<Output>(
     child.on('close', (exitCode) => resolve({ result, exitCode, stderr }))
     // The request travels on standard input: no quoting, on any system.
     child.stdin.end(run.input)
-  })
+  }).finally(launch.done)
   if (run.signal?.aborted) throw new DomainError('agent_cancelled')
   const { result } = output
   if (!result || result.is_error) {

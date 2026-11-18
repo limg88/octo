@@ -117,12 +117,14 @@ import {
   createWarehouseTimesheetReader,
   createWordRenderer,
   createWorkerTextExtractor,
+  createWslLauncher,
   createXlsxModel,
   fixedPersonOf,
   locateClaude,
   type SecretCipher,
   shellPath,
   withShellPath,
+  wslState,
 } from '@octo/infrastructure'
 import { app, BrowserWindow, safeStorage, shell } from 'electron'
 import releaseKeys from '../../release-keys.json' with { type: 'json' }
@@ -224,11 +226,17 @@ const INTERPRETER_VARIABLE = 'OCTO_PYTHON_PATH'
 /** A folder to read the catalog of deliverables from instead of the one shipped: demos and tests. */
 const CATALOG_FOLDER_VARIABLE = 'OCTO_CATALOG_DIR'
 const INTERPRETER = join('bin', 'python3')
-/** The systems an interpreter is shipped for, as the installers name them. */
+const WINDOWS_PLATFORM = 'win32'
+const WSL_COMMAND = 'wsl.exe'
+const WSL_CLAUDE = 'claude'
+/** The systems an interpreter is shipped for, as the installers name them: Windows runs Linux's, in WSL2. */
 const INTERPRETER_SYSTEMS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: 'mac',
   linux: 'linux',
+  win32: 'linux',
 }
+/** Where the installed app keeps the interpreter: on Windows it is the copy for the distribution. */
+const INTERPRETER_FOLDER: Partial<Record<NodeJS.Platform, string>> = { win32: 'python-linux' }
 
 /**
  * The interpreter Octo ships for the calculations Claude runs inside its fence: the one of the
@@ -239,7 +247,9 @@ function shippedInterpreter(): string | null {
   const system = INTERPRETER_SYSTEMS[process.platform]
   const candidates = [
     process.env[INTERPRETER_VARIABLE],
-    app.isPackaged ? join(process.resourcesPath, 'python', INTERPRETER) : undefined,
+    app.isPackaged
+      ? join(process.resourcesPath, INTERPRETER_FOLDER[process.platform] ?? 'python', INTERPRETER)
+      : undefined,
     system &&
       join(here, '..', '..', 'resources', 'python', `${system}-${process.arch}`, INTERPRETER),
   ]
@@ -453,6 +463,17 @@ function start(seatEnv: Record<string, string | undefined>): void {
     }),
     env: seatEnv,
     interpreter: shippedInterpreter(),
+    // On Windows the sandbox is inside WSL2: the runs that need it are started there.
+    ...(process.platform === WINDOWS_PLATFORM
+      ? {
+          fenceLauncher: createWslLauncher({
+            wsl: WSL_COMMAND,
+            state: () => wslState(WSL_COMMAND),
+            command: [WSL_CLAUDE],
+            scripts: join(dataFolder, 'avvio'),
+          }),
+        }
+      : {}),
   }
   const agent = createClaudeCliRunner(claude)
   const work = createFsWorkFolders(dataFolder)

@@ -28,6 +28,14 @@ mac:
     - target: zip
       arch: [arm64, x64]
 win:
+  # On Windows Claude computes inside WSL2: the interpreter shipped is the one for Linux.
+  extraResources:
+    - from: resources/python/linux-x64
+      to: python-linux
+    - from: resources/deliverable
+      to: deliverable
+    - from: resources/catalogo
+      to: catalogo
   artifactName: Octo-${version}-win-${arch}.${ext}
   target:
     - target: nsis

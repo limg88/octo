@@ -81,7 +81,7 @@ describe('the fence of a run with calculations', () => {
       'Grep',
       'Glob',
       'Edit(//stato/lavoro/p-1/q-1/**)',
-      'Bash(/app/python/bin/python3 *)',
+      'Bash("/app/python/bin/python3" *)',
     ])
     expect(grant.more.slice(0, 2)).toEqual(['--add-dir', '/stato/lavoro/p-1/q-1'])
     expect(JSON.parse(grant.more[3] ?? '')).toEqual(fenceSettings('/progetti/Aurora', fence))
@@ -94,7 +94,8 @@ describe('the fence of a run with calculations', () => {
 
   it('tells the run the one way it may compute', () => {
     const told = fencePrompt(fence)
-    expect(told).toContain('/app/python/bin/python3 /stato/lavoro/p-1/q-1/<script>.py')
+    // Quoted: the folder of the app's state has a space in its name on a Mac.
+    expect(told).toContain('"/app/python/bin/python3" "/stato/lavoro/p-1/q-1/<script>.py"')
     expect(told).toContain('The project cannot be written')
   })
 
@@ -176,38 +177,44 @@ describe('the work folders of the app', () => {
     expect(await work.files('p-9', 'mai-fatta')).toEqual([])
   })
 
-  it('give back only the files a run left, never what a link or a name points to elsewhere', async () => {
-    const work = createFsWorkFolders(data)
-    const folder = await work.create('p-9', 'q-2')
-    await writeFile(join(root, 'segreto.txt'), 'fuori')
-    await writeFile(join(folder, 'dentro.txt'), 'dentro')
-    await symlink(join(root, 'segreto.txt'), join(folder, 'link.txt')).catch(() => undefined)
-    expect(await work.files('p-9', 'q-2')).toEqual(['dentro.txt'])
-    expect(new TextDecoder().decode(await work.read('p-9', 'q-2', 'dentro.txt'))).toBe('dentro')
-    // A folder that is a link, and a second name for a file outside: neither is a file of the run.
-    await symlink(root, join(folder, 'via')).catch(() => undefined)
-    await link(join(root, 'segreto.txt'), join(folder, 'doppio.txt')).catch(() => undefined)
-    for (const name of [
-      '../../../segreto.txt',
-      'assente.txt',
-      'link.txt',
-      'via/segreto.txt',
-      'doppio.txt',
-    ]) {
-      await expect(work.read('p-9', 'q-2', name)).rejects.toMatchObject({ code: 'work_not_found' })
-    }
-    // Octo writes in the folder of a run too, and never through what a run left as a link.
-    await work.write('p-9', 'q-2', 'uscita/modulo.xlsx', new TextEncoder().encode('ok'))
-    expect(await work.files('p-9', 'q-2')).toContain('uscita/modulo.xlsx')
-    for (const name of ['via/scritto.txt', 'link.txt', '../fuori.txt']) {
-      await expect(
-        work.write('p-9', 'q-2', name, new TextEncoder().encode('no')),
-      ).rejects.toMatchObject({ code: 'work_not_found' })
-    }
-    expect(await readFile(join(root, 'segreto.txt'), 'utf8')).toBe('fuori')
-    await expect(work.create('../fuori', 'q-1')).rejects.toMatchObject({ code: 'work_not_found' })
-    await expect(work.files('p-9', 'a/b')).rejects.toMatchObject({ code: 'work_not_found' })
-  })
+  // Links need rights a Windows runner does not give: the same code is tried where they can be made.
+  fenced(
+    'give back only the files a run left, never what a link or a name points to elsewhere',
+    async () => {
+      const work = createFsWorkFolders(data)
+      const folder = await work.create('p-9', 'q-2')
+      await writeFile(join(root, 'segreto.txt'), 'fuori')
+      await writeFile(join(folder, 'dentro.txt'), 'dentro')
+      await symlink(join(root, 'segreto.txt'), join(folder, 'link.txt')).catch(() => undefined)
+      expect(await work.files('p-9', 'q-2')).toEqual(['dentro.txt'])
+      expect(new TextDecoder().decode(await work.read('p-9', 'q-2', 'dentro.txt'))).toBe('dentro')
+      // A folder that is a link, and a second name for a file outside: neither is a file of the run.
+      await symlink(root, join(folder, 'via')).catch(() => undefined)
+      await link(join(root, 'segreto.txt'), join(folder, 'doppio.txt')).catch(() => undefined)
+      for (const name of [
+        '../../../segreto.txt',
+        'assente.txt',
+        'link.txt',
+        'via/segreto.txt',
+        'doppio.txt',
+      ]) {
+        await expect(work.read('p-9', 'q-2', name)).rejects.toMatchObject({
+          code: 'work_not_found',
+        })
+      }
+      // Octo writes in the folder of a run too, and never through what a run left as a link.
+      await work.write('p-9', 'q-2', 'uscita/modulo.xlsx', new TextEncoder().encode('ok'))
+      expect(await work.files('p-9', 'q-2')).toContain('uscita/modulo.xlsx')
+      for (const name of ['via/scritto.txt', 'link.txt', '../fuori.txt']) {
+        await expect(
+          work.write('p-9', 'q-2', name, new TextEncoder().encode('no')),
+        ).rejects.toMatchObject({ code: 'work_not_found' })
+      }
+      expect(await readFile(join(root, 'segreto.txt'), 'utf8')).toBe('fuori')
+      await expect(work.create('../fuori', 'q-1')).rejects.toMatchObject({ code: 'work_not_found' })
+      await expect(work.files('p-9', 'a/b')).rejects.toMatchObject({ code: 'work_not_found' })
+    },
+  )
 })
 
 describe('the questions kept with the app', () => {

@@ -77,6 +77,24 @@ Non costruito: correggere a parole il tipo distribuito con l'app, per tutti i pr
 
 Non costruito, per scelta della revisione: il controllo di doppioni e contraddizioni fra le pagine, i contratti di output con l'esempio validato, l'aggiornamento periodico da solo.
 
+## R6 — Windows: WSL2
+
+Tutto questo si prova sul PC del pilota, a PC preparato (WSL2 installato, Claude Code installato e con l'accesso fatto **dentro** la distribuzione). Sono i sette punti di §6.4 della revisione, più l'installatore.
+
+| # | Che cosa provare | Come | Esito che chiude | Esito |
+|---|---|---|---|---|
+| R6.1 | WSL c'è ed è la versione 2 | In PowerShell: `wsl -l -v` | Una distribuzione con VERSION 2. Se il PC aziendale non permette di installarla, R6 è fallito e va scritto | da fare |
+| R6.2 | Claude Code dentro la distribuzione, con il seat | Nella distribuzione: `claude --version`, poi `claude` e l'accesso | Risponde a una domanda. L'accesso fatto su Windows non vale lì | da fare |
+| R6.3 | Octo trova WSL2 e offre «Con calcoli» | Installa Octo, apri «Chiedi» | La casella «Con calcoli» c'è. Se manca: `wsl -l -v` e `wsl -e sh -c 'PATH="$HOME/.local/bin:$PATH" command -v claude'` dicono che cosa non trova | da fare |
+| R6.4 | Un calcolo dentro WSL2, con il progetto su disco Windows | «Con calcoli», una somma su un file del progetto | La tabella esce con la fonte; i file sono in `%APPDATA%\Octo\lavoro\…`; nel progetto niente | da fare |
+| R6.5 | **La prova ostile dentro WSL2** | Nella distribuzione, in una copia del repository: `node apps/desktop/scripts/fetch-python.mjs linux-x64`, poi `pnpm test:recinto`. Poi la stessa con progetto e cartella di lavoro sotto `/mnt/c` (variabile `TMPDIR=/mnt/c/Temp`) | 2 test passati in tutti e due i casi. Se sotto `/mnt/c` una scrittura riesce, il recinto su Windows non regge per i progetti su disco Windows: fermarsi e dirlo | da fare |
+| R6.6 | Cartelle sincronizzate con OneDrive o SharePoint | Progetto in una cartella sincronizzata, con qualche file «solo online» | Chiedi e un calcolo funzionano; un file solo online viene scaricato o segnalato, non letto vuoto | da fare |
+| R6.7 | L'interprete per Linux distribuito con l'installatore | Dopo l'installazione: `wsl -e "/mnt/c/…/Octo/resources/python-linux/bin/python3" -c "import openpyxl; print(1)"` | Stampa 1. Se i collegamenti del pacchetto si sono persi nell'installatore di Windows, `bin/python3` manca e va usato `bin/python3.13` | da fare |
+| R6.8 | Antivirus aziendale sui processi avviati da WSL | Guardare se un calcolo viene bloccato o rallentato | Nessun blocco, o l'eccezione chiesta all'IT | da fare |
+| R6.9 | Tre giorni di posta letta su Windows senza intervento | Non verificabile: il lettore non è costruito | Vedi la sezione che segue | bloccato |
+
+Sul Mac è provato che i percorsi con spazi reggono (il comando e la regola portano le virgolette): la prova ostile gira in una cartella con uno spazio nel nome.
+
 ## R6 — che cosa serve sapere sulla posta di Windows
 
 In `docs/` non è scritto quale Outlook ha il pilota (`docs/roadmap.md`, «Scelte prese durante F2 (posta)»: «Dipende da quale Outlook ha il pilota»). Il lettore della posta su Windows non si costruisce alla cieca. Da rilevare nella sessione con il pilota (R2.6):

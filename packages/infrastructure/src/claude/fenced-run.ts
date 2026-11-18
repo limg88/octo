@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { basename, dirname, join, posix } from 'node:path'
 import { DomainError, type DomainErrorCode } from '@octo/domain'
 import {
   type ClaudeCliConfig,
@@ -19,11 +19,15 @@ export type Fence = {
 
 /** The systems whose sandbox Claude Code can put a run in. Windows has it only inside WSL2. */
 const FENCED_PLATFORMS: readonly NodeJS.Platform[] = ['darwin', 'linux']
-/** True when a run can be fenced here: a system with a sandbox, and an interpreter to run. */
+/**
+ * True when a run can be fenced here: an interpreter to run, and a system with a sandbox or,
+ * on Windows, a way into WSL2 where the sandbox is.
+ */
 export const canFence = (
   interpreter: string | null,
   platform: NodeJS.Platform = process.platform,
-): boolean => interpreter !== null && FENCED_PLATFORMS.includes(platform)
+  inWsl = false,
+): boolean => interpreter !== null && (FENCED_PLATFORMS.includes(platform) || inWsl)
 
 const FENCE_TOOLS = [...READ_ONLY_TOOLS, 'Write', 'Edit', 'Bash'] as const
 /** What the CLI says when the sandbox of the system cannot start. */
@@ -37,7 +41,9 @@ const HOME = '~/'
  * runs outside it.
  */
 export function fenceSettings(projectFolder: string, fence: Fence): object {
-  const runtime = dirname(dirname(fence.interpreter))
+  // A path of the distribution is of Linux whatever system Octo runs on.
+  const up = fence.interpreter.startsWith('/') ? posix.dirname : dirname
+  const runtime = up(up(fence.interpreter))
   return {
     sandbox: {
       enabled: true,
@@ -67,7 +73,8 @@ export function fenceGrant(projectFolder: string, fence: Fence): RunGrant {
     allowed: [
       ...READ_ONLY_TOOLS,
       `Edit(${absoluteRule(fence.workFolder)}/**)`,
-      `Bash(${fence.interpreter} *)`,
+      // In quotes, as the run is told to write it: a folder may have a space in its name.
+      `Bash("${fence.interpreter}" *)`,
     ],
     more: [
       '--add-dir',
@@ -86,9 +93,9 @@ export function fencePrompt(fence: Fence): string {
   return `
 
 You can run calculations. To compute, write a Python script with the Write tool inside the work
-folder \`${fence.workFolder}\`, then run it with one Bash command written exactly like this, with no
-variables, no \`cd\`, no pipes and no other command:
-\`${fence.interpreter} ${fence.workFolder}/<script>.py\`
+folder \`${fence.workFolder}\`, then run it with one Bash command written exactly like this, the
+double quotes included, with no variables, no \`cd\`, no pipes and no other command:
+\`"${fence.interpreter}" "${fence.workFolder}/<script>.py"\`
 - The interpreter has the standard library and openpyxl (Excel files). Nothing can be installed
   and there is no network.
 - The script reads the files of the project by their absolute path and writes only in the work
@@ -111,23 +118,26 @@ export async function runFenced<Output>(
   fence: Fence,
   platform: NodeJS.Platform = process.platform,
 ): Promise<Output> {
-  if (!FENCED_PLATFORMS.includes(platform)) throw new DomainError('fence_unavailable')
+  const launcher = config.fenceLauncher ?? config.launcher
+  if (!FENCED_PLATFORMS.includes(platform) && !launcher) throw new DomainError('fence_unavailable')
   // The sandbox knows the folders by their real path: a link would be another place to it.
   const [projectFolder, workFolder, interpreter] = await Promise.all([
     realpath(run.projectFolder),
     realpath(fence.workFolder),
     realpath(dirname(fence.interpreter)).then(
-      (folder) => `${folder}/${fence.interpreter.slice(dirname(fence.interpreter).length + 1)}`,
+      (folder) => join(folder, basename(fence.interpreter)),
       () => {
         throw new DomainError('fence_interpreter_missing')
       },
     ),
   ])
-  const real: Fence = { workFolder, interpreter }
+  // Inside WSL2 the fence is drawn on the folders as the distribution calls them.
+  const seen = (path: string): string => launcher?.path(path) ?? path
+  const real: Fence = { workFolder: seen(workFolder), interpreter: seen(interpreter) }
   return runStructured(
-    config,
+    launcher ? { ...config, launcher } : config,
     { ...run, projectFolder, systemPrompt: `${run.systemPrompt}${fencePrompt(real)}` },
-    fenceGrant(projectFolder, real),
+    fenceGrant(seen(projectFolder), real),
     fenceFailure,
   )
 }
