@@ -22,6 +22,7 @@ import { type SystemNotify, systemNotify } from './notify.ts'
 import { ProgressView } from './ProgressView.tsx'
 import { AddProjectDialog, ManageProjectsDialog } from './ProjectDialogs.tsx'
 import { ProjectSettings, type SettingsPart } from './ProjectSettings.tsx'
+import { ProjectSheetView } from './ProjectSheetView.tsx'
 import { ProjectSwitcher } from './ProjectSwitcher.tsx'
 import { SectionNav } from './SectionNav.tsx'
 import { SignIn } from './SignIn.tsx'
@@ -483,6 +484,8 @@ export function App({ api, notify = systemNotify }: Props) {
               />
             ) : tab === 'hours' ? (
               <HoursView api={api} project={selected} onOpenSources={() => setTab('sources')} />
+            ) : tab === 'sheet' ? (
+              <ProjectSheetView api={api} project={selected} onOpenSection={setTab} />
             ) : tab === 'forecast' ? (
               <ForecastView api={api} project={selected} onOpenSection={setTab} />
             ) : tab === 'progress' ? (

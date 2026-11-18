@@ -287,7 +287,12 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       ok: false as const,
       code: 'forecast_model_not_set' as const,
     })),
-    forecastLifetime: vi.fn(async () => ok([])),
+    projectSheets: vi.fn(async () => ok([])),
+    sheetPlans: vi.fn(async () => ok({})),
+    saveSheetPlans: vi.fn(async () => ok({})),
+    proposeSheetPlan: vi.fn(async () => ok({})),
+    confirmSheetBudget: vi.fn(async () => ok({})),
+    exportSheetData: vi.fn(async () => ok({ path: '' })),
     projectShape: vi.fn(async () => ok({ twoTrackers: true, fixedPriceOnly: false })),
     readForecastOrders: vi.fn(async () => ({
       ok: false as const,
@@ -921,7 +926,7 @@ describe('project tabs', () => {
     expect(await screen.findByPlaceholderText(messages.askPlaceholder)).toBeTruthy()
   })
 
-  it('offers no alignment to a project with one tracker, and tells a fixed price by its invoices', async () => {
+  it('offers no alignment to a project with one tracker, and sends a fixed price to the sheet of its code', async () => {
     const { api } = fakeApi({
       projectShape: vi.fn(async () => ok({ twoTrackers: false, fixedPriceOnly: true })),
     })
@@ -936,6 +941,12 @@ describe('project tabs', () => {
     // Sold at a fixed price only: «Avanzamento» is what NetSuite says, no form of the client.
     fireEvent.click(screen.getByRole('tab', { name: messages.progressTab }))
     expect(await screen.findByText(messages.progress.fixedPrice.intro)).toBeTruthy()
+    // What was ordered and invoiced is in the sheet of the project code: one press away.
+    fireEvent.click(screen.getByRole('button', { name: messages.openSection(messages.sheetTab) }))
+    expect(await screen.findByText(messages.forecast.noRows)).toBeTruthy()
+    expect(screen.getByRole('tab', { name: messages.sheetTab }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
   })
 
   it('groups the sections in the sidebar and moves among them with the arrows', async () => {
@@ -954,6 +965,7 @@ describe('project tabs', () => {
     ])
     expect(group(messages.nav.monthly)).toEqual([
       messages.hoursTab,
+      messages.sheetTab,
       messages.forecastTab,
       messages.progressTab,
     ])

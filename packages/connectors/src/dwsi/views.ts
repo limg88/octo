@@ -57,8 +57,8 @@ const f = (name: string): DwsiColumn => ({ name, type: 'double precision' })
 
 /**
  * The closed list of what the extractor reads, per project (`projectid`). Personal columns
- * beyond the name (notes, smart working, on-call), sales representatives, comments and the
- * HR views are never read.
+ * beyond the name (notes, smart working, on-call), sales representatives and comments are never
+ * read; of the HR views only what `STANDARD_COST_VIEW` and `EMPLOYEE_VIEW` declare.
  */
 export const DWSI_VIEWS: readonly DwsiView[] = [
   {
@@ -144,6 +144,66 @@ export const DWSI_VIEWS: readonly DwsiView[] = [
     people: [],
   },
   {
+    name: 'v_purchase_order_all',
+    category: 'economics',
+    label: 'Ordini a fornitore',
+    columns: [
+      t('projectid'),
+      t('purchaseorderid'),
+      i('lineid'),
+      d('purchaseorderdate'),
+      t('status'),
+      t('vendorname'),
+      t('item'),
+      f('quantity'),
+      f('amount'),
+      f('invoiced'),
+      { name: 'closed', type: 'character varying', reads: 'flag' },
+    ],
+    key: ['purchaseorderid', 'lineid'],
+    syncEntity: 'PURCHASEORDER',
+    people: [],
+  },
+  {
+    name: 'v_itemreceiptpo_all',
+    category: 'economics',
+    label: 'Ricevimenti da fornitore',
+    columns: [
+      t('projectid'),
+      { name: 'internalid', type: 'bigint' },
+      i('lineid'),
+      t('purchaseorderid'),
+      d('receiptdate'),
+      t('vendorname'),
+      t('item'),
+      f('quantity'),
+      f('amount'),
+    ],
+    key: ['internalid', 'lineid'],
+    syncEntity: 'ITEMRECEIPTPO',
+    people: [],
+  },
+  {
+    name: 'v_invoice_po_all',
+    category: 'economics',
+    label: 'Fatture dei fornitori',
+    columns: [
+      t('projectid'),
+      t('invoiceid'),
+      i('lineid'),
+      t('status'),
+      d('invoicedate'),
+      t('vendorname'),
+      t('item'),
+      n('amount'),
+      t('purchaseorder'),
+      t('type'),
+    ],
+    key: ['invoiceid', 'lineid'],
+    syncEntity: 'INVOICEPO',
+    people: [],
+  },
+  {
     name: 'v_project_revenue_all',
     category: 'economics',
     label: 'Ricavi e costi mensili',
@@ -225,12 +285,32 @@ export const EMPLOYEE_VIEW: { name: string; columns: readonly DwsiColumn[] } = {
   columns: [t('name'), t('email')],
 }
 
+/**
+ * What an hour of a person costs today, as the sheets of the administration price every hour:
+ * only the name and the cost of an hour are read, and only of who wrote hours on a project code
+ * bound to the PM who owns the source (the other columns of the view are never named).
+ */
+export const STANDARD_COST_VIEW: { name: string; columns: readonly DwsiColumn[] } = {
+  name: 'v_employee_cost_production_digital',
+  columns: [t('name'), n('laborcosthh')],
+}
+
 /** Every relation of the list: the signature and the privilege check cover them all. */
 export const DWSI_RELATIONS: readonly string[] = [
   ...DWSI_VIEWS.map((v) => v.name),
   SYNC_TABLE.name,
   EMPLOYEE_VIEW.name,
+  STANDARD_COST_VIEW.name,
 ]
+
+/**
+ * The cost of an hour of who wrote hours on a project code (`$1`), by name. Nobody else's cost
+ * is ever asked.
+ */
+export const STANDARD_COSTS_QUERY =
+  `SELECT c."name", c."laborcosthh" FROM ${DWSI_SCHEMA}."${STANDARD_COST_VIEW.name}" AS c ` +
+  `WHERE c."name" IN (SELECT t."employee" FROM ${DWSI_SCHEMA}."v_timesheet_all" AS t ` +
+  `WHERE t."projectid" = $1) ORDER BY 1, 2`
 
 /**
  * The project codes, among `$2`, bound to the person whose addresses (UPN and email, in lower

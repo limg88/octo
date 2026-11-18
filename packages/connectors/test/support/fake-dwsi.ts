@@ -72,6 +72,24 @@ CREATE TABLE dwsi.base_invoice (
   "type" varchar(30), memo varchar(2048)
 );
 CREATE VIEW dwsi.v_invoice_all AS SELECT * FROM dwsi.base_invoice;
+CREATE TABLE dwsi.base_purchase_order (
+  purchaseorderid varchar(30), lineid int4, purchaseorderdate date, status varchar(50),
+  vendorname varchar(255), item varchar(255), quantity float8, amount float8, invoiced float8,
+  projectid varchar(9), closed varchar(5), salesrep varchar(100), memo varchar(2048)
+);
+CREATE VIEW dwsi.v_purchase_order_all AS SELECT * FROM dwsi.base_purchase_order;
+CREATE TABLE dwsi.base_item_receipt (
+  internalid int8, lineid int4, documentnumber int4, purchaseorderid varchar(30),
+  receiptdate date, vendorname varchar(255), item varchar(255), description varchar(2048),
+  quantity float8, itemrate float8, amount float8, projectid varchar(9)
+);
+CREATE VIEW dwsi.v_itemreceiptpo_all AS SELECT * FROM dwsi.base_item_receipt;
+CREATE TABLE dwsi.base_invoice_po (
+  invoiceid varchar(30), lineid int4, status varchar(50), invoicedate date,
+  vendorname varchar(255), item varchar(255), amount numeric(18, 4), projectid varchar(9),
+  purchaseorder varchar(30), "type" varchar(30), memo varchar(2048)
+);
+CREATE VIEW dwsi.v_invoice_po_all AS SELECT * FROM dwsi.base_invoice_po;
 CREATE TABLE dwsi.base_project_revenue (
   projectid varchar(9), anno float8, mese float8, itemgroup varchar(50), "cost" numeric(18, 4),
   actualcost numeric(18, 4), revenue numeric(18, 4), actualrevenue numeric(18, 4),
@@ -99,6 +117,10 @@ CREATE TABLE dwsi.base_employee (
   birthdate date, phone varchar(50), laborcost numeric(18, 4), jobtitle varchar(100)
 );
 CREATE VIEW dwsi.v_dw_employee AS SELECT * FROM dwsi.base_employee;
+CREATE TABLE dwsi.base_employee_cost (
+  internalid int8, "name" varchar(100), laborcosthh numeric(18, 4), laborcostdd numeric(18, 4)
+);
+CREATE VIEW dwsi.v_employee_cost_production_digital AS SELECT * FROM dwsi.base_employee_cost;
 `
 
 const RELATIONS = [
@@ -106,12 +128,16 @@ const RELATIONS = [
   'v_project',
   'v_sales_order_all',
   'v_invoice_all',
+  'v_purchase_order_all',
+  'v_itemreceiptpo_all',
+  'v_invoice_po_all',
   'v_project_revenue_all',
   'v_database_pl_all',
   'v_backlog_all',
   'dw_prod_projectpercentcomplete',
   'dw_prod_syncdata',
   'v_dw_employee',
+  'v_employee_cost_production_digital',
 ]
 
 /**
@@ -140,6 +166,9 @@ INSERT INTO dwsi.base_employee VALUES
   (3, 'Anna Riva', 'anna.riva@example.test', NULL, '1990-03-03', '+39 002', 41.2000, 'Dev'),
   (4, 'Carla Fumi', 'carla.fumi@example.test', NULL, '1991-04-04', '+39 003', 40.0000, 'Dev'),
   (5, 'Ugo Esterno', 'ugo@example.test', NULL, NULL, NULL, NULL, 'Altro');
+INSERT INTO dwsi.base_employee_cost VALUES
+  (3, 'Anna Riva', 42.0000, 336.0000), (4, 'Carla Fumi', 40.0000, 320.0000),
+  (2, 'Luca Bassi', 44.0000, 352.0000);
 INSERT INTO dwsi.base_sales_order VALUES
   ('SO-17', 1, '2026-01-10', 'Billed', 'Servizi', 1.0000, 98000.0000, 45000.0000, 'PRJ000101',
    'F', 'Rino Venditti');
@@ -158,7 +187,9 @@ INSERT INTO dwsi.dw_prod_syncdata VALUES
   ('TIMESHEET', '2026-11-05 06:00:00'), ('PROJECT', '2026-11-05 06:10:00.250'),
   ('SALESORDER', '2026-11-04 22:00:00'), ('INVOICE', '2026-11-04 22:05:00'),
   ('PROJECTREVENUE', '2026-11-04 23:00:00'), ('BACKLOG', '2026-11-04 23:30:00'),
-  ('PROJECTPERCENTCOMPLETE', '2026-11-05 05:00:00'), ('EMPLOYEE', '2026-11-05 05:00:00');
+  ('PROJECTPERCENTCOMPLETE', '2026-11-05 05:00:00'), ('EMPLOYEE', '2026-11-05 05:00:00'),
+  ('PURCHASEORDER', '2026-11-04 22:10:00'), ('ITEMRECEIPTPO', '2026-11-04 22:15:00'),
+  ('INVOICEPO', '2026-11-04 22:20:00');
 `
 
 export interface DwsiAccount {

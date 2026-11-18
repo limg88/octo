@@ -14,7 +14,7 @@ Durata: 3 minuti. Mostra che i costi a budget di una commessa a corpo non vanno 
    bash demo/51-previsionale-budget-dai-tetti/run.sh
    ```
 
-2. **Apri «Previsionale».** Si apre «Commessa».
+2. **Apri «Commessa».**
    Atteso: «Costi a budget: non scritti: avanzamento non calcolabile» e «Margine a finire: servono i costi a budget o i costi totali previsti». Sotto: «Proposta dai tetti delle persone: 2.840,00 (Rossi Mario 2 gg, Bianchi Luca 8 gg, Verdi Sara 1,5 gg).» con il pulsante «Usa come costi a budget».
    Dimostra: 2 × 8 × 25 + 8 × 8 × 25 + 1,5 × 8 × 70 = 2.840. Il costo orario è quello dell'ultimo timesheet di ognuno; per chi non ha timesheet, quello scritto nelle impostazioni.
 

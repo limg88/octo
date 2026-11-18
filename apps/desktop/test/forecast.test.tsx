@@ -3,7 +3,6 @@ import type { ForecastView as View } from '@octo/application'
 import {
   DEFAULT_FORECAST_SETTINGS,
   type ForecastSettings,
-  type Lifetime,
   NO_FORECAST_PROJECT,
   NO_ROW_INPUTS,
   type Project,
@@ -11,7 +10,7 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForecastView, previousMonthOf } from '../src/renderer/ForecastView.tsx'
-import { amountField, amountOf, amountText, lifetimeMail } from '../src/renderer/forecast-text.ts'
+import { amountField, amountOf, amountText } from '../src/renderer/forecast-text.ts'
 import { messages } from '../src/renderer/messages.ts'
 import type { OctoApi, Result } from '../src/shared/api.ts'
 
@@ -86,7 +85,6 @@ type Api = Pick<
   | 'forecastView'
   | 'compileForecast'
   | 'readForecastOrders'
-  | 'forecastLifetime'
   | 'openEvidence'
 >
 
@@ -102,7 +100,6 @@ function fakeApi(overrides: Partial<Api> = {}) {
     ),
     // NetSuite is not linked: what Octo asks by itself for a code it does not know changes nothing.
     readForecastOrders: vi.fn(async () => UNLINKED),
-    forecastLifetime: vi.fn(async () => ok<Lifetime[]>([])),
     openEvidence: vi.fn(async () => ok(null)),
     ...overrides,
   }
@@ -523,35 +520,34 @@ describe('the forecast', () => {
     expect(onOpenSection).toHaveBeenCalledWith('hours')
   })
 
-  it('works with no model, proposing the only one found, and saves projects and rates', async () => {
-    const api = fakeApi({ forecastSettings: vi.fn(async () => ok(DEFAULT_FORECAST_SETTINGS)) })
-    render(<ForecastView api={api} project={project} now={now} />)
+  it('works with no model, proposing the only one found, and saves the projects', async () => {
+    // Rates and costs written before the budget existed stay as they are through a save.
+    const before: ForecastSettings = {
+      ...DEFAULT_FORECAST_SETTINGS,
+      rates: [{ person: 'Rossi Mario', code: null, ratePerDay: 400 }],
+      externals: [{ name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 }],
+      hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }],
+    }
+    const onOpenSection = vi.fn()
+    const api = fakeApi({ forecastSettings: vi.fn(async () => ok(before)) })
+    render(<ForecastView api={api} project={project} now={now} onOpenSection={onOpenSection} />)
     expect(await screen.findByText(text.setupIntro)).toBeTruthy()
     // The month is computed with no model; only filling the spreadsheet needs one.
     await waitFor(() => expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-06'))
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
     const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     await waitFor(() => expect(model.value).toBe('amministrazione/Previsionale.xlsx'))
-    // The rates are long: they open on request, under a line with their name.
-    const ratesFold = screen.getByText(text.rates, { selector: 'summary' })
-      .parentElement as HTMLDetailsElement
-    expect(ratesFold.open).toBe(false)
-    const rates = within(within(ratesFold).getByRole('group', { name: text.rates }))
-    const externals = within(screen.getByRole('group', { name: text.externalRates }))
-    const set = (group: typeof rates, column: string, row: number, value: string) =>
-      fireEvent.change(group.getByLabelText(text.cell(column, row)), { target: { value } })
+    // Rates and costs are of the budget of a code: here they are said to be there, not typed.
+    expect(screen.getByText(text.ratesInBudget)).toBeTruthy()
+    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
+    expect(screen.queryByRole('group', { name: text.externalRates })).toBeNull()
+    expect(screen.queryByRole('group', { name: text.hourlyCosts })).toBeNull()
+    const settings = screen.getByText(text.ratesInBudget).closest('form') as HTMLElement
+    fireEvent.click(
+      within(settings).getByRole('button', { name: messages.openSection(messages.sheetTab) }),
+    )
+    expect(onOpenSection).toHaveBeenCalledWith('sheet')
     fireEvent.change(screen.getByLabelText(text.hoursPerDay), { target: { value: '7.5' } })
-    // A rate without its figure, an external without its cost: told, and nothing is saved.
-    set(rates, text.columns.person, 1, 'Rossi Mario')
-    set(externals, text.columns.name, 1, 'Studio Blu')
-    set(externals, text.columns.code, 1, 'p1')
-    set(externals, text.columns.rate, 1, '500')
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
-    // A rate that is wrong opens its line: the error is never left where it is not seen.
-    expect(ratesFold.open).toBe(true)
-    expect(screen.getByText(text.wrong.rate(1))).toBeTruthy()
-    expect(screen.getByText(text.wrong.external(1))).toBeTruthy()
-    expect(api.saveForecastSettings).not.toHaveBeenCalled()
 
     // How each code of the project is sold: a fee with months that are not a number is told.
     const ofCode = (label: string, code: string) =>
@@ -562,23 +558,13 @@ describe('the forecast', () => {
     fireEvent.change(ofCode(text.columnFeeMonths, 'P2'), { target: { value: 'un anno' } })
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     expect(screen.getByText(text.wrong.project('P2'))).toBeTruthy()
+    expect(api.saveForecastSettings).not.toHaveBeenCalled()
     fireEvent.change(ofCode(text.columnFeeMonths, 'P2'), { target: { value: '12' } })
-
-    set(rates, text.columns.rate, 1, '400')
-    fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
-    set(rates, text.columns.person, 2, 'Rossi Mario')
-    set(rates, text.columns.code, 2, 'p2')
-    set(rates, text.columns.rate, 2, '630')
-    fireEvent.click(rates.getByRole('button', { name: text.add.rate }))
-    fireEvent.click(rates.getByRole('button', { name: text.removeRow(3) }))
-    set(externals, text.columns.cost, 1, '300')
-    // With no code sold by the day the rates are no longer asked: those written are kept.
     fireEvent.change(ofCode(text.columnKind, 'P1'), { target: { value: 'fixed_price' } })
-    expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     await waitFor(() =>
       expect(api.saveForecastSettings).toHaveBeenCalledWith('p-1', {
-        ...DEFAULT_FORECAST_SETTINGS,
+        ...before,
         modelPath: 'amministrazione/Previsionale.xlsx',
         projects: {
           P1: { ...NO_FORECAST_PROJECT, kind: 'fixed_price' },
@@ -593,11 +579,6 @@ describe('the forecast', () => {
           },
         },
         hoursPerDay: 7.5,
-        rates: [
-          { person: 'Rossi Mario', code: null, ratePerDay: 400 },
-          { person: 'Rossi Mario', code: 'P2', ratePerDay: 630 },
-        ],
-        externals: [{ name: 'Studio Blu', code: 'P1', costPerDay: 300, ratePerDay: 500 }],
       }),
     )
     expect((await screen.findAllByText(text.project('Sviluppo', 'P1'))).length).toBeGreaterThan(0)
@@ -632,7 +613,7 @@ describe('the forecast', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/non è ancora configurata/)
   })
 
-  it('learns by itself how a new code is sold, and asks no rate when nothing is sold by the day', async () => {
+  it('learns by itself how a new code is sold, and asks no rate in its settings', async () => {
     const fixed: View = {
       ...view,
       forecast: {
@@ -666,14 +647,8 @@ describe('the forecast', () => {
     expect(
       screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnOrdered, 'P2')).value,
     ).toBe('7500')
-    expect(screen.getByText(text.noRatesNeeded)).toBeTruthy()
+    // No rate is asked here, however the code is sold: rates are of its budget.
     expect(screen.queryByRole('group', { name: text.rates })).toBeNull()
-    // Sold by the day again, the rates are asked again.
-    fireEvent.change(screen.getByLabelText(text.forCode(text.columnKind, 'P2')), {
-      target: { value: 'time_material' },
-    })
-    expect(screen.getByRole('group', { name: text.rates })).toBeTruthy()
-    expect(screen.queryByText(text.noRatesNeeded)).toBeNull()
 
     cleanup()
     // Every code is known already: NetSuite is not asked again.
@@ -682,7 +657,7 @@ describe('the forecast', () => {
       forecastView: vi.fn(async () => ok(fixed)),
     })
     render(<ForecastView api={settled} project={project} now={now} />)
-    expect(await screen.findByText(text.noRatesNeeded)).toBeTruthy()
+    expect(await screen.findByText(text.ratesInBudget)).toBeTruthy()
     expect(settled.readForecastOrders).not.toHaveBeenCalled()
 
     cleanup()
@@ -865,276 +840,5 @@ describe('the forecast', () => {
       screen.queryByRole('button', { name: messages.openSection(messages.hoursTab) }),
     ).toBeNull()
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
-  })
-})
-
-describe('a project code over its whole life', () => {
-  const life: Lifetime = {
-    code: 'AUR-01',
-    description: 'Assessment Aurora',
-    kind: 'fixed_price',
-    through: '2026-11',
-    ordered: 7500,
-    invoiced: 2250,
-    recognized: 5250,
-    lines: [
-      { person: 'Bianchi Luca', hours: 26, cost: 1197, source: 'timesheet', months: [] },
-      { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
-      { person: 'Verdi Sara', hours: 8, cost: 560, source: 'declared', months: [] },
-    ],
-    hours: 68,
-    costs: 3457,
-    estimatedHours: 0,
-    estimatedCosts: 0,
-    marginToDate: (7500 - 3457) / 7500,
-    budgetCosts: 4800,
-    proposedBudget: null,
-    progress: 3457 / 4800,
-    expectedCosts: 4800,
-    marginAtEnd: 0.36,
-    notApprovedHours: 3,
-    unreadMonths: [],
-  }
-  const days: Lifetime = {
-    ...life,
-    code: 'AUR-02',
-    description: '',
-    kind: 'time_material',
-    ordered: null,
-    invoiced: null,
-    recognized: null,
-    lines: [{ person: 'Neri Ugo', hours: 2, cost: null, source: 'timesheet', months: [] }],
-    hours: 2,
-    costs: 0,
-    marginToDate: null,
-    budgetCosts: null,
-    progress: null,
-    expectedCosts: null,
-    marginAtEnd: null,
-    notApprovedHours: 0,
-    unreadMonths: ['2026-09'],
-  }
-  const fixedOnly = {
-    ...configured,
-    projects: { 'AUR-01': { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const } },
-  }
-  const words = text.lifetime
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('is what a project sold only at a fixed price opens on, as the sheet the PM keeps by hand', async () => {
-    const writeText = vi.fn(async () => {})
-    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
-    const api = fakeApi({
-      forecastSettings: vi.fn(async () => ok(fixedOnly)),
-      forecastLifetime: vi.fn(async () => ok([life])),
-    })
-    render(<ForecastView api={api} project={project} now={now} />)
-    const table = await screen.findByRole('table', { name: words.people })
-    expect(
-      screen.getByRole('tab', { name: text.parts.lifetime }).getAttribute('aria-selected'),
-    ).toBe('true')
-    const rows = within(table)
-      .getAllByRole('row')
-      .map((row) => row.textContent)
-    expect(rows).toEqual([
-      `${words.person}${words.hours}${words.cost}${words.source}`,
-      'Bianchi Luca261.197,00timesheet',
-      'Rossi Anna341.700,00timesheet',
-      'Verdi Sara8560,00senza timesheet, dichiarate',
-      `${words.total}683.457,00`,
-    ])
-    // What NetSuite says of the invoices and of the revenue, with the share of the order.
-    expect(screen.getByText('2.250,00 (30%)')).toBeTruthy()
-    expect(screen.getByText('5.250,00 (70%)')).toBeTruthy()
-    expect(screen.getByText('53,91%')).toBeTruthy()
-    expect(screen.getByText(`4.800,00 · ${words.progress('72,02%')}`)).toBeTruthy()
-    expect(screen.getByText(`36% · ${words.onCosts('4.800,00')}`)).toBeTruthy()
-    expect(screen.getByText(text.notApproved('3'))).toBeTruthy()
-    // One code only: nothing to choose.
-    expect(screen.queryByLabelText(words.code)).toBeNull()
-
-    fireEvent.click(screen.getByRole('button', { name: words.copy }))
-    expect(await screen.findByText(words.copied)).toBeTruthy()
-    expect(writeText).toHaveBeenCalledWith(lifetimeMail(life))
-
-    // The month is one click away, and the way back too.
-    fireEvent.click(screen.getByRole('tab', { name: text.parts.month }))
-    expect(await screen.findByText(text.groupOwn)).toBeTruthy()
-    expect(screen.queryByRole('table', { name: words.people })).toBeNull()
-  })
-
-  it('is chosen among the codes of a project sold in more ways, which opens on the month', async () => {
-    const api = fakeApi({ forecastLifetime: vi.fn(async () => ok([days, life])) })
-    render(<ForecastView api={api} project={project} now={now} />)
-    expect(await screen.findByText(text.groupOwn)).toBeTruthy()
-    expect(api.forecastLifetime).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('tab', { name: text.parts.lifetime }))
-    // The fixed price is shown first, whatever the order of the codes.
-    const chosen = await screen.findByLabelText<HTMLSelectElement>(words.code)
-    expect(chosen.value).toBe('AUR-01')
-    fireEvent.change(chosen, { target: { value: 'AUR-02' } })
-    expect(screen.getByText(text.unreadMonths('2026-09'))).toBeTruthy()
-    expect(screen.getByText(words.withoutCost('Neri Ugo'))).toBeTruthy()
-    expect(screen.getByText(words.noBudget)).toBeTruthy()
-    expect(screen.getByText(words.noExpected)).toBeTruthy()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(3)
-  })
-
-  it('marks as an estimate the hours not yet in NetSuite, on the page and in the mail', async () => {
-    const estimated: Lifetime = {
-      ...life,
-      lines: [
-        ...life.lines,
-        { person: 'Neri Ugo', hours: 8, cost: 560, source: 'no_timesheet', months: [] },
-        { person: 'Bianchi Luca', hours: 4.5, cost: 207, source: 'estimate', months: ['2026-11'] },
-      ],
-      hours: 80.5,
-      costs: 4224,
-      estimatedHours: 4.5,
-      estimatedCosts: 207,
-    }
-    const api = fakeApi({
-      forecastSettings: vi.fn(async () => ok(fixedOnly)),
-      forecastLifetime: vi.fn(async () => ok([estimated])),
-    })
-    render(<ForecastView api={api} project={project} now={now} />)
-    const table = await screen.findByRole('table', { name: words.people })
-    const rows = within(table)
-      .getAllByRole('row')
-      .map((row) => row.textContent)
-    expect(rows).toContain(`Neri Ugo8560,00${words.sources.no_timesheet}`)
-    expect(rows).toContain(`Bianchi Luca4,5207,00${words.sources.estimate} (2026-11)`)
-    expect(screen.getByText(words.estimated('4,5', '207,00'))).toBeTruthy()
-    const mail = lifetimeMail(estimated)
-    expect(mail).toMatch(new RegExp(`Bianchi Luca \\(${words.estimateMark}\\)\\s+4,5\\s+207,00`))
-    expect(mail).toContain(words.estimated('4,5', '207,00'))
-  })
-
-  it('keeps what an hour costs of who has no timesheet, written once in the settings', async () => {
-    const api = fakeApi()
-    render(<ForecastView api={api} project={project} now={now} />)
-    await screen.findByText(text.groupOwn)
-    const group = screen.getByRole('group', { name: text.hourlyCosts })
-    const [name, cost] = within(group).getAllByRole('textbox')
-    fireEvent.change(name as HTMLElement, { target: { value: ' Verdi Sara ' } })
-    fireEvent.change(cost as HTMLElement, { target: { value: 'tanto' } })
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
-    expect(await screen.findByText(text.wrong.hourlyCost(1))).toBeTruthy()
-    expect(api.saveForecastSettings).not.toHaveBeenCalled()
-    fireEvent.change(cost as HTMLElement, { target: { value: '70' } })
-    fireEvent.click(screen.getByRole('button', { name: text.save }))
-    await waitFor(() =>
-      expect(api.saveForecastSettings).toHaveBeenCalledWith(
-        'p-1',
-        expect.objectContaining({ hourlyCosts: [{ person: 'Verdi Sara', costPerHour: 70 }] }),
-      ),
-    )
-  })
-
-  it('proposes the costs at budget from the caps of the people, and keeps them only when the PM says so', async () => {
-    const proposed: Lifetime = {
-      ...life,
-      budgetCosts: null,
-      progress: null,
-      expectedCosts: null,
-      marginAtEnd: null,
-      proposedBudget: {
-        costs: 4584,
-        people: [
-          { person: 'Anna Rossi', days: 2, costPerHour: 50 },
-          { person: 'Luca Bianchi', days: 8, costPerHour: 46 },
-          { person: 'Sara Verdi', days: 1.5, costPerHour: 70 },
-        ],
-        withoutCost: ['Ugo Neri'],
-      },
-    }
-    const started = {
-      ...configured,
-      projects: {
-        'AUR-01': { ...NO_FORECAST_PROJECT, kind: 'fixed_price' as const, startMonth: '2026-09' },
-      },
-    }
-    const api = fakeApi({
-      forecastSettings: vi.fn(async () => ok(started)),
-      forecastLifetime: vi
-        .fn()
-        .mockResolvedValueOnce(ok([proposed]))
-        .mockResolvedValue(ok([{ ...proposed, budgetCosts: 4584 }])),
-    })
-    render(<ForecastView api={api} project={project} now={now} />)
-    expect(
-      await screen.findByText(
-        new RegExp(
-          words
-            .proposed('4.584,00', 'Anna Rossi 2 gg, Luca Bianchi 8 gg, Sara Verdi 1,5 gg')
-            .replace(/[.()]/g, '\\$&'),
-        ),
-      ),
-    ).toBeTruthy()
-    expect(screen.getByText(new RegExp(words.proposedWithoutCost('Ugo Neri')))).toBeTruthy()
-    // Nothing is written until the PM presses: then from the month the code began.
-    expect(api.saveForecastSettings).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: words.useProposed }))
-    await waitFor(() =>
-      expect(api.saveForecastSettings).toHaveBeenCalledWith(
-        'p-1',
-        expect.objectContaining({
-          months: expect.objectContaining({
-            '2026-09': { 'AUR-01': { ...NO_ROW_INPUTS, budgetCosts: 4584 } },
-          }),
-        }),
-      ),
-    )
-    // The life of the code is read again, and says the proposal is what is in use.
-    expect(await screen.findByText(new RegExp(words.proposedInUse))).toBeTruthy()
-    expect(screen.queryByRole('button', { name: words.useProposed })).toBeNull()
-    expect(api.forecastLifetime).toHaveBeenCalledTimes(2)
-  })
-
-  it('says why it cannot be told, and when the project has no code yet', async () => {
-    const failing = fakeApi({
-      forecastSettings: vi.fn(async () => ok(fixedOnly)),
-      forecastLifetime: vi.fn(async () => ({
-        ok: false as const,
-        code: 'forecast_timesheet_not_set' as const,
-      })),
-    })
-    render(<ForecastView api={failing} project={project} now={now} />)
-    expect((await screen.findByRole('alert')).textContent).toMatch(/timesheet/i)
-    cleanup()
-    const empty = fakeApi({ forecastSettings: vi.fn(async () => ok(fixedOnly)) })
-    render(<ForecastView api={empty} project={project} now={now} />)
-    expect(await screen.findByText(text.noRows)).toBeTruthy()
-  })
-
-  it('goes in a mail as plain text, with what it misses said in words', () => {
-    const mail = lifetimeMail(life)
-    expect(mail.split('\n').slice(0, 2)).toEqual([
-      'AUR-01 · Assessment Aurora',
-      words.through('2026-11'),
-    ])
-    expect(mail).toContain(`${words.invoiced}: 2.250,00 (30%)`)
-    // A table in plain text: every row as wide as the others.
-    const table = mail
-      .split('\n')
-      .filter((line) => /\d,\d\d$|Costo$/.test(line) && !line.includes(':'))
-    expect(table.map((line) => line.replace(/\s+/g, ' '))).toEqual([
-      `${words.person} ${words.hours} ${words.cost}`,
-      'Bianchi Luca 26 1.197,00',
-      'Rossi Anna 34 1.700,00',
-      'Verdi Sara 8 560,00',
-      `${words.total} 68 3.457,00`,
-    ])
-    expect(new Set(table.map((line) => line.length)).size).toBe(1)
-    expect(mail).toContain(`${words.marginToDate}: 53,91%`)
-    expect(mail).toContain(`${words.marginAtEnd}: 36% · ${words.onCosts('4.800,00')}`)
-    const bare = lifetimeMail(days)
-    expect(bare.split('\n')[0]).toBe('AUR-02')
-    expect(bare).toContain(`${words.ordered}: —`)
-    expect(bare).not.toContain(words.marginAtEnd)
-    expect(bare).toContain(words.withoutCost('Neri Ugo'))
-    expect(bare).toContain(text.unreadMonths('2026-09'))
-    // An amount invoiced with no order to compare it with is said as it is.
-    expect(lifetimeMail({ ...days, invoiced: 100 })).toContain(`${words.invoiced}: 100,00`)
   })
 })

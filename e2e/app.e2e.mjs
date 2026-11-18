@@ -90,7 +90,12 @@ try {
   // Demo 21: the sections are in the sidebar, grouped, and the arrows move among them.
   const nav21 = (group) => page.getByRole('tablist', { name: group }).getByRole('tab')
   assert.deepEqual(await nav21('Lavoro').allInnerTexts(), ['Chiedi', 'Deliverable', 'Cruscotto'])
-  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), ['Ore', 'Previsionale', 'Avanzamento'])
+  assert.deepEqual(await nav21('Ogni mese').allInnerTexts(), [
+    'Ore',
+    'Commessa',
+    'Previsionale',
+    'Avanzamento',
+  ])
   assert.deepEqual(await nav21('Progetto').allInnerTexts(), ['Impostazioni'])
   // Demo 23: Octo opens on the page of the day, the first section, for who is signed in.
   assert.deepEqual(await nav21('Ogni giorno').allInnerTexts(), ['Oggi'])
@@ -504,20 +509,19 @@ try {
   await page.getByRole('button', { name: `Salva: ${elena}`, exact: true }).click()
   await forecastRow('PRJ000101').getByText('33.200,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('51,78%').waitFor()
-  await page.getByText('Impostazioni del previsionale').click()
-  const externals = page.getByRole('group', { name: 'Esterni senza timesheet' })
-  await cell(externals, 'Nome, riga 1').fill('Studio Blu')
-  await cell(externals, 'Commessa, riga 1').fill('PRJ000202')
-  await cell(externals, 'Costo al giorno, riga 1').fill('300')
-  await cell(externals, 'Tariffa al giorno, riga 1').fill('500')
-  await page.locator('.dashboard-settings').getByRole('button', { name: 'Salva' }).click()
   // What the PM adds for a code is typed in its row; the rest opens under it. One save for all.
-  await page.getByRole('button', { name: 'Altri dati, PRJ000202', exact: true }).click()
+  await page.getByRole('button', { name: 'Calcolo e dettagli, PRJ000202', exact: true }).click()
   const inputs202 = page.getByRole('group', { name: 'Dati del mese per PRJ000202' })
   await cell(inputs202, 'Nome, riga 1').fill('Studio Blu')
   await cell(inputs202, 'Ore, riga 1').fill('40')
   await inputs202.getByLabel(/^A corpo/).fill('20000')
   await page.getByRole('button', { name: 'Salva i dati del mese' }).click()
+  // What the external costs and is sold for is typed where it is said to be missing: the
+  // settings of the forecast hold no rates any more, they are of the budget of the code.
+  const blu = 'Studio Blu su PRJ000202'
+  await page.getByLabel(`Costo al giorno, ${blu}`, { exact: true }).fill('300')
+  await page.getByLabel(`Tariffa al giorno, ${blu}`, { exact: true }).fill('500')
+  await page.getByRole('button', { name: `Salva: ${blu}`, exact: true }).click()
   await forecastRow('PRJ000202').getByText('7,5%', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000202').getByText('3.000,00').waitFor()
   await page.getByRole('button', { name: 'Compila il modello' }).click()
@@ -530,6 +534,14 @@ try {
   assert.ok(compiled.length > 0 && !compiled.equals(modelBefore))
   assert.ok(readFileSync(modelFile).equals(modelBefore))
   await page.screenshot({ path: `${work}/previsionale.png` })
+
+  // Demo 57: the sheet of a project code over its whole life is a section of its own.
+  await page.getByRole('tab', { name: 'Commessa', exact: true }).click()
+  await page.getByRole('region', { name: 'Ordine', exact: true }).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByRole('region', { name: 'Costi e margine', exact: true }).waitFor()
+  await page.getByRole('table', { name: 'Ore e costi per persona' }).waitFor()
+  await page.getByText('Documento interno: costi e margini non vanno al cliente.').waitFor()
+  await page.screenshot({ path: `${work}/commessa.png`, fullPage: true })
 
   // Demo 10: progress requests on the form of the client.
   execFileSync('node', [`${root}demo/lib/fake-progress.ts`, `${work}/Aurora`])

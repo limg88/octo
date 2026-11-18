@@ -186,7 +186,7 @@ Valori da `demo/lib/hours-data.ts`, `fake-tracker.ts`, `fake-alignment.ts`, `fak
 - *Interfaccia* — `TodayView.tsx`, `AllProjectsView.tsx`, `RiskRegister.tsx`; `sections.ts`, `SectionNav.tsx`, `App.tsx` (sezione nuova, apertura, destinazione con il mese o lo sprint già scelto: oggi `onOpenSection` porta solo alla sezione, le viste devono accettare un punto di arrivo), `ProjectSwitcher.tsx`, `messages.ts`, `styles.css`.
 - *Ponte* — `shared/api.ts`, `preload.ts`, `main/ipc.ts`, `main/main.ts` (unico punto di composizione).
 
-**Vincolo da tenere presente:** la roadmap chiede «codice nuovo sotto le 15.000 righe»; oggi i sorgenti senza test sono circa 29.900 righe (connettori portati compresi; non so quante contino come «nuove»). Stimo per tutto il riepilogo 1.800–2.500 righe più i test: **stima mia, non verificata**.
+**Vincolo da tenere presente:** la roadmap fissa il tetto a 50.000 righe effettive di sorgenti senza test, connettori portati compresi (deciso il 18/11/2026, al posto delle 15.000 righe di codice nuovo: vedi «Tetto del codice» in [roadmap.md](roadmap.md)); al 18/11/2026 sono 46.900, e sopra il tetto ogni aggiunta si paga con una rimozione. Stimo per tutto il riepilogo 1.800–2.500 righe più i test: **stima mia, non verificata**.
 
 ## 11. Piano a incrementi
 

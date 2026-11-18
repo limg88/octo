@@ -171,7 +171,11 @@ function ofPerson<T>(named: readonly T[], nameOf: (entry: T) => string, person: 
 }
 
 /** The rate of a person on a code: the one written for that code, else the person's own. */
-function rateOf(rates: readonly ForecastRate[], person: string, code: string): ForecastRate | null {
+export function rateOf(
+  rates: readonly ForecastRate[],
+  person: string,
+  code: string,
+): ForecastRate | null {
   const named = (rate: ForecastRate) => rate.person
   return (
     ofPerson(

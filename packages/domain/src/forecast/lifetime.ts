@@ -1,3 +1,6 @@
+import type { ProjectEconomics } from '../economics/model.ts'
+import type { PlanView } from '../economics/plan.ts'
+import { type SheetEconomics, sheetEconomics } from '../economics/sheet.ts'
 import { type HoursEntry, personKey } from '../hours/model.ts'
 import type { PersonCap } from '../team/model.ts'
 import { unreadForecastMonths } from './compile.ts'
@@ -92,7 +95,24 @@ export type Lifetime = {
   recognized: number | null
   lines: LifetimeLine[]
   hours: number
+  /** The costs so far: the lines of the people and what the suppliers delivered. */
   costs: number
+  /** What the suppliers delivered against their orders so far; zero without any. */
+  supplierCosts: number
+  /**
+   * The costs so far less what was invoiced: work done the client has not been billed for when
+   * positive. Null while nothing tells what was invoiced.
+   */
+  wip: number | null
+  /**
+   * The revenue recognised less what was invoiced: invoices still to issue when positive, billed
+   * in advance when negative. Null while either is not told.
+   */
+  toBill: number | null
+  /** What the company's system says of the money of the code; null when it was not read. */
+  economics: SheetEconomics | null
+  /** The plan of the code read against what happened; null while the PM wrote none. */
+  plan: PlanView | null
   /** The part of the hours and of the costs that is an estimate from the tracker. */
   estimatedHours: number
   estimatedCosts: number
@@ -115,6 +135,9 @@ export type Lifetime = {
 }
 
 const WHOLE = 1
+const CENTS = 100
+/** An amount to the cent: a product of hours and a cost is no longer a sum of rows. */
+const cents = (value: number): number => Math.round(value * CENTS) / CENTS
 
 /** The last value written for a code up to a month, among what the PM adds month by month. */
 function lastWritten(
@@ -129,7 +152,14 @@ function lastWritten(
   return written.at(-1)?.[1][code]?.[field] ?? null
 }
 
-function timesheetLines(entries: readonly HoursEntry[]): LifetimeLine[] {
+/**
+ * The approved hours of each person, at what an hour of theirs costs today, as the sheet of the
+ * administration prices every hour at the current cost of the person. Without a row that carries a cost the hours are there and the cost is not.
+ */
+function timesheetLines(
+  entries: readonly HoursEntry[],
+  costs: ReadonlyMap<string, number>,
+): LifetimeLine[] {
   const people = new Map<string, LifetimeLine>()
   for (const entry of entries) {
     const key = personKey(entry.person)
@@ -141,7 +171,8 @@ function timesheetLines(entries: readonly HoursEntry[]): LifetimeLine[] {
       months: [],
     }
     line.hours += entry.hours
-    if (entry.cost !== null && entry.cost !== undefined) line.cost = (line.cost ?? 0) + entry.cost
+    const costPerHour = costs.get(key)
+    line.cost = costPerHour === undefined ? null : cents(line.hours * costPerHour)
     people.set(key, line)
   }
   return [...people.values()].sort((a, b) => a.person.localeCompare(b.person, 'it'))
@@ -234,6 +265,45 @@ function estimateLines(
 }
 
 /**
+ * What an hour of each person costs today, by the key of the person: as the company's system
+ * says, else as their last timesheet up to the month says.
+ */
+export function currentHourlyCosts(
+  timesheet: readonly HoursEntry[],
+  month: string,
+  read: ProjectEconomics | null,
+): Map<string, number> {
+  return new Map([
+    ...hourlyCostsOf(timesheet.filter((entry) => entry.day.slice(0, month.length) <= month)),
+    ...(read?.standardCosts ?? []).map((cost): [string, number] => [
+      personKey(cost.person),
+      cost.costPerHour,
+    ]),
+  ])
+}
+
+/**
+ * The sheet of a code with its plan: once the PM plans the code line by line, the costs at
+ * budget are those of the plan, the costs expected are those so far with those planned for the
+ * months to come, and the progress is the one of the plan. A plan with no line changes nothing.
+ */
+export function withPlan(life: Lifetime, plan: PlanView | null): Lifetime {
+  // With no line planned the view still tells who worked in which month: nothing else changes.
+  if (plan === null || plan.lines.every((line) => line.unplanned)) return { ...life, plan }
+  const budgetCosts = plan.totals.budget.costs > 0 ? plan.totals.budget.costs : life.budgetCosts
+  const expectedCosts = life.costs + plan.totals.forecast.costs
+  const { ordered } = life
+  return {
+    ...life,
+    plan,
+    budgetCosts,
+    expectedCosts,
+    progress: plan.progress[plan.through] ?? life.progress,
+    marginAtEnd: ordered ? (ordered - Math.max(expectedCosts, life.costs)) / ordered : null,
+  }
+}
+
+/**
  * A project code from its start to a month: who worked how much and at what cost, and the
  * margins a PM computes by hand. A cost that is missing is left out and the line says so; what
  * is estimated from the tracker is a line of its own, marked as an estimate. `readMonths` as in
@@ -248,20 +318,36 @@ export function compileLifetime(
   worklog: ForecastWorklog = NO_FORECAST_WORKLOG,
   /** The caps of the people of the project: they tell of a code only when it is the only one. */
   caps: readonly PersonCap[] = [],
+  /** What the company's system says of the money of the code; null when it was not read. */
+  read: ProjectEconomics | null = null,
 ): Lifetime {
   const code = forecastCode(projectCode)
   const project = settings.projects[code] ?? NO_FORECAST_PROJECT
   const upTo = timesheet.filter(
     (entry) => entry.project === code && entry.day.slice(0, month.length) <= month,
   )
+  const costsOfAnHour = currentHourlyCosts(timesheet, month, read)
   const lines = [
-    ...timesheetLines(upTo.filter((entry) => entry.approved)),
+    ...timesheetLines(
+      upTo.filter((entry) => entry.approved),
+      costsOfAnHour,
+    ),
     ...declaredLines(settings, code, month),
     ...noTimesheetLines(worklog, timesheet, settings, code, month),
     ...estimateLines(worklog, timesheet, settings, code, month),
   ]
+  const economics = read === null ? null : sheetEconomics(read, month)
+  const supplierCosts = economics?.suppliers?.received ?? 0
   const hours = lines.reduce((total, line) => total + line.hours, 0)
-  const costs = lines.reduce((total, line) => total + (line.cost ?? 0), 0)
+  const costs = lines.reduce((total, line) => total + (line.cost ?? 0), 0) + supplierCosts
+  // The lines of the invoices tell what was invoiced; without any, what the backlog said.
+  const invoiced =
+    economics !== null && economics.billing.length > 0 ? economics.invoiced : project.invoiced
+  // The ledger tells the revenue recognised; while it books nothing, what the backlog said.
+  const recognized =
+    read !== null && read.ledger.length > 0
+      ? (economics?.ledger.revenue ?? null)
+      : project.recognized
   const estimates = lines.filter((line) => line.source === 'estimate')
   const { ordered } = project
   const budgetCosts = lastWritten(settings, code, month, 'budgetCosts')
@@ -273,11 +359,16 @@ export function compileLifetime(
     kind: project.kind,
     through: month,
     ordered,
-    invoiced: project.invoiced,
-    recognized: project.recognized,
+    invoiced,
+    recognized,
     lines,
     hours,
     costs,
+    supplierCosts,
+    wip: invoiced === null ? null : costs - invoiced,
+    toBill: invoiced === null || recognized === null ? null : recognized - invoiced,
+    economics,
+    plan: null,
     estimatedHours: estimates.reduce((total, line) => total + line.hours, 0),
     estimatedCosts: estimates.reduce((total, line) => total + (line.cost ?? 0), 0),
     marginToDate: marginOn(costs),

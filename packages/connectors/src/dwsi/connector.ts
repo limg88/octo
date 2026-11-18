@@ -1,3 +1,4 @@
+import type { ProjectEconomics } from '@octo/domain'
 import { ConnectorError } from '../errors.ts'
 import type {
   Connector,
@@ -36,6 +37,8 @@ import {
   type DwsiCategory,
   type DwsiView,
   EMPLOYEE_VIEW,
+  STANDARD_COST_VIEW,
+  STANDARD_COSTS_QUERY,
   SYNC_TABLE,
   viewQuery,
 } from './views.ts'
@@ -222,7 +225,7 @@ async function checkSignature(session: DwsiSession): Promise<void> {
     of.set(String(c.name), c.type)
     found.set(relation, of)
   }
-  for (const relation of [...DWSI_VIEWS, SYNC_TABLE, EMPLOYEE_VIEW]) {
+  for (const relation of [...DWSI_VIEWS, SYNC_TABLE, EMPLOYEE_VIEW, STANDARD_COST_VIEW]) {
     const of = found.get(relation.name)
     if (!of) {
       throw new ConnectorError('definition_changed', {
@@ -344,6 +347,8 @@ export interface DwsiProjectOrder {
   invoiced: number | null
   /** The revenue recognised so far, as the last period of its backlog says; null without one. */
   recognized: number | null
+  /** The money of the project: ledger, invoices to the client, orders to the suppliers. */
+  economics: ProjectEconomics
 }
 
 const ORDER_DAY = /^\d{4}-\d{2}-\d{2}/
@@ -368,6 +373,52 @@ const viewNamed = (name: string): DwsiView => DWSI_VIEWS.find((v) => v.name === 
 const PROJECT_VIEW = viewNamed('v_project')
 const ORDERS_VIEW = viewNamed('v_sales_order_all')
 const BACKLOG_VIEW = viewNamed('v_backlog_all')
+const INVOICES_VIEW = viewNamed('v_invoice_all')
+const LEDGER_VIEW = viewNamed('v_project_revenue_all')
+const PURCHASES_VIEW = viewNamed('v_purchase_order_all')
+const RECEIPTS_VIEW = viewNamed('v_itemreceiptpo_all')
+const VENDOR_INVOICES_VIEW = viewNamed('v_invoice_po_all')
+
+type Row = Record<string, unknown>
+const wordOf = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
+const dayOf = (value: unknown): string => ORDER_DAY.exec(String(value ?? ''))?.[0] ?? ''
+/** A number of the warehouse; null for what is not one. */
+function amountOf(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : null
+}
+
+const MONTH_DIGITS = 2
+
+/** The rows that carry an amount and a day, each as the line it is: the others tell nothing. */
+function datedLines<Line>(
+  rows: readonly Row[],
+  day: string,
+  line: (row: Row, at: string, amount: number) => Line,
+): Line[] {
+  return rows.flatMap((row) => {
+    const at = dayOf(row[day])
+    const amount = amountOf(row.amount)
+    return at === '' || amount === null ? [] : [line(row, at, amount)]
+  })
+}
+
+/** What the ledger booked in each month, group by group; a row with no period tells nothing. */
+function ledgerOf(rows: readonly Row[]): ProjectEconomics['ledger'] {
+  return rows.flatMap((row) => {
+    const [year, month] = [amountOf(row.anno), amountOf(row.mese)]
+    if (year === null || month === null) return []
+    return [
+      {
+        month: `${year}-${String(month).padStart(MONTH_DIGITS, '0')}`,
+        group: wordOf(row.itemgroup),
+        cost: amountOf(row.cost) ?? 0,
+        revenue: amountOf(row.actualrevenue) ?? 0,
+      },
+    ]
+  })
+}
 
 /** The sum of the values of a column that are numbers; null when no row carries one. */
 function sumOf(rows: ReadonlyArray<Record<string, unknown>>, column: string): number | null {
@@ -496,6 +547,61 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
           const days = lines
             .flatMap((line) => ORDER_DAY.exec(String(line.salesorderdate ?? ''))?.[0] ?? [])
             .sort()
+          const costs = await session.query(STANDARD_COSTS_QUERY, [code]).catch((error) => {
+            throw pgFailure(error)
+          })
+          if (costs.length > maxRows) throw new ConnectorError('response_too_large')
+          const economics: ProjectEconomics = {
+            standardCosts: costs.flatMap((row) => {
+              const costPerHour = amountOf(row.laborcosthh)
+              const person = wordOf(row.name)
+              return person === '' || costPerHour === null ? [] : [{ person, costPerHour }]
+            }),
+            ledger: ledgerOf(await readView(session, LEDGER_VIEW, code)),
+            invoices: datedLines(
+              await readView(session, INVOICES_VIEW, code),
+              'invoicedate',
+              (row, day, amount) => ({
+                invoice: wordOf(row.invoiceid),
+                salesOrder: wordOf(row.salesorder),
+                day,
+                amount,
+              }),
+            ),
+            purchases: datedLines(
+              await readView(session, PURCHASES_VIEW, code),
+              'purchaseorderdate',
+              (row, day, amount) => ({
+                order: wordOf(row.purchaseorderid),
+                vendor: wordOf(row.vendorname),
+                day,
+                amount,
+              }),
+            ),
+            receipts: datedLines(
+              await readView(session, RECEIPTS_VIEW, code),
+              'receiptdate',
+              (row, day, amount) => ({
+                order: wordOf(row.purchaseorderid),
+                vendor: wordOf(row.vendorname),
+                day,
+                amount,
+              }),
+            ),
+            vendorInvoices: datedLines(
+              await readView(session, VENDOR_INVOICES_VIEW, code),
+              'invoicedate',
+              // The warehouse writes what a supplier invoiced as a negative amount: told here as
+              // the sheet of the administration tells it, positive, a credit note negative.
+              (row, day, amount) => ({
+                invoice: wordOf(row.invoiceid),
+                order: wordOf(row.purchaseorder),
+                vendor: wordOf(row.vendorname),
+                day,
+                amount: -amount,
+              }),
+            ),
+          }
           all.push({
             projectid: code,
             name: typeof project?.name === 'string' ? project.name.trim() : '',
@@ -504,6 +610,7 @@ export function createDwsiConnector(options: DwsiConnectorOptions = {}): DwsiCon
             firstOrderDay: days[0] ?? null,
             invoiced: (last ? sumOf([last], 'amountbilled') : null) ?? invoicedOf(lines),
             recognized: last ? sumOf([last], 'amountrecognized') : null,
+            economics,
           })
         }
         return all

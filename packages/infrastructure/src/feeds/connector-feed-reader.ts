@@ -602,6 +602,7 @@ export function createWarehouseOrdersReader(
           startMonth: order.firstOrderDay?.slice(0, MONTH_LENGTH) ?? null,
           invoiced: order.invoiced,
           recognized: order.recognized,
+          economics: order.economics,
         }))
       } catch (error) {
         throw failure(error)

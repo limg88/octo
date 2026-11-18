@@ -23,7 +23,7 @@ Durata: 4 minuti. Mostra che per un progetto venduto a corpo il PM non deve spie
    Atteso: «PRJ000101: a corpo senza costi totali a budget, avanzamento e ricavi restano a zero». Nessuna riga chiede tariffe: per una commessa a corpo la tariffa al giorno non serve.
 
 4. **Apri «Impostazioni del previsionale».**
-   Atteso: nella tabella «Commesse del progetto» `PRJ000101` è «A corpo» con ordinato `40000`. Al posto della tabella «Tariffe al giorno» c'è la frase «Nessuna commessa di questo progetto è venduta a giornate: le tariffe al giorno non servono. I ricavi vengono dall'ordinato.»
+   Atteso: nella tabella «Commesse del progetto» `PRJ000101` è «A corpo» con ordinato `40000`. Nessuna tabella di tariffe: dalla demo 59 tariffe e costi si scrivono nel budget della commessa, e qui c'è solo la frase che lo dice con «Apri «Commessa»».
    Dimostra: la pagina mostra solo ciò che serve al tipo di vendita del progetto.
 
 5. **Scrivi i costi a budget.** Nella riga di `PRJ000101` premi «Altri dati».
@@ -32,7 +32,7 @@ Durata: 4 minuti. Mostra che per un progetto venduto a corpo il PM non deve spie
    Dimostra: per un corpo il ricavo del mese è la quota di ordinato che i costi sostenuti sono dei costi a budget.
 
 6. **Correggi il tipo, se NetSuite sbaglia.** In «Impostazioni del previsionale» porta `PRJ000101` su «A giornate (T&M)».
-   Atteso: ricompare subito la tabella «Tariffe al giorno». Premi «Salva», poi «Leggi ordinato da NetSuite»: il tipo resta «A giornate (T&M)».
+   Atteso: premi «Salva», poi «Leggi ordinato da NetSuite»: il tipo resta «A giornate (T&M)».
    Dimostra: NetSuite decide solo la prima volta; dopo vale ciò che ha scelto il PM. Riporta la commessa su «A corpo» e salva.
 
 ## Che cosa dimostra

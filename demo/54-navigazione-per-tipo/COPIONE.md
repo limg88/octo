@@ -19,15 +19,11 @@ Durata: 3 minuti. Mostra che un progetto a corpo con un solo tracker non si trov
    Dimostra: l'allineamento confronta le voci del tracker del cliente con i ticket del proprio Jira. Con un solo tracker, o nessuno, non c'è niente da allineare e la sezione non viene offerta.
 
 3. **Apri «Avanzamento».**
-   Atteso: la frase «Questo progetto è venduto a corpo: non ha un modulo del cliente da compilare né posizioni d'ordine da ripartire. …» e la tabella:
-   | Commessa | Ordinato | Fatturato | Da fatturare | Ricavi riconosciuti |
-   |---|---|---|---|---|
-   | PRJ000101 Assessment Aurora | 7.500,00 | 2.250,00 (30%) | 5.250,00 (70%) | 5.250,00 (70%) |
+   Atteso: la frase «Questo progetto è venduto a corpo. Ordinato, fatturato e quanto resta da fatturare sono in «Commessa». …» e due pulsanti: «Apri «Commessa»» e «Ho un modulo del cliente da compilare».
+   Dimostra: prima questa pagina chiedeva il modulo Excel del cliente, la mappa delle celle e le posizioni dell'ordine, cioè la richiesta di SAL di un progetto a giornate. Dalla demo 57 ordinato e fatturato non sono ripetuti qui: stanno in un posto solo.
 
-   Dimostra: prima questa pagina chiedeva il modulo Excel del cliente, la mappa delle celle e le posizioni dell'ordine, cioè la richiesta di SAL di un progetto a giornate; l'acconto già fatturato non aveva un posto dove comparire.
-
-4. **Premi «Apri «Previsionale»».**
-   Atteso: la scheda «Commessa» con costi e margini della stessa commessa (demo 48).
+4. **Premi «Apri «Commessa»».**
+   Atteso: la sezione «Commessa» con ordinato 7.500,00, fatturato 2.250,00 (30%), da fatturare 5.250,00 e ricavi riconosciuti 5.250,00 (70%), più costi e margini (demo 48).
 
 5. **Torna ad «Avanzamento» e premi «Ho un modulo del cliente da compilare».**
    Atteso: compare l'impostazione del modulo, come per un progetto a giornate.

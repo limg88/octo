@@ -1,7 +1,6 @@
 import {
   cleanForecastSettings,
   compileForecast,
-  compileLifetime,
   DomainError,
   FORECAST_MONTH,
   type Forecast,
@@ -14,17 +13,18 @@ import {
   type HoursEntry,
   type HoursPeriod,
   isDomainError,
-  type Lifetime,
   monthsOf,
   NO_FORECAST_PROJECT,
   NO_FORECAST_WORKLOG,
   OCTO_FOLDER,
   type Project,
+  type ProjectEconomics,
   type ProjectTeam,
   readForecastModel,
   romeDateString,
+  type SheetPlans,
+  settingsWithPlans,
   type TrackerHours,
-  teamCaps,
 } from '@octo/domain'
 import { secretKey } from './feeds.ts'
 import type {
@@ -65,6 +65,11 @@ export type ForecastDeps = {
   worklog?: (project: Project) => Promise<TrackerHours[]>
   /** The people of the project: their caps propose the costs at budget. */
   team?: (project: Project) => Promise<ProjectTeam>
+  /**
+   * The plans of the project codes: what a line says an hour is sold for, or costs, is what the
+   * forecast of its code uses. Without them the settings stand alone.
+   */
+  sheetPlans?: (project: Project) => Promise<SheetPlans>
 }
 
 /** Where Octo puts the filled models, one folder per month. The model itself is never touched. */
@@ -78,6 +83,10 @@ export type ForecastView = { forecast: Forecast; modelPath: string }
 export type ForecastFile = { path: string; notInModel: string[] }
 /** What a reading of the orders brought: the settings with them, and the codes it found. */
 export type ForecastOrdersRun = { settings: ForecastSettings; codes: string[] }
+/** The same, with the money of each code as the company's system books it: never kept. */
+export type ForecastOrdersRead = ForecastOrdersRun & {
+  economics: Record<string, ProjectEconomics>
+}
 
 export type Forecasts = {
   settings(project: Project): Promise<ForecastSettings>
@@ -86,11 +95,6 @@ export type Forecasts = {
   candidates(project: Project): Promise<string[]>
   /** The forecast of a month for the project codes of the project, computed and not written. */
   view(project: Project, month: string): Promise<ForecastView>
-  /**
-   * Every project code of the project from its start to the month that runs: who worked how
-   * much and at what cost, what was invoiced and recognised, the margins today and at the end.
-   */
-  lifetime(project: Project): Promise<Lifetime[]>
   /** Writes a copy of the model with the rows of the project codes filled for a month. */
   compile(project: Project, month: string): Promise<ForecastFile>
   /**
@@ -103,7 +107,8 @@ export type Forecasts = {
 
 /** Months of timesheets asked to the company's system in one go: the most a reading takes. */
 const MONTHS_PER_READING = 12
-const MONTH_LENGTH = 7
+/** The characters of a month in a day written `YYYY-MM-DD`. */
+export const MONTH_LENGTH = 7
 
 const MODEL_EXTENSION = 'xlsx'
 const MODEL_NAME = /previsional|avanzament|forecast/i
@@ -120,7 +125,20 @@ function checkedPath(path: string): string {
 
 const fileName = (path: string): string => path.split('/').pop() ?? path
 
-export function createForecasts(deps: ForecastDeps): Forecasts {
+/**
+ * What the monthly forecast and the sheet of a project code both read: the codes of the project,
+ * the months of timesheets held, the hours of the tracker, the orders of the company's system.
+ */
+export type ForecastReadings = {
+  codesOf(project: Project, timesheet: readonly HoursEntry[]): Promise<string[]>
+  monthsRead(project: Project, month: string): Promise<string[] | null>
+  readMissing(project: Project, months: readonly string[]): Promise<boolean>
+  worklogOf(project: Project, codes: readonly string[]): Promise<ForecastWorklog>
+  readOrders(project: Project): Promise<ForecastOrdersRead>
+}
+
+/** One for a composition: the months it catches up with are asked once, whoever asks. */
+export function createForecastReadings(deps: ForecastDeps): ForecastReadings {
   async function codesOf(project: Project, timesheet: readonly HoursEntry[]): Promise<string[]> {
     const chosen = (await deps.codes(project)).map(forecastCode).filter((code) => code !== '')
     if (chosen.length > 0) return chosen
@@ -193,28 +211,7 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
     return { entries, code: only }
   }
 
-  async function compiled(project: Project, month: string, settings: ForecastSettings) {
-    const timesheet = await deps.timesheet(project)
-    if (timesheet === null) throw new DomainError('forecast_timesheet_not_set')
-    const codes = await codesOf(project, timesheet)
-    const read = await monthsRead(project, month)
-    const worklog = await worklogOf(project, codes)
-    return compileForecast(codes, timesheet, settings, month, undefined, read, worklog)
-  }
-
-  async function load(
-    project: Project,
-    month: string,
-  ): Promise<{ forecast: Forecast; settings: ForecastSettings }> {
-    if (!FORECAST_MONTH.test(month)) throw new DomainError('forecast_month_invalid')
-    const settings = await deps.settings.load(project.folder)
-    const forecast = await compiled(project, month, settings)
-    if (forecast.unreadMonths.length === 0) return { forecast, settings }
-    const caughtUp = await readMissing(project, forecast.unreadMonths)
-    return { forecast: caughtUp ? await compiled(project, month, settings) : forecast, settings }
-  }
-
-  async function readOrders(project: Project): Promise<ForecastOrdersRun> {
+  async function readOrders(project: Project): Promise<ForecastOrdersRead> {
     const config = (await deps.sources.load(project.folder)).dwsi
     if (config === null) throw new DomainError('source_not_configured')
     const secret = await deps.secrets.get(secretKey(project, 'dwsi'))
@@ -222,8 +219,10 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
     const orders = await deps.orders.read(config, secret, new AbortController().signal)
     const settings = await deps.settings.load(project.folder)
     const projects = { ...settings.projects }
+    const economics: Record<string, ProjectEconomics> = {}
     for (const order of orders) {
       const code = forecastCode(order.code)
+      if (order.economics) economics[code] = order.economics
       // A code never read before is sold as its orders say; a known one as the PM left it.
       const known = projects[code] ?? {
         ...NO_FORECAST_PROJECT,
@@ -241,7 +240,40 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
     }
     const saved = cleanForecastSettings({ ...settings, projects })
     await deps.settings.save(project.folder, saved)
-    return { settings: saved, codes: orders.map((order) => forecastCode(order.code)).sort() }
+    const codes = orders.map((order) => forecastCode(order.code)).sort()
+    return { settings: saved, codes, economics }
+  }
+
+  return { codesOf, monthsRead, readMissing, worklogOf, readOrders }
+}
+
+export function createForecasts(
+  deps: ForecastDeps,
+  readings: ForecastReadings = createForecastReadings(deps),
+): Forecasts {
+  const { codesOf, monthsRead, readMissing, worklogOf, readOrders } = readings
+
+  async function compiled(project: Project, month: string, settings: ForecastSettings) {
+    const timesheet = await deps.timesheet(project)
+    if (timesheet === null) throw new DomainError('forecast_timesheet_not_set')
+    const codes = await codesOf(project, timesheet)
+    const read = await monthsRead(project, month)
+    const worklog = await worklogOf(project, codes)
+    const plans = deps.sheetPlans ? await deps.sheetPlans(project) : {}
+    const used = settingsWithPlans(settings, plans)
+    return compileForecast(codes, timesheet, used, month, undefined, read, worklog)
+  }
+
+  async function load(
+    project: Project,
+    month: string,
+  ): Promise<{ forecast: Forecast; settings: ForecastSettings }> {
+    if (!FORECAST_MONTH.test(month)) throw new DomainError('forecast_month_invalid')
+    const settings = await deps.settings.load(project.folder)
+    const forecast = await compiled(project, month, settings)
+    if (forecast.unreadMonths.length === 0) return { forecast, settings }
+    const caughtUp = await readMissing(project, forecast.unreadMonths)
+    return { forecast: caughtUp ? await compiled(project, month, settings) : forecast, settings }
   }
 
   return {
@@ -266,34 +298,6 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
     async view(project, month) {
       const { forecast, settings } = await load(project, month)
       return { forecast, modelPath: settings.modelPath }
-    },
-
-    async lifetime(project) {
-      const month = romeDateString((deps.clock ?? { now: () => new Date() }).now()).slice(
-        0,
-        MONTH_LENGTH,
-      )
-      // What was invoiced and recognised changes month by month: asked again, without a word.
-      await readOrders(project).catch((error: unknown) => {
-        if (!isDomainError(error)) throw error
-      })
-      const settings = await deps.settings.load(project.folder)
-      const all = async (): Promise<Lifetime[]> => {
-        const timesheet = await deps.timesheet(project)
-        if (timesheet === null) throw new DomainError('forecast_timesheet_not_set')
-        const codes = [...new Set((await codesOf(project, timesheet)).map(forecastCode))].sort()
-        const read = await monthsRead(project, month)
-        const worklog = await worklogOf(project, codes)
-        // The caps are of the project: they are of a code only when it is the only one.
-        const team = codes.length === 1 && deps.team ? await deps.team(project) : null
-        const caps = team ? teamCaps(team) : []
-        return codes.map((code) =>
-          compileLifetime(code, timesheet, settings, month, read, worklog, caps),
-        )
-      }
-      const first = await all()
-      const unread = [...new Set(first.flatMap((lifetime) => lifetime.unreadMonths))].sort()
-      return unread.length > 0 && (await readMissing(project, unread)) ? all() : first
     },
 
     async compile(project, month) {
@@ -334,6 +338,10 @@ export function createForecasts(deps: ForecastDeps): Forecasts {
       return { path: target, notInModel }
     },
 
-    readOrders,
+    // The money of the codes is of the sheet: the forecast keeps what it saved, and no more.
+    async readOrders(project) {
+      const { settings, codes } = await readOrders(project)
+      return { settings, codes }
+    },
   }
 }

@@ -16,13 +16,49 @@ Conclusione: la versione definitiva è il motore di v0 (Claude che legge liberam
 | Modello | Claude Code sul seat di ciascun PM, sul suo computer |
 | Memoria | la cartella del progetto è la fonte di verità; lo stato dell'app sta a parte |
 | Controlli | il modello propone, il codice controlla dopo: ciò che non è verificato viene marcato, non tolto |
+| Che cosa può fare Claude | leggere tutto il progetto; calcolare e scrivere solo dentro un recinto (vedi «Claude dentro un recinto») |
 | Fonti di T0 | posta e file locali, Azure DevOps, Jira, NetSuite/DWSI |
 | Teams | in T1, tramite l'app «Verbale» |
 | Pseudonimizzazione | tolta (era una scelta prudenziale, non un obbligo) |
 | Server | solo dopo T0, e solo per la memoria distillata (cruscotti e analisi fra progetti) |
 | Parole | «deliverable» e «istruzioni»; il termine «ricette» non si usa |
-| Manutenzione | una persona: codice nuovo sotto le 15.000 righe |
+| Manutenzione | una persona: codice sotto le 50.000 righe effettive, interfaccia sotto le 20.000 (vedi «Tetto del codice») |
 | Repository | privato; nessun dato di clienti, demo su dati sintetici |
+
+### Tetto del codice (deciso il 18/11/2026)
+
+Il tetto iniziale di 15.000 righe di codice nuovo è stato superato nei primi quattro giorni. Lo sostituisce questo.
+
+- **Tetto**: 50.000 righe effettive. Al 18/11/2026 sono 46.900.
+- **Che cosa si conta**: i sorgenti in `packages/*/src` e `apps/*/src` (`.ts` e `.tsx`), senza righe vuote e senza commenti. Sono compresi i connettori portati da octobrief-new e i testi dell'interfaccia. Restano fuori i test (37.900 righe alla stessa data), i fogli di stile, le demo e il server del distillato di T2, che è un programma a parte.
+- **Interfaccia**: `apps/desktop/src` non supera le 20.000 righe. Al 18/11/2026 sono 19.700.
+- **Sopra il tetto**: ogni aggiunta si paga con una rimozione nello stesso incremento.
+- **Perché 50.000**: il lavoro previsto (Claude che calcola e scrive in una cartella di lavoro, deliverable del progetto con script e modello, memoria curata, tabella con fonte in Chiedi, posta su Windows, aggiornamento automatico) è stimato fra 5.200 e 7.100 righe. Il tetto lo lascia entrare solo se una parte del codice di oggi esce. È un freno dichiarato, non una misura di quante righe regge una persona.
+
+Dove sta il codice al 18/11/2026:
+
+| Area | Righe effettive |
+|---|---|
+| Interfaccia (`apps/desktop`) | 19.700 |
+| Dominio | 10.100 |
+| Infrastruttura | 5.900 |
+| Connettori | 5.600 |
+| Casi d'uso | 5.600 |
+
+Per misurarlo:
+
+```bash
+find packages/*/src apps/*/src \( -name '*.ts' -o -name '*.tsx' \) -print0 | xargs -0 cat | grep -vE '^\s*$|^\s*(//|/\*|\*)' | wc -l
+```
+
+### Claude dentro un recinto (deciso il 18/11/2026)
+
+- **Decisione del PM**: Claude può eseguire calcoli sui dati del progetto e scrivere file, purché il suo ambito di manovra sia recintato. A questa condizione la sicurezza non è un ostacolo.
+- **Che cosa cambia**: finora Claude leggeva soltanto in Chiedi (Read, Grep, Glob) e nei deliverable scriveva in `_octo/lavori/<id>/` senza eseguire comandi. La decisione rivede la regola di F4 «Niente script nel progetto e niente Python sul PC».
+- **Perché**: nel vault di v0 il lavoro è fatto in gran parte di analisi su misura con calcoli e di file rivisti a più giri. Leggendo soltanto, Claude non aggrega un'esportazione da decine di megabyte e non verifica i conti di un documento.
+- **Il recinto**: Claude legge il progetto e scrive solo in una cartella di lavoro sotto `_octo/`. Il limite lo impongono gli strumenti concessi a Claude, non una frase nel prompt.
+- **Che cosa resta nel codice di Octo**: ciò che va garantito e vale per ogni PM (lettura delle fonti, controlli, ciclo di revisione, conti che devono coincidere con NetSuite).
+- **Da verificare prima di costruirci sopra**: che in modalità ristretta si possa concedere l'esecuzione di calcoli tenendo la scrittura nella sola cartella di lavoro, sul Mac e sul PC Windows del pilota. Non è ancora stato provato.
 
 ## T0 — MVP a fette
 
@@ -215,7 +251,7 @@ Con il permesso del PM ho letto il vault su cui gira la Suite v0. Nessun contenu
 - **Catalogo dentro l'app**: ogni deliverable è una cartella (istruzioni, contratto di output, modello) distribuita con Octo. Punto di partenza: le skill generalizzate di `second-brain-starter` (stato avanzamento, email al cliente, stima, verbale).
 - **Claude scrive solo nella cartella di lavoro**: verificato che, in modalità ristretta, gli si può permettere di scrivere in una sola sottocartella (`_octo/lavori/<id>/`) e in nessun altro posto, senza eseguire comandi.
 - **Prima il Markdown, poi il file**: la bozza è Markdown, rivista dentro Octo; solo dopo l'approvazione Octo produce Word. È la regola che il vault si era già dato.
-- **Niente script nel progetto e niente Python sul PC**: ciò che deve dare sempre lo stesso risultato (conti, controlli, impaginazione) lo fa il codice di Octo.
+- **Niente script nel progetto e niente Python sul PC**: ciò che deve dare sempre lo stesso risultato (conti, controlli, impaginazione) lo fa il codice di Octo. *Rivista il 18/11/2026*: vedi «Claude dentro un recinto».
 - **Controlli**: citazioni verificate come in Chiedi; red-team come seconda lettura indipendente, in sola lettura; dati interni fuori dai documenti per il cliente.
 - **Revisione a parole, a giri**: ogni richiesta del PM è un giro; Octo li conta e misura i tempi.
 - **Registro automatico**: per ogni deliverable, minuti di bozza, giri e minuti di revisione. È la misura del ritorno che a mano non veniva compilata.
@@ -356,3 +392,24 @@ Dalla descrizione funzionale delle 31 skill di v0. Criterio: entra ciò che un a
 **Restano specifiche del progetto o del cliente**: il ciclo di vita dei documenti contrattuali con impaginazione sul precedente, budget e capacity finché dipendono da griglia e scheda di commessa.
 
 **Debito da non portare**: periodo attivo cablato, percorsi assoluti, connettori dismessi, note ed esclusioni come costanti nel codice, profili e glossario dentro il prompt. Note, esclusioni, profili e glossario sono dati del progetto, con data e autore.
+
+## Schede progetto
+
+Le schede progetto dell'amministrazione (un file Excel per commessa) fissano le colonne di NetSuite e le formule dei numeri economici. Octo le adotta come regola e le mostra nella sezione «Commessa». Sette incrementi, chiusi con le demo 57, 58 e 59.
+
+1. **Sezione «Commessa» e riordino delle sezioni economiche.** *Fatto* (demo 57). La commessa a vita intera esce da «Previsionale» e diventa una sezione; «Previsionale» è il mese di tutte le commesse; «Avanzamento» a corpo rimanda a «Commessa».
+2. **Regole allineate alla scheda.** *Fatto* (demo 58, 59). Ogni ora di timesheet vale il costo orario di oggi della persona, letto dalla vista che alimenta il foglio «Risorse Interne» (`v_employee_cost_production_digital`: solo nome e costo orario, solo di chi ha ore sulla commessa); se manca, quello dell'ultimo timesheet. Fatturato dalle righe fattura. Avanzamento dichiarato dal PM, altrimenti costi a oggi su costi totali. «Come sono calcolate le cifre» dice ogni regola. Le ore restano quelle approvate: nelle schede lette non c'è una riga non approvata.
+3. **Fornitori e controllo con NetSuite.** *Fatto* (demo 58). Ordini a fornitore, ricevimenti e fatture dei fornitori (`v_purchase_order_all`, `v_itemreceiptpo_all`, `v_invoice_po_all`); il ricevuto è un costo della commessa; costi di NetSuite per gruppo accanto al calcolato.
+4. **Sintesi e fatturazione al cliente.** *Fatto* (demo 58, 59). Lavoro non fatturato (WIP), fatture da emettere (FRD), da fatturare; fatture per ordine di vendita e per mese; piano di fatturazione contro il fatturato.
+5. **Budget.** *Fatto* (demo 59). Righe per gruppo (risorse interne ed esterne, prodotti, altri costi), mesi in colonna, proposta da timesheet, esterni dichiarati e ordini a fornitore, conferma del budget.
+6. **Mesi: actual, forecast, scostamenti.** *Fatto* (demo 59). Mesi chiusi dai timesheet, mesi a venire ripianificati, ore dichiarate nel modello, calcolato accanto a NetSuite, scostamento dal budget.
+7. **Tipologie, anagrafica, esportazione.** *Fatto* (demo 59). Articoli di canone e licenza riconosciuti (`SERV - CAN`, `SERV - CAN ASS. MNT`, `CAN SU SW PROPRI`, `CAN SU SW TERZI`, `LIC SW TER`); `SERVPRO-N` non dice niente perché sulle schede è metà a giornate e metà a corpo. Anagrafica della commessa. Tabella «Dati» in un file per l'amministrazione.
+
+*Restano*, dichiarati nella demo 59:
+- il previsionale del mese legge dal budget tariffe e costi (le tabelle delle tariffe sono uscite dalle sue impostazioni; ciò che vi era scritto vale finché il budget non dice altro), ma non le quantità pianificate;
+- nel previsionale del mese i costi esterni sono quelli dichiarati a mano, non i ricevimenti;
+- le ore dichiarate al cliente (`Ore DICH.`) sono nel modello e nei calcoli ma non hanno ancora un campo nella griglia;
+- le righe di prodotto non hanno la competenza da data a data;
+- «Fatture da emettere» usa i ricavi riconosciuti da NetSuite, non quelli calcolati dal piano.
+
+*Verificato sul NetSuite vero il 17/11/2026*, in sola lettura: l'utente di Octo legge le tre viste dei fornitori e quella del costo orario, e i tipi delle colonne sono quelli dichiarati. Le fatture dei fornitori sulle righe di commessa sono scritte in negativo (12.062 righe contro 810): Octo le mostra in positivo, come la scheda. La lettura completa sulle commesse vere non è stata provata.

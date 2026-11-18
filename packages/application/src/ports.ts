@@ -35,6 +35,7 @@ import type {
   PrepNote,
   ProgressSettings,
   Project,
+  ProjectEconomics,
   ProjectTeam,
   QuestionRecord,
   Reader,
@@ -44,6 +45,7 @@ import type {
   RiskRegister,
   SharedReading,
   SheetGrid,
+  SheetPlans,
   SignInConfig,
   SignInSetup,
   SourceFileStamp,
@@ -429,6 +431,8 @@ export type ProjectOrder = {
   /** What was invoiced and what was recognised as revenue so far; null when not told. */
   invoiced: number | null
   recognized: number | null
+  /** The money of the code as the company's system books it; absent when it was not read. */
+  economics?: ProjectEconomics
 }
 
 /**
@@ -483,6 +487,12 @@ export interface TrackerSnapshotReader {
 export interface ForecastSettingsStore {
   load(projectFolder: string): Promise<ForecastSettings>
   save(projectFolder: string, settings: ForecastSettings): Promise<void>
+}
+
+/** The plans of the project codes of a project, kept with Octo's settings of the project. */
+export interface SheetPlanStore {
+  load(projectFolder: string): Promise<SheetPlans>
+  save(projectFolder: string, plans: SheetPlans): Promise<void>
 }
 
 /** A cell to write in a sheet: where, and what. */

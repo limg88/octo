@@ -1465,6 +1465,8 @@ table.data tr:has(+ tr.row-details) td {
   min-width: 0;
 }
 
+/* The total closes the table: its heading weighs as its figures, and no line follows it. */
+table.data tfoot th,
 table.data tfoot td {
   font-weight: 600;
   border-bottom: 0;
@@ -2127,7 +2129,7 @@ details.advanced[open] > summary {
 }
 
 .forecast-month table.data {
-  min-width: 1120px;
+  min-width: 1040px;
 }
 
 /* The note of a row: two lines of it at most, the whole of it in its window. */
@@ -3547,23 +3549,6 @@ span.marker-warning {
   max-width: 720px;
 }
 
-/* The figures of a project code over its whole life: a name and its value on each line. */
-.lifetime-figures {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
-  margin: 12px 0;
-}
-
-.lifetime-figures dt {
-  font-weight: 500;
-}
-
-.lifetime-figures dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
 /* The meetings a project holds, each with where it can go. */
 .held-meetings {
   list-style: none;
@@ -3594,4 +3579,99 @@ span.marker-warning {
 .code-name {
   display: block;
   white-space: normal;
+}
+
+/* Four figures of a group stand on a row, or two by two: never three and one left alone. */
+.figures-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1040px) {
+  .figures-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The project code a sheet is of, with the choice among the codes of the project beside it. */
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* How the figures of a sheet are computed: a name and its rule on each line. */
+.rules {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.rules > div {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) 1fr;
+  gap: 12px;
+}
+
+.rules dt {
+  font-weight: 500;
+}
+
+.rules dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* The plan of a project code: lines and months. The line stays in sight while the months scroll. */
+.plan-grid table.data {
+  min-width: 1120px;
+}
+
+.plan-grid table.data th,
+.plan-grid table.data td {
+  padding-inline: 4px;
+}
+
+.plan-grid table.data th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg);
+  min-width: 160px;
+}
+
+.plan-grid td input.amount {
+  width: 52px;
+  padding-inline: 4px;
+  margin-left: auto;
+}
+
+.plan-grid td:nth-child(2) input.amount,
+.plan-grid td:nth-child(3) input.amount {
+  width: 84px;
+}
+
+/* A group of lines, or of totals: its name runs across the grid. */
+.plan-grid tr.plan-band th {
+  padding-top: 12px;
+  background: var(--panel);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* The last month that is a fact: marked by a line, not by a colour alone. */
+.plan-grid th.plan-through {
+  box-shadow: inset 0 -2px var(--accent);
+}
+
+.plan-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-name input {
+  flex: 1;
+  min-width: 0;
 }

@@ -82,11 +82,18 @@ export type ForecastProject = {
 
 /**
  * The items of the company's system whose sale is of one kind: a line of a sales order names one
- * of them. An item not listed here says nothing about how the project is sold.
+ * of them. An item not listed here says nothing about how the project is sold: `SERVPRO-N` is
+ * left out on purpose, sold by the day on some projects and at a fixed price on as many.
  */
 const KIND_OF_ORDER_ITEM: Readonly<Record<string, ForecastKind>> = {
   'PROG-CORPO': 'fixed_price',
   SERVPRO: 'time_material',
+  // Fees and licences, as the sheets of the administration class the projects that sell them.
+  'SERV - CAN': 'fee',
+  'SERV - CAN ASS. MNT': 'fee',
+  'CAN SU SW PROPRI': 'fee',
+  'CAN SU SW TERZI': 'fee',
+  'LIC SW TER': 'fee',
 }
 
 /**

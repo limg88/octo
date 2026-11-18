@@ -1,7 +1,7 @@
 // A fake NetSuite warehouse for a project sold at a fixed price whose work began two months ago:
 // the timesheets of both months are in the warehouse, but Octo holds only those of last month,
 // as when the PM read in «Ore» the month it proposes. It also writes what a PM sets once.
-// Usage: node demo/lib/fake-dwsi-months.ts <project folder> <app data folder> [no-credential|lifetime|estimate|budget]
+// Usage: node demo/lib/fake-dwsi-months.ts <project folder> <app data folder> [no-credential|lifetime|estimate|budget|suppliers]
 //        (prints the name of its database and keeps running; SIGTERM drops the database)
 // `no-credential` leaves the NetSuite source without its password: Octo cannot read by itself.
 // `lifetime` adds what the page of the whole life of the code shows: a second person on the
@@ -56,13 +56,22 @@ const CAPS: Array<[name: string, days: number]> = [
   ['Bianchi Luca', 8],
   ['Verdi Sara', 1.5],
 ]
-const lifetime = mode === 'lifetime' || estimate
+/** `suppliers` is `lifetime` with an order to a supplier, what it delivered and its invoice. */
+const suppliers = mode === 'suppliers'
+const lifetime = mode === 'lifetime' || estimate || suppliers
+const SUPPLIER = { name: 'Studio Blu Srl', order: 'PO-31', ordered: 2000, received: 1200 }
 /** Logged on the tracker in the month that runs: NetSuite gets these hours when it closes. */
 const RUNNING = { person: 'Luca Bianchi', hours: 4.5 }
 const HOURLY_COST = 70
 const row = (work: { id: number; hours: number }, day: string, person = PERSON) =>
   `(${work.id}, 'IT', '${person}', '${day}', '${CODE}', 'Analisi', NULL, NULL, NULL, 'OR',
     ${work.hours}, 'Approved', ${COST_PER_HOUR}, ${work.hours * COST_PER_HOUR})`
+
+/** The revenue the ledger recognises in the last month; the rest is of the first. */
+const LAST_REVENUE = 2250
+const ledgerRow = (month: string, group: string, cost: number, revenue: number, id: number) =>
+  `('${CODE}', ${Number(month.slice(0, 4))}, ${Number(month.slice(5))}, '${group}', ${cost},
+    ${cost}, ${revenue}, ${revenue}, ${id}, ${cost})`
 
 const fake = await startFakeDwsi()
 await fake.exec(`
@@ -77,6 +86,28 @@ await fake.exec(`
   UPDATE dwsi.base_backlog
     SET amount = ${ORDERED}, amountbilled = ${INVOICED}, amountrecognized = ${RECOGNIZED}
     WHERE projectid = '${CODE}';
+  -- The invoice of the advance and the ledger of the two months tell the same as the backlog.
+  UPDATE dwsi.base_invoice
+    SET amount = ${INVOICED}, invoicedate = '${firstMonth}-20', item = 'PROG-CORPO'
+    WHERE projectid = '${CODE}';
+  DELETE FROM dwsi.base_project_revenue WHERE projectid = '${CODE}';
+  INSERT INTO dwsi.base_project_revenue VALUES
+    ${ledgerRow(firstMonth, 'Labor (TS)', FIRST.hours * COST_PER_HOUR, RECOGNIZED - LAST_REVENUE, 901)},
+    ${ledgerRow(lastMonth, 'Labor (TS)', LAST.hours * COST_PER_HOUR, LAST_REVENUE, 902)}
+    ${suppliers ? `, ${ledgerRow(lastMonth, 'Service', SUPPLIER.received, 0, 903)}` : ''};
+  ${
+    suppliers
+      ? `INSERT INTO dwsi.base_purchase_order VALUES
+           ('${SUPPLIER.order}', 1, '${firstMonth}-10', 'Pending Bill', '${SUPPLIER.name}',
+            'SERVPRO', 5, ${SUPPLIER.ordered}, 0, '${CODE}', 'F', NULL, NULL);
+         INSERT INTO dwsi.base_item_receipt VALUES
+           (7001, 1, 31, '${SUPPLIER.order}', '${lastMonth}-28', '${SUPPLIER.name}', 'SERVPRO',
+            'Consulenza', 3, 400, ${SUPPLIER.received}, '${CODE}');
+         INSERT INTO dwsi.base_invoice_po VALUES
+           ('FF-12', 1, 'Open', '${lastMonth}-30', '${SUPPLIER.name}', 'SERVPRO',
+            ${-SUPPLIER.received}, '${CODE}', '${SUPPLIER.order}', 'Bill', NULL);`
+      : ''
+  }
   DELETE FROM dwsi.base_timesheet WHERE projectid = '${CODE}';
   INSERT INTO dwsi.base_timesheet VALUES
     ${row(FIRST, `${firstMonth}-15`)},

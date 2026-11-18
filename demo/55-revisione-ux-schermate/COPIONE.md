@@ -29,9 +29,9 @@ Durata: 5 minuti. I 23 interventi di `docs/revisione-ux.md` (UX-01 … UX-23), r
    Atteso: le intestazioni numeriche finiscono sullo stesso bordo destro delle cifre; ordinando una misura il simbolo ▲/▼ compare a sinistra dell'etichetta senza spostarla. La riga segnata dice «Assenza prevista» in grigio; «Torna» resta verde, le righe da verificare ambra. Scrivi «prevista» in «Filtra»: resta quella riga.
    Dimostra: uno stato previsto non sembra una quadratura riuscita (UX-03, UX-13).
 
-5. **Previsionale: una riga per commessa.** Apri «Previsionale», scheda del mese.
+5. **Previsionale: una riga per commessa.** Apri «Previsionale».
    Atteso: sopra la tabella una spiegazione di tre frasi; ogni commessa occupa una riga. «Calcolo e dettagli» apre sotto la riga «Come è calcolato» e i campi di quella sola commessa. Con sole commesse a giornate c'è la colonna «Giorni» e non «Avanzamento» (il contrario con sole quote, entrambe se il mese è misto). Stringi la finestra: scorre la tabella, «Salva» resta fermo.
-   Dimostra: il confronto fra commesse non è interrotto dalle spiegazioni (UX-14, UX-15, UX-16 nella scheda «Commessa»).
+   Dimostra: il confronto fra commesse non è interrotto dalle spiegazioni (UX-14, UX-15; UX-16 nella sezione «Commessa»).
 
 6. **Avanzamento: «Nuova richiesta» prima delle fatture.** Apri «Avanzamento», imposta l'ordine se richiesto e aggiungi due richieste.
    Atteso: «Nuova richiesta» sta dopo i totali e gli avvisi; il modulo si apre in quel punto. «Correggi» su una richiesta dello storico apre il modulo in alto e porta lì il focus (il titolo del modulo). Le posizioni «Non fatturata», quando NetSuite è collegato, sono grigie e non ambra.

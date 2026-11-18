@@ -530,6 +530,22 @@ describe('how a project is sold, by the items of its orders', () => {
     expect(forecastKindOfItems(['Trasferta', 'SERVPRO'])).toBe('time_material')
   })
 
+  it('knows the items of a fee and of a licence, and leaves alone the one sold both ways', () => {
+    for (const item of [
+      'SERV - CAN',
+      'serv - can ass. mnt',
+      'CAN SU SW PROPRI',
+      'CAN SU SW TERZI',
+      'LIC SW TER',
+    ]) {
+      expect(forecastKindOfItems([item])).toBe('fee')
+    }
+    // Sold by the day on some projects and at a fixed price on as many: it tells nothing.
+    expect(forecastKindOfItems(['SERVPRO-N'])).toBeNull()
+    // A fee with days sold beside it is two things: the PM says which.
+    expect(forecastKindOfItems(['SERV - CAN', 'SERVPRO'])).toBeNull()
+  })
+
   it('says nothing when the orders do not tell, or tell two things', () => {
     expect(forecastKindOfItems([])).toBeNull()
     expect(forecastKindOfItems(['Servizi'])).toBeNull()
@@ -694,7 +710,8 @@ describe('a project code over its whole life', () => {
       '2026-11',
     ])
     expect(life.lines).toEqual([
-      { person: 'Bianchi Luca', hours: 26, cost: 1197, source: 'timesheet', months: [] },
+      // Every hour at what an hour costs today: 26 hours at the 46 of November, not 990 + 207.
+      { person: 'Bianchi Luca', hours: 26, cost: 1196, source: 'timesheet', months: [] },
       { person: 'Neri Ugo', hours: 2, cost: null, source: 'timesheet', months: [] },
       { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
       // Who has no timesheet, as the PM declared them; without a cost written, hours only.
@@ -710,14 +727,14 @@ describe('a project code over its whole life', () => {
       invoiced: 2250,
       recognized: 5250,
       hours: 74,
-      costs: 3457,
+      costs: 3456,
       budgetCosts: 4800,
       expectedCosts: 4800,
       notApprovedHours: 3,
       unreadMonths: [],
     })
-    expect(life.marginToDate).toBeCloseTo((7500 - 3457) / 7500)
-    expect(life.progress).toBeCloseTo(3457 / 4800)
+    expect(life.marginToDate).toBeCloseTo((7500 - 3456) / 7500)
+    expect(life.progress).toBeCloseTo(3456 / 4800)
     expect(life.marginAtEnd).toBeCloseTo((7500 - 4800) / 7500)
   })
 
@@ -820,7 +837,7 @@ describe('hours the timesheets do not hold', () => {
   it('estimates the months not yet in the timesheets from the tracker, and says it is an estimate', () => {
     const life = compileLifetime('P1', rows, settings, '2026-11', READ, worklog)
     expect(life.lines).toEqual([
-      { person: 'Bianchi Luca', hours: 21.5, cost: 929, source: 'timesheet', months: [] },
+      { person: 'Bianchi Luca', hours: 21.5, cost: 989, source: 'timesheet', months: [] },
       { person: 'Rossi Anna', hours: 34, cost: 1700, source: 'timesheet', months: [] },
       // Who has no timesheet: October and November, not December which is still to come.
       { person: 'Sara Verdi', hours: 8, cost: 560, source: 'no_timesheet', months: [] },
@@ -831,21 +848,21 @@ describe('hours the timesheets do not hold', () => {
       // Never in a timesheet and no cost written: the hours are there, the cost is not.
       { person: 'Ugo Neri', hours: 1, cost: null, source: 'estimate', months: ['2026-11'] },
     ])
-    expect(life).toMatchObject({ hours: 71, costs: 3516, estimatedHours: 7.5, estimatedCosts: 327 })
-    expect(life.marginToDate).toBeCloseTo((7500 - 3516) / 7500)
+    expect(life).toMatchObject({ hours: 71, costs: 3576, estimatedHours: 7.5, estimatedCosts: 327 })
+    expect(life.marginToDate).toBeCloseTo((7500 - 3576) / 7500)
   })
 
   it('counts nothing from the tracker when its hours are of another code, or of none', () => {
     for (const code of ['P9', null]) {
       const life = compileLifetime('P1', rows, settings, '2026-11', READ, { ...worklog, code })
       expect(life.lines.map((line) => line.source)).toEqual(['timesheet', 'timesheet'])
-      expect(life).toMatchObject({ estimatedHours: 0, estimatedCosts: 0, costs: 2629 })
+      expect(life).toMatchObject({ estimatedHours: 0, estimatedCosts: 0, costs: 2689 })
     }
     expect(compileLifetime('P1', rows, settings, '2026-11', READ).estimatedHours).toBe(0)
     // Who the PM said has no timesheet and has one after all is counted by the timesheet only.
     const both = { ...settings, hourlyCosts: [{ person: 'Rossi Anna', costPerHour: 99 }] }
     const anna = { code: 'P1', entries: [logged('Anna Rossi', '2026-09-10', 34)] }
-    expect(compileLifetime('P1', rows, both, '2026-11', READ, anna).costs).toBe(2629)
+    expect(compileLifetime('P1', rows, both, '2026-11', READ, anna).costs).toBe(2689)
   })
 
   it('counts in a month, beside the externals, who has no timesheet by the hours logged', () => {

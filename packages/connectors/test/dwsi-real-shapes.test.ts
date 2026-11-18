@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { type DwsiSession, pgFailure } from '../src/dwsi/session.ts'
-import { DWSI_RELATIONS, DWSI_VIEWS, EMPLOYEE_VIEW, SYNC_TABLE } from '../src/dwsi/views.ts'
+import {
+  DWSI_RELATIONS,
+  DWSI_VIEWS,
+  EMPLOYEE_VIEW,
+  STANDARD_COST_VIEW,
+  SYNC_TABLE,
+} from '../src/dwsi/views.ts'
 import {
   type ConnectorContext,
   ConnectorError,
@@ -37,7 +43,7 @@ interface Warehouse {
 }
 
 function scripted(w: Warehouse): DwsiSession {
-  const columns = [...DWSI_VIEWS, SYNC_TABLE, EMPLOYEE_VIEW].flatMap((r) =>
+  const columns = [...DWSI_VIEWS, SYNC_TABLE, EMPLOYEE_VIEW, STANDARD_COST_VIEW].flatMap((r) =>
     r.columns.map((c) => ({
       relation: r.name,
       name: c.name,

@@ -11,7 +11,6 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { dateText, messages } from './messages.ts'
-import { ProgressFixedPrice } from './ProgressFixedPrice.tsx'
 import { ProgressInvoices } from './ProgressInvoices.tsx'
 import { ProgressRequestForm } from './ProgressRequestForm.tsx'
 import { ProgressSetup } from './ProgressSetup.tsx'
@@ -31,15 +30,14 @@ type ProgressApi = Pick<
   | 'registerProgressInvoices'
   | 'openEvidence'
   | 'chooseProjectPath'
-  | 'forecastLifetime'
 >
 
 type Props = {
   api: ProgressApi
   project: Project
   /**
-   * True for a project sold only at a fixed price: until the PM sets a form of the client, its
-   * progress is what the company's system says of its invoices.
+   * True for a project sold only at a fixed price: until the PM sets a form of the client, what
+   * was ordered and invoiced is in the sheet of the project code, and the page sends there.
    */
   fixedPrice?: boolean
   onOpenSection?: ((section: Section) => void) | undefined
@@ -136,12 +134,20 @@ export function ProgressView({ api, project, fixedPrice = false, onOpenSection }
 
   if (fixedPrice && !ready(settings) && panel.kind !== 'setup') {
     return (
-      <ProgressFixedPrice
-        api={api}
-        project={project}
-        onOpenSection={onOpenSection}
-        onUseForm={() => setPanel({ kind: 'setup' })}
-      />
+      <div className="dashboard">
+        {error && <Failure code={error} />}
+        <p className="hint">{text.fixedPrice.intro}</p>
+        <div className="actions">
+          {onOpenSection && (
+            <button type="button" className="primary" onClick={() => onOpenSection('sheet')}>
+              {messages.openSection(messages.sheetTab)}
+            </button>
+          )}
+          <button type="button" className="quiet" onClick={() => setPanel({ kind: 'setup' })}>
+            {text.fixedPrice.useForm}
+          </button>
+        </div>
+      </div>
     )
   }
 

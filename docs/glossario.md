@@ -27,6 +27,11 @@ Le parole che Octo usa con chi lo usa. Una cosa ha un nome solo; i nomi tecnici 
 | valutazione | ciò che dice Claude di una mail o di un rischio, con la sua fonte | giudizio automatico, score |
 | registro dei rischi | i rischi del progetto che il PM ha accettato | risk log |
 | entrare, uscire | farsi riconoscere da Octo con l'utente aziendale, e smettere | login, logout, autenticarsi |
+| lavoro non fatturato | costi a oggi meno fatturato; nella scheda progetto è il WIP | WIP (la sigla sta nella riga d'aiuto) |
+| fatture da emettere | ricavi riconosciuti meno fatturato; nella scheda progetto è l'FRD | FRD (la sigla sta nella riga d'aiuto) |
+| ricevuto (da un fornitore) | ciò che un fornitore ha consegnato su un ordine: il costo che la commessa sostiene | item receipt |
+| budget (di una commessa) | ciò che si è pianificato quando la commessa è stata venduta, riga per riga e mese per mese | baseline |
+| actual, forecast | i mesi che sono un fatto e quelli ancora da venire, come li chiama la scheda progetto | consuntivo e previsione (nella griglia) |
 | commessa assegnata | una commessa di cui in NetSuite sei il project manager | — |
 
 Regole:

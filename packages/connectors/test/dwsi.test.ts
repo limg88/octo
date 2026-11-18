@@ -623,6 +623,9 @@ describe('a DWSI extraction', () => {
       v_project_revenue_all: '2026-11-04T23:00:00.000Z',
       // No entity of the warehouse dates the P&L: not deduced.
       v_database_pl_all: null,
+      v_purchase_order_all: '2026-11-04T22:10:00.000Z',
+      v_itemreceiptpo_all: '2026-11-04T22:15:00.000Z',
+      v_invoice_po_all: '2026-11-04T22:20:00.000Z',
       v_backlog_all: '2026-11-04T23:30:00.000Z',
       dw_prod_projectpercentcomplete: '2026-11-05T05:00:00.000Z',
     })
@@ -980,6 +983,19 @@ describe('a DWSI sync', () => {
         firstOrderDay: '2026-01-10',
         invoiced: 45000,
         recognized: 41000,
+        // The money of the project, line by line: the sheet of the code sums it by its rules.
+        economics: {
+          // Only of who wrote hours on the code: nobody else's cost is asked.
+          standardCosts: [{ person: 'Anna Riva', costPerHour: 42 }],
+          ledger: [
+            { month: '2026-09', group: 'Labor', cost: 200, revenue: 0 },
+            { month: '2026-09', group: 'Labor', cost: 10000, revenue: 13800 },
+          ],
+          invoices: [{ invoice: 'INV-5', salesOrder: 'SO-17', day: '2026-06-30', amount: 45000 }],
+          purchases: [],
+          receipts: [],
+          vendorInvoices: [],
+        },
       },
       {
         projectid: 'PRJ000202',
@@ -989,6 +1005,14 @@ describe('a DWSI sync', () => {
         firstOrderDay: null,
         invoiced: null,
         recognized: null,
+        economics: {
+          standardCosts: [{ person: 'Carla Fumi', costPerHour: 40 }],
+          ledger: [],
+          invoices: [],
+          purchases: [],
+          receipts: [],
+          vendorInvoices: [],
+        },
       },
     ])
     // A line of an order carries the quantity invoiced, not an amount: 0,3 of 1 is 30% of the
@@ -1006,6 +1030,41 @@ describe('a DWSI sync', () => {
       expect(borea).toMatchObject({ ordered: 9500, invoiced: 3250, recognized: null })
     } finally {
       await fake.exec(`DELETE FROM dwsi.base_sales_order WHERE salesorderid = 'SO-90'`)
+    }
+    // An order to a supplier, what it delivered and its invoice (negative in the warehouse); a line with no day or no
+    // amount tells nothing, and a line of another project never comes.
+    await fake.exec(`
+      INSERT INTO dwsi.base_purchase_order VALUES
+        ('PO-31', 1, '2026-09-10', 'Pending Bill', 'Studio Blu', 'SERVPRO', 5, 2000, 0, 'PRJ000202', 'F', 'x', 'nota'),
+        ('PO-31', 2, NULL, 'Pending Bill', 'Studio Blu', 'SERVPRO', 1, 400, 0, 'PRJ000202', 'F', 'x', NULL),
+        ('PO-77', 1, '2026-09-11', 'Pending Bill', 'Altro', 'SERVPRO', 1, 999, 0, 'PRJ000101', 'F', 'x', NULL);
+      INSERT INTO dwsi.base_item_receipt VALUES
+        (7001, 1, 31, 'PO-31', '2026-10-28', 'Studio Blu', 'SERVPRO', 'Consulenza', 3, 400, 1200, 'PRJ000202'),
+        (7002, 1, 32, 'PO-31', '2026-10-29', 'Studio Blu', 'SERVPRO', 'Consulenza', 1, 400, NULL, 'PRJ000202');
+      INSERT INTO dwsi.base_invoice_po VALUES
+        ('FF-12', 1, 'Open', '2026-10-30', 'Studio Blu', 'SERVPRO', -1200, 'PRJ000202', 'PO-31', 'Bill', 'memo');
+    `)
+    try {
+      const [, borea] = await managingBoth(() => dwsiConnector.orders(ctx([APOLLO, BOREA])))
+      expect(borea?.economics).toMatchObject({
+        purchases: [{ order: 'PO-31', vendor: 'Studio Blu', day: '2026-09-10', amount: 2000 }],
+        receipts: [{ order: 'PO-31', vendor: 'Studio Blu', day: '2026-10-28', amount: 1200 }],
+        vendorInvoices: [
+          {
+            invoice: 'FF-12',
+            order: 'PO-31',
+            vendor: 'Studio Blu',
+            day: '2026-10-30',
+            amount: 1200,
+          },
+        ],
+      })
+    } finally {
+      await fake.exec(`
+        DELETE FROM dwsi.base_purchase_order;
+        DELETE FROM dwsi.base_item_receipt;
+        DELETE FROM dwsi.base_invoice_po;
+      `)
     }
     const asLuca = (perimeter: string[]) => ctx(perimeter, { owner: 'luca.bassi@example.test' })
     expect((await dwsiConnector.orders(asLuca([APOLLO, BOREA]))).map((o) => o.projectid)).toEqual([

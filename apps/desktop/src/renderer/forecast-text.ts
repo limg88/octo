@@ -1,5 +1,6 @@
 import type { Lifetime, LifetimeLine } from '@octo/domain'
 import { messages } from './messages.ts'
+import { monthText } from './today-text.ts'
 
 const THOUSANDS = /^\d{1,3}(\.\d{3})+$/
 
@@ -31,9 +32,19 @@ export const amountText = (value: number | null): string =>
 
 /** Where a line of the life of a code comes from, with the months it stands for when an estimate. */
 export function lifetimeSourceText(line: Pick<LifetimeLine, 'source' | 'months'>): string {
-  const source = messages.forecast.lifetime.sources[line.source]
+  const source = messages.sheet.summary.sources[line.source]
   return line.months.length === 0 ? source : `${source} (${line.months.join(', ')})`
 }
+
+const SHORT_MONTH = new Intl.DateTimeFormat('it-IT', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
+/** A month `YYYY-MM` as the heading of a column: short, with its year. */
+export const shortMonthText = (month: string): string =>
+  SHORT_MONTH.format(new Date(`${month}-01T00:00:00Z`))
 
 const COLUMN_GAP = 2
 
@@ -59,7 +70,7 @@ function aligned(rows: readonly string[][]): string[] {
  * what they miss said in so many words. Nothing that is not on the page.
  */
 export function lifetimeMail(life: Lifetime): string {
-  const text = messages.forecast.lifetime
+  const text = messages.sheet.summary
   const { money, share, hours } = messages.forecast
   const amount = (value: number | null): string => (value === null ? '—' : money(value))
   const ofOrder = (value: number | null): string =>
@@ -76,16 +87,19 @@ export function lifetimeMail(life: Lifetime): string {
       hours(line.hours),
       amount(line.cost),
     ]),
+    ...(life.supplierCosts > 0 ? [[text.suppliersLine, '', money(life.supplierCosts)]] : []),
     [text.total, hours(life.hours), money(life.costs)],
   ])
   const missing = life.lines.filter((line) => line.cost === null).map((line) => line.person)
   return [
     life.description === '' ? life.code : `${life.code} · ${life.description}`,
-    text.through(life.through),
+    text.through(monthText(life.through)),
     '',
     `${text.ordered}: ${amount(life.ordered)}`,
     `${text.invoiced}: ${ofOrder(life.invoiced)}`,
     `${text.recognized}: ${ofOrder(life.recognized)}`,
+    ...(life.wip === null ? [] : [`${text.wip} (${text.wipNote}): ${money(life.wip)}`]),
+    ...(life.toBill === null ? [] : [`${text.toBill} (${text.toBillNote}): ${money(life.toBill)}`]),
     '',
     ...table,
     '',

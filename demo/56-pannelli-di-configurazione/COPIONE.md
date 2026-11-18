@@ -21,9 +21,9 @@ Durata: 5 minuti. Gli interventi UX-24 … UX-35 di `docs/revisione-ux.md` («In
    Atteso: il campo si chiama «Confronta fino al»; sotto: «Le ore dei giorni successivi restano fuori dal confronto. Lascia vuoto per usare tutto il periodo scelto.». Le due liste di eccezioni, se lunghe, sono richiuse come nel passo 1.
    Dimostra: un campo vuoto dichiara il suo effetto (UX-31, UX-24).
 
-3. **Previsionale: formato del mese e tariffe a richiesta.** Apri «Previsionale» › «Impostazioni del previsionale».
-   Atteso: la colonna è «Mese di inizio (AAAA-MM)» e una cella vuota mostra solo «AAAA-MM», non un mese d'esempio. «Tariffe al giorno» è una riga che si apre. Aprila, scrivi una persona senza tariffa, richiudi e premi «Salva»: il blocco si riapre da solo con l'errore; ciò che avevi scritto è ancora lì.
-   Dimostra: un esempio non sembra un valore, e un errore non resta nascosto (UX-32, UX-33).
+3. **Previsionale: formato del mese.** Apri «Previsionale» › «Impostazioni del previsionale».
+   Atteso: la colonna è «Mese di inizio (AAAA-MM)» e una cella vuota mostra solo «AAAA-MM», non un mese d'esempio. Le tariffe non sono più qui: dalla demo 59 stanno nel budget della commessa, e la pagina lo dice con «Apri «Commessa»».
+   Dimostra: un esempio non sembra un valore (UX-32). UX-33 è superata: non c'è più un blocco di tariffe da richiudere.
 
 4. **Avanzamento: la cella che riceve il dato.** Apri «Avanzamento» › impostazioni, alla mappa delle celle.
    Atteso: i pulsanti dei dati sono disattivati con «Scegli una riga con una cella valida per inserire un dato.». Scrivi `D2` in una riga e clicca nel suo testo: compare «Inserisci nella cella D2» e i pulsanti si attivano. Aggiungi una riga sopra o sotto e toglila: la destinazione resta D2. Togli la riga di D2: i pulsanti si disattivano.

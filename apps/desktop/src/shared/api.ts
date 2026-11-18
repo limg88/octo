@@ -58,6 +58,7 @@ import type {
   RestoreOutcome,
   RiskChange,
   RiskRegister,
+  SheetPlans,
   SourceRun,
   StoredMeeting,
   TemplateFormat,
@@ -146,7 +147,12 @@ export const CHANNELS = {
   forecastView: 'forecast:view',
   forecastCompile: 'forecast:compile',
   forecastOrdersRead: 'forecast:orders-read',
-  forecastLifetime: 'forecast:lifetime',
+  projectSheets: 'sheet:list',
+  sheetPlans: 'sheet:plans:get',
+  sheetPlansSave: 'sheet:plans:save',
+  sheetPropose: 'sheet:propose',
+  sheetConfirm: 'sheet:confirm',
+  sheetExport: 'sheet:export',
   projectShape: 'projects:shape',
   progressSettingsGet: 'progress:settings:get',
   progressSettingsSave: 'progress:settings:save',
@@ -424,7 +430,16 @@ export type OctoApi = {
   /** What the project is like: which sections have something to work on. */
   projectShape(projectId: string): Promise<Result<ProjectShape>>
   /** Every project code of the project over its whole life, up to the month that runs. */
-  forecastLifetime(projectId: string): Promise<Result<Lifetime[]>>
+  projectSheets(projectId: string): Promise<Result<Lifetime[]>>
+  /** The plans of the project codes as the PM wrote them. */
+  sheetPlans(projectId: string): Promise<Result<SheetPlans>>
+  saveSheetPlans(projectId: string, plans: SheetPlans): Promise<Result<SheetPlans>>
+  /** Adds to the plan of a code a line for everybody known and not planned yet. */
+  proposeSheetPlan(projectId: string, code: string): Promise<Result<SheetPlans>>
+  /** Confirms the budget of a code: its costs stop following today's. */
+  confirmSheetBudget(projectId: string, code: string): Promise<Result<SheetPlans>>
+  /** Writes the long table of a code as a file; its path in the project. */
+  exportSheetData(projectId: string, code: string): Promise<Result<{ path: string }>>
   progressSettings(projectId: string): Promise<Result<ProgressSettings>>
   saveProgressSettings(
     projectId: string,

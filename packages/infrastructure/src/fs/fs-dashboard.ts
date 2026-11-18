@@ -8,6 +8,7 @@ import type {
   HoursSettingsStore,
   ModelSettingsStore,
   ProgressSettingsStore,
+  SheetPlanStore,
   TeamStore,
   TrackerExports,
 } from '@octo/application'
@@ -18,6 +19,7 @@ import {
   cleanHoursSettings,
   cleanModelSettings,
   cleanProgressSettings,
+  cleanSheetPlans,
   cleanTeam,
   DEFAULT_ALIGNMENT_SETTINGS,
   DEFAULT_DASHBOARD_SETTINGS,
@@ -32,7 +34,10 @@ import {
   isDomainError,
   NO_DECISIONS,
   NO_FORECAST_PROJECT,
+  NO_SHEET_REGISTRY,
   PHASES,
+  PLAN_GROUPS,
+  type SheetPlans,
   TEAM_SIDES,
 } from '@octo/domain'
 import { z } from 'zod'
@@ -231,6 +236,51 @@ export function createFsForecastSettings(): ForecastSettingsStore {
       return cleanForecastSettings(forecastSettingsOf(parsed.data))
     },
     save: (projectFolder, settings) => writeJson(fileOf(projectFolder), settings),
+  }
+}
+
+const SHEET_PLAN_FILE = 'sheet-plan.json'
+const quantities = z.record(z.string(), z.number()).default({})
+const sheetPlanSchema = z.record(
+  z.string(),
+  z.object({
+    lines: z
+      .array(
+        z.object({
+          group: z.enum(PLAN_GROUPS),
+          name: z.string(),
+          unitCost: amount,
+          unitPrice: amount,
+          budget: quantities,
+          forecast: quantities,
+          declared: quantities,
+        }),
+      )
+      .default([]),
+    confirmedOn: z.string().nullable().default(null),
+    milestones: z
+      .array(z.object({ salesOrder: z.string(), month: z.string(), amount: z.number() }))
+      .default([]),
+    declaredProgress: z.record(z.string(), z.number()).default({}),
+    registry: z.record(z.string(), z.string()).default({}),
+  }),
+)
+
+/** The plans of the project codes, in a file of their own beside the other settings. */
+export function createFsSheetPlans(): SheetPlanStore {
+  const fileOf = (projectFolder: string) =>
+    join(projectFolder, PROJECT_SETTINGS_FOLDER, SHEET_PLAN_FILE)
+  return {
+    async load(projectFolder) {
+      const parsed = sheetPlanSchema.safeParse(await readJsonOr(fileOf(projectFolder), {}))
+      if (!parsed.success) throw new DomainError('sheet_plan_invalid', SHEET_PLAN_FILE)
+      const plans: SheetPlans = {}
+      for (const [code, plan] of Object.entries(parsed.data)) {
+        plans[code] = { ...plan, registry: { ...NO_SHEET_REGISTRY, ...plan.registry } }
+      }
+      return cleanSheetPlans(plans)
+    },
+    save: (projectFolder, plans) => writeJson(fileOf(projectFolder), plans),
   }
 }
 

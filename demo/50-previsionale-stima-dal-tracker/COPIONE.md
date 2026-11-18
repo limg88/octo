@@ -15,7 +15,7 @@ Durata: 4 minuti. Mostra come Octo arriva alle ore vere della commessa quando i 
    ```
    Atteso: si apre Octo sul progetto «Aurora».
 
-2. **Apri «Previsionale».** Si apre la scheda «Commessa».
+2. **Apri «Commessa».**
    Atteso:
    | Persona | Ore | Costo | Fonte |
    |---|---|---|---|
@@ -42,15 +42,15 @@ Durata: 4 minuti. Mostra come Octo arriva alle ore vere della commessa quando i 
    Atteso: costi interni 537,50, costi esterni 560,00; sotto la riga: «Sara Verdi: 8 h dal tracker, senza timesheet, a costo orario». Avanzamento 48,69%.
    Dimostra: chi non ha timesheet entra anche nel mese, accanto agli esterni: è un costo vero. La stima del mese in corso no: nel previsionale del mese per l'amministrazione Octo non stima niente.
 
-7. **Apri «Impostazioni del previsionale».**
-   Atteso: in fondo la tabella «Persone senza timesheet, a costo orario» con «Verdi Sara · 70».
+7. **Apri «Commessa» › «Budget» e premi «Parti dalla proposta».**
+   Atteso: fra le «Risorse esterne» c'è Verdi Sara con costo unitario 70: il costo orario scritto prima che il budget esistesse resta in uso, e da qui si cambia (dalla demo 59 le impostazioni del previsionale non hanno più questa tabella).
 
 ## Che cosa dimostra
 - Quando il timesheet del mese arriva in NetSuite, la riga «stima» di quel mese sparisce e resta il timesheet: le stesse ore non sono mai contate due volte.
 - Una persona mai comparsa in un timesheet e senza costo orario scritto compare con le ore e senza costo, e la pagina avvisa che il margine è più alto del vero.
 
 ## Che cosa non fa
-- Con più commesse nel progetto le ore del tracker non vengono attribuite: il tracker non dice su quale commessa sono. In quel caso restano i timesheet e gli «Esterni senza timesheet» scritti a mano.
+- Con più commesse nel progetto le ore del tracker non vengono attribuite: il tracker non dice su quale commessa sono. In quel caso restano i timesheet e gli esterni dichiarati a mano nei dati del mese.
 
 ## Test
 ```bash

@@ -16,6 +16,7 @@ import {
   createFeeding,
   createFeeds,
   createFolderMigration,
+  createForecastReadings,
   createForecasts,
   createHours,
   createMeetings,
@@ -24,6 +25,7 @@ import {
   createPreferences,
   createProgress,
   createProjectShapes,
+  createProjectSheets,
   createProjects,
   createReadings,
   createRisks,
@@ -35,6 +37,7 @@ import {
   createTrackerSnapshots,
   createUpdates,
   type Feeding,
+  type ForecastDeps,
   type MailArchive,
   type Projects,
   type Session,
@@ -83,6 +86,7 @@ import {
   createFsProjectScaffold,
   createFsRiskRegisterStore,
   createFsSharedReadings,
+  createFsSheetPlans,
   createFsSourceSettings,
   createFsTeamStore,
   createFsTrackerExports,
@@ -640,7 +644,8 @@ function start(seatEnv: Record<string, string | undefined>): void {
     alignment: alignmentSettings,
     forecast: forecastSettings,
   })
-  const forecasts = createForecasts({
+  const sheetPlans = createFsSheetPlans()
+  const forecastDeps: ForecastDeps = {
     settings: forecastSettings,
     files,
     sheets,
@@ -655,7 +660,15 @@ function start(seatEnv: Record<string, string | undefined>): void {
     clock,
     worklog: (project) => hours.trackerHours(project),
     team: (project) => team.get(project),
-  })
+    sheetPlans: (project) => sheetPlans.load(project.folder),
+  }
+  // The forecast and the sheet read the same things: one reading serves both.
+  const forecastReadings = createForecastReadings(forecastDeps)
+  const forecasts = createForecasts(forecastDeps, forecastReadings)
+  const projectSheets = createProjectSheets(
+    { ...forecastDeps, plans: sheetPlans },
+    forecastReadings,
+  )
   const judge = createClaudeTodayJudge(claude)
   const risks = createRisks({
     store: createFsRiskRegisterStore(),
@@ -718,6 +731,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     alignments,
     hours,
     forecasts,
+    projectSheets,
     shapes,
     progress: createProgress({
       settings: createFsProgressSettings(),

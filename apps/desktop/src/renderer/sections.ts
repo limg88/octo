@@ -7,6 +7,7 @@ export const SECTIONS = [
   'deliverables',
   'dashboard',
   'hours',
+  'sheet',
   'forecast',
   'progress',
   'alignment',
@@ -20,6 +21,7 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deliverables: messages.deliverablesTab,
   dashboard: messages.dashboardTab,
   hours: messages.hoursTab,
+  sheet: messages.sheetTab,
   forecast: messages.forecastTab,
   progress: messages.progressTab,
   alignment: messages.alignmentTab,
@@ -30,7 +32,7 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
 export const SECTION_GROUPS: ReadonlyArray<{ title: string; sections: readonly Section[] }> = [
   { title: messages.nav.daily, sections: ['today'] },
   { title: messages.nav.work, sections: ['ask', 'deliverables', 'dashboard'] },
-  { title: messages.nav.monthly, sections: ['hours', 'forecast', 'progress'] },
+  { title: messages.nav.monthly, sections: ['hours', 'sheet', 'forecast', 'progress'] },
   { title: messages.nav.sprint, sections: ['alignment'] },
   { title: messages.nav.project, sections: ['sources'] },
 ]

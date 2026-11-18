@@ -49,6 +49,8 @@ export const DOMAIN_ERROR_CODES = [
   'forecast_model_invalid',
   'forecast_month_invalid',
   'forecast_settings_invalid',
+  'sheet_plan_invalid',
+  'sheet_code_unknown',
   'forecast_timesheet_not_set',
   'deck_model_invalid',
   'update_check_failed',
