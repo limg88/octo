@@ -56,6 +56,16 @@ Correzione emersa e non fatta: **`pnpm e2e` (il giro delle demo 01-59 nella fine
 
 Uscito con le due sezioni e non rifatto: il confronto fra richieste e fatture di NetSuite, i titoli simili proposti fra voci senza ticket e ticket senza riferimento, il segnale dell'allineamento in «Oggi» a fine sprint. Se uno di questi ti serve, si aggiunge allo script a parole (R4.3) o si chiede.
 
+## R4b — Catalogo in file
+
+| # | Che cosa provare | Come | Esito che chiude | Esito |
+|---|---|---|---|---|
+| R4b.1 | Il PM corregge l'istruzione di un tipo in meno di 5 minuti, senza codice | Oggi la via a parole è per progetto: «Deliverable» → un tipo → «Istruzioni per questo progetto». Cronometra una correzione vera e la bozza successiva | Meno di 5 minuti, e la bozza successiva la rispetta | da fare |
+| R4b.2 | Le bozze dei dieci tipi con Claude vero sono quelle di prima | Una bozza per due tipi che usi spesso, sul progetto vero | Nessuna differenza di struttura rispetto alle bozze di prima del 18/11. I dieci tipi letti dai file sono stati confrontati con le costanti del codice: dieci su dieci uguali, quindi le istruzioni che arrivano a Claude sono le stesse | da fare |
+| R4b.3 | Il catalogo dentro l'app installata | Installa la build (`pnpm dist`) e apri «Deliverable» | I dieci tipi ci sono | da fare |
+
+Non costruito: correggere a parole il tipo distribuito con l'app, per tutti i progetti. I file ora ci sono; manca chi li scrive al posto del PM e dove tenere la correzione fuori dall'app installata.
+
 ## R6 — che cosa serve sapere sulla posta di Windows
 
 In `docs/` non è scritto quale Outlook ha il pilota (`docs/roadmap.md`, «Scelte prese durante F2 (posta)»: «Dipende da quale Outlook ha il pilota»). Il lettore della posta su Windows non si costruisce alla cieca. Da rilevare nella sessione con il pilota (R2.6):
