@@ -602,96 +602,6 @@ main {
   gap: 8px;
 }
 
-.ask {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.ask-main {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* The conversations already had, beside the one in view. */
-.ask-chats {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 240px;
-  flex-shrink: 0;
-  padding: 16px 12px;
-  border-right: 1px solid var(--line);
-  overflow-y: auto;
-}
-
-.ask-chats ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ask-chat {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  height: auto;
-  padding: 6px 8px;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  text-align: left;
-}
-
-.ask-chat-selected {
-  background: var(--accent-soft);
-}
-
-.ask-chat-title {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-weight: 500;
-}
-
-@media (max-width: 1000px) {
-  .ask-chats {
-    width: 180px;
-  }
-}
-
-.conversation {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.exchange {
-  max-width: 1120px;
-  width: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.question {
-  font-weight: 600;
-  font-size: 15px;
-}
-
 .progress {
   color: var(--muted);
   overflow: hidden;
@@ -864,26 +774,6 @@ blockquote {
 main > .warning,
 .section-view > .warning {
   margin: 12px 24px 0;
-}
-
-.composer {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  padding: 12px 24px 16px;
-  border-top: 1px solid var(--line);
-}
-
-.composer textarea {
-  flex: 1;
-  resize: none;
-  min-height: 56px;
-  padding: 8px 12px;
-  border-radius: var(--radius-large);
-}
-
-.composer button {
-  min-height: 32px;
 }
 
 /* A tab is a quiet pill: the one in use is tinted, heavier and underlined. */
@@ -3780,30 +3670,6 @@ span.marker-warning {
 
 /* The option beside the question: said each time, so it sits by the button that asks. */
 /* The files attached to the conversation, named above the field of the question. */
-.chat-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0 24px 6px;
-  list-style: none;
-}
-
-/* The option of the next question and its guide stay together, right before the button. */
-.composer-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-}
-
-.composer .check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
 .computed h3 {
   font-size: 14px;
   margin: 16px 0 8px;
@@ -3826,6 +3692,255 @@ span.marker-warning {
   overflow: auto;
   font-size: 13px;
   white-space: pre-wrap;
+}
+
+/*
+ * «Chiedi» is a chat: the conversations beside, one narrow column of questions and answers, and
+ * one card to write in that holds everything the next question needs.
+ */
+.ask {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ask-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 20px;
+}
+
+.ask-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.ask-welcome-title {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.ask-chats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 232px;
+  flex-shrink: 0;
+  padding: 16px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.ask-chats ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ask-chats > ul {
+  gap: 14px;
+}
+
+.ask-chats-age {
+  display: block;
+  padding: 0 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ask-chat {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.ask-chat-selected {
+  background: var(--accent-soft);
+}
+
+.ask-chat-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+  .ask-chats {
+    width: 180px;
+  }
+}
+
+.conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.composer,
+.ask-ready {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* A conversation not yet started: the greeting, the card and the suggestions in the middle. */
+.ask-fresh .ask-main {
+  justify-content: center;
+}
+
+.ask-fresh .conversation {
+  flex: none;
+}
+
+/* An answer has its source beside it: an exchange has the room of two columns. */
+.exchange {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* What the PM asked: a bubble on the right. What Octo answers is the page itself. */
+.question {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 9px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--accent-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.exchange .asked-at {
+  font-size: 12px;
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: calc(100% - 48px);
+  padding: 10px 10px 8px 14px;
+  border: 1px solid var(--field-line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+.composer-field,
+.composer-field:focus {
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  resize: none;
+}
+
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-space {
+  flex: 1;
+}
+
+.composer-round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.composer-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* An option of the next question: a pill that is tinted while it is on. */
+.composer-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--field-line);
+  border-radius: 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.composer-toggle > :first-child {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.composer-toggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer-toggle-on {
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.chat-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ask-ready {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 48px);
+  padding-top: 14px;
+}
+
+.ask-ready > * {
+  border-radius: 14px;
 }
 
 /*

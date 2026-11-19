@@ -577,6 +577,8 @@ export const messages = {
     freshHint:
       'In questa chat Octo tiene conto delle tue domande precedenti e ricontrolla le fonti a ogni risposta.',
     none: 'Nessuna chat ancora.',
+    welcome: (project: string) => `Che cosa vuoi sapere di ${project}?`,
+    ages: { today: 'Oggi', yesterday: 'Ieri', week: 'Ultimi 7 giorni', before: 'Prima' },
     legacy: 'Domande precedenti',
     filter: 'Cerca fra le chat',
     nothingFound: 'Nessuna chat corrisponde.',

@@ -194,7 +194,7 @@ describe('the conversation with a project', () => {
     expect(drafts).toEqual([{ question: record.question, answer }])
   })
 
-  it('says it is asking on the button, can be stopped, and drops what comes back for another project', async () => {
+  it('says it is asking beside the button, can be stopped, and drops what comes back for another project', async () => {
     let finish: (result: Result<QuestionRecord>) => void = () => {}
     const api = askApi({
       listQuestions: vi.fn(async () => ok([])),
@@ -204,11 +204,11 @@ describe('the conversation with a project', () => {
     fireEvent.change(screen.getByLabelText(messages.askPlaceholder), {
       target: { value: 'Quando consegniamo?' },
     })
-    const submit = screen.getByRole('button', { name: messages.askSubmit })
-    fireEvent.click(submit)
-    await waitFor(() => expect(submit.getAttribute('aria-busy')).toBe('true'))
-    expect(submit.textContent).toContain(messages.wait.asking)
-    fireEvent.click(submit)
+    fireEvent.click(screen.getByRole('button', { name: messages.askSubmit }))
+    // While it asks the round button stops, and nothing else can be asked.
+    await waitFor(() => expect(screen.getByText(messages.wait.asking)).toBeTruthy())
+    expect(screen.queryByRole('button', { name: messages.askSubmit })).toBeNull()
+    fireEvent.keyDown(screen.getByLabelText(messages.askPlaceholder), { key: 'Enter' })
     expect(api.ask).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: messages.askCancel }))
     expect(api.cancelAsk).toHaveBeenCalledWith('p-1')

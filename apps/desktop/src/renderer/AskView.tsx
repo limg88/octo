@@ -14,8 +14,9 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
 import type { Handoff } from './context.ts'
 import { InfoTip } from './InfoTip.tsx'
+import { Logo } from './Logo.tsx'
 import { dateTimeText, errorText, messages, progressText } from './messages.ts'
-import { BusyButton, Waiting } from './Spinner.tsx'
+import { Waiting } from './Spinner.tsx'
 
 type AskApi = Pick<
   OctoApi,
@@ -47,6 +48,8 @@ type Pending = { question: string; chat: string | null }
 /** With fewer conversations than this all are in sight: a filter would only take room. */
 const FILTER_FROM_CHATS = 6
 const chats = messages.askChats
+/** The field grows with the words up to here, then scrolls. */
+const MAX_FIELD_PX = 200
 
 const chatTitle = (chat: Conversation): string =>
   chat.id === LEGACY_CONVERSATION ? chats.legacy : chat.title
@@ -158,6 +161,15 @@ export function AskView({
     setAttached((known) => [...known.filter((other) => other.name !== file.name), file])
   }
 
+  // The field is as tall as what is written in it, up to a few lines.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measured again when the words change.
+  useEffect(() => {
+    const area = field.current
+    if (!area) return
+    area.style.height = 'auto'
+    area.style.height = `${Math.min(area.scrollHeight, MAX_FIELD_PX)}px`
+  }, [question])
+
   // The page follows the conversation when it grows, not when a source is looked at.
   // biome-ignore lint/correctness/useExhaustiveDependencies: what is watched is how much there is to read.
   useEffect(() => {
@@ -197,8 +209,11 @@ export function AskView({
     if (viewing.current === chat) setChatId(conversationOf(result.value))
   }
 
+  const fresh = shown.length === 0 && !pendingHere
+  const groups = chatGroups(listed, Date.now())
+
   return (
-    <section className="ask" aria-label={messages.ask}>
+    <section className={fresh ? 'ask ask-fresh' : 'ask'} aria-label={messages.ask}>
       <nav className="ask-chats" aria-label={chats.title}>
         <button
           type="button"
@@ -221,20 +236,24 @@ export function AskView({
           <p className="hint">{chats.none}</p>
         ) : (
           <ul>
-            {listed.map((chat) => (
-              <li key={chat.id}>
-                <button
-                  type="button"
-                  className={chat.id === chatId ? 'ask-chat ask-chat-selected' : 'ask-chat'}
-                  aria-current={chat.id === chatId ? 'page' : undefined}
-                  title={chatTitle(chat)}
-                  onClick={() => openChat(chat.id)}
-                >
-                  <span className="ask-chat-title">{chatTitle(chat)}</span>
-                  <span className="hint">
-                    {chats.about(dateTimeText(chat.lastAt), chat.records.length)}
-                  </span>
-                </button>
+            {groups.map((group) => (
+              <li key={group.age}>
+                <span className="ask-chats-age">{chats.ages[group.age]}</span>
+                <ul>
+                  {group.chats.map((chat) => (
+                    <li key={chat.id}>
+                      <button
+                        type="button"
+                        className={chat.id === chatId ? 'ask-chat ask-chat-selected' : 'ask-chat'}
+                        aria-current={chat.id === chatId ? 'page' : undefined}
+                        title={`${chatTitle(chat)} · ${chats.about(dateTimeText(chat.lastAt), chat.records.length)}`}
+                        onClick={() => openChat(chat.id)}
+                      >
+                        <span className="ask-chat-title">{chatTitle(chat)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
             {listed.length === 0 && <li className="hint">{chats.nothingFound}</li>}
@@ -243,16 +262,16 @@ export function AskView({
       </nav>
       <div className="ask-main">
         <div className="conversation">
-          {shown.length === 0 && !pendingHere && (
-            <p className="hint">{chatId === null ? chats.freshHint : messages.askEmpty}</p>
+          {fresh && (
+            <div className="ask-welcome">
+              <Logo size={44} />
+              <p className="ask-welcome-title">{chats.welcome(project.name)}</p>
+              <p className="hint">{chatId === null ? chats.freshHint : messages.askEmpty}</p>
+            </div>
           )}
           {shown.map((record) => (
             <article key={record.id} className="exchange">
               <p className="question">{record.question}</p>
-              <p className="asked-at">
-                {dateTimeText(record.askedAt)}
-                {record.model && ` · ${messages.models.used(record.model)}`}
-              </p>
               {record.answer && (
                 <AnswerView
                   answer={record.answer}
@@ -262,6 +281,7 @@ export function AskView({
                       {onDraft && (
                         <button
                           type="button"
+                          className="quiet"
                           onClick={() =>
                             record.answer &&
                             onDraft({ question: record.question, answer: record.answer })
@@ -278,6 +298,10 @@ export function AskView({
                 />
               )}
               {record.error && <p className="warning">{errorText(record.error)}</p>}
+              <p className="asked-at">
+                {dateTimeText(record.askedAt)}
+                {record.model && ` · ${messages.models.used(record.model)}`}
+              </p>
             </article>
           ))}
           {pending !== null && pendingHere && (
@@ -293,85 +317,129 @@ export function AskView({
           )}
           <div ref={end} />
         </div>
-        {pending === null && (
+        <form className="composer" onSubmit={(event) => void submit(event)}>
+          {attached.length > 0 && (
+            <ul className="chat-files" aria-label={messages.attach.list}>
+              {attached.map((file) => (
+                <li key={file.name} className="chip">
+                  {file.name}
+                </li>
+              ))}
+            </ul>
+          )}
+          <textarea
+            ref={field}
+            className="composer-field"
+            aria-label={messages.askPlaceholder}
+            placeholder={messages.askPlaceholder}
+            value={question}
+            rows={1}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) void submit(event)
+            }}
+          />
+          <div className="composer-bar">
+            <button
+              type="button"
+              className="composer-round"
+              aria-label={messages.attach.button}
+              title={messages.attach.hint}
+              disabled={pending !== null}
+              onClick={() => void attach()}
+            >
+              <Glyph path="M8 3v10M3 8h10" />
+            </button>
+            {canCompute && (
+              <span className="composer-option">
+                <label
+                  className={compute ? 'composer-toggle composer-toggle-on' : 'composer-toggle'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={compute}
+                    onChange={(event) => setCompute(event.target.checked)}
+                  />
+                  {messages.computed.option}
+                </label>
+                <InfoTip
+                  title={messages.computed.help}
+                  steps={messages.computed.steps}
+                  note={messages.computed.note}
+                />
+              </span>
+            )}
+            <span className="composer-space" />
+            {pending !== null && <span className="hint">{messages.wait.asking}</span>}
+            {pending === null ? (
+              <button
+                type="submit"
+                className="composer-round primary"
+                aria-label={messages.askSubmit}
+                title={messages.askSubmit}
+                disabled={question.trim().length === 0}
+              >
+                <Glyph path="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="composer-round"
+                aria-label={messages.askCancel}
+                title={messages.askCancel}
+                onClick={() => void api.cancelAsk(project.id)}
+              >
+                <Glyph path="M4.5 4.5h7v7h-7z" />
+              </button>
+            )}
+          </div>
+        </form>
+        {fresh && (
           // biome-ignore lint/a11y/useSemanticElements: a group of buttons, not a set of form fields.
-          <div className="actions" role="group" aria-label={messages.askReadyTitle}>
+          <div className="ask-ready" role="group" aria-label={messages.askReadyTitle}>
             {messages.askReady.map((ready) => (
               <button
                 key={ready.label}
                 type="button"
                 className="quiet"
                 title={ready.question}
-                onClick={() => setQuestion(ready.question)}
+                onClick={() => {
+                  setQuestion(ready.question)
+                  field.current?.focus()
+                }}
               >
                 {ready.label}
               </button>
             ))}
           </div>
         )}
-        {attached.length > 0 && (
-          <ul className="chat-files" aria-label={messages.attach.list}>
-            {attached.map((file) => (
-              <li key={file.name} className="chip">
-                {file.name}
-              </li>
-            ))}
-          </ul>
-        )}
-        <form className="composer" onSubmit={(event) => void submit(event)}>
-          <textarea
-            ref={field}
-            aria-label={messages.askPlaceholder}
-            placeholder={messages.askPlaceholder}
-            value={question}
-            rows={2}
-            onChange={(event) => setQuestion(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) void submit(event)
-            }}
-          />
-          <button
-            type="button"
-            className="quiet"
-            title={messages.attach.hint}
-            disabled={pending !== null}
-            onClick={() => void attach()}
-          >
-            {messages.attach.button}
-          </button>
-          {canCompute && (
-            <span className="composer-option">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={compute}
-                  onChange={(event) => setCompute(event.target.checked)}
-                />
-                {messages.computed.option}
-              </label>
-              <InfoTip
-                title={messages.computed.help}
-                steps={messages.computed.steps}
-                note={messages.computed.note}
-              />
-            </span>
-          )}
-          <BusyButton
-            type="submit"
-            busy={pending !== null}
-            busyLabel={messages.wait.asking}
-            disabled={question.trim().length === 0}
-          >
-            {messages.askSubmit}
-          </BusyButton>
-          {pending !== null && (
-            <button type="button" onClick={() => void api.cancelAsk(project.id)}>
-              {messages.askCancel}
-            </button>
-          )}
-        </form>
       </div>
     </section>
+  )
+}
+
+/** A small sign drawn in a round button: its name is the label of the button. */
+function Glyph({ path }: { path: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d={path} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const AGES = ['today', 'yesterday', 'week', 'before'] as const
+type Age = (typeof AGES)[number]
+
+/** The conversations by how long ago they were last taken up, the newest group first. */
+function chatGroups(list: readonly Conversation[], now: number) {
+  const midnight = new Date(now).setHours(0, 0, 0, 0)
+  const ageOf = (chat: Conversation): Age => {
+    const days = Math.ceil((midnight - Date.parse(chat.lastAt)) / DAY_MS)
+    return days <= 0 ? 'today' : days === 1 ? 'yesterday' : days <= 7 ? 'week' : 'before'
+  }
+  return AGES.map((age) => ({ age, chats: list.filter((chat) => ageOf(chat) === age) })).filter(
+    (group) => group.chats.length > 0,
   )
 }
 

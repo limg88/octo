@@ -665,7 +665,8 @@ try {
   )
 
   await page.getByRole('tab', { name: 'Chiedi' }).click()
-  // A ready question fills the composer and waits for the PM.
+  // A ready question, offered where a conversation starts, fills the composer and waits for the PM.
+  await page.getByRole('button', { name: 'Nuova chat' }).click()
   await page
     .getByRole('group', { name: 'Domande pronte' })
     .getByRole('button', { name: 'Blocchi e rischi' })
