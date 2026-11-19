@@ -135,3 +135,21 @@ Ciò che il codice chiude e solo la prossima prova sul progetto reale può confe
 | R6c.14 | Le sigle delle trascrizioni tornano alla forma giusta (rilievo 3) | «Chiedi a Claude le coppie» sul progetto reale; approva quelle giuste; rileggi le riunioni | Le coppie proposte sono sensate; dopo la lettura le trascrizioni hanno la forma giusta. **Guardare se una coppia cambia parole che non c'entrano**: vale la parola intera, senza guardare maiuscole | da fare |
 | R6c.15 | Logo e icona (rilievo 2) | Guardare l'app installata nel Dock e nel Finder | Il polpo è l'icona. È il PNG da 256 punti ingrandito: **se sgrana serve l'originale a risoluzione piena** | da fare |
 | R6c.16 | Colonne e previsionale (rilievi 5, 23, 24) | Allarga le colonne che ti servono; apri «Calcolo e dettagli» e «Dati che mancano» sul mese vero | Le larghezze restano; il modulo sotto la riga è compatto; l'elenco di ciò che manca si legge | da fare |
+
+## R6d — Esiti della seconda prova
+
+Ciò che il codice chiude dopo la seconda prova sul progetto reale (build R6c) e che solo la prossima prova può confermare. I rilievi e gli esiti sono in `docs/esiti-seconda-prova.md`.
+
+| # | Che cosa | Come | Esito atteso | Stato |
+|---|---|---|---|---|
+| R6d.1 | Riunioni fuori squadra (rilievo «Il punto») | «Fonti» → «Leggi ora» sulle riunioni, poi «Oggi» → «Leggi ora» | Le riunioni registrate con partecipanti noti e nessuno della squadra escono da `_octo/riunioni/` con i loro punti e stanno in «riunioni da assegnare» con «non partecipa nessuno della squadra»; in «Il punto» non c'è più alcun punto di un altro progetto | da verificare |
+| R6d.2 | La squadra decide | Controllare «Persone e calendario»: ci sono tutte le persone del fornitore e del cliente che partecipano alle riunioni del progetto | Le riunioni vere del progetto restano in agenda; quelle finite fra «da assegnare» per una persona mancante rientrano aggiungendola alla squadra o con «È di questo progetto» | da verificare |
+| R6d.3 | Punti senza responsabile | «Chiudi la giornata» su una riunione registrata | I punti che nessuno ha preso non sono in coda come tuoi: stanno fra quelli «di altri»; al massimo 6 punti nuovi per chiusura | da verificare |
+| R6d.4 | Colonne | Trascinare il bordo destro di un'intestazione in Sintesi, Fatturazione, Cruscotto, previsionale | Si muove solo quella colonna, la tabella scorre di lato se serve, la larghezza resta al ritorno; doppio clic la toglie | da verificare |
+| R6d.5 | Logo in tema scuro | Passare al tema scuro | Il polpo si legge, su una tessera chiara | da verificare |
+| R6d.6 | Deliverable in scrittura | Lanciare una stima, premere «Nuovo deliverable» | In testa all'elenco «<tipo> · In scrittura…» riporta al modulo compilato | da verificare |
+| R6d.7 | Chiedi | Una conversazione nuova, una domanda pronta, un allegato, «Con calcoli», una conversazione di ieri | Pagina a chat come in `demo/75`; nulla di ciò che c'era è andato perso | da verificare |
+| R6d.8 | Rilettura critica | Una mail al cliente vera | Al massimo 5 rilievi di una riga; «Visto» e «Correggi» sotto ciascuno; nessun elemento fuori scala | da verificare |
+| R6d.9 | Catalogo | Aprire «Deliverable» | «Memoria del progetto» a parte con la sua spiegazione; «Storia con criteri di accettazione» | da verificare |
+| R6d.10 | Ticket su Jira | «Allineamento dello sprint» → «Crea su Jira i ticket mancanti…» → spuntarne uno → conferma | Il ticket esiste sul Jira interno nel progetto scelto, con `[prefisso id]` nel titolo e il tipo giusto; `_octo/.lavori/allineamento/scritture.json` lo riporta; un secondo tentativo non lo ricrea. Se il token non può creare issue: «Jira lo ha rifiutato» e nulla è scritto | da verificare |
+| R6d.11 | Glossario su note e riepilogo | Aggiungere una coppia, «Leggi ora» sulle riunioni | La forma giusta è anche in `notes.md` e `report.md` delle riunioni già lette | da verificare |
