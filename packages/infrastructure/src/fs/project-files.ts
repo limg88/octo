@@ -48,6 +48,7 @@ const meetingsSchema = z.object({
   root: z.string(),
   since: z.string().nullable().default(null),
   released: z.array(z.string()).optional(),
+  kept: z.array(z.string()).optional(),
 })
 
 const feedBase = { since: z.string(), targetFolder: z.string() }

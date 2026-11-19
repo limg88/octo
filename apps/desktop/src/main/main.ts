@@ -765,6 +765,7 @@ function start(seatEnv: Record<string, string | undefined>): void {
     clock,
     models: chosenModels,
     liveSources,
+    pm: () => identity()?.name ?? null,
   })
   const today = createToday({
     points,

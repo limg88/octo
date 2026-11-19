@@ -108,10 +108,11 @@ export const messages = {
     aside: {
       title: (count: number) =>
         count === 1 ? '1 riunione da assegnare' : `${count} riunioni da assegnare`,
-      hint: 'Non sono in «Oggi»: Octo non sa dire se sono di questo progetto. Una riunione è del progetto quando partecipa una sua persona o il titolo lo nomina.',
+      hint: 'Non sono in «Oggi» né fra le riunioni del progetto. Una riunione è del progetto quando partecipa una persona della sua squadra; se partecipano altri e nessuno della squadra, non lo è finché non lo dici tu.',
       list: 'Riunioni da assegnare',
       recorded: 'registrata con Verbale',
       invited: 'dal calendario',
+      outside: 'non partecipa nessuno della squadra',
       claude: { other: 'Claude: non è di questo progetto', unknown: 'Claude: non so dirlo' },
       elsewhere: (project: string) => `I partecipanti sono persone del progetto «${project}».`,
       mine: 'È di questo progetto',

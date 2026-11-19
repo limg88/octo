@@ -841,6 +841,8 @@ export interface MeetingReader {
       day: string
       points: readonly PointToCheck[]
       meetings: readonly MeetingToRead[]
+      /** The name of the PM, when known: a point nobody took is not theirs. */
+      pm?: string | null
     },
   ): Promise<ProposedClosing>
   /**

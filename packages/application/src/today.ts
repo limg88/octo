@@ -206,6 +206,8 @@ export type MeetingAside = {
   recorded: boolean
   /** What Claude said when it was asked, with the sentence it stands on; null when not asked. */
   said: Pick<MeetingChoice, 'place' | 'reason'> | null
+  /** True when others take part and nobody of the team: Octo says it, Claude is not asked. */
+  outside: boolean
   /** The other project its people point to, when one stands out. */
   elsewhere: string | null
 }
@@ -294,6 +296,8 @@ const MAX_MEETINGS_PER_RUN = 20
 
 /** What a word on a meeting of the calendar is kept by: its series, so it is asked once. */
 const asideId = (meeting: DayMeeting): string => meeting.uid || meetingKey(meeting)
+/** A meeting aside nobody said anything of yet: the ones Claude is asked about. */
+const doubtful = (meeting: MeetingAside): boolean => meeting.said === null && !meeting.outside
 
 /** How far back an invitation is looked for: a series called longer ago is called again. */
 export const INVITE_MONTHS = 12
@@ -437,12 +441,15 @@ export function createToday(deps: TodayDeps): Today {
       ...mails,
     ]
     const nextDay = nextWorkday(today)
-    // A meeting is of the project when one of its people takes part or its title names it; the
-    // rest is as the PM or Claude said, and what nobody can tell waits aside, off the page.
+    // A meeting is of the project when one of its people takes part, or nobody is known of and
+    // its title names it; with others and none of its people it is not. The rest is as the PM or
+    // Claude said, and what nobody can tell waits aside, off the page.
+    const pm = [deps.identity()?.name ?? '', ...own]
     const rule: MeetingRule = {
+      pm,
       people: meetingPeople(
         team.people.map((person) => person.name),
-        [deps.identity()?.name ?? '', ...own],
+        pm,
       ),
       keywords: projectKeywords(
         project.name,
@@ -479,6 +486,7 @@ export function createToday(deps: TodayDeps): Today {
             start: meeting.start,
             recorded: false,
             said: why === 'claude' ? { place, reason } : null,
+            outside: why === 'outside',
             elsewhere: null,
           },
         ]
@@ -493,6 +501,7 @@ export function createToday(deps: TodayDeps): Today {
             start: meeting.started,
             recorded: true,
             said: choice ? { place: choice.place, reason: choice.reason } : null,
+            outside: meeting.outside,
             elsewhere: meeting.elsewhere,
           },
         ]
@@ -707,7 +716,7 @@ export function createToday(deps: TodayDeps): Today {
         !computed.judgedToday &&
         (first.length > 0 ||
           computed.closing.unread > 0 ||
-          computed.toAssign.some((meeting) => meeting.said === null) ||
+          computed.toAssign.some(doubtful) ||
           (deps.reader !== undefined && upcoming(computed).length > 0) ||
           computed.unjudged.some((mail) => visible.has(mail.id))),
       toAssign: computed.toAssign,
@@ -898,12 +907,12 @@ export function createToday(deps: TodayDeps): Today {
     computed: Computed,
     input: EvaluateInput,
   ): Promise<void> {
-    const doubtful = computed.toAssign.filter((meeting) => meeting.said === null)
-    if (doubtful.length === 0 || !deps.judge.meetings) return
+    const unsure = computed.toAssign.filter(doubtful)
+    if (unsure.length === 0 || !deps.judge.meetings) return
     const proposed = await deps.judge.meetings({
       projectFolder: project.folder,
       project: { name: project.name, ...computed.rule },
-      meetings: doubtful.slice(0, MAX_MEETINGS_PER_RUN).map((meeting) => ({
+      meetings: unsure.slice(0, MAX_MEETINGS_PER_RUN).map((meeting) => ({
         id: meeting.id,
         title: meeting.title,
         start: meeting.start,
@@ -915,7 +924,7 @@ export function createToday(deps: TodayDeps): Today {
     })
     let choices = computed.settings.meetings ?? {}
     for (const verdict of proposed) {
-      const meeting = doubtful.find((candidate) => candidate.id === verdict.id)
+      const meeting = unsure.find((candidate) => candidate.id === verdict.id)
       if (!meeting || !MEETING_PLACES.includes(verdict.place)) continue
       choices = withMeetingChoice(choices, meeting.id, {
         place: verdict.place,

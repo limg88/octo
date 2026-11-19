@@ -1974,6 +1974,7 @@ describe('the day as a list with its detail', () => {
         start: '2026-11-16T14:00:00.000Z',
         recorded: false,
         said: { place: 'other' as const, reason: 'Parla del budget di Boreale.' },
+        outside: false,
         elsewhere: null,
       },
       {
@@ -1982,6 +1983,7 @@ describe('the day as a list with its detail', () => {
         start: '2026-11-13T14:00:00.000Z',
         recorded: true,
         said: null,
+        outside: true,
         elsewhere: 'Borea',
       },
     ]

@@ -369,6 +369,37 @@ describe('a meeting given to the wrong project', () => {
     await expect(meetings.assign(borea, id)).rejects.toMatchObject({ code: 'meeting_not_found' })
   })
 
+  it('keeps out, and takes out, a meeting nobody of the team took part in, until the PM says', async () => {
+    const strangers = (n: number, title: string): MeetingReading => ({
+      folder: `export-${n}`,
+      status: 'complete',
+      meeting: { ...meeting(n, title), participants: ['Ugo Neri', 'Lea Blu'] },
+    })
+    // Its title names Aurora, but who took part is of no team: it does not enter by itself.
+    const named = strangers(9, 'Aurora: stima delle ore')
+    const id = named.status === 'complete' ? named.meeting.id : ''
+    const { meetings, disk, points } = setup({ readings: [named], teams })
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 0 })
+    expect(await meetings.unassigned(aurora)).toMatchObject([{ id, outside: true }])
+    // The PM gives it to the project: it stays there, reading after reading.
+    await meetings.assign(aurora, id)
+    await meetings.sync(aurora)
+    const [held] = await meetings.imported(aurora)
+    expect(held?.id).toBe(id)
+
+    // One the project took before the rule, with the points it opened, leaves at the next reading.
+    const before = setup({ readings: [named], teams })
+    const folder = held?.folder ?? ''
+    for (const [key, text] of disk) before.disk.set(key, text)
+    await before.points.keep(aurora, { ...NO_OPEN_POINTS, points: [pointOf(folder, 1)] })
+    expect(await before.meetings.imported(aurora)).toHaveLength(1)
+    await before.meetings.sync(aurora)
+    expect(await before.meetings.imported(aurora)).toEqual([])
+    expect((await before.points.register(aurora)).points).toEqual([])
+    expect(await before.meetings.unassigned(aurora)).toMatchObject([{ id, outside: true }])
+    expect((await points.register(aurora)).points).toEqual([])
+  })
+
   it('waits for the PM when its people are of more projects, and says whose most of them are', async () => {
     // Carla Neri is of Borea: no team has all three, so nothing is certain.
     const mixed = dailies.map((reading) =>
@@ -482,7 +513,7 @@ describe('a meeting given to the wrong project', () => {
 
     await meetings.assign(aurora, id)
     expect(await meetings.imported(aurora)).toHaveLength(1)
-    expect(configs.get(aurora.folder)?.meetings).toEqual({ root: ROOT, since: null })
+    expect(configs.get(aurora.folder)?.meetings).toMatchObject({ root: ROOT, since: null })
   })
 
   it('refuses a meeting the project does not hold and a project that is not another one', async () => {

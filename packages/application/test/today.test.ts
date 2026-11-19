@@ -1557,6 +1557,7 @@ describe('whose turn a mail is, on the page of the day', () => {
       onlineMeetingURL: null,
       exportRevision: null,
       exportedAt: null,
+      outside: false,
       elsewhere: 'Boreale',
     }
     let unassigned = [recording]

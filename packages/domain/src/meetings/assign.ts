@@ -12,6 +12,8 @@ export type MeetingInvite = {
   /** How it repeats, when it does: it is then at that hour on every day of its rule. */
   recurrence?: string | null
   excluded?: readonly string[]
+  /** Who is invited, when the invitation says it. */
+  attendees?: readonly string[]
 }
 
 /** What a project offers to recognise a meeting as its own. */

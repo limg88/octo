@@ -5,7 +5,7 @@ import { type ClaudeCliConfig, projectRules, runStructured } from './structured-
 import { NOT_SOURCES, withContext } from './today-judge.ts'
 
 /** Points opened by one reading at most: a day opens a few things, not a backlog. */
-export const MAX_POINTS_PER_CLOSING = 12
+export const MAX_POINTS_PER_CLOSING = 6
 
 const closingSchema = z.object({
   verdicts: z.array(
@@ -61,7 +61,7 @@ describe your own work.`
 
 export const DAY_CLOSING_PROMPT = `A Project Manager closes the day of one project. You are given the
 open points of the project as "points" (each with its "id", "title", "owner", and "due" when it
-has a day), and the meetings recorded and not yet read as "meetings", each with its "title", when
+has a day), the name of the Project Manager as "pm" when it is known, and the meetings recorded and not yet read as "meetings", each with its "title", when
 it "started" and its "files": a report, notes, a transcript. The project is the current folder.
 Read the files of every meeting: the report and the notes first, the transcript to find the exact
 words. Read nothing else to decide: only what was said in these meetings counts.
@@ -87,8 +87,9 @@ commitment somebody took, or a question left without an answer, that is not alre
 points given. For each:
 - "title": the point in one line, in Italian, as a Project Manager would write it in a list of
   open points.
-- "owner": the name of who took it, as the meeting says it; an empty string when it is the
-  Project Manager's or nobody was named.
+- "owner": the name of who took it, as the meeting says it. An empty string only when the
+  Project Manager took it themselves; when nobody was named write "da assegnare", never an
+  empty string: what nobody took is not the Project Manager's.
 - "due": the day it is due by, as YYYY-MM-DD, only when the meeting names it; otherwise null.
   Never work out a day the meeting does not state.
 - "path" and "quote": as above.
@@ -107,7 +108,12 @@ export function createClaudeMeetingReader(config: ClaudeCliConfig): MeetingReade
       const result = await runStructured(config, {
         projectFolder: request.projectFolder,
         input: JSON.stringify(
-          { day: request.day, points: request.points, meetings: request.meetings },
+          {
+            day: request.day,
+            pm: request.pm ?? null,
+            points: request.points,
+            meetings: request.meetings,
+          },
           null,
           1,
         ),

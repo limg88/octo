@@ -910,6 +910,7 @@ export function TodayView({
                         {meeting.said.reason !== '' && ` («${meeting.said.reason}»)`}
                       </>
                     )}
+                    {meeting.outside && <> · {text.aside.outside}</>}
                     {meeting.elsewhere !== null && (
                       <> · {text.aside.elsewhere(meeting.elsewhere)}</>
                     )}

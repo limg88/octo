@@ -9,12 +9,17 @@ export type MeetingPlace = (typeof MEETING_PLACES)[number]
 export type MeetingChoice = { place: MeetingPlace; by: 'pm' | 'claude'; reason: string }
 
 /** What tells a meeting as of a project: its people, apart from the PM, and the words that name it. */
-export type MeetingRule = { people: readonly string[]; keywords: readonly string[] }
+export type MeetingRule = {
+  people: readonly string[]
+  keywords: readonly string[]
+  /** The name and the addresses of the PM: who is in every meeting is not counted among its people. */
+  pm?: readonly string[]
+}
 
 /** Where a meeting was put, and by what: the PM's word, a rule of Octo, or Claude. */
 export type PlacedMeeting = {
   place: MeetingPlace
-  why: 'pm' | 'person' | 'keyword' | 'no_people' | 'claude' | null
+  why: 'pm' | 'person' | 'outside' | 'keyword' | 'no_people' | 'claude' | null
   /** The sentence Claude stands on, when it was Claude. */
   reason: string
 }
@@ -33,8 +38,24 @@ export function meetingPeople(names: readonly string[], pm: readonly string[]): 
 }
 
 /**
+ * Whether who took part says a meeting is not of a team: somebody other than the PM is known to
+ * have been there, the team names its people, and none of them was. A meeting nobody is known of
+ * says nothing either way.
+ */
+export function outsideTeam(
+  participants: readonly string[],
+  people: readonly string[],
+  pm: readonly string[],
+): boolean {
+  if (people.length === 0) return false
+  const others = meetingPeople(participants, pm)
+  return others.length > 0 && !people.some((person) => attends(person, others))
+}
+
+/**
  * Where a meeting stands for a project. The PM's word comes first. Then the rule: it is of the
- * project when one of its people takes part, or a word that names the project is in its title.
+ * project when one of its people takes part; it is not when others do and none of its people;
+ * with nobody known, it is when a word that names the project is in its title.
  * A project that names no person has nothing to tell by, and keeps every meeting as before.
  * What the rule leaves in doubt is as Claude said, when it was asked; else nobody can tell.
  */
@@ -46,6 +67,9 @@ export function placeMeeting(
   if (choice?.by === 'pm') return { place: choice.place, why: 'pm', reason: '' }
   if (rule.people.some((person) => attends(person, meeting.participants))) {
     return { place: 'project', why: 'person', reason: '' }
+  }
+  if (outsideTeam(meeting.participants, rule.people, rule.pm ?? [])) {
+    return { place: 'other', why: 'outside', reason: '' }
   }
   if (rule.keywords.some((keyword) => phraseIn(meeting.title, keyword))) {
     return { place: 'project', why: 'keyword', reason: '' }

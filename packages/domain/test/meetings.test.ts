@@ -13,6 +13,7 @@ import {
   meetingOwner,
   meetingPeople,
   meetingsReadingNote,
+  outsideTeam,
   parseMeetingMeta,
   placeMeeting,
   projectByPeople,
@@ -338,6 +339,7 @@ describe('whether a meeting is of a project', () => {
   const rule = {
     people: meetingPeople(['Paola Verdi', 'Rossi Mario', 'Carla Bianchi', ' '], pm),
     keywords: ['Aurora', 'collaudo ordini'],
+    pm,
   }
   const meeting = (title: string, participants: string[]) => ({ title, participants })
 
@@ -350,14 +352,31 @@ describe('whether a meeting is of a project', () => {
     expect(
       placeMeeting(meeting('Allineamento', ['mario.rossi@example.test']), rule, undefined),
     ).toMatchObject({ place: 'project', why: 'person' })
-    expect(placeMeeting(meeting('Aurora: stato', ['Ugo Neri']), rule, undefined)).toMatchObject({
+    expect(placeMeeting(meeting('Aurora: stato', []), rule, undefined)).toMatchObject({
       place: 'project',
       why: 'keyword',
     })
   })
 
+  it('is not of the project when others take part and nobody of its team, whatever its title', () => {
+    const outside = meeting('Aurora: stima delle ore', ['Paola Verdi', 'Ugo Neri', 'Lea Blu'])
+    expect(placeMeeting(outside, rule, undefined)).toEqual({
+      place: 'other',
+      why: 'outside',
+      reason: '',
+    })
+    // Claude is not heard against who took part; the PM is.
+    const claude = { place: 'project', by: 'claude', reason: 'Nomina Aurora.' } as const
+    expect(placeMeeting(outside, rule, claude).why).toBe('outside')
+    expect(placeMeeting(outside, rule, { ...claude, by: 'pm' }).place).toBe('project')
+    // A team that names nobody, or a meeting nobody is known of, says nothing.
+    expect(outsideTeam(['Ugo Neri'], [], pm)).toBe(false)
+    expect(outsideTeam(['Paola Verdi'], rule.people, pm)).toBe(false)
+    expect(outsideTeam(['Ugo Neri', 'Mario Rossi'], rule.people, pm)).toBe(false)
+  })
+
   it('is as Claude said where the rule cannot tell, and as the PM says before anything else', () => {
-    const doubtful = meeting('Comitato', ['Ugo Neri'])
+    const doubtful = meeting('Comitato', [])
     const claude = { place: 'other', by: 'claude', reason: 'Parla del budget di Boreale.' } as const
     expect(placeMeeting(doubtful, rule, claude)).toEqual({
       place: 'other',

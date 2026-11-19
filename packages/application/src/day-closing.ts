@@ -29,6 +29,8 @@ export type DayClosingDeps = {
   clock: Clock
   models?: (project: Project) => Promise<ModelSettings>
   liveSources?: (project: Project) => Promise<LiveSource[]>
+  /** The name of who uses Octo, when it is known. */
+  pm?: () => string | null
 }
 
 export type CloseDayInput = {
@@ -138,6 +140,7 @@ export function createDayClosing(deps: DayClosingDeps): DayClosing {
           .filter((point) => point.state === 'open')
           .map(({ id, title, owner, due }) => ({ id, title, owner, due })),
         meetings,
+        pm: deps.pm?.() ?? null,
         model: (await deps.models?.(project))?.ask ?? null,
         liveSources: (await deps.liveSources?.(project)) ?? [],
         onModel: (used) => {

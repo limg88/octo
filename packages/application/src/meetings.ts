@@ -21,6 +21,7 @@ import {
   meetingOwner,
   meetingPeople,
   meetingsReadingNote,
+  outsideTeam,
   type Project,
   type ProjectTeam,
   parseMailDocument,
@@ -69,6 +70,8 @@ export type MeetingsDeps = {
 
 /** A finished meeting no project could be told for, with the project its people point to. */
 export type UnassignedMeeting = RecordedMeeting & {
+  /** True when others took part and nobody of the team of the project: it is not asked to Claude. */
+  outside: boolean
   /** The name of the other project whose team its participants are of; null when none stands out. */
   elsewhere: string | null
 }
@@ -120,7 +123,15 @@ export type Meetings = {
 type Complete = Extract<MeetingReading, { status: 'complete' }>
 type Skipped = Extract<MeetingReading, { status: 'skipped' }>
 type Owned = { reading: Complete; folder: string }
-type Scan = { mine: Owned[]; unassigned: Complete[]; skipped: Skipped[] }
+type Scan = {
+  mine: Owned[]
+  unassigned: Complete[]
+  skipped: Skipped[]
+  /** Held by the project though nobody of its team took part, and never given to it by the PM. */
+  strangers: Owned[]
+  /** The ids of the unassigned whose people say they are not of the project. */
+  outside: Set<string>
+}
 
 /** The invitation that calls a meeting off: its time is no longer of the project. */
 const CALENDAR_CANCEL = 'CANCEL'
@@ -185,8 +196,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const content = await deps.files.readText(project.folder, path)
       const stored = content === null ? null : parseMailDocument(path, content)
       if (stored?.meeting && stored.invite !== CALENDAR_CANCEL) {
-        const { uid, start, end, recurrence, excluded } = stored.meeting
-        invites.push({ uid, start, end, recurrence, excluded })
+        const { uid, start, end, recurrence, excluded, attendees } = stored.meeting
+        invites.push({ uid, start, end, recurrence, excluded, attendees })
       }
     }
     return {
@@ -213,16 +224,23 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     return teams
   }
 
-  /** Writes among the settings of a project that a meeting is, or is no longer, taken away from it. */
-  async function release(project: Project, meetingId: string, away: boolean): Promise<void> {
+  /** Writes among the settings of a project that a meeting is, or is no longer, on one of its lists. */
+  async function mark(
+    project: Project,
+    list: 'released' | 'kept',
+    meetingId: string,
+    on: boolean,
+  ): Promise<void> {
     const current = await deps.settings.load(project.folder)
     if (!current.meetings) return
-    const before = current.meetings.released ?? []
-    if (before.includes(meetingId) === away) return
-    const released = away ? [...before, meetingId] : before.filter((id) => id !== meetingId)
-    const meetings = cleanMeetingsSource({ ...current.meetings, released })
+    const before = current.meetings[list] ?? []
+    if (before.includes(meetingId) === on) return
+    const next = on ? [...before, meetingId] : before.filter((id) => id !== meetingId)
+    const meetings = cleanMeetingsSource({ ...current.meetings, [list]: next })
     await deps.settings.save(project.folder, { ...current, meetings })
   }
+  const release = (project: Project, meetingId: string, away: boolean): Promise<void> =>
+    mark(project, 'released', meetingId, away)
 
   /** Every folder of the export root, told apart: of this project, of none, or left out. */
   async function scan(project: Project, config: MeetingsSourceConfig): Promise<Scan> {
@@ -238,8 +256,25 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       }
     }
     let candidates: MeetingCandidate[] | null = null
-    let teams: Awaited<ReturnType<typeof teamsOf>> | null = null
-    const found: Scan = { mine: [], unassigned: [], skipped: [] }
+    const pm = deps.pm?.() ?? []
+    const asked = new Set(projects.map((other) => other.id))
+    // The people a project is told by: those of its team, the PM left out.
+    const teams = (await teamsOf(project))
+      .filter((team) => asked.has(team.id))
+      .map(({ id, people }) => ({ projectId: id, people: meetingPeople(people, pm) }))
+    const peopleOf = (projectId: string): readonly string[] =>
+      teams.find((team) => team.projectId === projectId)?.people ?? []
+    const kept = new Set(config.kept)
+    /** Who took part: as Verbale says, else who the invitation to that very event invites. */
+    const takingPart = async (meeting: RecordedMeeting): Promise<readonly string[]> => {
+      if (meeting.participants.length > 0) return meeting.participants
+      candidates ??= await Promise.all(projects.map(candidateOf))
+      const invite = candidates
+        .flatMap((candidate) => candidate.invites)
+        .find((called) => called.uid === meeting.calendarEventUID)
+      return invite?.attendees ?? []
+    }
+    const found: Scan = { mine: [], unassigned: [], skipped: [], strangers: [], outside: new Set() }
     for (const reading of readings) {
       if (reading.status === 'skipped') {
         if (!beforeFirstDay(reading, config.since)) found.skipped.push(reading)
@@ -248,35 +283,39 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const holder = holders.get(reading.meeting.id)
       // From before the first day taken: left alone, unless the project already holds it.
       if (!holder && beforeFirstDay(reading, config.since)) continue
+      const people = await takingPart(reading.meeting)
+      const strange = outsideTeam(people, peopleOf(project.id), pm)
+      // Held here though nobody of the team was there, and the PM never said it is of the project.
+      if (holder?.projectId === project.id && strange && !kept.has(reading.meeting.id)) {
+        found.strangers.push({ reading, folder: holder.folder })
+        found.unassigned.push(reading)
+        found.outside.add(reading.meeting.id)
+        continue
+      }
       let owner = holder?.projectId ?? null
       if (!holder) {
         candidates ??= await Promise.all(projects.map(candidateOf))
         const notes = (await deps.exports.read(config.root, reading.folder, 'notes.md')) ?? ''
-        // A project that gave the meeting away takes no part in telling whose it is.
+        // A project that gave the meeting away, or none of whose people was there, takes no part
+        // in telling whose it is: the calendar and the words choose among the others only.
         const willing = candidates.filter(
-          (candidate) => !released.get(candidate.projectId)?.has(reading.meeting.id),
+          (candidate) =>
+            !released.get(candidate.projectId)?.has(reading.meeting.id) &&
+            !outsideTeam(people, peopleOf(candidate.projectId), pm),
         )
         owner = meetingOwner(reading.meeting, notes, willing)
         if (owner === null) {
           // Neither the calendar nor the words tell: the people do, when they are of one project.
-          teams ??= await teamsOf(project)
-          const asked = new Set(willing.map((candidate) => candidate.projectId))
-          const known = teams
-            .filter((team) => asked.has(team.id))
-            .map(({ id, people }) => ({ projectId: id, people }))
+          const able = new Set(willing.map((candidate) => candidate.projectId))
+          const known = teams.filter((team) => able.has(team.projectId))
           // All the known people on one team; else one project only with somebody there.
-          owner =
-            certainProject(reading.meeting.participants, known) ??
-            projectByPeople(
-              reading.meeting.participants,
-              known.map((team) => ({
-                ...team,
-                people: meetingPeople(team.people, deps.pm?.() ?? []),
-              })),
-            )
+          owner = certainProject(people, known) ?? projectByPeople(people, known)
         }
       }
-      if (owner === null) found.unassigned.push(reading)
+      if (owner === null) {
+        found.unassigned.push(reading)
+        if (strange) found.outside.add(reading.meeting.id)
+      }
       if (owner !== project.id) continue
       const folder = holder?.folder ?? `${MEETINGS_FOLDER}/${meetingFolderName(reading.meeting)}`
       found.mine.push({ reading, folder })
@@ -322,6 +361,14 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
 
   async function read(project: Project, config: MeetingsSourceConfig): Promise<ReadingCounts> {
     const found = await scan(project, config)
+    // A meeting nobody of the team took part in leaves the project, with the points it opened;
+    // it waits among those to assign, where the PM can give it back.
+    for (const { reading, folder } of found.strangers) {
+      for (const path of await deps.files.under(project.folder, folder)) {
+        await deps.files.remove(project.folder, path)
+      }
+      await deps.forget?.(project, { id: reading.meeting.id, folder })
+    }
     const counts = { written: 0, unchanged: 0 }
     const changing: Skipped[] = []
     for (const owned of found.mine) {
@@ -372,7 +419,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const config = await configOf(project)
       if (!config) return []
       try {
-        const { unassigned } = await scan(project, config)
+        const { unassigned, outside } = await scan(project, config)
         if (unassigned.length === 0) return []
         const teams = await teamsOf(project)
         return unassigned.map(({ meeting }) => {
@@ -383,6 +430,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
           )
           return {
             ...meeting,
+            outside: outside.has(meeting.id),
             elsewhere: teams.find((team) => team.id === likelier)?.name ?? null,
           }
         })
@@ -405,6 +453,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       if (outcome === 'changing') throw new DomainError('source_busy', SOURCE)
       // A meeting once taken away and now wanted back is of the project again.
       if (config.released?.includes(meetingId)) await release(project, meetingId, false)
+      // Said by the PM: it stays, whoever took part.
+      await mark(project, 'kept', meetingId, true)
     },
 
     async destinations(project) {
