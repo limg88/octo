@@ -632,6 +632,8 @@ try {
   await work11.getByRole('button', { name: 'Scrivi la bozza' }).click()
   await work11.getByText('Problemi noti').waitFor({ timeout: TIMEOUT_MS })
   await work11.getByText('Elenco delle voci chiuse per questo rilascio').waitFor()
+  // What to check before approving is one line that opens.
+  await work11.getByText('Da controllare prima di approvare').click()
   await work11
     .getByText('Nessun dato interno (giornate, costi, tariffe, codici commessa)')
     .waitFor()
