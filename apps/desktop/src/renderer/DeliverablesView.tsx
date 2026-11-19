@@ -70,6 +70,10 @@ export function DeliverablesView({
   const [shown, setShown] = useState<Shown>({ view: 'catalog' })
   const [step, setStep] = useState<Step | null>(null)
   const busy = step !== null
+  /** The deliverable being written, not yet a draft: its kind and what the PM filled in. */
+  const [making, setMaking] = useState<{ kindId: string; inputs: Record<string, string> } | null>(
+    null,
+  )
   /** The project on the page now: a draft that comes back for another one is not shown here. */
   const live = useRef<string | null>(project.id)
   live.current = project.id
@@ -89,6 +93,7 @@ export function DeliverablesView({
     setShown({ view: 'catalog' })
     setError(null)
     setStep(null)
+    setMaking(null)
     setProgress(null)
     void api.deliverableCatalog(project.id).then((result) => {
       if (!current) return
@@ -107,6 +112,7 @@ export function DeliverablesView({
     // The draft is shown as soon as it is written: the critical reading goes on meanwhile.
     const stopDraft = api.onDeliverableDraft((projectId, drafted) => {
       if (projectId !== project.id) return
+      setMaking(null)
       setAll((previous) => [drafted, ...previous.filter((other) => other.id !== drafted.id)])
       setShown({ view: 'one', id: drafted.id })
     })
@@ -175,6 +181,18 @@ export function DeliverablesView({
           {messages.deliverableRegister}
         </button>
         <ul>
+          {making && (
+            <li>
+              <button
+                type="button"
+                className={formKind?.id === making.kindId ? 'project project-selected' : 'project'}
+                onClick={() => setShown({ view: 'form', kindId: making.kindId })}
+              >
+                <span>{kindOf(making.kindId)?.title ?? making.kindId}</span>
+                <span className="hint">{messages.deliverableMaking}</span>
+              </button>
+            </li>
+          )}
           {all.map((deliverable) => (
             <li key={deliverable.id}>
               <button
@@ -256,15 +274,18 @@ export function DeliverablesView({
             busy={busy}
             writing={step === 'start'}
             handoff={handoff}
+            started={making?.kindId === formKind.id ? making.inputs : null}
             onKindChanged={() => {
               void api.deliverableCatalog(project.id).then((next) => {
                 if (next.ok) setCatalog(next.value)
               })
             }}
             onStart={async (inputs) => {
+              setMaking({ kindId: formKind.id, inputs })
               const made = await run('start', () =>
                 api.startDeliverable(project.id, formKind.id, inputs),
               )
+              setMaking((current) => (current?.inputs === inputs ? null : current))
               // The context went into the draft: the next deliverable starts empty.
               if (made) onHandoffDone?.()
             }}
@@ -344,6 +365,7 @@ function KindForm({
   busy,
   writing,
   handoff,
+  started,
   onStart,
   onKindChanged,
 }: {
@@ -353,6 +375,8 @@ function KindForm({
   busy: boolean
   writing: boolean
   handoff: Handoff | null
+  /** What was filled in for the deliverable of this kind being written now, when there is one. */
+  started: Record<string, string> | null
   onStart: (inputs: Record<string, string>) => void
   /** How the kind is written changed: the catalog is read again. */
   onKindChanged: () => void
@@ -360,7 +384,7 @@ function KindForm({
   const filledField = handoff ? handoffField(kind) : null
   /** What the form starts with: the context of an answer in its field, when there is one. */
   const initial = (): Record<string, string> =>
-    handoff && filledField ? { [filledField]: handoffText(handoff) } : {}
+    started ?? (handoff && filledField ? { [filledField]: handoffText(handoff) } : {})
   const [inputs, setInputs] = useState<Record<string, string>>(initial)
   const [instructions, setInstructions] = useState('')
   const [saved, setSaved] = useState(false)

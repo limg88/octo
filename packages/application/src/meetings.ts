@@ -286,7 +286,11 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const people = await takingPart(reading.meeting)
       const strange = outsideTeam(people, peopleOf(project.id), pm)
       // Held here though nobody of the team was there, and the PM never said it is of the project.
-      if (holder?.projectId === project.id && strange && !kept.has(reading.meeting.id)) {
+      // Only who Verbale itself lists counts for this: an invitation read from the mail may
+      // keep a meeting out, never take away one the project holds.
+      const recorded = reading.meeting.participants
+      const intruder = recorded.length > 0 && outsideTeam(recorded, peopleOf(project.id), pm)
+      if (holder?.projectId === project.id && intruder && !kept.has(reading.meeting.id)) {
         found.strangers.push({ reading, folder: holder.folder })
         found.unassigned.push(reading)
         found.outside.add(reading.meeting.id)
@@ -481,7 +485,10 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
           if (text !== null) await deps.writer.write(target.folder, path, text)
         }
         await release(target, meetingId, false)
+        // The PM's word: it stays there, whoever took part.
+        await mark(target, 'kept', meetingId, true)
       }
+      await mark(project, 'kept', meetingId, false)
       // Said before the files go: the next reading must not take the meeting back.
       await release(project, meetingId, true)
       for (const path of paths) await deps.files.remove(project.folder, path)

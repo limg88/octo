@@ -1520,6 +1520,7 @@ export const messages = {
   },
   deliverablesTab: 'Deliverable',
   deliverableNew: 'Nuovo deliverable',
+  deliverableMaking: 'In scrittura…',
   ownKindNew: 'Crea un tipo tuo',
   ownKindBadge: 'Tuo',
   ownKindIntro:
