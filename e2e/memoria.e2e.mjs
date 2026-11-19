@@ -27,8 +27,10 @@ const app = await electron.launch({
 try {
   const page = await app.firstWindow()
   await page.getByRole('tab', { name: 'Deliverable' }).click()
-  for (const title of ['Memoria: decisioni e regole del PM', 'Memoria: cronologia del progetto']) {
-    await page.getByText(title, { exact: true }).first().waitFor({ timeout: TIMEOUT_MS })
+  // The pages of the memory stand apart in the catalog, under what they are for.
+  const memory = page.getByRole('region', { name: 'Memoria del progetto' })
+  for (const title of ['decisioni e regole del PM', 'cronologia del progetto']) {
+    await memory.getByText(title, { exact: true }).waitFor({ timeout: TIMEOUT_MS })
   }
   await page
     .getByRole('button', { name: /Memoria: fatti correnti/ })

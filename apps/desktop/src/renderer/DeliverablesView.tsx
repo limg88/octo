@@ -321,34 +321,53 @@ function Catalog({
   onEdit: (kindId: string | null) => void
   onRemove: (kindId: string) => void
 }) {
+  const card = (kind: DeliverableKind, title: string) => (
+    <div key={kind.id} className="kind-card">
+      <button
+        type="button"
+        className="kind"
+        aria-label={kind.title}
+        onClick={() => onChoose(kind.id)}
+      >
+        <strong>{title}</strong>
+        <span className="hint">
+          {messages.deliverableFor[kind.audience]}
+          {isOwnKind(kind.id) && ` · ${messages.ownKindBadge}`}
+        </span>
+        <span>{kind.summary}</span>
+      </button>
+      {isOwnKind(kind.id) && (
+        <div className="actions">
+          <button type="button" className="quiet" onClick={() => onEdit(kind.id)}>
+            {messages.ownKindEdit} {kind.title}
+          </button>
+          <button type="button" className="quiet" onClick={() => onRemove(kind.id)}>
+            {messages.ownKindRemove} {kind.title}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+  // The pages of the memory are not texts to send: they stand apart, and say what they are for.
+  const memory = catalog.filter((kind) => kind.memoryPage !== undefined)
   return (
     <>
       <h3>{messages.deliverableChoose}</h3>
       {empty && <p className="hint">{messages.deliverableNone}</p>}
       <div className="kinds">
-        {catalog.map((kind) => (
-          <div key={kind.id} className="kind-card">
-            <button type="button" className="kind" onClick={() => onChoose(kind.id)}>
-              <strong>{kind.title}</strong>
-              <span className="hint">
-                {messages.deliverableFor[kind.audience]}
-                {isOwnKind(kind.id) && ` · ${messages.ownKindBadge}`}
-              </span>
-              <span>{kind.summary}</span>
-            </button>
-            {isOwnKind(kind.id) && (
-              <div className="actions">
-                <button type="button" className="quiet" onClick={() => onEdit(kind.id)}>
-                  {messages.ownKindEdit} {kind.title}
-                </button>
-                <button type="button" className="quiet" onClick={() => onRemove(kind.id)}>
-                  {messages.ownKindRemove} {kind.title}
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+        {catalog
+          .filter((kind) => kind.memoryPage === undefined)
+          .map((kind) => card(kind, kind.title))}
       </div>
+      {memory.length > 0 && (
+        <section aria-label={messages.memoryKinds.title}>
+          <h3>{messages.memoryKinds.title}</h3>
+          <p className="hint">{messages.memoryKinds.about}</p>
+          <div className="kinds">
+            {memory.map((kind) => card(kind, kind.title.replace(messages.memoryKinds.prefix, '')))}
+          </div>
+        </section>
+      )}
       <div className="actions">
         <button type="button" onClick={() => onEdit(null)}>
           {messages.ownKindNew}
@@ -571,14 +590,14 @@ function Review({
           <ClientFilter text={deliverable.draft.text} />
         )}
         {inReview && kind && (
-          <section aria-label={messages.deliverableChecklist}>
-            <h4>{messages.deliverableChecklist}</h4>
+          <details className="review-fold" aria-label={messages.deliverableChecklist}>
+            <summary>{messages.deliverableChecklist}</summary>
             <ul className="missing">
               {kind.checklist.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          </section>
+          </details>
         )}
         {inReview && (
           <form className="source-form" onSubmit={submit}>
@@ -675,12 +694,11 @@ function ClientFilter({ text }: { text: string }) {
   if (found.length === 0) return null
   return (
     <section className="red-team" aria-label={messages.deliverableClientFilter}>
-      <h4>{messages.deliverableClientFilter}</h4>
-      <p className="hint">{messages.deliverableClientFilterIntro}</p>
+      <h4 title={messages.deliverableClientFilterIntro}>{messages.deliverableClientFilter}</h4>
       <ul className="findings">
         {found.map((finding) => (
-          <li key={`${finding.kind}-${finding.excerpt}`}>
-            <span className="status status-warning">
+          <li key={`${finding.kind}-${finding.excerpt}`} className="finding">
+            <span className="severity severity-media">
               {messages.deliverableClientFilterKind[finding.kind]}
             </span>
             <strong>{finding.match}</strong>
@@ -719,7 +737,6 @@ function RedTeam({
     : messages.deliverableRedTeamFix
   return (
     <section className="red-team" aria-label={messages.deliverableRedTeam}>
-      <h4>{messages.deliverableRedTeam}</h4>
       <p className={ok ? 'badge badge-ok' : 'badge badge-warning'}>
         {ok ? messages.deliverableRedTeamOk : toCorrect}
       </p>
@@ -729,32 +746,36 @@ function RedTeam({
             const key = findingKey(finding)
             const marked = seen?.includes(key) ?? false
             return (
-              <li key={key} className={marked ? 'finding-seen' : undefined}>
-                <span className="status status-warning">
-                  {messages.deliverableSeverity[finding.severity]}
-                </span>
-                <strong>{finding.finding}</strong>
-                <blockquote>{finding.where}</blockquote>
-                <span className="hint">{finding.why}</span>
-                {seen && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    aria-pressed={marked}
-                    onClick={() => onSeen(key)}
-                  >
-                    {marked ? `${messages.review.seenDone} ✓` : messages.review.seen}
-                  </button>
-                )}
+              <li key={key} className={marked ? 'finding finding-seen' : 'finding'}>
+                <details>
+                  <summary>
+                    <span className={`severity severity-${finding.severity}`}>
+                      {messages.deliverableSeverity[finding.severity]}
+                    </span>
+                    {finding.finding}
+                  </summary>
+                  <blockquote>{finding.where}</blockquote>
+                  {finding.why && <p className="hint">{finding.why}</p>}
+                </details>
                 {seen && fixing?.key !== key && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    disabled={busy}
-                    onClick={() => setFixing({ key, words: '' })}
-                  >
-                    {text.fix}
-                  </button>
+                  <div className="finding-actions">
+                    <button
+                      type="button"
+                      className="link"
+                      aria-pressed={marked}
+                      onClick={() => onSeen(key)}
+                    >
+                      {marked ? messages.review.seenDone : messages.review.seen}
+                    </button>
+                    <button
+                      type="button"
+                      className="link"
+                      disabled={busy}
+                      onClick={() => setFixing({ key, words: '' })}
+                    >
+                      {text.fix}
+                    </button>
+                  </div>
                 )}
                 {seen && fixing?.key === key && (
                   <form
@@ -765,14 +786,13 @@ function RedTeam({
                       setFixing(null)
                     }}
                   >
-                    <label>
-                      {text.fixWhat}
-                      <textarea
-                        rows={2}
-                        value={fixing.words}
-                        onChange={(event) => setFixing({ key, words: event.target.value })}
-                      />
-                    </label>
+                    <textarea
+                      aria-label={text.fixWhat}
+                      placeholder={text.fixWhat}
+                      rows={2}
+                      value={fixing.words}
+                      onChange={(event) => setFixing({ key, words: event.target.value })}
+                    />
                     <div className="actions">
                       <button type="submit" className="quiet-submit" disabled={busy}>
                         {text.fixSubmit}
@@ -787,11 +807,6 @@ function RedTeam({
             )
           })}
         </ul>
-      )}
-      {report.holds && (
-        <p className="hint">
-          {messages.deliverableHolds}: {report.holds}
-        </p>
       )}
     </section>
   )

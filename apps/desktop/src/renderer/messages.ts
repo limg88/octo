@@ -1609,6 +1609,13 @@ export const messages = {
     `Approvati: ${count} · scrittura ${draft} min · revisione ${review} min · ${rounds} giri.`,
   deliverableNone: 'Nessun deliverable ancora. Scegline uno dal catalogo.',
   deliverableChoose: 'Che cosa vuoi preparare?',
+  memoryKinds: {
+    title: 'Memoria del progetto',
+    about:
+      'Non sono testi da mandare: sono le pagine che Octo fa leggere per prime a Claude a ogni domanda e a ogni deliverable. Aggiornale ogni tanto (i fatti di oggi, le decisioni prese, la cronologia): le risposte diventano più giuste e più brevi da controllare.',
+    /** How the title of a kind of the memory begins: left out where the heading already says it. */
+    prefix: /^Memoria:\s*/,
+  },
   deliverableFor: { client: 'Per il cliente', internal: 'Interno' },
   deliverableWrite: 'Scrivi la bozza',
   deliverableWriting:
@@ -1632,7 +1639,6 @@ export const messages = {
   deliverableRedTeamOk: 'Può uscire: nessun punto contestabile trovato.',
   deliverableRedTeamFix: 'Da correggere prima di farlo uscire.',
   deliverableRedTeamFixApproved: 'La rilettura segnalava correzioni prima dell’invio.',
-  deliverableHolds: 'Che cosa regge',
   deliverableSeverity: { grave: 'Grave', media: 'Media', lieve: 'Lieve' },
   deliverableChecklist: 'Da controllare prima di approvare',
   deliverableChange: 'Che cosa vuoi cambiare?',
@@ -1861,8 +1867,8 @@ export const messages = {
   review: {
     panel: 'Rilettura',
     draft: 'Bozza',
-    seen: 'Segna come rivisto',
-    seenDone: 'Rivisto',
+    seen: 'Visto',
+    seenDone: 'Visto ✓',
     left: (count: number) =>
       count === 0
         ? 'Tutti i rilievi rivisti'
@@ -1871,8 +1877,8 @@ export const messages = {
           : `${count} rilievi da rivedere`,
     reset: 'La bozza è cambiata: i rilievi sono da rivedere di nuovo.',
     pending: 'La rilettura critica è in corso: i rilievi arrivano qui.',
-    fix: 'Correggi questo',
-    fixWhat: 'Che cosa cambiare in questo passo (vuoto: decide Claude come correggerlo)',
+    fix: 'Correggi',
+    fixWhat: 'Che cosa cambiare qui (vuoto: decide Claude)',
     fixSubmit: 'Riscrivi solo questo passo',
     fixRequest: (where: string, finding: string, words: string) =>
       [

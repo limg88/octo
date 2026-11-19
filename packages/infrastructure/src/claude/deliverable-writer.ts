@@ -14,8 +14,12 @@ import { z } from 'zod'
 import { draftAnswerSchema, liveSourcesPrompt, MEMORY_PROMPT } from './ask-prompt.ts'
 import { type ClaudeCliConfig, projectRules, runStructured } from './structured-run.ts'
 
-/** The most a sentence of the critical reading is long: a finding is read at a glance. */
+/** The most a sentence of the critical reading may be long: past this the answer is refused. */
 export const MAX_FINDING_SENTENCE = 220
+/** The words Claude is asked to keep a finding within: it is read at a glance. */
+export const FINDING_WORDS = 12
+/** The findings shown at most, the most serious first: five things to put right, not a list. */
+export const MAX_FINDINGS = 5
 
 const redTeamSchema = z.object({
   verdict: z.enum(RED_TEAM_VERDICTS),
@@ -284,12 +288,14 @@ Look for:
    tense, numbers that bind once written.
 8. The most contestable conclusion.
 
-Give back "findings" (each with its severity: grave, media or lieve; the words of the text it is
-about in "where", copied as they are; and why the reader could contest it), "holds" (what stands)
-and the "verdict": "deliverable" or "fix_first". Write in the language of the text.
-Be brief: "finding" is one sentence, "why" is one sentence, "holds" is one sentence, each at most
-twenty words and never more than ${MAX_FINDING_SENTENCE} characters. The Project Manager reads
-them at a glance: no preamble, no repetition of the text, one finding for one problem.
+Give back "findings": at most ${MAX_FINDINGS}, the ones that matter most, each with its severity
+(grave, media or lieve), the words of the text it is about in "where", copied as they are and no
+longer than they need to be, the "finding" and "why". Then "holds" (what stands, one short
+sentence) and the "verdict": "deliverable" or "fix_first". Write in the language of the text.
+Be terse. "finding" says what is wrong in at most ${FINDING_WORDS} words, with no preamble and
+without repeating the text. "why" is the consequence for the reader in at most ${FINDING_WORDS}
+words, and an empty string when the finding already says it. One finding for one problem; never
+more than ${MAX_FINDING_SENTENCE} characters in a sentence.
 Do not rewrite the text. Do not invent objections to look severe: a finding with no concrete
 consequence for the reader is not one. No minimum number of findings.`,
   ]
@@ -329,8 +335,8 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
         signal: request.signal,
         model: request.model,
       }),
-    redTeam: async (request) =>
-      runStructured(config, {
+    redTeam: async (request) => {
+      const report = await runStructured(config, {
         projectFolder: request.projectFolder,
         input: request.text,
         systemPrompt: redTeamSystemPrompt(request.kind, await projectRules(request.projectFolder)),
@@ -338,6 +344,15 @@ export function createClaudeDeliverableWriter(config: ClaudeCliConfig): Delivera
         signal: request.signal,
         model: request.model,
         onModel: request.onModel,
-      }),
+      })
+      // The most serious first, and no more than can be put right in one go.
+      const findings = [...report.findings]
+        .sort(
+          (a, b) =>
+            RED_TEAM_SEVERITIES.indexOf(a.severity) - RED_TEAM_SEVERITIES.indexOf(b.severity),
+        )
+        .slice(0, MAX_FINDINGS)
+      return { ...report, findings }
+    },
   }
 }

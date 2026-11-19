@@ -620,7 +620,7 @@ try {
   await work11.getByRole('button', { name: 'Nuovo deliverable' }).click()
   for (const kind of [
     'Analisi funzionale da riunione',
-    'Voce di backlog',
+    'Storia con criteri di accettazione',
     'Modifiche da applicare al tracker',
     'Scenari di test',
     'Technical proposal',

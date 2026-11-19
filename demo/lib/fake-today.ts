@@ -239,6 +239,8 @@ writeFileSync(
         person('Bianchi Anna', 'Analisi'),
         // Leaves the project in four days.
         person('Neri Sara', 'Test', dayOf(4)),
+        // Of the client: a meeting she calls is of the project.
+        { ...person('Carla Bianchi', 'Referente del cliente'), side: 'client' },
       ],
       // The sprint compared in «Allineamento» ends tomorrow.
       periods: [{ name: 'Sprint 28', from: dayOf(-13), to: dayOf(1) }],

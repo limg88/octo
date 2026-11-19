@@ -36,7 +36,7 @@ Durata: 5 minuti.
    Atteso: la bozza ha esattamente le sezioni del modello — «Premessa», «Che cosa cambia», «Per chi usa il sistema», «Che cosa resta da fare» — e in «Informazioni mancanti» le sezioni per cui il progetto non dice nulla. Premi «Approva» e apri il file Word: in testa a ogni pagina c'è «Fornitore Demo S.p.A. — Nota di rilascio», l'intestazione del modello; il testo di esempio del modello non c'è.
    Dimostra: il modello Word dà al tipo la struttura e la carta. Apri «Email al cliente»: lì il modello non c'è.
 
-6. **Un modello PowerPoint per un tipo qualsiasi.** Scegli «Voce di backlog», premi «Scegli un modello» e scegli `Presentazioni/Stato avanzamento - periodo scorso.pptx`.
+6. **Un modello PowerPoint per un tipo qualsiasi.** Scegli «Storia con criteri di accettazione», premi «Scegli un modello» e scegli `Presentazioni/Stato avanzamento - periodo scorso.pptx`.
    Atteso: compare «PowerPoint — la bozza segue le slide della presentazione, e l'approvato esce anche in PowerPoint».
    Dimostra: la presentazione è del tipo a cui la dai, non del progetto.
 

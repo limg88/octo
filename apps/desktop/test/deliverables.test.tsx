@@ -201,7 +201,6 @@ describe('DeliverablesView', () => {
     const filter = screen.getByRole('region', { name: messages.deliverableClientFilter })
     expect(within(filter).getByText('99.000 euro')).toBeTruthy()
     expect(within(filter).getByText(messages.deliverableClientFilterKind.money)).toBeTruthy()
-    expect(screen.getByText(/La data regge\./)).toBeTruthy()
     expect(screen.getByText('Chi firma il verbale')).toBeTruthy()
     expect(screen.getByText(DELIVERABLE_CATALOG[0]?.checklist[0] ?? '')).toBeTruthy()
     expect(screen.getByText(/Scrittura 2 min · Revisione 0 min · 1 giro/)).toBeTruthy()
@@ -755,7 +754,7 @@ describe('the review beside the draft', () => {
 
     fireEvent.click(within(panel()).getByRole('button', { name: messages.review.seen }))
     expect(within(panel()).getByText(messages.review.left(0))).toBeTruthy()
-    fireEvent.click(within(panel()).getByRole('button', { name: /Rivisto/ }))
+    fireEvent.click(within(panel()).getByRole('button', { name: /Visto/ }))
     expect(within(panel()).getByText(messages.review.left(1))).toBeTruthy()
     fireEvent.click(within(panel()).getByRole('button', { name: messages.review.seen }))
 

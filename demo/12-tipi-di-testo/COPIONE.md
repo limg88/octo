@@ -15,7 +15,7 @@ Durata: 3 minuti. Mostra i sei tipi di testo aggiunti al catalogo e il percorso 
    Atteso: si apre Octo sul progetto «Aurora».
 
 2. **Apri «Deliverable».**
-   Atteso: nel catalogo, dopo email, stato di avanzamento, verbale e stima, ci sono «Analisi funzionale da riunione», «Voce di backlog», «Modifiche da applicare al tracker», «Scenari di test», «Note di rilascio» e «Technical proposal», ognuno con a chi è destinato.
+   Atteso: nel catalogo, dopo email, stato di avanzamento, verbale e stima, ci sono «Analisi funzionale da riunione», «Storia con criteri di accettazione», «Modifiche da applicare al tracker», «Scenari di test», «Note di rilascio» e «Technical proposal», ognuno con a chi è destinato.
 
 3. **Scegli «Note di rilascio».** In «Quale rilascio» scrivi `2.4 di novembre` e premi «Scrivi la bozza».
    Atteso: la bozza con le sezioni «Rilascio», «Novità», «Problemi noti»; «1 fonte controllata»; sotto «Che cosa manca» la voce «Elenco delle voci chiuse per questo rilascio».

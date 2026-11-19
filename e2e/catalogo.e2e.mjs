@@ -16,7 +16,7 @@ const TITLES = [
   'Verbale di riunione',
   'Stima',
   'Analisi funzionale da riunione',
-  'Voce di backlog',
+  'Storia con criteri di accettazione',
   'Modifiche da applicare al tracker',
   'Scenari di test',
   'Note di rilascio',

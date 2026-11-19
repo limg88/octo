@@ -85,8 +85,8 @@ try {
   await row.click()
   assert.equal(await detail.count(), 0)
 
-  // I2. A meeting nobody can tell as of the project is not on the agenda: it waits aside, with
-  // what Claude said, and enters when the PM says it is of the project.
+  // I2. A meeting where others take part and nobody of the team is not on the agenda: it waits
+  // aside, said so, and enters when the PM says it is of the project.
   const today = page.getByRole('region', { name: 'Oggi' })
   const aside = page.getByText('1 riunione da assegnare')
   await aside.waitFor({ timeout: TIMEOUT_MS })
@@ -94,7 +94,7 @@ try {
   await aside.click()
   const waiting = page.getByRole('list', { name: 'Riunioni da assegnare' })
   await waiting.getByText('Comitato di direzione').waitFor()
-  await waiting.getByText(/Claude: non so dirlo/).waitFor({ timeout: TIMEOUT_MS })
+  await waiting.getByText(/non partecipa nessuno della squadra/).waitFor({ timeout: TIMEOUT_MS })
   await page.screenshot({ path: `${work}/da-assegnare.png`, fullPage: true })
   await waiting.getByRole('button', { name: 'È di questo progetto', exact: true }).click()
   await aside.waitFor({ state: 'detached', timeout: TIMEOUT_MS })
@@ -145,8 +145,8 @@ try {
     /^Correggi i rilievi della rilettura critica:\n- Il budget non ha una fonte$/,
   )
   await page.screenshot({ path: `${work}/rilettura.png`, fullPage: true })
-  await drafts.getByRole('button', { name: 'Correggi questo' }).click()
-  await drafts.getByLabel(/^Che cosa cambiare in questo passo/).fill('Togli la cifra')
+  await drafts.getByRole('button', { name: 'Correggi', exact: true }).click()
+  await drafts.getByLabel(/^Che cosa cambiare qui/).fill('Togli la cifra')
   await drafts.getByRole('button', { name: 'Riscrivi solo questo passo' }).click()
   await drafts.getByText('Può uscire: nessun punto contestabile trovato.').waitFor({
     timeout: TIMEOUT_MS,

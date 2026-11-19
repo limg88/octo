@@ -17,7 +17,7 @@ Durata: 5 minuti. Incremento I3 di `docs/esiti-prova-deem.md`: chi scrive un'ema
 2. **Leggi la rilettura critica.** A destra, «Rilettura».
    Atteso: «Da correggere prima di farlo uscire.» e un rilievo di una frase, «Il budget non ha una fonte», con il passo del testo a cui si riferisce. Sotto, «Che cosa vuoi cambiare?» è già compilato: «Correggi i rilievi della rilettura critica: - Il budget non ha una fonte». Si manda così o ci si scrive sopra.
 
-3. **Correggi solo quel rilievo.** Sul rilievo premi «Correggi questo», scrivi `Togli la cifra`, poi «Riscrivi solo questo passo».
+3. **Correggi solo quel rilievo.** Sul rilievo premi «Correggi», scrivi `Togli la cifra`, poi «Riscrivi solo questo passo».
    Atteso: la bozza torna senza la frase sul budget; il resto è com'era; la rilettura dice «Può uscire: nessun punto contestabile trovato.»
    Dimostra: a chi scrive arriva il passo da riscrivere, il rilievo, ciò che hai chiesto e l'ordine di lasciare il resto parola per parola.
 

@@ -47,7 +47,7 @@ I numeri delle ore, del previsionale e dei bug dipendono dal giorno in cui lanci
    Dimostra: la citazione si consulta senza perdere la risposta; «riscontrata nel file» non è «conclusione verificata».
 
 8. **Dalla risposta alla bozza.** Sotto la prima risposta premi «Prepara un deliverable da questa risposta».
-   Atteso: «Deliverable» si apre con il riquadro «Contesto dalla risposta» (la domanda e quante fonti). Scegli «Voce di backlog»: il campo «Altro da sapere» è già compilato con domanda, fonti citate e risposta. Scrivi il bisogno e premi «Scrivi la bozza»: anello e «Scrivo…» sul pulsante.
+   Atteso: «Deliverable» si apre con il riquadro «Contesto dalla risposta» (la domanda e quante fonti). Scegli «Storia con criteri di accettazione»: il campo «Altro da sapere» è già compilato con domanda, fonti citate e risposta. Scrivi il bisogno e premi «Scrivi la bozza»: anello e «Scrivo…» sul pulsante.
    Poi: a sinistra la bozza con i suoi richiami, a destra «Rilettura» con la rilettura critica, ciò che va controllato, «Che cosa vuoi cambiare?» e «Approva»; sotto, la fonte citata. Accanto al titolo «Interno» o «Per il cliente». Se ci sono rilievi, «Segna come rivisto» li conta; chiedi una modifica e tornano da rivedere.
    Premi «Approva»: compaiono i file pronti (Markdown e Word).
    Dimostra: la bozza nasce dal contesto della risposta; ciò che hai rivisto vale per la bozza su cui l'hai rivisto.
