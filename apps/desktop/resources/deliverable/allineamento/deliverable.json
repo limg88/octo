@@ -1,6 +1,6 @@
 {
   "title": "Allineamento dello sprint",
-  "about": "Le voci del tracker del cliente in uno sprint confrontate con i ticket del tracker interno, e il file dei ticket mancanti da importare a mano.",
+  "about": "Le voci del tracker del cliente in uno sprint confrontate con i ticket del tracker interno, e i ticket mancanti: un file da importare a mano, oppure creati da Octo sul Jira interno quando lo confermi.",
   "parameters": [
     { "name": "sprint", "label": "Sprint (vuoto: quello della configurazione)" }
   ],

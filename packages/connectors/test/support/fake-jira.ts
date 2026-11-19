@@ -57,6 +57,10 @@ export interface FakeJiraOptions {
 export interface FakeJira {
   server: FakeServer
   options: FakeJiraOptions
+  /** The fields of the issues created, in the order they came. */
+  created: Array<Record<string, unknown> & { summary: string; project: { key: string } }>
+  /** An issue whose summary holds these words is refused. */
+  refuseSummary: string | null
   /** Answers the search with every issue, ignoring the projects (a misbehaving system). */
   leakPerimeter: boolean
   /** Refuses the list of fields, as a site does to an account that may not see it. */
@@ -115,6 +119,8 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
   const fake: FakeJira = {
     server: undefined as unknown as FakeServer,
     options,
+    created: [],
+    refuseSummary: null,
     leakPerimeter: false,
     hideFields: false,
     orderByMinuteOnly: false,
@@ -226,6 +232,30 @@ export async function startFakeJira(options: FakeJiraOptions): Promise<FakeJira>
   function handle(req: IncomingMessage, res: ServerResponse): void {
     const url = new URL(req.url ?? '/', 'http://fake')
     const path = decodeURIComponent(url.pathname)
+    // The one thing that is written: an issue, kept as it was sent.
+    if (req.method === 'POST' && path === `${API}/issue`) {
+      if (req.headers.authorization !== expected) {
+        json(res, 401, { errorMessages: ['Client must be authenticated to access this resource.'] })
+        return
+      }
+      let sent = ''
+      req.on('data', (chunk) => {
+        sent += chunk
+      })
+      req.on('end', () => {
+        const { fields } = JSON.parse(sent)
+        if (fake.refuseSummary !== null && fields.summary.includes(fake.refuseSummary)) {
+          json(res, 400, { errorMessages: ['refused'] })
+          return
+        }
+        fake.created.push(fields)
+        json(res, 201, {
+          id: String(90000 + fake.created.length),
+          key: `${fields.project.key}-${900 + fake.created.length}`,
+        })
+      })
+      return
+    }
     if (req.method !== 'GET') {
       json(res, 405, { errorMessages: ['method not allowed'] })
       return

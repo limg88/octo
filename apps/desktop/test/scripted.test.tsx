@@ -48,6 +48,8 @@ type Api = Pick<
   | 'keepScripted'
   | 'correctScripted'
   | 'approveScripted'
+  | 'missingTickets'
+  | 'createTickets'
   | 'onDeliverableProgress'
 >
 function fakeApi(overrides: Partial<Api> = {}) {
@@ -59,6 +61,8 @@ function fakeApi(overrides: Partial<Api> = {}) {
     keepScripted: vi.fn(async () => ok({ folder: '_octo/deliverable/avanzamento', files: [] })),
     correctScripted: vi.fn(async () => ok(correction)),
     approveScripted: vi.fn(async () => ok(null)),
+    missingTickets: vi.fn(async () => ok({ site: 'contoso', projectKey: 'AUR', tickets: [] })),
+    createTickets: vi.fn(async () => ok([])),
     onDeliverableProgress: (listener) => {
       tell = listener
       return () => {}

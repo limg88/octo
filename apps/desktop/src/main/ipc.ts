@@ -2,6 +2,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   AgentRunner,
+  AlignmentTickets,
   AppPreferences,
   AskQuestion,
   Backups,
@@ -44,10 +45,12 @@ import {
   MAIL_TURNS,
   MAX_GLOSSARY_ENTRIES,
   MAX_GLOSSARY_WORD,
+  MAX_TICKETS_PER_REQUEST,
   MODEL_CHOICES,
   OPEN_POINT_STATES,
   opensAsDocument,
   PHASES,
+  PROJECT_KEY,
   pathInProject,
   RISK_STATES,
   TEAM_ADDRESSES,
@@ -73,6 +76,7 @@ export type IpcDeps = {
   keepWork: KeepWork
   chatFiles: ChatFiles
   scripted: ScriptedDeliverables
+  tickets: AlignmentTickets
   sources: Sources
   meetings: Meetings
   documents: Documents
@@ -155,6 +159,14 @@ const scriptedRunInput = scriptedInput.extend({
     .refine((asked) => Object.keys(asked).length <= MAX_RULES),
 })
 const scriptedOfRunInput = scriptedInput.extend({ runId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const ticketsInput = byProject.extend({ runId: z.string().min(1).max(MAX_RULE_LENGTH) })
+const ticketsCreateInput = ticketsInput.extend({
+  summaries: z
+    .array(z.string().min(1).max(MAX_QUESTION_LENGTH))
+    .min(1)
+    .max(MAX_TICKETS_PER_REQUEST),
+  projectKey: z.string().regex(PROJECT_KEY),
+})
 const scriptedWordsInput = scriptedInput.extend({ words: z.string().max(MAX_QUESTION_LENGTH) })
 const evidenceInput = byProject.extend({ path: z.string().min(1) })
 const MAX_RULES = 200
@@ -792,6 +804,19 @@ export function registerIpc(deps: IpcDeps): void {
     const project = await deps.projects.get(projectId)
     return deps.scripted.correct(project, slug, words, await scriptedOptions(project))
   })
+
+  handle(CHANNELS.ticketsMissing, ticketsInput, async ({ projectId, runId }) =>
+    deps.tickets.missing(await deps.projects.get(projectId), runId),
+  )
+
+  handle(CHANNELS.ticketsCreate, ticketsCreateInput, async (input) =>
+    deps.tickets.create(
+      await deps.projects.get(input.projectId),
+      input.runId,
+      input.summaries,
+      input.projectKey,
+    ),
+  )
 
   handle(CHANNELS.scriptedApprove, scriptedOfRunInput, async ({ projectId, slug, runId }) => {
     await deps.scripted.approve(await deps.projects.get(projectId), slug, runId)

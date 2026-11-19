@@ -1,6 +1,7 @@
 import type {
   FeedReader,
   ProjectOrdersReader,
+  TicketWriter,
   TimesheetReader,
   TrackerHoursReader,
   TrackerSnapshotReader,
@@ -686,6 +687,35 @@ export function createWarehouseOrdersReader(
           recognized: order.recognized,
           economics: order.economics,
         }))
+      } catch (error) {
+        throw failure(error)
+      }
+    },
+  }
+}
+
+/**
+ * The tickets the PM asks to create in the internal Jira, through the connector and with the
+ * same credential the feed reads with. The client that writes may only create an issue.
+ */
+export function createJiraTicketWriter(options: ConnectorFeedOptions = {}): TicketWriter {
+  const trackers = createConnectorReader(
+    options.devEndpoints ? { devEndpoints: options.devEndpoints } : {},
+  )
+  const codeOf = (code: string): string => FAILURES[code as keyof typeof FAILURES] ?? 'feed_failed'
+  return {
+    async create(config, secret, projectKey, tickets) {
+      try {
+        const { config: raw, scope } = await jiraTracker(trackers, config, secret, options)
+        const source = await trackers.connect('jira', raw, secret, scope)
+        const outcomes = await trackers.createIssues(
+          { ...source, secret },
+          tickets.map((ticket) => ({ projectKey, ...ticket })),
+          new AbortController().signal,
+        )
+        return outcomes.map((outcome) =>
+          'key' in outcome ? outcome : { error: codeOf(outcome.error) },
+        )
       } catch (error) {
         throw failure(error)
       }

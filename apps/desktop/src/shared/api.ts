@@ -25,6 +25,8 @@ import type {
   ScriptedSummary,
   SessionView,
   SheetStep,
+  TicketOutcome,
+  TicketsToCreate,
   TodayView,
   TrackerHoursRun,
   TrackerSnapshotRun,
@@ -121,6 +123,8 @@ export const CHANNELS = {
   scriptedKeep: 'scripted:keep',
   scriptedCorrect: 'scripted:correct',
   scriptedApprove: 'scripted:approve',
+  ticketsMissing: 'tickets:missing',
+  ticketsCreate: 'tickets:create',
   instructionsGet: 'deliverables:instructions:get',
   instructionsSave: 'deliverables:instructions:save',
   kindCorrect: 'deliverables:kind:correct',
@@ -296,6 +300,15 @@ export type OctoApi = {
   ): Promise<Result<ScriptedCorrection>>
   /** Writes in the project what a correction changed. */
   approveScripted(projectId: string, slug: string, runId: string): Promise<Result<null>>
+  /** The tickets a run of the alignment found missing in the internal Jira. Writes nothing. */
+  missingTickets(projectId: string, runId: string): Promise<Result<TicketsToCreate>>
+  /** Creates in the internal Jira the missing tickets the PM chose, and only those. */
+  createTickets(
+    projectId: string,
+    runId: string,
+    summaries: string[],
+    projectKey: string,
+  ): Promise<Result<TicketOutcome[]>>
   cancelAsk(projectId: string): Promise<Result<null>>
   /**
    * Opens a source of the project. Inside the app a text is read in Octo, on the sentence quoted

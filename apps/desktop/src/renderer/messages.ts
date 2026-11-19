@@ -588,6 +588,22 @@ export const messages = {
   askPlaceholder: 'Chiedi qualcosa su questo progetto…',
   askSubmit: 'Chiedi',
   askCancel: 'Ferma',
+  tickets: {
+    open: 'Crea su Jira i ticket mancanti…',
+    title: 'Ticket mancanti da creare su Jira',
+    about: (site: string) =>
+      `È l’unica cosa che Octo scrive fuori dal progetto: crea su ${site} i soli ticket spuntati, uno per uno, quando confermi. Non modifica e non cancella nulla. Il titolo porta l’id della voce del cliente, così il prossimo allineamento li collega.`,
+    none: 'Nessun ticket mancante in questo allineamento.',
+    project: 'Progetto Jira in cui crearli (chiave)',
+    projectHint: 'Per esempio: AUR',
+    create: (count: number) => (count === 1 ? 'Crea 1 ticket…' : `Crea ${count} ticket…`),
+    confirm: (count: number, key: string, site: string) =>
+      `Sto per creare ${count === 1 ? '1 ticket' : `${count} ticket`} nel progetto ${key} di ${site}. Da Octo non si annulla.`,
+    yes: 'Conferma e crea',
+    creating: 'Creo i ticket…',
+    created: (key: string) => `Creato: ${key}`,
+    refused: 'Jira lo ha rifiutato: controlla tipo, progetto e permessi',
+  },
   scripted: {
     title: 'Deliverable del progetto, con script',
     intro:

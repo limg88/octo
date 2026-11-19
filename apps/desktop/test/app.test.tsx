@@ -191,6 +191,8 @@ function fakeApi(overrides: Partial<OctoApi> = {}) {
       ok({ runId: 'r', ok: true, messages: [], files: [], summary: '', changed: [] }),
     ),
     approveScripted: vi.fn(async () => ok(null)),
+    missingTickets: vi.fn(async () => ok({ site: 'contoso', projectKey: 'AUR', tickets: [] })),
+    createTickets: vi.fn(async () => ok([])),
     openEvidence: vi.fn(async () => ok(null)),
     glossary: vi.fn(async () => ok({ entries: [], proposed: [] })),
     saveGlossary: vi.fn(async () => ok({ entries: [], proposed: [] })),

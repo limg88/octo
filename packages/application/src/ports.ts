@@ -30,6 +30,7 @@ import type {
   MailMessage,
   MeetingPlace,
   MeetingReading,
+  MissingTicket,
   ModelSettings,
   NowRule,
   OpenPointRegister,
@@ -481,6 +482,20 @@ export interface TrackerHoursReader {
     period: HoursPeriod,
     signal: AbortSignal,
   ): Promise<TrackerHours[]>
+}
+
+/**
+ * Creates tickets in the internal Jira with the PM's credential, only when the PM asks and only
+ * the ones given. It changes and deletes nothing. Each ticket gives its key, or the code of what
+ * refused it; a failure before any ticket is a DomainError with a `feed_*` code.
+ */
+export interface TicketWriter {
+  create(
+    config: JiraFeedConfig,
+    secret: string,
+    projectKey: string,
+    tickets: readonly MissingTicket[],
+  ): Promise<Array<{ key: string } | { error: string }>>
 }
 
 /**

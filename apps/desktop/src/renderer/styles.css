@@ -3743,6 +3743,22 @@ span.marker-warning {
   white-space: pre-wrap;
 }
 
+/* The tickets to create on Jira: a list to tick, then where, then the confirmation. */
+.tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tickets-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /*
  * «Chiedi» is a chat: the conversations beside, one narrow column of questions and answers, and
  * one card to write in that holds everything the next question needs.

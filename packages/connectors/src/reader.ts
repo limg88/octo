@@ -7,11 +7,13 @@ import {
   createJiraConnector,
   type JiraConnector,
   type JiraTrackerOptions,
+  type NewJiraIssue,
 } from './jira/connector.ts'
 import type { JiraTrackerSnapshot } from './jira/tracker.ts'
 import type { JiraWorklog, WorklogPeriod } from './jira/worklogs.ts'
 import { createNetGuard } from './net-guard.ts'
 import type { AnyConnector, ConnectorContext, Json, PerimeterOption, SyncBatch } from './port.ts'
+import type { HttpRule } from './rules.ts'
 import { createSafeHttp } from './safe-http.ts'
 import { SecretValue } from './secret-value.ts'
 
@@ -63,6 +65,16 @@ export interface ConnectorReader {
     period: WorklogPeriod,
     signal: AbortSignal,
   ): Promise<JiraWorklog[]>
+  /**
+   * Creates issues on a Jira source, one call each, because the PM asked for exactly these. The
+   * client it uses may do nothing but that call. Each issue gives its key or the code of what
+   * refused it: one that fails does not stop the others.
+   */
+  createIssues(
+    source: Omit<ReadableSource, 'kind'>,
+    issues: readonly NewJiraIssue[],
+    signal: AbortSignal,
+  ): Promise<Array<{ key: string } | { error: string }>>
   /**
    * Every work item of an Azure DevOps source, or every issue of a Jira one, as it is now: read
    * only when the PM asks.
@@ -154,10 +166,12 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
     source: { config: unknown; perimeter: readonly string[]; secret: string | null },
     signal: AbortSignal,
     work: (connector: AnyConnector, ctx: ConnectorContext<unknown>) => Promise<T>,
+    /** The rules of the client when it is not there to read. */
+    rules?: (connector: AnyConnector) => HttpRule[],
   ): Promise<T> {
     const connector = connectors[kind]
     const http = createSafeHttp({
-      rules: connector.rules(source.config),
+      rules: rules?.(connector) ?? connector.rules(source.config),
       onBlocked,
       allowLoopbackHttp: allowLoopback,
       signal,
@@ -240,6 +254,29 @@ export function createConnectorReader(options: ConnectorReaderOptions = {}): Con
       const config = connectors.jira.parseConfig(source.config)
       return withContext('jira', { ...source, config }, signal, (connector, ctx) =>
         (connector as unknown as JiraConnector).worklogs(ctx as never, period),
+      )
+    },
+
+    async createIssues(source, issues, signal) {
+      const config = connectors.jira.parseConfig(source.config)
+      const jira = connectors.jira as unknown as JiraConnector
+      return withContext(
+        'jira',
+        { ...source, config },
+        signal,
+        async (_connector, ctx) => {
+          const outcomes: Array<{ key: string } | { error: string }> = []
+          for (const issue of issues) {
+            try {
+              outcomes.push({ key: await jira.createIssue(ctx as never, issue) })
+            } catch (error) {
+              if (!(error instanceof ConnectorError)) throw error
+              outcomes.push({ error: error.code })
+            }
+          }
+          return outcomes
+        },
+        () => jira.writeRules(config),
       )
     },
 

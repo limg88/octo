@@ -1,6 +1,7 @@
 export * from './answer.ts'
 export * from './attends.ts'
 export * from './backup.ts'
+export * from './deliverables/alignment-tickets.ts'
 export * from './deliverables/catalog.ts'
 export * from './deliverables/client-filter.ts'
 export * from './deliverables/deck.ts'

@@ -119,6 +119,20 @@ export function jiraRules(endpoint: JiraEndpoint): HttpRule[] {
   ]
 }
 
+/**
+ * The only call that writes: the creation of an issue. It is no rule of the connector: a client
+ * that may write is made apart, for the one moment the PM asks for it, and may do nothing else.
+ */
+export function jiraWriteRules(endpoint: JiraEndpoint): HttpRule[] {
+  return [
+    {
+      method: 'POST',
+      host: endpoint.host,
+      path: lit(...endpoint.prefix, 'rest', 'api', '3', 'issue'),
+    },
+  ]
+}
+
 /** A URL of the API: the endpoint, its prefix, `rest/api/3`, the segments and the query. */
 export function apiUrl(
   endpoint: JiraEndpoint,

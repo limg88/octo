@@ -74,6 +74,51 @@ describe('Jira through the connector reader', () => {
       storyPointsField: 'customfield_10098',
     })
   })
+
+  it('creates the issues the PM asked for, one call each, and does nothing else with that client', async () => {
+    const reader = await start()
+    const { config, perimeter } = await reader.connect('jira', CONFIG, TOKEN, ['AUR'])
+    fake.refuseSummary = 'rifiutato'
+    const issue = (summary: string, description = '') => ({
+      projectKey: 'AUR',
+      type: 'Story',
+      summary,
+      description,
+    })
+    const outcomes = await reader.createIssues(
+      { config, perimeter, secret: TOKEN },
+      [
+        issue('[AZDO 12] Esportazione', 'Come da riunione.'),
+        issue('rifiutato'),
+        issue('[AZDO 13] Filtro'),
+      ],
+      new AbortController().signal,
+    )
+    // One that the site refuses says why, and does not stop the others.
+    expect(outcomes).toEqual([
+      { key: 'AUR-901' },
+      { error: 'source_http_error' },
+      { key: 'AUR-902' },
+    ])
+    expect(fake.created.map((fields) => fields.summary)).toEqual([
+      '[AZDO 12] Esportazione',
+      '[AZDO 13] Filtro',
+    ])
+    expect(fake.created[0]).toMatchObject({
+      project: { key: 'AUR' },
+      issuetype: { name: 'Story' },
+      description: { type: 'doc' },
+    })
+    expect(fake.created[1]).not.toHaveProperty('description')
+    // A wrong credential creates nothing.
+    const refused = await reader.createIssues(
+      { config, perimeter, secret: 'altro' },
+      [issue('Mai creato')],
+      new AbortController().signal,
+    )
+    expect(refused).toEqual([{ error: 'source_auth_failed' }])
+    expect(fake.created).toHaveLength(2)
+  })
 })
 
 describe('the fields of a Jira site', () => {

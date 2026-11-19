@@ -9,6 +9,7 @@ import {
   type SyncBatch,
   type SyncLimits,
 } from '../port.ts'
+import type { HttpRule } from '../rules.ts'
 import { backlogExport } from '../shared/export.ts'
 import { basicAuthorization, sendJson } from '../shared/http.ts'
 import { orderGuard } from '../shared/order.ts'
@@ -19,6 +20,7 @@ import {
   type JiraConfig,
   type JiraEndpoint,
   jiraRules,
+  jiraWriteRules,
   parseJiraConfig,
   publicEndpoint,
 } from './config.ts'
@@ -192,7 +194,25 @@ export interface JiraConnector extends Connector<JiraConfig, JiraCursor> {
     ctx: ConnectorContext<JiraConfig>,
     options: JiraTrackerOptions,
   ): Promise<JiraTrackerSnapshot>
+  /** The rules of the client that creates issues: that call, and nothing else. */
+  writeRules(config: JiraConfig): HttpRule[]
+  /**
+   * Creates one issue, because the PM asked for exactly this one. The only thing the connector
+   * ever writes; it changes and deletes nothing. Gives the key of the new issue.
+   */
+  createIssue(ctx: ConnectorContext<JiraConfig>, issue: NewJiraIssue): Promise<string>
 }
+
+/** An issue to create: where, of which type, and what it says. */
+export interface NewJiraIssue {
+  projectKey: string
+  type: string
+  summary: string
+  description: string
+}
+
+/** The longest summary Jira takes. */
+export const MAX_SUMMARY = 255
 
 /** What a snapshot of the tracker reads beyond the issues themselves. */
 export interface JiraTrackerOptions {
@@ -463,6 +483,37 @@ export function createJiraConnector(options: JiraConnectorOptions = {}): JiraCon
     parseConfig: parseJiraConfig,
     parseCursor,
     rules: (config) => jiraRules(endpointOf(config)),
+    writeRules: (config) => jiraWriteRules(endpointOf(config)),
+
+    async createIssue(ctx, issue) {
+      const text = issue.description.trim()
+      const fields = {
+        project: { key: issue.projectKey },
+        issuetype: { name: issue.type },
+        summary: issue.summary.trim().slice(0, MAX_SUMMARY),
+        ...(text === ''
+          ? {}
+          : {
+              description: {
+                type: 'doc',
+                version: 1,
+                content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+              },
+            }),
+      }
+      const res = await sendJson(
+        ctx.http,
+        'POST',
+        apiUrl(endpointOf(ctx.config), ['issue']),
+        basicAuthorization(ctx.config.email, ctx.secret),
+        { fields },
+      )
+      const created = res.json()
+      const key =
+        typeof created === 'object' && created !== null ? Reflect.get(created, 'key') : null
+      if (typeof key !== 'string' || key === '') throw new ConnectorError('source_bad_response')
+      return key
+    },
 
     async test(ctx): Promise<ConnectorCheck> {
       try {

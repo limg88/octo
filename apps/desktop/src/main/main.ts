@@ -5,6 +5,7 @@ import { homedir, hostname, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  createAlignmentTickets,
   createAskQuestion,
   createBackups,
   createChatFiles,
@@ -103,6 +104,7 @@ import {
   createGithubReleaseFeed,
   createHttpDownloads,
   createJiraHoursReader,
+  createJiraTicketWriter,
   createJsonBackupFiles,
   createJsonPersonalSources,
   createJsonPreferences,
@@ -827,6 +829,16 @@ function start(seatEnv: Record<string, string | undefined>): void {
     chatFiles,
     glossary,
     keepWork: createKeepWork({ questions, work, writer }),
+    tickets: createAlignmentTickets({
+      work,
+      files,
+      writer,
+      sources: settings,
+      secrets,
+      tickets: createJiraTicketWriter({ devEndpoints }),
+      clock,
+      who: () => identity()?.name ?? '',
+    }),
     scripted: createScriptedDeliverables({
       files,
       writer,

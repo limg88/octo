@@ -7,6 +7,7 @@ import type {
 import type { Project } from '@octo/domain'
 import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
+import { MissingTickets } from './MissingTickets.tsx'
 import { errorText, messages, progressText } from './messages.ts'
 import { BusyButton, Waiting } from './Spinner.tsx'
 
@@ -18,12 +19,16 @@ type ScriptedApi = Pick<
   | 'keepScripted'
   | 'correctScripted'
   | 'approveScripted'
+  | 'missingTickets'
+  | 'createTickets'
   | 'onDeliverableProgress'
 >
 type Props = { api: ScriptedApi; project: Project }
 
 const text = messages.scripted
 type Working = 'run' | 'correct' | null
+/** The file of the missing tickets an alignment leaves: what can be created on Jira. */
+const MISSING_FILE = /^mancanti_.*\.csv$/
 
 /** What a run gave: what the script said, and its files, kept in the project only when told. */
 function Outcome({
@@ -158,6 +163,9 @@ function Scripted({
               )
             }
           />
+        )}
+        {run?.ok && run.files.some((name) => MISSING_FILE.test(name)) && (
+          <MissingTickets key={run.runId} api={api} projectId={project.id} runId={run.runId} />
         )}
         <details className="advanced">
           <summary>{text.correct}</summary>

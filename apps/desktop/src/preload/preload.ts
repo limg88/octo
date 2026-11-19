@@ -41,6 +41,10 @@ const api: OctoApi = {
     ipcRenderer.invoke(CHANNELS.scriptedKeep, { projectId, slug, runId }),
   correctScripted: (projectId, slug, words) =>
     ipcRenderer.invoke(CHANNELS.scriptedCorrect, { projectId, slug, words }),
+  missingTickets: (projectId, runId) =>
+    ipcRenderer.invoke(CHANNELS.ticketsMissing, { projectId, runId }),
+  createTickets: (projectId, runId, summaries, projectKey) =>
+    ipcRenderer.invoke(CHANNELS.ticketsCreate, { projectId, runId, summaries, projectKey }),
   approveScripted: (projectId, slug, runId) =>
     ipcRenderer.invoke(CHANNELS.scriptedApprove, { projectId, slug, runId }),
   cancelAsk: (projectId) => ipcRenderer.invoke(CHANNELS.questionsCancel, { projectId }),
