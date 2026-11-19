@@ -3,6 +3,7 @@ import { type DataColumn, DataTable } from './DataTable.tsx'
 import { shortMonthText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { type Figure, Figures } from './ProjectSheetSummary.tsx'
+import { Resizable } from './Resizable.tsx'
 import type { Section } from './sections.ts'
 
 type Props = {
@@ -53,7 +54,7 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
       {billing.length === 0 ? (
         <p className="hint">{text.noInvoices}</p>
       ) : (
-        <div className="table-wide table-intrinsic">
+        <Resizable name={text.clientTable} className="table-wide table-intrinsic">
           <table className="data" aria-label={text.clientTable}>
             <thead>
               <tr>
@@ -97,7 +98,7 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
               </tfoot>
             )}
           </table>
-        </div>
+        </Resizable>
       )}
     </section>
   )

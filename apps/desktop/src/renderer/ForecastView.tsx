@@ -18,6 +18,7 @@ import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
 import { messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
+import { Resizable } from './Resizable.tsx'
 import { useSavedNote } from './SavedNote.tsx'
 import { Waiting } from './Spinner.tsx'
 import type { Section } from './sections.ts'
@@ -360,7 +361,7 @@ function SettingsForm({
         <>
           <h4>{text.projects}</h4>
           <p className="hint">{text.projectsHint}</p>
-          <div className="table-wide">
+          <Resizable name={text.projects} className="table-wide">
             <table aria-label={text.projects}>
               <thead>
                 <tr>
@@ -432,7 +433,7 @@ function SettingsForm({
                 ))}
               </tbody>
             </table>
-          </div>
+          </Resizable>
         </>
       )}
       <FieldProblems lines={problems?.projects ?? []} />

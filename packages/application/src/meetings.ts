@@ -9,7 +9,6 @@ import {
   likelierProject,
   MEETING_META_FILE,
   MEETING_TEXT_FILES,
-  MEETING_TRANSCRIPT_FILE,
   MEETINGS_FOLDER,
   MEETINGS_READING_PATH,
   type MeetingCandidate,
@@ -350,8 +349,9 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
       const path = `${folder}/${name}`
       const text = texts.get(name)
       if (text !== undefined) {
-        // What a transcript heard badly is written in its right form as it enters the project.
-        const entered = name === MEETING_TRANSCRIPT_FILE ? applyGlossary(text, heard) : text
+        // What a transcript heard badly, and the notes made from it repeat, is written in its
+        // right form as it enters the project.
+        const entered = name.endsWith('.md') ? applyGlossary(text, heard) : text
         outcomes.push(await deps.writer.write(project.folder, path, entered))
       } else if ((await deps.files.readText(project.folder, path)) !== null) {
         await deps.files.remove(project.folder, path)

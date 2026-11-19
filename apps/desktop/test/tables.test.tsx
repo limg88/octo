@@ -7,9 +7,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type DataColumn, DataTable } from '../src/renderer/DataTable.tsx'
 import { KnownList } from '../src/renderer/KnownList.tsx'
 import { messages } from '../src/renderer/messages.ts'
+import { MIN_COLUMN_PX, Resizable } from '../src/renderer/Resizable.tsx'
 import { type Row, RowsField } from '../src/renderer/RowsField.tsx'
 import { TodaySettings } from '../src/renderer/TodaySettings.tsx'
-import { MIN_COLUMN_PX } from '../src/renderer/use-column-widths.ts'
 import type { Result } from '../src/shared/api.ts'
 
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value })
@@ -96,37 +96,80 @@ describe('a table of data', () => {
     const table = (label: string) => (
       <DataTable label={label} columns={COLUMNS} rows={BUGS} rowKey={(bug) => bug.id} />
     )
-    const widthOf = (at: number): string =>
-      (screen.getByRole('table').querySelectorAll('col')[at] as HTMLElement).style.width
+    const widths = (): string[] =>
+      [...screen.getByRole('table').querySelectorAll('col')].map((col) => col.style.width)
+    const untouched = COLUMNS.map((column) => column.width ?? '')
     const { unmount } = render(table('Bug'))
     const edge = screen.getByRole('separator', { name: messages.table.widthOf('Titolo') })
-    // The buttons of a row have no edge to drag.
+    // The buttons of a row have no edge to take the focus.
     expect(screen.getAllByRole('separator')).toHaveLength(3)
-    expect(widthOf(1)).toBe('')
-    // Dragged with the mouse: the column follows, and never gets too narrow to read.
+    expect(widths()).toEqual(untouched)
+    // Dragged with the mouse: every column takes the width it has (none, in this test: the
+    // least), and only the one dragged follows the mouse, never too narrow to read.
     fireEvent.mouseDown(edge, { clientX: 100 })
     fireEvent.mouseMove(document, { clientX: 400 })
-    // (A heading has no width in this test: the column is as wide as the mouse went.)
-    expect(widthOf(1)).toBe('300px')
+    const least = `${MIN_COLUMN_PX}px`
+    expect(widths()).toEqual([least, `${MIN_COLUMN_PX + 300}px`, least, least])
+    expect(screen.getByRole('table').style.width).toBe(`${MIN_COLUMN_PX * 4 + 300}px`)
     fireEvent.mouseMove(document, { clientX: -900 })
     fireEvent.mouseUp(document)
-    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX}px`)
+    expect(widths()[1]).toBe(least)
     fireEvent.mouseMove(document, { clientX: 700 })
-    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX}px`)
+    expect(widths()[1]).toBe(least)
     // Moved with the arrows, for who does not use the mouse.
     fireEvent.keyDown(edge, { key: 'ArrowRight' })
     fireEvent.keyDown(edge, { key: 'Enter' })
-    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX + 16}px`)
+    expect(widths()[1]).toBe(`${MIN_COLUMN_PX + 16}px`)
     unmount()
     // The same table opened again is as it was left; another table is not touched.
     const again = render(table('Bug'))
-    expect(widthOf(1)).toBe(`${MIN_COLUMN_PX + 16}px`)
+    expect(widths()[1]).toBe(`${MIN_COLUMN_PX + 16}px`)
     fireEvent.doubleClick(screen.getByRole('separator', { name: messages.table.widthOf('Titolo') }))
-    expect(widthOf(1)).toBe('')
+    expect(widths()).toEqual(untouched)
+    expect(screen.getByRole('table').style.width).toBe('')
     again.unmount()
     window.localStorage.setItem('octo.colonne.Altra', 'non è JSON')
     render(table('Altra'))
-    expect(widthOf(1)).toBe('')
+    expect(widths()).toEqual(untouched)
+  })
+
+  it('drags the edge of any heading of a table written by hand, by where the mouse is', () => {
+    window.localStorage.clear()
+    render(
+      <Resizable name="A mano">
+        <table>
+          <thead>
+            <tr>
+              <th>Voce</th>
+              <th>Costo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sviluppo</td>
+              <td>10</td>
+            </tr>
+          </tbody>
+        </table>
+      </Resizable>,
+    )
+    const [first] = screen.getAllByRole('columnheader')
+    const heading = first as HTMLElement
+    heading.getBoundingClientRect = () => ({ right: 200, width: 200 }) as DOMRect
+    // Far from the edge nothing is taken hold of; near it the heading says so and follows.
+    fireEvent.mouseMove(heading, { clientX: 50 })
+    fireEvent.mouseDown(heading, { clientX: 50 })
+    expect(heading.className).toBe('')
+    fireEvent.mouseMove(heading, { clientX: 197 })
+    expect(heading.className).toBe('column-grip')
+    fireEvent.mouseDown(heading, { clientX: 197 })
+    fireEvent.mouseMove(document, { clientX: 247 })
+    fireEvent.mouseUp(document)
+    const cols = [...screen.getByRole('table').querySelectorAll('col')].map((c) => c.style.width)
+    expect(cols).toEqual(['250px', `${MIN_COLUMN_PX}px`])
+    expect(window.localStorage.getItem('octo.colonne.A mano')).toBe(`[250,${MIN_COLUMN_PX}]`)
+    fireEvent.doubleClick(heading, { clientX: 197 })
+    expect(screen.getByRole('table').querySelectorAll('col')).toHaveLength(0)
   })
 
   it('finds the rows that hold every word typed, and says how many', () => {

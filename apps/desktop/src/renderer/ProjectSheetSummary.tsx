@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { lifetimeMail, lifetimeSourceText, progressSourceText } from './forecast-text.ts'
 import { messages } from './messages.ts'
+import { Resizable } from './Resizable.tsx'
 import { monthText } from './today-text.ts'
 
 type Props = {
@@ -99,7 +100,7 @@ function Ledger({ sheet }: { sheet: Lifetime }) {
         <p className="hint">{text.ledger.none}</p>
       ) : (
         <>
-          <div className="table-wide table-intrinsic">
+          <Resizable name={text.ledger.title} className="table-wide table-intrinsic">
             <table className="data" aria-label={text.ledger.title}>
               <thead>
                 <tr>
@@ -124,7 +125,7 @@ function Ledger({ sheet }: { sheet: Lifetime }) {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </Resizable>
           <p className="hint">
             {Math.abs(difference) < CENT
               ? text.ledger.same(money(sheet.costs))

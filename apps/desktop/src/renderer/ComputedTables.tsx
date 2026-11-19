@@ -1,6 +1,7 @@
 import { type CheckedTable, tableUnverified } from '@octo/domain'
 import type { OpenSource } from './CitationPanel.tsx'
 import { messages } from './messages.ts'
+import { Resizable } from './Resizable.tsx'
 
 type Props = {
   tables: readonly CheckedTable[]
@@ -20,7 +21,7 @@ export function ComputedTables({ tables, onOpenSource }: Props) {
       {tables.map((table) => (
         <section key={`${table.title} ${table.file}`} className="computed" aria-label={table.title}>
           <h3>{table.title}</h3>
-          <div className="table-scroll">
+          <Resizable name={table.title} className="table-scroll">
             <table className="data" aria-label={table.title}>
               <thead>
                 <tr>
@@ -43,7 +44,7 @@ export function ComputedTables({ tables, onOpenSource }: Props) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Resizable>
           <p className="hint">
             {text.computedFrom}{' '}
             {table.sources.map((source) =>

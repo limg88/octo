@@ -1508,23 +1508,6 @@ table.data tfoot td {
   gap: 6px;
 }
 
-/* The right edge of a heading: dragged, it gives the column the width the PM wants. */
-.column-edge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 7px;
-  cursor: col-resize;
-  border-right: 2px solid transparent;
-}
-
-.column-edge:hover,
-.column-edge:focus-visible {
-  border-right-color: var(--accent);
-  outline: none;
-}
-
 .table-filter {
   display: flex;
   align-items: center;
@@ -3843,4 +3826,49 @@ span.marker-warning {
   overflow: auto;
   font-size: 13px;
   white-space: pre-wrap;
+}
+
+/*
+ * A table whose columns are dragged: a thin line closes each heading, and near it the mouse
+ * takes hold of the column. The edge that takes the focus is there for the arrows.
+ */
+.resizable thead tr > * {
+  border-right: 1px solid var(--line);
+}
+
+.resizable table thead th.column-grip,
+.resizable table thead th.column-grip * {
+  cursor: col-resize;
+}
+
+.resizable table thead th.column-grip {
+  border-right-color: var(--accent);
+}
+
+.column-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+}
+
+.column-edge:focus-visible {
+  border-right: 2px solid var(--accent);
+  outline: none;
+}
+
+/* The mark is dark: on a dark ground it stands on a light tile. */
+:root[data-theme="dark"] .logo {
+  padding: 2px;
+  border-radius: 7px;
+  background: #f1efff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo {
+    padding: 2px;
+    border-radius: 7px;
+    background: #f1efff;
+  }
 }

@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useId, useMemo, useState } from 'react'
 import { messages } from './messages.ts'
-import { useColumnWidths } from './use-column-widths.ts'
+import { Resizable } from './Resizable.tsx'
 
 /** What a column is put in order by: words, a number, or nothing (always last). */
 export type SortValue = string | number | null
@@ -77,7 +77,6 @@ export function DataTable<Row>({
   initialOrder,
 }: Props<Row>) {
   const filterId = useId()
-  const resize = useColumnWidths(label)
   const [typed, setTyped] = useState('')
   const [order, setOrder] = useState<Order>(initialOrder ?? null)
   const searched = columns.some((column) => column.text)
@@ -122,106 +121,98 @@ export function DataTable<Row>({
           )}
         </div>
       )}
-      <table className="data data-fixed" aria-label={label}>
-        <colgroup>
-          {columns.map((column) => (
-            <col
-              key={column.key}
-              style={
-                resize.widths[column.key] !== undefined
-                  ? { width: `${resize.widths[column.key]}px` }
-                  : column.width
-                    ? { width: column.width }
-                    : undefined
-              }
-            />
-          ))}
-        </colgroup>
-        <thead>
-          {groups && (
-            <tr className="column-groups">
-              {groups.map((group, at) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a group is its place among the columns.
-                <th key={at} colSpan={group.span} scope="colgroup">
-                  {group.label}
-                </th>
-              ))}
+      <Resizable name={label}>
+        <table className="data data-fixed" aria-label={label}>
+          <colgroup>
+            {columns.map((column) => (
+              <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+            ))}
+          </colgroup>
+          <thead>
+            {groups && (
+              <tr className="column-groups">
+                {groups.map((group, at) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a group is its place among the columns.
+                  <th key={at} colSpan={group.span} scope="colgroup">
+                    {group.label}
+                  </th>
+                ))}
+              </tr>
+            )}
+            <tr>
+              {columns.map((column) => {
+                const direction = order?.key === column.key ? order.direction : undefined
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    className={classOf(column)}
+                    aria-sort={column.sort ? (direction ?? 'none') : undefined}
+                    aria-label={column.label === '' ? column.name : undefined}
+                  >
+                    {column.sort ? (
+                      <button
+                        type="button"
+                        className="sort"
+                        title={text.sortBy(column.label)}
+                        onClick={() => setOrder(nextOrder(order, column.key))}
+                      >
+                        {column.label}
+                        <span aria-hidden="true" className="sort-mark">
+                          {direction ? MARK[direction] : ''}
+                        </span>
+                      </button>
+                    ) : (
+                      column.label
+                    )}
+                    {column.kind !== 'actions' && (
+                      // biome-ignore lint/a11y/useSemanticElements: the edge between two headings, dragged or moved with the arrows.
+                      <span
+                        className="column-edge"
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label={text.widthOf(column.label)}
+                        aria-valuenow={0}
+                        title={text.widthHint}
+                        tabIndex={0}
+                      />
+                    )}
+                  </th>
+                )
+              })}
             </tr>
-          )}
-          <tr>
-            {columns.map((column) => {
-              const direction = order?.key === column.key ? order.direction : undefined
+          </thead>
+          <tbody>
+            {shown.map((row) => {
+              const under = detail?.(row)
               return (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={classOf(column)}
-                  aria-sort={column.sort ? (direction ?? 'none') : undefined}
-                  aria-label={column.label === '' ? column.name : undefined}
-                >
-                  {column.sort ? (
-                    <button
-                      type="button"
-                      className="sort"
-                      title={text.sortBy(column.label)}
-                      onClick={() => setOrder(nextOrder(order, column.key))}
-                    >
-                      {column.label}
-                      <span aria-hidden="true" className="sort-mark">
-                        {direction ? MARK[direction] : ''}
-                      </span>
-                    </button>
-                  ) : (
-                    column.label
+                <Fragment key={rowKey(row)}>
+                  <tr className={rowClassName?.(row)}>
+                    {columns.map((column) => (
+                      <td key={column.key} className={classOf(column)}>
+                        {column.cell(row)}
+                      </td>
+                    ))}
+                  </tr>
+                  {under && (
+                    <tr className="row-details">
+                      <td colSpan={columns.length}>{under}</td>
+                    </tr>
                   )}
-                  {column.kind !== 'actions' && (
-                    // biome-ignore lint/a11y/useSemanticElements: the edge between two headings, dragged or moved with the arrows.
-                    <span
-                      className="column-edge"
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={text.widthOf(column.label)}
-                      aria-valuenow={resize.widths[column.key] ?? 0}
-                      title={text.widthHint}
-                      tabIndex={0}
-                      {...resize.handle(column.key)}
-                    />
-                  )}
-                </th>
+                </Fragment>
               )
             })}
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((row) => {
-            const under = detail?.(row)
-            return (
-              <Fragment key={rowKey(row)}>
-                <tr className={rowClassName?.(row)}>
-                  {columns.map((column) => (
-                    <td key={column.key} className={classOf(column)}>
-                      {column.cell(row)}
-                    </td>
-                  ))}
-                </tr>
-                {under && (
-                  <tr className="row-details">
-                    <td colSpan={columns.length}>{under}</td>
-                  </tr>
-                )}
-              </Fragment>
-            )
-          })}
-          {shown.length === 0 && (
-            <tr>
-              <td colSpan={columns.length} className="hint">
-                {text.none}
-              </td>
-            </tr>
-          )}
-        </tbody>
-        {footer && <tfoot>{footer}</tfoot>}
-      </table>
+            {shown.length === 0 && (
+              <tr>
+                <td colSpan={columns.length} className="hint">
+                  {text.none}
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {footer && <tfoot>{footer}</tfoot>}
+        </table>
+      </Resizable>
     </div>
   )
 }

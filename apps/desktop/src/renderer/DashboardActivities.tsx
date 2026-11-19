@@ -2,6 +2,7 @@ import type { DashboardView } from '@octo/application'
 import { DEFAULT_HOURS_PER_DAY } from '@octo/domain'
 import { useState } from 'react'
 import { dateTimeText, messages } from './messages.ts'
+import { Resizable } from './Resizable.tsx'
 
 type Props = {
   view: Pick<DashboardView, 'activities'>
@@ -37,7 +38,7 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
   return (
     <section aria-label={text.title}>
       <p className="hint">{text.intro}</p>
-      <div className="table-wide table-intrinsic">
+      <Resizable name={text.title} className="table-wide table-intrinsic">
         <table className="data" aria-label={text.title}>
           <thead>
             <tr>
@@ -122,13 +123,13 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
             </tr>
           </tfoot>
         </table>
-      </div>
+      </Resizable>
       {otherHours > 0 && <p className="hint">{text.otherHours(hoursText(otherHours))}</p>}
       <h3>{text.people}</h3>
       {people.length === 0 ? (
         <p className="hint">{text.noHours}</p>
       ) : (
-        <div className="table-wide table-intrinsic">
+        <Resizable name={text.people} className="table-wide table-intrinsic">
           <table className="data" aria-label={text.people}>
             <thead>
               <tr>
@@ -169,7 +170,7 @@ export function DashboardActivities({ view, onOpenItem }: Props) {
               ))}
             </tbody>
           </table>
-        </div>
+        </Resizable>
       )}
     </section>
   )
