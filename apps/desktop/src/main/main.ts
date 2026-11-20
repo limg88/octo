@@ -795,7 +795,16 @@ function start(seatEnv: Record<string, string | undefined>): void {
   registerIpc({
     window,
     nextReading: () => nextReadingAt,
-    session,
+    // Who has just signed in finds every project read, not only the one in sight: at the start
+    // nobody was in, and the reading of that moment read nothing.
+    session: {
+      ...session,
+      signIn: async () => {
+        const view = await session.signIn()
+        if (session.current() !== null) periodic()
+        return view
+      },
+    },
     today,
     risks,
     points,
