@@ -6,7 +6,7 @@ import {
   type ModelSettings,
   type Project,
 } from '@octo/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { errorText, messages } from './messages.ts'
 
@@ -23,6 +23,9 @@ export function ModelsSection({ api, project }: Props) {
   const [settings, setSettings] = useState<ModelSettings>(DEFAULT_MODEL_SETTINGS)
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(false)
+  /** What was read or saved last: anything else is a change still to save. */
+  const [kept, setKept] = useState('')
+  const formId = useId()
   const [error, setError] = useState<ErrorCode | null>(null)
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export function ModelsSection({ api, project }: Props) {
     void api.modelSettings(project.id).then((result) => {
       if (!result.ok) return setError(result.code)
       setSettings(result.value)
+      setKept(JSON.stringify(result.value))
       setLoaded(true)
     })
   }, [api, project.id])
@@ -42,13 +46,27 @@ export function ModelsSection({ api, project }: Props) {
     const result = await api.saveModelSettings(project.id, settings)
     if (!result.ok) return setError(result.code)
     setSettings(result.value)
+    setKept(JSON.stringify(result.value))
     setSaved(true)
   }
 
+  const clean = JSON.stringify(settings) === kept
   return (
     <section className="source" aria-label={text.title}>
-      <h3>{text.title}</h3>
-      <p className="hint">{text.intro}</p>
+      <div className="title-row">
+        <div>
+          <h3>{text.title}</h3>
+          <p className="hint">{text.intro}</p>
+        </div>
+        {loaded && (
+          <div className="actions">
+            <span className="hint">{saved ? text.saved : clean ? text.nothingToSave : ''}</span>
+            <button type="submit" form={formId} className="primary">
+              {text.save}
+            </button>
+          </div>
+        )}
+      </div>
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}
@@ -56,15 +74,16 @@ export function ModelsSection({ api, project }: Props) {
       )}
       {loaded && (
         <form
-          className="settings-form"
+          id={formId}
+          className="panel model-tasks"
           onSubmit={(event) => {
             event.preventDefault()
             void save()
           }}
         >
           {MODEL_TASKS.map((task) => (
-            <label key={task}>
-              {text.task[task]}
+            <label key={task} className="list-row">
+              <strong className="list-row-text">{text.task[task]}</strong>
               <select
                 value={settings[task] ?? DEFAULT_OPTION}
                 onChange={(event) => {
@@ -82,10 +101,6 @@ export function ModelsSection({ api, project }: Props) {
               </select>
             </label>
           ))}
-          <div className="actions">
-            <button type="submit">{text.save}</button>
-          </div>
-          {saved && <p className="badge badge-ok">{text.saved}</p>}
         </form>
       )}
     </section>

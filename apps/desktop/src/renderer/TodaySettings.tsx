@@ -73,61 +73,78 @@ export function TodaySettings({ api, project }: Props) {
   }
 
   return (
-    <section className="panel settings-panel" aria-label={text.settings}>
-      <h3>{text.settings}</h3>
+    <section className="source" aria-label={text.settings}>
+      <div>
+        <h3>{text.settings}</h3>
+        <p className="hint">
+          {view.ownAddresses.length > 0
+            ? text.addressesKnown(view.ownAddresses.join(', '))
+            : text.addressesNone}
+        </p>
+      </div>
       {error && <Failure code={error} />}
       {savedNote.note}
-      <p className="hint">
-        {view.ownAddresses.length > 0
-          ? text.addressesKnown(view.ownAddresses.join(', '))
-          : text.addressesNone}
-      </p>
-      <div className="field">
-        <label htmlFor="today-addresses">{text.addresses}</label>
-        <textarea
-          id="today-addresses"
-          rows={3}
-          value={addresses}
-          onChange={(event) => setAddresses(event.target.value)}
-        />
-        <span className="hint">{text.addressesHint}</span>
+      <div className="panel setting-rows">
+        <div className="setting-row">
+          <div className="setting-what">
+            <label htmlFor="today-addresses">{text.addresses}</label>
+            <span className="hint">{text.addressesHint}</span>
+          </div>
+          <div className="setting-how">
+            <textarea
+              id="today-addresses"
+              rows={3}
+              value={addresses}
+              onChange={(event) => setAddresses(event.target.value)}
+            />
+            <button type="button" onClick={() => void saveAddresses()}>
+              {text.saveAddresses}
+            </button>
+          </div>
+        </div>
+        <div className="setting-row">
+          <div className="setting-what">
+            <strong>{text.notifyTitle}</strong>
+            <span className="hint">{text.notifyHint}</span>
+          </div>
+          <div className="setting-how">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={view.notify}
+                onChange={(event) => void notify(event.target.checked)}
+              />{' '}
+              {text.notifyLabel}
+            </label>
+            {view.notify && notifyRefused() && (
+              <span className="warning" role="status">
+                {text.notifyRefused}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="setting-row">
+          <div className="setting-what">
+            <strong>{text.mutedTitle}</strong>
+          </div>
+          <div className="setting-how">
+            {view.mutedKinds.length === 0 ? (
+              <span className="status">{text.mutedNone}</span>
+            ) : (
+              <ul className="plain-rows">
+                {view.mutedKinds.map((kind) => (
+                  <li key={kind}>
+                    <span>{text.kinds[kind]}</span>
+                    <button type="button" className="quiet" onClick={() => void unmute(kind)}>
+                      {text.unmute}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
-      <div className="actions">
-        <button type="button" onClick={() => void saveAddresses()}>
-          {text.saveAddresses}
-        </button>
-      </div>
-      <div className="field">
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={view.notify}
-            onChange={(event) => void notify(event.target.checked)}
-          />{' '}
-          {text.notifyLabel}
-        </label>
-        <span className="hint">{text.notifyHint}</span>
-        {view.notify && notifyRefused() && (
-          <span className="warning" role="status">
-            {text.notifyRefused}
-          </span>
-        )}
-      </div>
-      <h4>{text.mutedTitle}</h4>
-      {view.mutedKinds.length === 0 ? (
-        <p className="hint">{text.mutedNone}</p>
-      ) : (
-        <ul className="plain-rows">
-          {view.mutedKinds.map((kind) => (
-            <li key={kind}>
-              <span>{text.kinds[kind]}</span>
-              <button type="button" className="quiet" onClick={() => void unmute(kind)}>
-                {text.unmute}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   )
 }

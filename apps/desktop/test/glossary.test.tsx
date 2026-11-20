@@ -57,6 +57,29 @@ describe('the glossary of a project, in its settings', () => {
     await waitFor(() => expect(screen.queryByRole('list', { name: text.proposed })).toBeNull())
   })
 
+  it('is one row while it holds nothing, and opens when asked or when Claude proposes', async () => {
+    const proposal = { heard: 'aurora uan', right: 'Aurora ONE' }
+    const api = {
+      glossary: vi.fn(async () => ok<Glossary>({ entries: [], proposed: [] })),
+      saveGlossary: vi.fn(async (_id: string, glossary: Glossary) => ok(glossary)),
+      proposeGlossary: vi.fn(async () => ok<Glossary>({ entries: [], proposed: [proposal] })),
+    }
+    render(<GlossarySection api={api} project={project} />)
+    const title = await screen.findByRole('button', { name: text.title })
+    await waitFor(() => expect(api.glossary).toHaveBeenCalled())
+    // Closed: its name, how many pairs it holds, and the way to ask Claude for some.
+    expect(title.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByText(new RegExp(messages.rows.count(0)))).toBeTruthy()
+    expect(screen.queryByRole('button', { name: text.save })).toBeNull()
+    fireEvent.click(title)
+    expect(screen.getByRole('button', { name: text.save })).toBeTruthy()
+    fireEvent.click(title)
+    expect(screen.queryByRole('button', { name: text.save })).toBeNull()
+    // What Claude proposes is shown without asking for it.
+    fireEvent.click(screen.getByRole('button', { name: text.propose }))
+    expect(await screen.findByRole('list', { name: text.proposed })).toBeTruthy()
+  })
+
   it('says why it cannot read the glossary', async () => {
     const api = {
       glossary: vi.fn(async () => ({ ok: false as const, code: 'unexpected' as const })),

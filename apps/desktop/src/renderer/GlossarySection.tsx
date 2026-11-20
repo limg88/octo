@@ -30,6 +30,8 @@ export function GlossarySection({ api, project }: Props) {
   const [proposed, setProposed] = useState<GlossaryEntry[]>([])
   const [error, setError] = useState<ErrorCode | null>(null)
   const [asking, setAsking] = useState(false)
+  /** Whether the PM opened or closed the glossary; null: it follows what it holds. */
+  const [wanted, setWanted] = useState<boolean | null>(null)
   const savedNote = useSavedNote()
 
   const show = (glossary: Glossary) => {
@@ -65,61 +67,82 @@ export function GlossarySection({ api, project }: Props) {
     setError(null)
     const result = await api.proposeGlossary(project.id)
     setAsking(false)
-    if (result.ok) show(result.value)
-    else setError(result.code)
+    if (!result.ok) return setError(result.code)
+    show(result.value)
+    // What was asked for is shown, whatever the PM did with the glossary before.
+    setWanted(null)
   }
 
+  const count = typed().length
+  // With nothing in it the glossary is one row; it opens when asked, or when there is something.
+  const open = wanted ?? (count > 0 || proposed.length > 0)
   return (
-    <section className="source" aria-label={text.title}>
-      <h3>{text.title}</h3>
-      <p className="hint">{text.intro}</p>
-      {error && (
-        <p className="warning" role="alert">
-          {errorText(error)}
-        </p>
-      )}
-      <RowsField
-        label={text.title}
-        columns={COLUMNS}
-        rows={rows}
-        onChange={setRows}
-        addLabel={text.add}
-        cellLabel={(column, row) => text.cell(text[column], row)}
-        removeLabel={text.remove}
-      />
-      <div className="actions">
-        <button type="button" className="primary" onClick={() => void save(typed(), proposed)}>
-          {text.save}
+    <section className="panel" aria-label={text.title}>
+      <div className="list-row">
+        <button
+          type="button"
+          className="quiet glossary-title"
+          aria-expanded={open}
+          onClick={() => setWanted(!open)}
+        >
+          {text.title}
         </button>
+        <span className="list-row-text hint">
+          {messages.rows.count(count)} · {text.short}
+        </span>
         <BusyButton busy={asking} busyLabel={text.asking} onClick={() => void propose()}>
           {text.propose}
         </BusyButton>
-        {savedNote.note}
       </div>
-      {proposed.length > 0 && (
-        <ul className="today-muted" aria-label={text.proposed}>
-          {proposed.map((pair) => (
-            <li key={pair.heard}>
-              <span>{text.pair(pair.heard, pair.right)}</span>
-              <button
-                type="button"
-                className="quiet"
-                aria-label={text.acceptOf(pair.heard)}
-                onClick={() => void save([...typed(), pair], without(pair))}
-              >
-                {text.accept}
-              </button>
-              <button
-                type="button"
-                className="quiet"
-                aria-label={text.dismissOf(pair.heard)}
-                onClick={() => void save(typed(), without(pair))}
-              >
-                {text.dismiss}
-              </button>
-            </li>
-          ))}
-        </ul>
+      {error && (
+        <p className="warning panel-body" role="alert">
+          {errorText(error)}
+        </p>
+      )}
+      {open && (
+        <div className="panel-body">
+          <p className="hint">{text.intro}</p>
+          <RowsField
+            label={text.title}
+            columns={COLUMNS}
+            rows={rows}
+            onChange={setRows}
+            addLabel={text.add}
+            cellLabel={(column, row) => text.cell(text[column], row)}
+            removeLabel={text.remove}
+          />
+          <div className="actions">
+            <button type="button" onClick={() => void save(typed(), proposed)}>
+              {text.save}
+            </button>
+            {savedNote.note}
+          </div>
+          {proposed.length > 0 && (
+            <ul className="today-muted" aria-label={text.proposed}>
+              {proposed.map((pair) => (
+                <li key={pair.heard}>
+                  <span>{text.pair(pair.heard, pair.right)}</span>
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-label={text.acceptOf(pair.heard)}
+                    onClick={() => void save([...typed(), pair], without(pair))}
+                  >
+                    {text.accept}
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-label={text.dismissOf(pair.heard)}
+                    onClick={() => void save(typed(), without(pair))}
+                  >
+                    {text.dismiss}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   )

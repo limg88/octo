@@ -280,6 +280,7 @@ export const messages = {
           ? 'Prossima lettura fra 1 minuto'
           : `Prossima lettura fra ${minutes} minuti`,
     notifyBody: (project: string) => `${project} · entra in «Adesso»`,
+    notifyTitle: 'Notifica del sistema',
     notifyLabel: 'Avvisami con una notifica del sistema quando una voce entra in «Adesso»',
     notifyHint:
       'Una notifica al più per ogni lettura delle fonti, e nessuna mentre stai guardando «Oggi» di questo progetto.',
@@ -689,16 +690,24 @@ export const messages = {
     `Ultima lettura ${at}: ${written} nuove, ${unchanged} già presenti.`,
   mailLastFailed: (at: string) => `Ultima lettura ${at} non riuscita.`,
   mailStale: 'La posta non viene letta da più di un giorno.',
+  credential: {
+    source: 'Fonte',
+    state: 'Stato',
+    title: 'Credenziale',
+    places: {
+      here: 'su questo computer',
+      shared: 'di chi condivide la cartella',
+      none: 'nessuna',
+      not_needed: 'non serve',
+    },
+    sharedTitle: 'Credenziale di chi condivide la cartella.',
+    sharedNote:
+      'Su questo computer non c’è la credenziale, o la fonte da qui non si legge: vale la lettura di chi condivide la cartella. Per leggerla anche da qui, premi «Modifica» e inserisci la tua.',
+  },
   elsewhere: {
     who: (reader: { name: string; computer: string }) => `${reader.name} · ${reader.computer}`,
     read: (who: string) => `Letta da ${who}`,
     reading: (who: string) => `In lettura da ${who}`,
-    noCredential:
-      'Su questo computer non c’è la credenziale: vale la lettura di chi condivide la cartella. Per leggerla anche da qui, premi «Modifica» e inserisci la tua.',
-    noMail:
-      'Su questo computer la posta non si legge: vale quella scritta nel progetto da chi condivide la cartella.',
-    noMeetings:
-      'La cartella di Verbale non è su questo computer: valgono le riunioni portate nel progetto da chi condivide la cartella.',
   },
   mailNotConfigured: 'La posta di questo progetto non è ancora configurata.',
   feedIntro: {
@@ -756,10 +765,19 @@ export const messages = {
   team: {
     title: 'Persone e calendario',
     intro:
-      'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Octo li scrive anche come testo del progetto: risposte e deliverable li leggono e li citano. Chi non era sul progetto in un periodo non viene segnalato per le ore che mancano.',
+      'Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Risposte e deliverable li leggono e li citano.',
     people: 'Persone',
-    peopleHint:
-      'Solo il nome è obbligatorio. L’allocazione è la parte del suo tempo che la persona dà al progetto, in percentuale: vuota se non la sai. Le date si lasciano vuote se la persona c’è dall’inizio o c’è ancora. In «Come scrivergli» va ciò che un’email deve rispettare, per esempio «prima la richiesta». «Tu / lei» fissa come ci si rivolge alla persona; lasciato su «come nelle mail», chi scrive segue le mail che le hai già mandato, e dà del lei se non ce ne sono.',
+    hints: {
+      allocation: 'L’allocazione è la parte del suo tempo sul progetto: vuota se non la sai.',
+      dates: 'Le date restano vuote se la persona c’è dall’inizio o c’è ancora.',
+      note: 'Ciò che un’email deve rispettare, per esempio «prima la richiesta».',
+      address:
+        'Con «come nelle mail» chi scrive segue le mail che le hai già mandato, e dà del lei se non ce ne sono.',
+    },
+    blank: { allocation: 'non indicata', from: 'dall’inizio', to: 'c’è ancora' },
+    unnamed: 'Senza nome',
+    show: (person: string) => `Mostra ${person}`,
+    nothingToSave: 'Nessuna modifica da salvare',
     addressAuto: 'come nelle mail',
     periods: 'Calendario: periodi e sprint',
     columns: {
@@ -819,6 +837,7 @@ export const messages = {
     choice: { fable: 'Fable', opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' },
     save: 'Salva i modelli',
     saved: 'Modelli salvati: valgono dalla prossima domanda e dal prossimo deliverable.',
+    nothingToSave: 'Nessuna modifica da salvare',
     used: (model: string) => `modello ${model}`,
     wroteAndReviewed: (write: string, review: string | null) =>
       review === null || review === write
@@ -1690,8 +1709,7 @@ export const messages = {
   deliverableSourcesNote:
     'I numeri fra parentesi rimandano alle fonti: spariscono dal file approvato.',
   guideTitle: 'Avvio del progetto',
-  guideIntro:
-    'Collega ciò che alimenta la memoria di questo progetto, una riga per volta. Ogni collegamento è facoltativo: puoi tornarci quando vuoi.',
+  guideIntro: 'Collega ciò che alimenta la memoria di questo progetto: ogni riga è facoltativa.',
   guideFill: 'Leggi tutte le fonti',
   guideFilling: 'Sto leggendo tutte le fonti collegate…',
   guideStep: (label: string, written: number, unchanged: number) =>
@@ -1825,6 +1843,7 @@ export const messages = {
   agentReady: (version: string) => `Claude ${version}`,
   glossary: {
     title: 'Glossario: sigle e nomi sentiti male',
+    short: 'la forma giusta di ciò che le trascrizioni scrivono come lo sentono',
     intro:
       'Le trascrizioni delle riunioni scrivono sigle e nomi come li sentono. Qui dici la forma giusta: Octo la mette nelle trascrizioni quando entrano nel progetto e la dà a chi scrive i deliverable. Claude propone le coppie, tu le approvi.',
     heard: 'Come viene scritta',

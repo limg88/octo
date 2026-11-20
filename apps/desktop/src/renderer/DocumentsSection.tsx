@@ -46,6 +46,7 @@ export function DocumentsSection({ api, project }: Props) {
     <section className="sources" aria-label={messages.documentsTitle}>
       <SourceHeader
         title={messages.documentsTitle}
+        credential="not_needed"
         linked
         open={false}
         status={
@@ -63,11 +64,7 @@ export function DocumentsSection({ api, project }: Props) {
             ) : (
               state && <p className="badge badge-warning">{messages.documentsNever}</p>
             )}
-            <Elsewhere
-              readBy={state?.readBy ?? null}
-              readingBy={state?.readingBy ?? null}
-              notHere={null}
-            />
+            <Elsewhere readBy={state?.readBy ?? null} readingBy={state?.readingBy ?? null} />
           </>
         }
       >
@@ -75,7 +72,6 @@ export function DocumentsSection({ api, project }: Props) {
           {messages.documentsConvert}
         </button>
       </SourceHeader>
-      <p className="hint">{messages.documentsIntro}</p>
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}

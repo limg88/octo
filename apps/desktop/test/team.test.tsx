@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { NO_TEAM, type Project, type ProjectTeam } from '@octo/domain'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { messages } from '../src/renderer/messages.ts'
 import { TeamSection } from '../src/renderer/TeamSection.tsx'
@@ -37,8 +37,20 @@ const team: ProjectTeam = {
 afterEach(cleanup)
 
 describe('the section of people and calendar', () => {
-  const cell = (row: string, column: string) =>
-    screen.getByLabelText(text.cell(row, column)) as HTMLInputElement
+  /** Puts a person of the list in view: its fields are beside the list, one person at a time. */
+  const choose = (n: number) =>
+    fireEvent.click(
+      within(screen.getByRole('table', { name: text.people })).getAllByRole('button')[
+        n - 1
+      ] as HTMLElement,
+    )
+  const PERSON = new RegExp(`^${text.personN(0).replace('0', '(\\d+)')}$`)
+  /** The field of a column of a row; that of a person is reached by choosing the person first. */
+  const cell = (row: string, column: string) => {
+    const person = PERSON.exec(row)
+    if (person) choose(Number(person[1]))
+    return screen.getByLabelText(text.cell(row, column)) as HTMLInputElement
+  }
   const set = (row: string, column: string, value: string) =>
     fireEvent.change(cell(row, column), { target: { value } })
   const columns = text.columns
@@ -49,15 +61,27 @@ describe('the section of people and calendar', () => {
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    await screen.findByRole('group', { name: text.people })
+    await screen.findByRole('table', { name: text.people })
     expect(cell(text.personN(2), columns.name).value).toBe('Carla Bianchi')
     expect(cell(text.personN(2), columns.side).value).toBe('client')
     expect(cell(text.personN(1), columns.from).value).toBe('2026-03-01')
     expect(cell(text.periodN(1), columns.period).value).toBe('Sprint 28')
+    // The list is read, not typed in: what is not written says what it means.
+    const rows = within(screen.getByRole('table', { name: text.people }))
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.textContent)
+    expect(rows[1]).toContain(text.sides.client)
+    expect(rows[1]).toContain(text.blank.allocation)
+    expect(rows[1]).toContain(text.blank.to)
+    expect(rows[0]).toContain('01/03/2026')
+    // Nothing was typed yet: there is nothing to save, and the page says so.
+    expect(screen.getByText(text.nothingToSave)).toBeTruthy()
 
     // A row that lacks what makes it a person or a period is told, and nothing is saved.
     fireEvent.click(screen.getByRole('button', { name: text.addPerson }))
     set(text.personN(3), columns.role, 'analista')
+    expect(screen.queryByText(text.nothingToSave)).toBeNull()
     set(text.periodN(1), columns.to, '')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
     expect(screen.getByText(text.personWrong(3))).toBeTruthy()
@@ -77,6 +101,8 @@ describe('the section of people and calendar', () => {
     expect(api.saveTeam).not.toHaveBeenCalled()
     set(text.personN(3), columns.allocation, '37,5')
     set(text.personN(3), columns.to, '2026-05-31')
+    // A person is taken off from where its fields are: the next one takes its place in view.
+    choose(1)
     fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
     fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
     set(text.periodN(1), columns.to, '2026-12-04')
@@ -109,7 +135,7 @@ describe('the section of people and calendar', () => {
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    await screen.findByRole('group', { name: text.people })
+    await screen.findByRole('table', { name: text.people })
     set(text.personN(1), columns.name, 'Carla Bianchi')
     set(text.personN(1), columns.side, 'client')
     fireEvent.click(screen.getByRole('button', { name: text.save }))
@@ -136,7 +162,7 @@ describe('the section of people and calendar', () => {
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    await screen.findByRole('group', { name: text.people })
+    await screen.findByRole('table', { name: text.people })
     const side = cell(text.personN(1), columns.side) as unknown as HTMLSelectElement
     expect([...side.options].map((option) => option.text)).toEqual([
       text.sides.supplier,
@@ -164,7 +190,7 @@ describe('the section of people and calendar', () => {
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    await screen.findByRole('group', { name: text.people })
+    await screen.findByRole('table', { name: text.people })
     expect(cell(text.personN(1), columns.capDays).value).toBe('8')
     expect(cell(text.personN(2), columns.capDays).value).toBe('')
     set(text.personN(2), columns.capDays, 'tanti')
@@ -194,7 +220,7 @@ describe('the section of people and calendar', () => {
       saveTeam: vi.fn(async (_id: string, next: ProjectTeam) => ok(next)),
     }
     render(<TeamSection api={api} project={project} />)
-    await screen.findByRole('group', { name: text.people })
+    await screen.findByRole('table', { name: text.people })
     expect(cell(text.personN(1), columns.address).value).toBe('tu')
     expect(cell(text.personN(2), columns.address).value).toBe('')
     set(text.personN(1), columns.address, 'lei')

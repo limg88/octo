@@ -896,11 +896,14 @@ main > .warning,
   gap: 8px;
 }
 
-.guide {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-large);
-  background: var(--panel);
+/* The start of a project is a title, a line and its one command: no frame around them. */
+.guide .title-row {
+  width: 100%;
+  max-width: none;
+}
+
+.guide h3 {
+  font-size: 17px;
 }
 
 .guide-steps,
@@ -1228,16 +1231,6 @@ button.kind-name {
   border: none;
   border-top: 1px solid var(--line);
   width: 100%;
-}
-
-.letterhead {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
 }
 
 /* Dashboard */
@@ -1886,29 +1879,71 @@ input.short {
   gap: 2px;
 }
 
-/* One source of the list: its name and state on the left, what to do on the right. */
+/* One source of the list: its name, its state, where its credential is, what to do. */
 .source-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 200px 180px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   max-width: none;
+  min-height: 40px;
+  padding: 5px 12px;
 }
 
-.source-title {
+.source-status {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
-.sources-page > .sources:not(.guide) {
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-large);
-  box-shadow: var(--shadow-control);
+.source-credential {
+  font-size: 13px;
+}
+
+.source-actions {
+  justify-content: flex-end;
+}
+
+/* The sources are the rows of one list; the settings of a source open under its row. */
+.source-list > .sources {
+  align-items: stretch;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.source-list > .sources > :not(.source-header):not([hidden]) {
+  margin: 0 12px 12px;
+}
+
+.source-list-head {
+  min-height: 32px;
+  background: var(--panel);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* What the values of the list mean, once for all its rows. */
+.source-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.source-notes dt {
+  display: inline;
+  font-weight: 600;
+}
+
+.source-notes dd {
+  display: inline;
+  margin: 0 0 0 4px;
 }
 
 .source-form h4 {
@@ -2038,13 +2073,138 @@ details.advanced[open] > summary {
   max-width: 1000px;
 }
 
-/* The people have more columns than the calendar: only their rows take the wider room. */
-.settings-form.wide-form.team-form {
-  max-width: 1280px;
+/* The people as a list to read, with the person in view beside it to change. */
+.team-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.team-people {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  align-items: start;
+  gap: 16px;
+}
+
+.panel-body.team-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-fields-wide {
+  grid-column: 1 / -1;
+}
+
+.team-fields input,
+.team-fields select {
+  width: 100%;
+  min-width: 0;
 }
 
 .team-form .calendar-rows {
   max-width: 1000px;
+}
+
+/* A setting a row: what it is and why on the left, how it is set on the right. */
+.setting-rows {
+  max-width: 880px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.setting-row:first-child {
+  border-top: 0;
+}
+
+.setting-what {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 320px;
+  font-size: 13px;
+}
+
+.setting-what label,
+.setting-what strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.setting-how {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.setting-how textarea {
+  width: 100%;
+}
+
+.setting-how .status {
+  margin-left: 0;
+}
+
+/* The files the deliverables are written on: a row each, what each is for after the rows. */
+.model-files {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-large);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.model-file h4 {
+  flex: none;
+  width: 220px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.model-file .status {
+  margin-left: 0;
+}
+
+.model-files > .model-file:first-child {
+  border-top: 0;
+}
+
+.model-note {
+  order: 1;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.model-note + .model-note {
+  border-top: 0;
+}
+
+/* Which model does what: its name on the left, the choice on the right. */
+.model-tasks {
+  max-width: 880px;
+}
+
+.model-tasks select {
+  flex: none;
+  width: 320px;
+}
+
+.glossary-title {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .settings-form .field label {
@@ -2744,14 +2904,6 @@ table.data tr.row-selected > :first-child {
 
 .progress-register {
   margin: 0;
-}
-
-.settings-panel {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 760px;
 }
 
 .today-first {
@@ -3574,7 +3726,8 @@ button.marker[aria-pressed="true"] {
   .dashboard .split,
   .answer.split,
   .deliverable-body .answer.split,
-  .sheet-columns {
+  .sheet-columns,
+  .team-people {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3885,6 +4038,13 @@ button.marker[aria-pressed="true"] {
 .title-row > .hint {
   flex: 1;
   min-width: 0;
+}
+
+/* The commands of a title keep their line, whatever the title beside them. */
+.title-row > .actions,
+.title-row > button {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* A small window: a band of figures goes on two rows. */

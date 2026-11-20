@@ -74,29 +74,48 @@ export function ProjectSettings({ api, project, part: asked = null }: Props) {
       {part === 'links' && (
         <>
           <SetupGuide api={api} project={project} />
-          <SourcesView
-            api={api}
-            project={project}
-            open={open === 'mail'}
-            onToggle={toggle('mail')}
-          />
-          <MeetingsSection
-            api={api}
-            project={project}
-            open={open === 'meetings'}
-            onToggle={toggle('meetings')}
-          />
-          {FEED_NAMES.map((feed) => (
-            <FeedSection
-              key={feed}
+          <div className="panel source-list">
+            <div className="source-header source-list-head" aria-hidden="true">
+              <span>{messages.credential.source}</span>
+              <span>{messages.credential.state}</span>
+              <span>{messages.credential.title}</span>
+              <span />
+            </div>
+            <SourcesView
               api={api}
               project={project}
-              feed={feed}
-              open={open === feed}
-              onToggle={toggle(feed)}
+              open={open === 'mail'}
+              onToggle={toggle('mail')}
             />
-          ))}
-          <DocumentsSection api={api} project={project} />
+            <MeetingsSection
+              api={api}
+              project={project}
+              open={open === 'meetings'}
+              onToggle={toggle('meetings')}
+            />
+            {FEED_NAMES.map((feed) => (
+              <FeedSection
+                key={feed}
+                api={api}
+                project={project}
+                feed={feed}
+                open={open === feed}
+                onToggle={toggle(feed)}
+              />
+            ))}
+            <DocumentsSection api={api} project={project} />
+          </div>
+          {/* What a value of a column means, said once under the list. */}
+          <dl className="source-notes">
+            <div>
+              <dt>{messages.credential.sharedTitle}</dt>
+              <dd>{messages.credential.sharedNote}</dd>
+            </div>
+            <div>
+              <dt>{messages.documentsTitle}.</dt>
+              <dd>{messages.documentsIntro}</dd>
+            </div>
+          </dl>
         </>
       )}
       {part === 'team' && (
@@ -107,23 +126,28 @@ export function ProjectSettings({ api, project, part: asked = null }: Props) {
       )}
       {part === 'today' && <TodaySettings api={api} project={project} />}
       {part === 'deliverables' && (
-        <section className="panel settings-panel" aria-label={messages.deliverableSettings.title}>
-          <p className="hint">{messages.deliverableSettings.intro}</p>
-          <ModelFile
-            key={`letterhead-${project.id}`}
-            text={LETTERHEAD_TEXT}
-            has={() => api.hasLetterhead(project.id)}
-            choose={() => api.chooseLetterhead(project.id)}
-            remove={() => api.removeLetterhead(project.id)}
-          />
-          <ModelFile
-            key={`deck-${project.id}`}
-            onlyWhenSet
-            text={{ ...DECK_MODEL_TEXT, hint: messages.deckModelLegacyHint }}
-            has={() => api.hasDeckModel(project.id)}
-            choose={() => api.chooseDeckModel(project.id)}
-            remove={() => api.removeDeckModel(project.id)}
-          />
+        <section className="source" aria-label={messages.deliverableSettings.title}>
+          <div>
+            <h3>{messages.settingsParts.deliverables}</h3>
+            <p className="hint">{messages.deliverableSettings.intro}</p>
+          </div>
+          <div className="model-files">
+            <ModelFile
+              key={`letterhead-${project.id}`}
+              text={LETTERHEAD_TEXT}
+              has={() => api.hasLetterhead(project.id)}
+              choose={() => api.chooseLetterhead(project.id)}
+              remove={() => api.removeLetterhead(project.id)}
+            />
+            <ModelFile
+              key={`deck-${project.id}`}
+              onlyWhenSet
+              text={{ ...DECK_MODEL_TEXT, hint: messages.deckModelLegacyHint }}
+              has={() => api.hasDeckModel(project.id)}
+              choose={() => api.chooseDeckModel(project.id)}
+              remove={() => api.removeDeckModel(project.id)}
+            />
+          </div>
         </section>
       )}
       {part === 'advanced' && <ModelsSection api={api} project={project} />}

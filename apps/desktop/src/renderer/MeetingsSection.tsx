@@ -6,7 +6,7 @@ import { Elsewhere } from './Elsewhere.tsx'
 import { MeetingsHeld } from './MeetingsHeld.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
 import { PathField } from './PathField.tsx'
-import { SourceHeader } from './SourceHeader.tsx'
+import { credentialPlace, SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
@@ -98,6 +98,7 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
     <section className="sources" aria-label={messages.meetingsTitle}>
       <SourceHeader
         title={messages.meetingsTitle}
+        credential={credentialPlace(linked, view.readableHere)}
         linked={linked}
         open={open}
         onToggle={onToggle}
@@ -120,11 +121,7 @@ export function MeetingsSection({ api, project, open, onToggle, now = systemNow 
                 {messages.meetingsLastRun(dateTimeText(run.at), run.written, run.unchanged)}
               </p>
             )}
-            <Elsewhere
-              readBy={view.readBy}
-              readingBy={view.readingBy}
-              notHere={linked && !view.readableHere ? messages.elsewhere.noMeetings : null}
-            />
+            <Elsewhere readBy={view.readBy} readingBy={view.readingBy} />
           </>
         }
       >

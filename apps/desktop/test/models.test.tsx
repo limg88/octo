@@ -25,9 +25,12 @@ describe('the models of a project', () => {
     const select = (label: string) => screen.findByLabelText<HTMLSelectElement>(label)
     expect((await select(text.task.ask)).value).toBe('haiku')
     expect((await select(text.task.write)).value).toBe('')
+    // Nothing was chosen yet: there is nothing to save, and the page says so.
+    expect(screen.getByText(text.nothingToSave)).toBeTruthy()
 
     fireEvent.change(await select(text.task.write), { target: { value: 'opus' } })
     fireEvent.change(await select(text.task.ask), { target: { value: '' } })
+    expect(screen.queryByText(text.nothingToSave)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: text.save }))
 
     await waitFor(() =>

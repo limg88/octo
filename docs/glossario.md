@@ -33,6 +33,12 @@ Le parole che Octo usa con chi lo usa. Una cosa ha un nome solo; i nomi tecnici 
 | budget (di una commessa) | ciò che si è pianificato quando la commessa è stata venduta, riga per riga e mese per mese | baseline |
 | actual, forecast | i mesi che sono un fatto e quelli ancora da venire, come li chiama la scheda progetto | consuntivo e previsione (nella griglia) |
 | commessa assegnata | una commessa di cui in NetSuite sei il project manager | — |
+| richiamo in vista | il richiamo di una risposta di cui «Fonte citata» mostra la fonte: quello scelto, o il primo dell'ultima risposta | citazione attiva |
+| credenziale | ciò con cui Octo legge una fonte: «su questo computer», «di chi condivide la cartella», «nessuna», «non serve» | token, password (nelle etichette) |
+| Octo (come fonte) | nella colonna «Fonte» di «Commessa»: la cifra è calcolata da Octo, non letta da un sistema | calcolato (da solo) |
+| manca | un dato che nessuna fonte dice: la cella lo dice a parole, non con un trattino | n/d, — |
+| scostamento da NetSuite | i costi che calcola Octo meno quelli registrati da NetSuite: «Da verificare» se non è zero | delta, differenza |
+| Calcolato da Octo, Valutato da Claude | le due parti della rilettura di un deliverable: ciò che il codice ha contato e ciò che Claude ha giudicato | controlli automatici, AI review |
 
 Regole:
 - Octo parla in prima persona («Leggo…», «Non ho salvato…») e dà del tu.

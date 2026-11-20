@@ -12,7 +12,7 @@ import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Elsewhere } from './Elsewhere.tsx'
 import { InfoTip } from './InfoTip.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
-import { SourceHeader } from './SourceHeader.tsx'
+import { credentialPlace, SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
@@ -260,17 +260,14 @@ export function FeedSection({ api, project, feed, now = systemNow, open = true, 
     <section className="sources" aria-label={label}>
       <SourceHeader
         title={label}
+        credential={credentialPlace(linked, view.hasSecret)}
         linked={linked}
         open={open}
         onToggle={onToggle}
         status={
           <>
             <Freshness view={view} busy={busy} now={now()} />
-            <Elsewhere
-              readBy={view.readBy}
-              readingBy={view.readingBy}
-              notHere={linked && !view.hasSecret ? messages.elsewhere.noCredential : null}
-            />
+            <Elsewhere readBy={view.readBy} readingBy={view.readingBy} />
           </>
         }
       >

@@ -63,19 +63,24 @@ export function SetupGuide({ api, project }: Props) {
 
   return (
     <section className="sources guide" aria-label={messages.guideTitle}>
-      <h3>{messages.guideTitle}</h3>
-      <p className="hint">{messages.guideIntro}</p>
-      {status && <p>{messages.guideLinked(linked, FEED_NAMES.length + LOCAL_SOURCES)}</p>}
+      <div className="title-row">
+        <div>
+          <h3>{messages.guideTitle}</h3>
+          <p className="hint">
+            {status
+              ? messages.guideLinked(linked, FEED_NAMES.length + LOCAL_SOURCES)
+              : messages.guideIntro}
+          </p>
+        </div>
+        <button type="button" className="primary" disabled={busy} onClick={() => void fill()}>
+          {messages.guideFill}
+        </button>
+      </div>
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}
         </p>
       )}
-      <div className="actions">
-        <button type="button" className="primary" disabled={busy} onClick={() => void fill()}>
-          {messages.guideFill}
-        </button>
-      </div>
       {busy && (
         <p className="progress" role="status">
           {messages.guideFilling}

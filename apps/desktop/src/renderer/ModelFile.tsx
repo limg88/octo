@@ -53,16 +53,13 @@ export function ModelFile({
 
   if (present === null || (onlyWhenSet && !present)) return null
   return (
-    <section className="letterhead" aria-label={text.title}>
-      <h4>{text.title}</h4>
-      <p className={present ? 'badge badge-ok' : 'badge'}>{present ? text.set : text.none}</p>
-      <p className="hint">{text.hint}</p>
-      {error && (
-        <p className="warning" role="alert">
-          {errorText(error)}
-        </p>
-      )}
-      <div className="actions">
+    <>
+      <section className="list-row model-file" aria-label={text.title}>
+        <h4>{text.title}</h4>
+        <span className={present ? 'status status-ok' : 'status'}>
+          {present ? text.set : text.none}
+        </span>
+        <span className="command-row-gap" />
         {!onlyWhenSet && (
           <button type="button" onClick={() => void change(choose)}>
             {text.choose}
@@ -73,7 +70,15 @@ export function ModelFile({
             {messages.letterheadRemove}
           </button>
         )}
-      </div>
-    </section>
+      </section>
+      {error && (
+        <p className="warning model-note" role="alert">
+          {errorText(error)}
+        </p>
+      )}
+      <p className="hint model-note">
+        <strong>{text.title}.</strong> {text.hint}
+      </p>
+    </>
   )
 }

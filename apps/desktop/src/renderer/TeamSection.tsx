@@ -6,12 +6,14 @@ import {
   TEAM_SIDES,
   type TeamPerson,
 } from '@octo/domain'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
+import { type DataColumn, DataTable } from './DataTable.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountOf, amountText } from './forecast-text.ts'
 import { errorText, messages } from './messages.ts'
-import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import { blankRow, emptyRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
+import { shortDayText } from './today-text.ts'
 
 type Props = { api: Pick<OctoApi, 'team' | 'saveTeam'>; project: Project }
 
@@ -30,31 +32,17 @@ type PersonKey =
 type PeriodKey = 'name' | 'from' | 'to'
 const SIDES: readonly TeamPerson['side'][] = TEAM_SIDES
 
+/** What is typed of a person: the list shows some of it, the detail beside the list all of it. */
 const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
-  { key: 'name', label: text.columns.name, width: 'minmax(150px, 1.2fr)' },
-  { key: 'role', label: text.columns.role, width: 'minmax(200px, 1.8fr)' },
-  {
-    key: 'side',
-    label: text.columns.side,
-    kind: 'select',
-    width: '130px',
-    options: SIDES.map((side) => ({ value: side, label: text.sides[side] })),
-  },
-  { key: 'allocation', label: text.columns.allocation, kind: 'amount', width: '110px' },
-  { key: 'capDays', label: text.columns.capDays, kind: 'amount', width: '110px' },
-  { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
-  { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
-  { key: 'note', label: text.columns.note, width: 'minmax(130px, 1fr)' },
-  {
-    key: 'address',
-    label: text.columns.address,
-    kind: 'select',
-    width: '120px',
-    options: [
-      { value: '', label: text.addressAuto },
-      ...TEAM_ADDRESSES.map((address) => ({ value: address, label: address })),
-    ],
-  },
+  { key: 'name', label: text.columns.name },
+  { key: 'role', label: text.columns.role },
+  { key: 'side', label: text.columns.side },
+  { key: 'allocation', label: text.columns.allocation },
+  { key: 'capDays', label: text.columns.capDays },
+  { key: 'from', label: text.columns.from },
+  { key: 'to', label: text.columns.to },
+  { key: 'note', label: text.columns.note },
+  { key: 'address', label: text.columns.address },
 ]
 const PERIOD_COLUMNS: RowsColumn<PeriodKey>[] = [
   { key: 'name', label: text.columns.period, width: 'minmax(200px, 1fr)' },
@@ -86,20 +74,26 @@ export function TeamSection({ api, project }: Props) {
   const [saved, setSaved] = useState<ProjectTeam | null>(null)
   const [error, setError] = useState<ErrorCode | null>(null)
   const [problems, setProblems] = useState<{ people: string[]; periods: string[] } | null>(null)
+  /** The person whose fields are in view beside the list. */
+  const [chosen, setChosen] = useState(0)
+  /** What was read or saved last, as typed: anything else is a change still to save. */
+  const [kept, setKept] = useState('')
+  const formId = useId()
 
   const show = useCallback((team: ProjectTeam) => {
-    setPeople(
-      orOneRow(
-        team.people.map(({ capDays, address, ...person }) => ({
-          ...person,
-          address: address ?? '',
-          allocation: amountText(person.allocation),
-          capDays: amountText(capDays ?? null),
-        })),
-        PERSON_COLUMNS,
-      ),
+    const shownPeople = orOneRow(
+      team.people.map(({ capDays, address, ...person }) => ({
+        ...person,
+        address: address ?? '',
+        allocation: amountText(person.allocation),
+        capDays: amountText(capDays ?? null),
+      })),
+      PERSON_COLUMNS,
     )
-    setPeriods(orOneRow([...team.periods], PERIOD_COLUMNS))
+    const shownPeriods = orOneRow([...team.periods], PERIOD_COLUMNS)
+    setPeople(shownPeople)
+    setPeriods(shownPeriods)
+    setKept(JSON.stringify({ people: shownPeople, periods: shownPeriods }))
   }, [])
 
   useEffect(() => {
@@ -162,10 +156,112 @@ export function TeamSection({ api, project }: Props) {
     setSaved(result.value)
   }
 
+  const typed = JSON.stringify({ people, periods })
+  const clean = typed === kept
+  const personAt = Math.min(chosen, people.length - 1)
+  const person = people[personAt]
+  const setPerson = (key: PersonKey, value: string) =>
+    setPeople(people.map((row, at) => (at === personAt ? { ...row, [key]: value } : row)))
+  /** The name of a field of the person in view, read by who cannot see where it stands. */
+  const nameOf = (key: PersonKey) => text.cell(text.personN(personAt + 1), PERSON_LABELS[key])
+  const input = (key: PersonKey, kind: 'text' | 'amount' | 'date' = 'text') => (
+    <label className="field">
+      {PERSON_LABELS[key]}
+      <input
+        type={kind === 'date' ? 'date' : 'text'}
+        inputMode={kind === 'amount' ? 'decimal' : undefined}
+        aria-label={nameOf(key)}
+        value={person?.[key] ?? ''}
+        onChange={(event) => setPerson(key, event.target.value)}
+      />
+    </label>
+  )
+  const select = (key: PersonKey, options: ReadonlyArray<{ value: string; label: string }>) => (
+    <label className="field">
+      {PERSON_LABELS[key]}
+      <select
+        aria-label={nameOf(key)}
+        value={person?.[key] ?? ''}
+        onChange={(event) => setPerson(key, event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+  const listed = people.map((row, index) => ({ row, index }))
+  const listColumns: DataColumn<(typeof listed)[number]>[] = [
+    {
+      key: 'name',
+      label: text.columns.name,
+      width: '32%',
+      cell: ({ row, index }) => (
+        <button
+          type="button"
+          className="quiet cell-button project-name"
+          aria-pressed={index === personAt}
+          aria-label={text.show(row.name.trim() === '' ? text.personN(index + 1) : row.name)}
+          onClick={() => setChosen(index)}
+        >
+          {row.name.trim() === '' ? text.unnamed : row.name}
+        </button>
+      ),
+    },
+    { key: 'role', label: text.columns.role, cell: ({ row }) => row.role },
+    {
+      key: 'side',
+      label: text.columns.side,
+      width: '100px',
+      cell: ({ row }) => text.sides[SIDES.find((side) => side === row.side) ?? 'supplier'],
+    },
+    {
+      key: 'allocation',
+      label: text.columns.allocation,
+      kind: 'number',
+      width: '110px',
+      cell: ({ row }) => row.allocation || <span className="hint">{text.blank.allocation}</span>,
+    },
+    {
+      key: 'from',
+      label: text.columns.from,
+      width: '100px',
+      cell: ({ row }) =>
+        row.from === '' ? <span className="hint">{text.blank.from}</span> : shortDayText(row.from),
+    },
+    {
+      key: 'to',
+      label: text.columns.to,
+      width: '100px',
+      cell: ({ row }) =>
+        row.to === '' ? <span className="hint">{text.blank.to}</span> : shortDayText(row.to),
+    },
+  ]
+
   return (
     <section className="source" aria-label={text.title}>
-      <h3>{text.title}</h3>
-      <p className="hint">{text.intro}</p>
+      <div className="title-row">
+        <div>
+          <h3>{text.title}</h3>
+          <p className="hint">{text.intro}</p>
+        </div>
+        {loaded && (
+          <div className="actions">
+            <span className="hint">
+              {saved
+                ? text.saved(saved.people.length, saved.periods.length)
+                : clean
+                  ? text.nothingToSave
+                  : ''}
+            </span>
+            <button type="submit" form={formId} className="primary">
+              {text.save}
+            </button>
+          </div>
+        )}
+      </div>
       {error && (
         <p className="warning" role="alert">
           {errorText(error)}
@@ -173,23 +269,86 @@ export function TeamSection({ api, project }: Props) {
       )}
       {loaded && (
         <form
-          className="settings-form wide-form team-form"
+          id={formId}
+          className="team-form"
           onSubmit={(event) => {
             event.preventDefault()
             void save()
           }}
         >
-          <h4>{text.people}</h4>
-          <p className="hint">{text.peopleHint}</p>
-          <RowsField
-            label={text.people}
-            columns={PERSON_COLUMNS}
-            rows={people}
-            onChange={setPeople}
-            addLabel={text.addPerson}
-            cellLabel={(column, row) => text.cell(text.personN(row), PERSON_LABELS[column])}
-            removeLabel={(row) => text.remove(text.personN(row))}
-          />
+          <div className="title-row">
+            <h4>
+              {text.people}{' '}
+              <span className="today-count">
+                {messages.rows.count(people.filter((row) => !emptyPerson(row)).length)}
+              </span>
+            </h4>
+            <button
+              type="button"
+              onClick={() => {
+                setPeople([...people, emptyRow(PERSON_COLUMNS)])
+                setChosen(people.length)
+              }}
+            >
+              {text.addPerson}
+            </button>
+          </div>
+          <div className="team-people">
+            <DataTable
+              label={text.people}
+              columns={listColumns}
+              rows={listed}
+              rowKey={({ index }) => String(index)}
+              rowClassName={({ index }) => (index === personAt ? 'row-selected' : undefined)}
+            />
+            {person && (
+              <section className="panel team-person" aria-label={text.personN(personAt + 1)}>
+                <div className="panel-head">
+                  <h4>{person.name.trim() === '' ? text.unnamed : person.name}</h4>
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-label={text.remove(text.personN(personAt + 1))}
+                    onClick={() =>
+                      setPeople(
+                        orOneRow(
+                          people.filter((_row, at) => at !== personAt),
+                          PERSON_COLUMNS,
+                        ),
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="panel-body team-fields">
+                  {input('name')}
+                  {input('role')}
+                  {select(
+                    'side',
+                    SIDES.map((side) => ({ value: side, label: text.sides[side] })),
+                  )}
+                  {input('allocation', 'amount')}
+                  {input('capDays', 'amount')}
+                  <p className="hint team-fields-wide">{text.hints.allocation}</p>
+                  {input('from', 'date')}
+                  {input('to', 'date')}
+                  <p className="hint team-fields-wide">{text.hints.dates}</p>
+                  <div className="team-fields-wide">
+                    {input('note')}
+                    <p className="hint">{text.hints.note}</p>
+                  </div>
+                  <div className="team-fields-wide">
+                    {select('address', [
+                      { value: '', label: text.addressAuto },
+                      ...TEAM_ADDRESSES.map((address) => ({ value: address, label: address })),
+                    ])}
+                    <p className="hint">{text.hints.address}</p>
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
           <FieldProblems lines={problems?.people ?? []} />
           <h4>{text.periods}</h4>
           <div className="calendar-rows">
@@ -204,15 +363,7 @@ export function TeamSection({ api, project }: Props) {
             />
           </div>
           <FieldProblems lines={problems?.periods ?? []} />
-          <div className="actions">
-            <button type="submit">{text.save}</button>
-            {problems && <NotSaved text={messages.notSaved} />}
-          </div>
-          {saved && (
-            <p className="badge badge-ok">
-              {text.saved(saved.people.length, saved.periods.length)}
-            </p>
-          )}
+          {problems && <NotSaved text={messages.notSaved} />}
         </form>
       )}
     </section>
