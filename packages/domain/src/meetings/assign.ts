@@ -69,8 +69,15 @@ export function meetingOwner(
   return named.length === 1 ? (named[0]?.projectId ?? null) : null
 }
 
-/** The people who work on a project, as its team names them. */
-export type MeetingTeam = { projectId: string; people: readonly string[] }
+/** The people who work on a project, as its team names them; `clients` are those of the client among them. */
+export type MeetingTeam = {
+  projectId: string
+  people: readonly string[]
+  clients?: readonly string[]
+}
+
+/** How many people of a team, the client's apart, must be at a meeting for them to tell whose it is. */
+const TELLING_PEOPLE = 2
 
 const ADDRESS = /<[^>]*>/g
 
@@ -83,6 +90,20 @@ const presentIn = (participants: readonly string[]): Set<string> =>
 function peopleShared(participants: readonly string[], team: MeetingTeam): number {
   const known = keysOf(team)
   return [...presentIn(participants)].filter((key) => known.has(key)).length
+}
+
+/**
+ * Whether who took part is enough to say a meeting is of a project: somebody of its client was
+ * there, or at least two of its people who are no fewer than the others. One person of the
+ * supplier alone tells nothing: a manager or a developer talks to the PM of many other things.
+ * `participants` are those of the meeting with the PM left out.
+ */
+export function tellingPresence(participants: readonly string[], team: MeetingTeam): boolean {
+  const present = presentIn(participants)
+  const clients = keysOf({ projectId: team.projectId, people: team.clients ?? [] })
+  if ([...present].some((key) => clients.has(key))) return true
+  const shared = peopleShared(participants, team)
+  return shared >= TELLING_PEOPLE && shared * 2 >= present.size
 }
 
 /**

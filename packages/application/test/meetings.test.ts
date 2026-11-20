@@ -62,6 +62,7 @@ function setup(
     after?: Record<string, MeetingReading | null>
     /** The people of each project, by its id. */
     teams?: Record<string, string[]>
+    clients?: readonly string[]
     /** The words the transcripts hear badly, with their right form. */
     glossary?: () => GlossaryEntry[]
   } = {},
@@ -135,7 +136,7 @@ function setup(
             people: (options.teams?.[project.id] ?? []).map((name) => ({
               name,
               role: '',
-              side: 'supplier' as const,
+              side: options.clients?.includes(name) ? ('client' as const) : ('supplier' as const),
               from: '',
               to: '',
               allocation: null,
@@ -367,6 +368,34 @@ describe('a meeting given to the wrong project', () => {
     // It cannot be given by hand to a project it is not waiting in.
     const id = dailies[0]?.status === 'complete' ? dailies[0].meeting.id : ''
     await expect(meetings.assign(borea, id)).rejects.toMatchObject({ code: 'meeting_not_found' })
+  })
+
+  it('does not enter a project by one of its people alone, unless the client was there', async () => {
+    const talk = (n: number, title: string, participants: string[]): MeetingReading => ({
+      folder: `export-${n}`,
+      status: 'complete',
+      meeting: { ...meeting(n, title), participants },
+    })
+    const readings = [
+      // A manager of the supplier talking to the PM of something else.
+      talk(1, 'Colloquio di carriera', ['Mario Rossi']),
+      // One of the team among people of another job.
+      talk(2, 'Capitolato di un altro cliente', ['Anna Bianchi', 'Ugo Neri', 'Lea Blu']),
+      // The client's person alone is enough.
+      talk(3, 'Allineamento', ['Dario Cliente']),
+      // One of the team alone, but the title names the project.
+      talk(4, 'Aurora: punto con Anna', ['Anna Bianchi']),
+    ]
+    const people = { [aurora.id]: ['Rossi Mario', 'Anna Bianchi', 'Dario Cliente'] }
+    const { meetings } = setup({ readings, teams: people, clients: ['Dario Cliente'] })
+    expect(await meetings.sync(aurora)).toMatchObject({ written: 2, error: null })
+    const titles = (await meetings.imported(aurora)).map((held) => held.title).sort()
+    expect(titles).toEqual(['Allineamento', 'Aurora: punto con Anna'])
+    // The other two wait for the PM, and are not said to be of somebody else.
+    expect(await meetings.unassigned(aurora)).toMatchObject([
+      { title: 'Colloquio di carriera', outside: false },
+      { title: 'Capitolato di un altro cliente', outside: false },
+    ])
   })
 
   it('keeps out, and takes out, a meeting nobody of the team took part in, until the PM says', async () => {

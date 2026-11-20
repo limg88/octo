@@ -1284,7 +1284,7 @@ export const messages = {
     unreadable: (path: string) => `Non è un’esportazione che so leggere: ${path}`,
     nothingExcluded: 'Niente.',
     possibleDuplicate: (hours: string, first: string, second: string) =>
-      `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Succede quando le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: controlla e togli il file o il codice superato.`,
+      `Possibili ore contate due volte: ${hours} ore uguali per persona e giorno sui codici ${first} e ${second}. Può essere una giornata divisa a metà fra due commesse, e allora va bene così. Oppure le ore sono state spostate da un codice all’altro e nella cartella resta un’esportazione vecchia: in quel caso togli il file o il codice superato.`,
     timesheetsTitle: 'Timesheet da NetSuite',
     timesheetsIntro:
       'Leggo le ore dei timesheet delle commesse indicate in «Impostazioni», con il tuo utente di sola lettura, per i mesi interi del periodo. Le tengo in un file del progetto per mese e da lì le confronto. Il costo di ogni riga serve al previsionale: lo tengo a parte, in una cartella che non entra nelle risposte né nei deliverable.',

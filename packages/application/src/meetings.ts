@@ -20,6 +20,7 @@ import {
   meetingOwner,
   meetingPeople,
   meetingsReadingNote,
+  onOurSide,
   outsideTeam,
   type Project,
   type ProjectTeam,
@@ -33,6 +34,7 @@ import {
   type SourceState,
   type StoredMeeting,
   sameExport,
+  tellingPresence,
 } from '@octo/domain'
 import type {
   Clock,
@@ -209,7 +211,7 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
   /** The people of this project and of the others, as their teams name the supplier's and the client's. */
   async function teamsOf(
     project: Project,
-  ): Promise<Array<{ id: string; name: string; people: string[] }>> {
+  ): Promise<Array<{ id: string; name: string; people: string[]; clients: string[] }>> {
     if (!deps.team) return []
     const teams = []
     for (const other of await deps.projects()) {
@@ -218,6 +220,8 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
         id: other.id,
         name: other.name,
         people: team?.people.map((person) => person.name) ?? [],
+        clients:
+          team?.people.filter((person) => !onOurSide(person)).map((person) => person.name) ?? [],
       })
     }
     return teams
@@ -260,9 +264,22 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
     // The people a project is told by: those of its team, the PM left out.
     const teams = (await teamsOf(project))
       .filter((team) => asked.has(team.id))
-      .map(({ id, people }) => ({ projectId: id, people: meetingPeople(people, pm) }))
+      .map(({ id, people, clients }) => ({
+        projectId: id,
+        people: meetingPeople(people, pm),
+        clients: meetingPeople(clients, pm),
+      }))
     const peopleOf = (projectId: string): readonly string[] =>
       teams.find((team) => team.projectId === projectId)?.people ?? []
+    /**
+     * Whether who took part is enough to tell a meeting as of a project. A meeting nobody is known
+     * of, and a project that names no person, are told as before: by the calendar and the words.
+     */
+    const telling = (projectId: string, others: readonly string[]): boolean => {
+      const team = teams.find((known) => known.projectId === projectId)
+      if (others.length === 0 || team === undefined || team.people.length === 0) return true
+      return tellingPresence(others, team)
+    }
     const kept = new Set(config.kept)
     /** Who took part: as Verbale says, else who the invitation to that very event invites. */
     const takingPart = async (meeting: RecordedMeeting): Promise<readonly string[]> => {
@@ -306,13 +323,30 @@ export function createMeetings(deps: MeetingsDeps): Meetings {
             !released.get(candidate.projectId)?.has(reading.meeting.id) &&
             !outsideTeam(people, peopleOf(candidate.projectId), pm),
         )
-        owner = meetingOwner(reading.meeting, notes, willing)
+        const others = meetingPeople(people, pm)
+        // A meeting at the hour of an invitation is of that project only when its people were
+        // there in number: one of them alone may be talking of anything else at that hour. The
+        // very event Verbale names, and the words, tell whoever took part.
+        const byEvent = (candidate: MeetingCandidate): MeetingCandidate => ({
+          ...candidate,
+          invites: candidate.invites.filter(
+            (invite) => invite.uid === reading.meeting.calendarEventUID,
+          ),
+        })
+        owner = meetingOwner(
+          reading.meeting,
+          notes,
+          willing.map((candidate) =>
+            telling(candidate.projectId, others) ? candidate : byEvent(candidate),
+          ),
+        )
         if (owner === null) {
           // Neither the calendar nor the words tell: the people do, when they are of one project.
           const able = new Set(willing.map((candidate) => candidate.projectId))
           const known = teams.filter((team) => able.has(team.projectId))
           // All the known people on one team; else one project only with somebody there.
-          owner = certainProject(people, known) ?? projectByPeople(people, known)
+          const byPeople = certainProject(people, known) ?? projectByPeople(people, known)
+          owner = byPeople !== null && telling(byPeople, others) ? byPeople : null
         }
       }
       if (owner === null) {
