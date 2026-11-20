@@ -12,6 +12,7 @@
       "!**/test/fixtures",
       "!.claude",
       "!docs",
+      "!**/.impeccable",
       "!pnpm-lock.yaml"
     ]
   },

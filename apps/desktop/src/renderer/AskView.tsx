@@ -350,7 +350,7 @@ export function AskView({
                   answered.length > 1 &&
                   citedN != null && (
                     <p className="hint">
-                      {chats.inView(citedN, answered.indexOf(citing) + 1, answered.length)}
+                      {chats.chosen(citedN, answered.indexOf(citing) + 1, answered.length)}
                     </p>
                   )
                 }

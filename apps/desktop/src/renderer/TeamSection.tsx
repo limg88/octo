@@ -44,10 +44,17 @@ const PERSON_COLUMNS: RowsColumn<PersonKey>[] = [
   { key: 'note', label: text.columns.note },
   { key: 'address', label: text.columns.address },
 ]
+/**
+ * The list of the people stands beside the person in view: every column but the role is as wide
+ * as what it holds, and the role takes the room left.
+ */
+const LIST_WIDTH = { name: '138px', side: '74px', allocation: '104px', day: '98px' }
+/** A day of the calendar takes the room of a date, so the name of the period has the rest. */
+const PERIOD_DAY_WIDTH = '130px'
 const PERIOD_COLUMNS: RowsColumn<PeriodKey>[] = [
   { key: 'name', label: text.columns.period, width: 'minmax(200px, 1fr)' },
-  { key: 'from', label: text.columns.from, kind: 'date', width: '150px' },
-  { key: 'to', label: text.columns.to, kind: 'date', width: '150px' },
+  { key: 'from', label: text.columns.from, kind: 'date', width: PERIOD_DAY_WIDTH },
+  { key: 'to', label: text.columns.to, kind: 'date', width: PERIOD_DAY_WIDTH },
 ]
 
 /** Nothing typed, or a share of time: more than nothing and at most all of it. */
@@ -197,7 +204,7 @@ export function TeamSection({ api, project }: Props) {
     {
       key: 'name',
       label: text.columns.name,
-      width: '32%',
+      width: LIST_WIDTH.name,
       cell: ({ row, index }) => (
         <button
           type="button"
@@ -214,27 +221,27 @@ export function TeamSection({ api, project }: Props) {
     {
       key: 'side',
       label: text.columns.side,
-      width: '100px',
+      width: LIST_WIDTH.side,
       cell: ({ row }) => text.sides[SIDES.find((side) => side === row.side) ?? 'supplier'],
     },
     {
       key: 'allocation',
       label: text.columns.allocation,
       kind: 'number',
-      width: '110px',
+      width: LIST_WIDTH.allocation,
       cell: ({ row }) => row.allocation || <span className="hint">{text.blank.allocation}</span>,
     },
     {
       key: 'from',
       label: text.columns.from,
-      width: '100px',
+      width: LIST_WIDTH.day,
       cell: ({ row }) =>
         row.from === '' ? <span className="hint">{text.blank.from}</span> : shortDayText(row.from),
     },
     {
       key: 'to',
       label: text.columns.to,
-      width: '100px',
+      width: LIST_WIDTH.day,
       cell: ({ row }) =>
         row.to === '' ? <span className="hint">{text.blank.to}</span> : shortDayText(row.to),
     },
@@ -276,32 +283,53 @@ export function TeamSection({ api, project }: Props) {
             void save()
           }}
         >
-          <div className="title-row">
-            <h4>
-              {text.people}{' '}
-              <span className="today-count">
-                {messages.rows.count(people.filter((row) => !emptyPerson(row)).length)}
-              </span>
-            </h4>
-            <button
-              type="button"
-              onClick={() => {
-                setPeople([...people, emptyRow(PERSON_COLUMNS)])
-                setChosen(people.length)
-              }}
-            >
-              {text.addPerson}
-            </button>
-          </div>
-          <div className="team-people">
-            <div className="table-wide team-list">
-              <DataTable
-                label={text.people}
-                columns={listColumns}
-                rows={listed}
-                rowKey={({ index }) => String(index)}
-                rowClassName={({ index }) => (index === personAt ? 'row-selected' : undefined)}
-              />
+          {/* The list and the calendar on the left, the person in view on the right. */}
+          <div className="team-columns">
+            <div className="team-main">
+              <div className="team-part">
+                <div className="title-row">
+                  <h4>
+                    {text.people}{' '}
+                    <span className="today-count">
+                      {messages.rows.count(people.filter((row) => !emptyPerson(row)).length)}
+                    </span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPeople([...people, emptyRow(PERSON_COLUMNS)])
+                      setChosen(people.length)
+                    }}
+                  >
+                    {text.addPerson}
+                  </button>
+                </div>
+                <div className="table-wide team-list">
+                  <DataTable
+                    label={text.people}
+                    columns={listColumns}
+                    rows={listed}
+                    rowKey={({ index }) => String(index)}
+                    rowClassName={({ index }) => (index === personAt ? 'row-selected' : undefined)}
+                  />
+                </div>
+              </div>
+              <FieldProblems lines={problems?.people ?? []} />
+              <div className="team-part">
+                <h4>{text.periods}</h4>
+                <div className="calendar-rows">
+                  <RowsField
+                    label={text.periods}
+                    columns={PERIOD_COLUMNS}
+                    rows={periods}
+                    onChange={setPeriods}
+                    addLabel={text.addPeriod}
+                    cellLabel={(column, row) => text.cell(text.periodN(row), PERIOD_LABELS[column])}
+                    removeLabel={(row) => text.remove(text.periodN(row))}
+                  />
+                </div>
+              </div>
+              <FieldProblems lines={problems?.periods ?? []} />
             </div>
             {person && (
               <section className="panel team-person" aria-label={text.personN(personAt + 1)}>
@@ -310,7 +338,9 @@ export function TeamSection({ api, project }: Props) {
                   <button
                     type="button"
                     className="quiet"
-                    aria-label={text.remove(text.personN(personAt + 1))}
+                    aria-label={text.remove(
+                      person.name.trim() === '' ? text.personN(personAt + 1) : person.name.trim(),
+                    )}
                     onClick={() =>
                       setPeople(
                         orOneRow(
@@ -320,7 +350,7 @@ export function TeamSection({ api, project }: Props) {
                       )
                     }
                   >
-                    ×
+                    {text.removeShort}
                   </button>
                 </div>
                 <div className="panel-body team-fields">
@@ -351,20 +381,6 @@ export function TeamSection({ api, project }: Props) {
               </section>
             )}
           </div>
-          <FieldProblems lines={problems?.people ?? []} />
-          <h4>{text.periods}</h4>
-          <div className="calendar-rows">
-            <RowsField
-              label={text.periods}
-              columns={PERIOD_COLUMNS}
-              rows={periods}
-              onChange={setPeriods}
-              addLabel={text.addPeriod}
-              cellLabel={(column, row) => text.cell(text.periodN(row), PERIOD_LABELS[column])}
-              removeLabel={(row) => text.remove(text.periodN(row))}
-            />
-          </div>
-          <FieldProblems lines={problems?.periods ?? []} />
           {problems && <NotSaved text={messages.notSaved} />}
         </form>
       )}

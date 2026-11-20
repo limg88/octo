@@ -350,12 +350,12 @@ describe('the conversation with a project', () => {
     fireEvent.click(within(list).getByRole('button', { name: /Prima domanda/ }))
     // Two answers, one panel: it says of which answer the citation in view is.
     expect(screen.getAllByRole('complementary', { name: text.panel })).toHaveLength(1)
-    expect(panel().textContent).toContain(chats.inView(1, 2, 2))
+    expect(panel().textContent).toContain(chats.chosen(1, 2, 2))
     const markers = screen.getAllByRole('button', { name: text.marker(3) })
     expect(markers).toHaveLength(2)
     // A marker of the first answer is chosen: the panel moves there, and only that marker is pressed.
     fireEvent.click(markers[0] as HTMLElement)
-    expect(panel().textContent).toContain(chats.inView(3, 1, 2))
+    expect(panel().textContent).toContain(chats.chosen(3, 1, 2))
     expect(panel().textContent).toContain('ci confermate entro lunedì')
     expect(
       screen

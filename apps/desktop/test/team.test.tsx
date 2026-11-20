@@ -103,8 +103,11 @@ describe('the section of people and calendar', () => {
     set(text.personN(3), columns.to, '2026-05-31')
     // A person is taken off from where its fields are: the next one takes its place in view.
     choose(1)
-    fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
-    fireEvent.click(screen.getByRole('button', { name: text.remove(text.personN(1)) }))
+    // The command says what it does in a word, and whom it takes off to who cannot see.
+    const off = screen.getByRole('button', { name: text.remove('Rossi Mario') })
+    expect(off.textContent).toBe(text.removeShort)
+    fireEvent.click(off)
+    fireEvent.click(screen.getByRole('button', { name: text.remove('Carla Bianchi') }))
     set(text.periodN(1), columns.to, '2026-12-04')
     // A row added and left empty is not a period, and not a mistake either.
     fireEvent.click(screen.getByRole('button', { name: text.addPeriod }))

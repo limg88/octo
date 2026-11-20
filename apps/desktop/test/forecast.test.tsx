@@ -400,6 +400,8 @@ describe('the forecast', () => {
     fireEvent.click(more.getByLabelText(text.totalCostsBeforeMonth))
     // The note is a field beside the two amounts, kept with the rest of the month.
     fireEvent.change(cell(text.columnOwnNote, 'P1'), { target: { value: 'SAL di giugno' } })
+    // A long note is read whole: its field has as many lines as the text needs.
+    expect(cell(text.columnOwnNote, 'P1').tagName).toBe('TEXTAREA')
     // The name of a code says whole what it is and how it is sold.
     expect(within(form).getByRole('button', { name: text.project('A corpo', 'P2') }).title).toBe(
       text.projectName('A corpo', 'P2', text.kinds.fixed_price),

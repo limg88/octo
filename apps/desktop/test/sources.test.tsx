@@ -98,7 +98,6 @@ describe('SourcesView', () => {
 
     const who = messages.elsewhere.who(giovanni)
     expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
-    expect(screen.getByText(messages.credential.places.shared)).toBeTruthy()
     // Nothing to read from here: no way to ask for it.
     const ask = [messages.mailSync, messages.readSavedSource].flatMap((name) =>
       screen.queryAllByRole<HTMLButtonElement>('button', { name }),

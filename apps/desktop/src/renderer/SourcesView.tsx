@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Elsewhere } from './Elsewhere.tsx'
 import { dateTimeText, errorText, messages } from './messages.ts'
-import { credentialPlace, SourceHeader } from './SourceHeader.tsx'
+import { SourceHeader } from './SourceHeader.tsx'
 
 type Props = {
   api: OctoApi
@@ -138,7 +138,6 @@ export function SourcesView({ api, project, now = systemNow, open = true, onTogg
     <section className="sources" aria-label={messages.mailTitle}>
       <SourceHeader
         title={messages.mailTitle}
-        credential={credentialPlace(view.config !== null, view.readableHere)}
         linked={view.config !== null}
         open={open}
         onToggle={onToggle}

@@ -1,7 +1,7 @@
 import type { Lifetime, LifetimeLine } from '@octo/domain'
 import { type ReactNode, useEffect, useState } from 'react'
 import { type DataColumn, DataTable } from './DataTable.tsx'
-import { lifetimeMail, lifetimeSourceText, progressSourceText } from './forecast-text.ts'
+import { lifetimeMail, lifetimeSourceText, progressSourceInTable } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { Resizable } from './Resizable.tsx'
 import { monthText } from './today-text.ts'
@@ -28,9 +28,13 @@ const ORIGIN_CLASS: Record<Origin['tone'], string> = {
 }
 const BY_OCTO: Origin = { label: text.byOcto, tone: 'computed' }
 const BY_SYSTEM: Origin = { label: text.bySystem, tone: 'source' }
+/** Kept with the forecast of the project: what stands in for NetSuite while it was not read. */
+const BY_FORECAST: Origin = { label: text.byForecast, tone: 'computed' }
+/** A figure nothing tells has no source either: the cell says so, it is never left empty. */
+const NOT_KNOWN: Origin = { label: text.notKnown, tone: 'computed' }
 
-function OriginMark({ origin }: { origin: Origin | null }) {
-  return origin && <span className={ORIGIN_CLASS[origin.tone]}>{origin.label}</span>
+function OriginMark({ origin }: { origin: Origin }) {
+  return <span className={ORIGIN_CLASS[origin.tone]}>{origin.label}</span>
 }
 
 /** A line of who worked on the code, already in words: a person, or the suppliers together. */
@@ -39,11 +43,11 @@ const PEOPLE_COLUMNS: DataColumn<PersonRow>[] = [
   {
     key: 'person',
     label: text.person,
-    width: '30%',
+    width: '28%',
     cell: (row) => <strong>{row.person}</strong>,
   },
-  { key: 'hours', label: text.hours, kind: 'number', width: '90px', cell: (row) => row.hours },
-  { key: 'cost', label: text.cost, kind: 'number', width: '110px', cell: (row) => row.cost },
+  { key: 'hours', label: text.hours, kind: 'number', width: '60px', cell: (row) => row.hours },
+  { key: 'cost', label: text.cost, kind: 'number', width: '88px', cell: (row) => row.cost },
   { key: 'source', label: text.source, cell: (row) => <OriginMark origin={row.origin} /> },
 ]
 /** Hours somebody wrote down are read from a source; those declared by hand are to be checked. */
@@ -84,9 +88,11 @@ function bandFigures(sheet: Lifetime): Figure[] {
       label: text.ordered,
       value: amount(sheet.ordered),
       note:
-        orders.length === 1 && only && only.salesOrder !== ''
-          ? text.orderNote(only.salesOrder)
-          : undefined,
+        orders.length > 1
+          ? text.ordersNote(orders.length)
+          : only && only.salesOrder !== ''
+            ? text.orderNote(only.salesOrder)
+            : undefined,
     },
     {
       label: text.invoiced,
@@ -124,51 +130,59 @@ function bandFigures(sheet: Lifetime): Figure[] {
 }
 
 /** A line of the table of the other figures: what it is, a few words on it, where it comes from. */
-type Entry = { label: string; note?: string | undefined; value: string; origin: Origin | null }
+type Entry = { label: string; note?: string | undefined; value: string; origin: Origin }
 
 /** What the order, the revenue and what is left to settle are worth, each with where it is from. */
 function entries(sheet: Lifetime): Entry[] {
   const { ordered, invoiced, recognized, progress } = sheet
-  const read = sheet.economics === null ? null : BY_SYSTEM
+  // Without NetSuite read the three amounts are those kept with the forecast of the project.
+  const kept = sheet.economics === null ? BY_FORECAST : BY_SYSTEM
+  const read = (value: number | null): Origin => (value === null ? NOT_KNOWN : kept)
   const toInvoice = ordered === null || invoiced === null ? null : ordered - invoiced
+  const computed = (value: number | null): Origin => (value === null ? NOT_KNOWN : BY_OCTO)
   return [
-    { label: text.ordered, value: amount(ordered), origin: read },
+    { label: text.ordered, value: amount(ordered), origin: read(ordered) },
     {
       label: text.invoicedPlain,
       note: ofOrdered(invoiced, ordered),
       value: amount(invoiced),
-      origin: read,
+      origin: read(invoiced),
     },
     {
       label: text.toInvoice,
       note: ofOrdered(toInvoice, ordered),
       value: amount(toInvoice),
-      origin: BY_OCTO,
+      origin: computed(toInvoice),
     },
     {
       label: text.recognizedPlain,
       note: ofOrdered(recognized, ordered),
       value: amount(recognized),
-      origin: read,
+      origin: read(recognized),
     },
     progress === null
-      ? { label: text.progress, note: text.noProgress, value: UNKNOWN, origin: null }
+      ? { label: text.progress, note: text.noProgress, value: UNKNOWN, origin: NOT_KNOWN }
       : {
           label: text.progress,
-          note: progressSourceText(progress),
+          note: progressSourceInTable(progress),
           value: share(progress.share),
           origin: progress.source === 'system' ? BY_SYSTEM : BY_OCTO,
         },
     sheet.marginAtEnd === null
-      ? { label: text.marginAtEnd, note: text.noExpected, value: UNKNOWN, origin: null }
+      ? { label: text.marginAtEnd, note: text.noExpected, value: UNKNOWN, origin: NOT_KNOWN }
       : {
           label: text.marginAtEnd,
-          note: text.onCosts(money(sheet.expectedCosts ?? 0)),
+          note: text.onCostsInTable(money(sheet.expectedCosts ?? 0)),
           value: share(sheet.marginAtEnd),
           origin: BY_OCTO,
         },
-    { label: text.wip, note: text.wipNote, value: amount(sheet.wip), origin: BY_OCTO },
-    { label: text.toBill, note: text.toBillNote, value: amount(sheet.toBill), origin: BY_OCTO },
+    { label: text.wip, note: text.wipNote, value: amount(sheet.wip), origin: computed(sheet.wip) },
+    {
+      label: text.toBill,
+      note: text.toBillNote,
+      value: amount(sheet.toBill),
+      origin: computed(sheet.toBill),
+    },
   ]
 }
 
@@ -183,7 +197,7 @@ const ENTRY_COLUMNS: DataColumn<Entry>[] = [
       </>
     ),
   },
-  { key: 'value', label: text.value, kind: 'number', width: '120px', cell: (entry) => entry.value },
+  { key: 'value', label: text.value, kind: 'number', width: '96px', cell: (entry) => entry.value },
   {
     key: 'source',
     label: text.source,

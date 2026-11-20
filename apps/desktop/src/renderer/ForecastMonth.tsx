@@ -391,8 +391,9 @@ export function ForecastMonth({
                       {amountInput(row, 'toInvoice', text.toInvoice)}
                       <label className="field">
                         {text.columnOwnNote}
-                        <input
-                          type="text"
+                        <textarea
+                          className="own-note"
+                          rows={1}
                           aria-label={text.forCode(text.columnOwnNote, row.code)}
                           value={draftFor(row.code).note}
                           onChange={(event) => change(row.code, { note: event.target.value })}

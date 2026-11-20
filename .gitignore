@@ -15,3 +15,7 @@ private/
 
 # The interpreter shipped with the app: fetched by apps/desktop/scripts/fetch-python.mjs.
 apps/desktop/resources/python/
+
+# Il controllo di design tiene qui la sua memoria di lavoro: non è del progetto.
+.impeccable/hook.cache.json
+**/.impeccable/hook.cache.json

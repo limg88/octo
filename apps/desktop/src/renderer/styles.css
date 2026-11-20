@@ -38,7 +38,12 @@
   --shadow-raised:
     0 1px 2px light-dark(rgba(15, 16, 20, 0.06), rgba(0, 0, 0, 0.4)),
     0 8px 28px light-dark(rgba(15, 16, 20, 0.12), rgba(0, 0, 0, 0.5));
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23808086' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  /* Under the heading of a table that stays in view: darker on a dark ground, or it is not seen. */
+  --shadow-header: 0 2px 4px light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5));
+  /* The mark is dark: on a dark ground it stands on this light tile. */
+  --logo-tile: #f1efff;
+  /* The arrow of a menu is drawn in the grey of the secondary text of each theme. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23606064' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   --radius: 6px;
   --radius-large: 8px;
   --control-height: 30px;
@@ -58,6 +63,13 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23a9a9af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23a9a9af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  }
 }
 
 * {
@@ -86,6 +98,13 @@ h2,
 h3,
 h4 {
   letter-spacing: -0.012em;
+}
+
+/* A paragraph does not leave one word alone on its last line. */
+p,
+dd,
+li {
+  text-wrap: pretty;
 }
 
 ::-webkit-scrollbar {
@@ -466,7 +485,6 @@ legend {
 .source-quoted {
   margin: 0 -8px;
   padding: 2px 8px;
-  border-left: 3px solid var(--accent);
   background: var(--accent-soft);
 }
 
@@ -667,7 +685,7 @@ main {
   min-width: 20px;
   padding: 0 5px;
   margin: 0 1px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--ok-bg);
   color: var(--ok);
   font-size: 13px;
@@ -1320,7 +1338,7 @@ button.kind-name {
   gap: 2px;
   padding: 1px 2px 1px 8px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--panel);
   font-size: 13px;
 }
@@ -1416,7 +1434,7 @@ table.data thead th {
   font-weight: 600;
   box-shadow:
     inset 0 -1px 0 var(--line),
-    0 2px 4px rgba(0, 0, 0, 0.12);
+    var(--shadow-header);
 }
 
 table.data tbody tr:hover {
@@ -1584,7 +1602,7 @@ table.data th.number > button.sort > .sort-mark {
   align-items: center;
   gap: 2px;
   padding: 1px 2px 1px 7px;
-  border-radius: 5px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 500;
 }
@@ -1600,8 +1618,9 @@ table.data th.number > button.sort > .sort-mark {
   cursor: pointer;
 }
 
+/* A veil of the mark's own colour: it shows on a light ground and on a dark one. */
 .signal-remove:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 .note-form {
@@ -1840,7 +1859,7 @@ input.short {
   height: 6px;
   appearance: none;
   border: none;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--hover);
   overflow: hidden;
 }
@@ -1890,10 +1909,10 @@ input.short {
   gap: 2px;
 }
 
-/* One source of the list: its name, its state, where its credential is, what to do. */
+/* One source of the list: its name, its state, what to do. */
 .source-header {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 200px 180px;
+  grid-template-columns: 150px minmax(0, 1fr) 180px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -1908,10 +1927,6 @@ input.short {
   align-items: flex-start;
   gap: 4px;
   min-width: 0;
-}
-
-.source-credential {
-  font-size: 13px;
 }
 
 .source-actions {
@@ -1999,7 +2014,16 @@ details.advanced[open] > summary {
   display: inline-flex;
 }
 
+/* The mark is small; what the pointer can hit around it is 26 px. */
+.info-tip-button::after,
+button.marker::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
 .info-tip-button {
+  position: relative;
   min-height: 0;
   width: 18px;
   height: 18px;
@@ -2091,16 +2115,39 @@ details.advanced[open] > summary {
   gap: 12px;
 }
 
-.team-people {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  align-items: start;
+.team-columns {
+  display: flex;
+  align-items: flex-start;
   gap: 16px;
+}
+
+.team-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.team-part {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-person {
+  flex: none;
+  width: 400px;
 }
 
 /* In a small window the list scrolls inside its frame: a role is never squeezed to a letter. */
 .team-list table.data {
-  min-width: 720px;
+  min-width: 580px;
+}
+
+/* A person is one row: a role or a date is not broken in two. */
+.team-list table.data td {
+  white-space: nowrap;
 }
 
 .panel-body.team-fields {
@@ -2117,10 +2164,6 @@ details.advanced[open] > summary {
 .team-fields select {
   width: 100%;
   min-width: 0;
-}
-
-.team-form .calendar-rows {
-  max-width: 1000px;
 }
 
 /* A setting a row: what it is and why on the left, how it is set on the right. */
@@ -2418,6 +2461,17 @@ table.data tr.row-selected > :first-child {
   gap: 12px;
 }
 
+/* A note is read whole: its field grows with what is written in it. */
+.own-note {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  field-sizing: content;
+  min-height: var(--control-height);
+  resize: none;
+  overflow-wrap: anywhere;
+}
+
 .panel-head-slim {
   min-height: 0;
   padding: 5px 10px;
@@ -2647,11 +2701,12 @@ table.data tr.row-selected > :first-child {
   padding: 0;
 }
 
+/* What Claude judges: a thin edge all around and a faint ground, not a bar on one side. */
 .today-judgement {
   padding: 6px 10px;
-  border-left: 3px solid var(--accent);
-  background: var(--panel);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border: 1px solid var(--accent-edge);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
 }
 
 /* A part of the page: its heading, then what it holds. */
@@ -2792,7 +2847,8 @@ table.data tr.row-selected > :first-child {
   gap: 8px;
   margin: 0 12px 8px;
   padding: 8px 10px;
-  border-left: 2px solid var(--accent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--hover);
 }
 
@@ -3335,7 +3391,7 @@ button.step {
   min-height: 24px;
   width: 26px;
   padding: 0;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1;
 }
 
@@ -3350,15 +3406,16 @@ h4.detail-title {
 
 .box {
   padding: 9px 12px;
-  border-left: 2px solid var(--accent);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--panel);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
+/* A sentence quoted from a source: the edge is the blue of the sources. */
 .box-source {
-  border-left-color: var(--source);
+  border-color: var(--source-edge);
 }
 
 .box-warning {
@@ -3490,7 +3547,6 @@ fieldset.metrics {
 }
 
 .today .today-judgement {
-  border-left-width: 2px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3533,6 +3589,7 @@ fieldset.metrics {
 }
 
 button.marker {
+  position: relative;
   min-height: 20px;
   height: 20px;
   padding: 0 5px;
@@ -3588,11 +3645,13 @@ span.marker-warning {
   margin: 0;
 }
 
+/* On one row each number stays inside its own source, or it leans on the one before. */
 .answer .sources-inline {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 4px 14px;
-  padding-left: 18px;
+  padding-left: 0;
+  list-style-position: inside;
 }
 
 .sources-actions {
@@ -3601,10 +3660,9 @@ span.marker-warning {
 }
 
 /* The marker whose source is in view. */
+/* The chosen marker is already full: a thin halo, which does not cover the full stop after it. */
 button.marker[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 2px var(--bg),
-    0 0 0 4px var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 /* The way to the whole path and the command that opens the source, on one row. */
@@ -3742,9 +3800,17 @@ button.marker[aria-pressed="true"] {
   .dashboard .split,
   .answer.split,
   .deliverable-body .answer.split,
-  .sheet-columns,
-  .team-people {
+  .sheet-columns {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The person in view goes under the list and the calendar, as wide as the page. */
+  .team-columns {
+    flex-direction: column;
+  }
+
+  .team-person {
+    width: 100%;
   }
 
   .split-detail,
@@ -4045,6 +4111,11 @@ button.marker[aria-pressed="true"] {
 
 .figure-note .status {
   margin-left: 0;
+}
+
+/* Where a figure comes from is read on one line. */
+.sheet-column table.data :is(.status, .pill, .badge) {
+  white-space: nowrap;
 }
 
 .sheet-summary > .notice-bar {
@@ -4506,12 +4577,13 @@ button.marker[aria-pressed="true"] {
   border-right-color: var(--accent);
 }
 
+/* The edge one drags is 12 px wide, inside its own heading: the next one would cover what leans out. */
 .column-edge {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  width: 7px;
+  width: 12px;
 }
 
 .column-edge:focus-visible {
@@ -4522,14 +4594,52 @@ button.marker[aria-pressed="true"] {
 /* The mark is dark: on a dark ground it stands on a light tile. */
 :root[data-theme="dark"] .logo {
   padding: 2px;
-  border-radius: 7px;
-  background: #f1efff;
+  border-radius: var(--radius);
+  background: var(--logo-tile);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .logo {
     padding: 2px;
-    border-radius: 7px;
-    background: #f1efff;
+    border-radius: var(--radius);
+    background: var(--logo-tile);
+  }
+}
+
+/*
+ * A finger instead of a pointer (a tablet with Windows): what one touches is 44 px high. The text
+ * of a field keeps its size: at 16 px a date no longer fits its narrow column.
+ */
+@media (pointer: coarse) {
+  :root {
+    --control-height: 44px;
+  }
+
+  .tab,
+  .nav-item,
+  .chip,
+  .segment {
+    min-height: 44px;
+  }
+
+  .theme-toggle button {
+    min-height: 40px;
+    width: 40px;
+  }
+
+  input:not([type="checkbox"], [type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .info-tip-button::after,
+  button.marker::after {
+    inset: -12px;
   }
 }

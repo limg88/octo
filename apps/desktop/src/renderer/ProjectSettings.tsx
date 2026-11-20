@@ -78,7 +78,6 @@ export function ProjectSettings({ api, project, part: asked = null }: Props) {
             <div className="source-header source-list-head" aria-hidden="true">
               <span>{messages.credential.source}</span>
               <span>{messages.credential.state}</span>
-              <span>{messages.credential.title}</span>
               <span />
             </div>
             <SourcesView

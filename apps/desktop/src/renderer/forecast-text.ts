@@ -43,6 +43,13 @@ export function progressSourceText(progress: SheetProgress): string {
   return sources.system(progress.day === null ? '' : shortDayText(progress.day))
 }
 
+/** The same in the table of the page, where the column beside already names the source. */
+export function progressSourceInTable(progress: SheetProgress): string {
+  if (progress.source !== 'system') return progressSourceText(progress)
+  const day = progress.day === null ? '' : shortDayText(progress.day)
+  return messages.sheet.summary.progressSources.systemInTable(day)
+}
+
 const SHORT_MONTH = new Intl.DateTimeFormat('it-IT', {
   month: 'short',
   year: 'numeric',

@@ -575,9 +575,9 @@ export const messages = {
   askChats: {
     title: 'Conversazioni',
     fresh: 'Nuova chat',
-    /** Which marker the source in view is of, and of which answer of the conversation. */
-    inView: (marker: number, answer: number, answers: number) =>
-      `Richiamo in vista: [${marker}] della risposta ${answer} di ${answers}.`,
+    /** Which marker the source shown is of, and of which answer of the conversation. */
+    chosen: (marker: number, answer: number, answers: number) =>
+      `Richiamo scelto: [${marker}] della risposta ${answer} di ${answers}`,
     freshHint:
       'In questa chat Octo tiene conto delle tue domande precedenti e ricontrolla le fonti a ogni risposta.',
     none: 'Nessuna chat ancora.',
@@ -693,16 +693,9 @@ export const messages = {
   credential: {
     source: 'Fonte',
     state: 'Stato',
-    title: 'Credenziale',
-    places: {
-      here: 'su questo computer',
-      shared: 'di chi condivide la cartella',
-      none: 'nessuna',
-      not_needed: 'non serve',
-    },
     sharedTitle: 'Credenziale di chi condivide la cartella.',
     sharedNote:
-      'Su questo computer non c’è la credenziale, o la fonte da qui non si legge: vale la lettura di chi condivide la cartella. Per leggerla anche da qui, premi «Modifica» e inserisci la tua.',
+      'Su questo computer non c’è la credenziale, o la fonte da qui non si legge: vale la lettura fatta da un altro computer, di cui lo stato dice chi e quando. Per leggerla anche da qui, premi «Modifica» e inserisci la tua.',
   },
   elsewhere: {
     who: (reader: { name: string; computer: string }) => `${reader.name} · ${reader.computer}`,
@@ -796,6 +789,7 @@ export const messages = {
     periodN: (n: number) => `periodo ${n}`,
     cell: (row: string, column: string) => `${column}, ${row}`,
     remove: (row: string) => `Togli ${row}`,
+    removeShort: 'Togli',
     addPerson: 'Aggiungi una persona',
     addPeriod: 'Aggiungi un periodo',
     personWrong: (n: number) => `Persona ${n}: manca il nome.`,
@@ -924,6 +918,9 @@ export const messages = {
       byOcto: 'Octo',
       bySystem: 'NetSuite',
       orderNote: (order: string) => `ordine ${order}`,
+      ordersNote: (count: number) => `${count} ordini di vendita`,
+      byForecast: 'Previsionale',
+      notKnown: 'non nota',
       atEnd: (shareText: string) => `a finire ${shareText}`,
       variance: 'Scostamento da NetSuite',
       varianceToCheck: 'Da verificare',
@@ -931,7 +928,7 @@ export const messages = {
       invoicedPlain: 'Fatturato',
       recognizedPlain: 'Ricavi riconosciuti',
       suppliersLine: 'Fornitori',
-      suppliersSource: 'ricevuto dai fornitori, da NetSuite',
+      suppliersSource: 'ricevuto, da NetSuite',
       wip: 'Lavoro non fatturato',
       wipNote: 'WIP',
       toBill: 'Fatture da emettere',
@@ -1004,6 +1001,8 @@ export const messages = {
       noProgress: 'NetSuite non lo dice, e mancano ordinato e costi totali per stimarlo',
       progressSources: {
         system: (day: string) => `da NetSuite, al ${day}`,
+        /** In the table the column beside already names the source. */
+        systemInTable: (day: string) => `al ${day}`,
         recognized: 'da NetSuite: ricavi riconosciuti sull’ordinato',
         costs: 'stima di Octo: costi a oggi sui costi totali previsti',
       },
@@ -1011,6 +1010,8 @@ export const messages = {
       marginAtEnd: 'Margine a finire',
       noExpected: 'servono i costi a budget o i costi totali previsti',
       onCosts: (costs: string) => `su costi previsti di ${costs}`,
+      /** The same, short enough for one row of the table. */
+      onCostsInTable: (costs: string) => `costi previsti ${costs}`,
       proposed: (costs: string, people: string) =>
         `Proposta dai tetti delle persone: ${costs} (${people}).`,
       proposedPerson: (person: string, days: string) => `${person} ${days} gg`,

@@ -69,7 +69,6 @@ describe('FeedSection', () => {
     const who = messages.elsewhere.who(giovanni)
     expect(await screen.findByText(messages.elsewhere.read(who))).toBeTruthy()
     expect(screen.getByText(messages.elsewhere.reading(who))).toBeTruthy()
-    expect(screen.getByText(messages.credential.places.shared)).toBeTruthy()
     // Nothing to read from here: no way to ask for it.
     const ask = [messages.feedSync, messages.readSavedSource].flatMap((name) =>
       screen.queryAllByRole<HTMLButtonElement>('button', { name }),
@@ -82,8 +81,6 @@ describe('FeedSection', () => {
     render(<FeedSection api={api} project={project} feed="ado" now={now} />)
 
     expect(await screen.findByText(/4 aggiornati, 120 invariati/)).toBeTruthy()
-    expect(screen.queryByText(messages.credential.places.shared)).toBeNull()
-    expect(screen.getByText(messages.credential.places.here)).toBeTruthy()
     expect(screen.queryByText(/^Letta da /)).toBeNull()
   })
 
@@ -251,7 +248,6 @@ describe('FeedSection', () => {
     const link = await screen.findByRole('button', { name: `${messages.sourceLink}: Azure DevOps` })
     // Linking a source is never the one action of the page: reading them all is.
     expect(link.className).toBe('')
-    expect(screen.getByText(messages.credential.places.none)).toBeTruthy()
   })
 
   it('offers the fields of the warehouse, with the port and the security of the connection', async () => {

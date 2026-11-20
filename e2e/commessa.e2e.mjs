@@ -73,7 +73,7 @@ try {
     .getByRole('table', { name: 'Ordine, ricavi e da regolare' })
     .getByRole('row', { name: /^Avanzamento/ })
   await progress.getByText('62%').waitFor()
-  await progress.getByText(/da NetSuite, al 28\/\d\d\/\d{4}$/).waitFor()
+  await progress.getByText(/al 28\/\d\d\/\d{4}$/).waitFor()
   await page.getByRole('button', { name: 'Copia i dati per un report' }).waitFor()
   await page.screenshot({ path: `${work}/sintesi.png`, fullPage: true })
 

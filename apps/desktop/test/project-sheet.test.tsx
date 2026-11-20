@@ -152,14 +152,16 @@ describe('the sheet of a project code', () => {
       `${words.costs}: 3.457,00${words.hoursWorked('68')}`,
       `${words.marginToDate}: 53,91%${words.atEnd('36%')}`,
     ])
-    // The others are a table: what Octo computes says so, what is not known where from says nothing.
+    // The others are a table. NetSuite was not read: the amounts of the order are those kept
+    // with the forecast, and their cell says so instead of staying empty.
     expect(entries()).toEqual([
-      `${words.ordered}7.500,00`,
-      `${words.invoicedPlain} · ${words.ofOrdered('30%')}2.250,00`,
+      `${words.ordered}7.500,00${words.byForecast}`,
+      `${words.invoicedPlain} · ${words.ofOrdered('30%')}2.250,00${words.byForecast}`,
       `${words.toInvoice} · ${words.ofOrdered('70%')}5.250,00${words.byOcto}`,
-      `${words.recognizedPlain} · ${words.ofOrdered('70%')}5.250,00`,
-      `${words.progress} · ${words.progressSources.system('31/10/2026')}55%${words.bySystem}`,
-      `${words.marginAtEnd} · ${words.onCosts('4.800,00')}36%${words.byOcto}`,
+      `${words.recognizedPlain} · ${words.ofOrdered('70%')}5.250,00${words.byForecast}`,
+      // In the table the note is short: the column beside already names the source.
+      `${words.progress} · ${words.progressSources.systemInTable('31/10/2026')}55%${words.bySystem}`,
+      `${words.marginAtEnd} · ${words.onCostsInTable('4.800,00')}36%${words.byOcto}`,
       `${words.wip} · ${words.wipNote}1.207,00${words.byOcto}`,
       `${words.toBill} · ${words.toBillNote}3.000,00${words.byOcto}`,
     ])
@@ -180,6 +182,9 @@ describe('the sheet of a project code', () => {
     fireEvent.click(screen.getByRole('button', { name: words.copy }))
     expect(await screen.findByText(words.copied)).toBeTruthy()
     expect(writeText).toHaveBeenCalledWith(lifetimeMail(life))
+    // What is copied has no column beside: it keeps the source and the whole note.
+    expect(lifetimeMail(life)).toContain(words.progressSources.system('31/10/2026'))
+    expect(lifetimeMail(life)).toContain(words.onCosts('4.800,00'))
   })
 
   it('is chosen among the codes of the project, the fixed price first, and stays chosen', async () => {
@@ -195,9 +200,11 @@ describe('the sheet of a project code', () => {
     // What is not known is a dash with its reason, never a zero.
     expect(band().slice(0, 2)).toEqual([`${words.ordered}: —`, `${words.invoiced}: —`])
     expect(entries().slice(4, 6)).toEqual([
-      `${words.progress} · ${words.noProgress}—`,
-      `${words.marginAtEnd} · ${words.noExpected}—`,
+      `${words.progress} · ${words.noProgress}—${words.notKnown}`,
+      `${words.marginAtEnd} · ${words.noExpected}—${words.notKnown}`,
     ])
+    // A figure nothing tells has no source: said in words, the cell is never empty.
+    expect(entries()[0]).toBe(`${words.ordered}—${words.notKnown}`)
     // Back from another section the same code is shown.
     unmount()
     render(<Sheet api={api} project={other} />)
@@ -403,6 +410,8 @@ describe('the sheet of a project code', () => {
     expect(band()[4]).toBe(`${words.variance}: 157,00${words.varianceToCheck}`)
     // What is read from NetSuite says so in its row.
     expect(entries()[0]).toBe(`${words.ordered}7.500,00${words.bySystem}`)
+    // Two sales orders: the band counts them instead of naming one.
+    expect(band()[0]).toBe(`${words.ordered}: 7.500,00${words.ordersNote(2)}`)
     // What the suppliers delivered is a line of the table: its total is the costs of the page.
     expect(rowsOf(words.people).slice(-2)).toEqual([
       `${words.suppliersLine}1.200,00${words.suppliersSource}`,

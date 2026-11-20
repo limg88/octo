@@ -46,7 +46,6 @@ export function DocumentsSection({ api, project }: Props) {
     <section className="sources" aria-label={messages.documentsTitle}>
       <SourceHeader
         title={messages.documentsTitle}
-        credential="not_needed"
         linked
         open={false}
         status={
