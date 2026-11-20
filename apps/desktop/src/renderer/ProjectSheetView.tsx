@@ -160,7 +160,6 @@ function CodeSheets({
       {reading}
       {stopped}
       {savedNote.note}
-      <p className="badge badge-warning">{messages.forecast.internal}</p>
       <header className="sheet-header">
         <h3>
           {sheet.code}
@@ -189,7 +188,11 @@ function CodeSheets({
       {billing ? (
         <ProjectSheetBilling sheet={sheet} onOpenSection={onOpenSection} />
       ) : (
-        <ProjectSheetSummary sheet={sheet} onUseBudget={keepBudget} />
+        <ProjectSheetSummary
+          sheet={sheet}
+          onUseBudget={keepBudget}
+          onOpenForecast={() => onOpenSection('forecast')}
+        />
       )}
     </>
   )
@@ -229,6 +232,7 @@ export function ProjectSheetView({ api, project, place, onOpenSection, active = 
           </button>
         ))}
       </div>
+      <p className="badge badge-warning">{messages.forecast.internal}</p>
       {part === 'hours' ? (
         <HoursView
           key={entries}

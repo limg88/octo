@@ -67,10 +67,13 @@ try {
     .getByRole('table', { name: 'Ore e costi per persona' })
     .waitFor({ timeout: TIMEOUT_MS })
   await figure('Ordinato').getByText('7.500,00').waitFor()
-  await figure('Avanzamento').getByText('62%').waitFor()
-  await figure('Avanzamento')
-    .getByText(/^da NetSuite, al 28\/\d\d\/\d{4}$/)
-    .waitFor()
+  // What Octo computes differs from what NetSuite booked: said in the band, to be checked.
+  await figure('Scostamento da NetSuite').getByText('Da verificare').waitFor()
+  const progress = page
+    .getByRole('table', { name: 'Ordine, ricavi e da regolare' })
+    .getByRole('row', { name: /^Avanzamento/ })
+  await progress.getByText('62%').waitFor()
+  await progress.getByText(/da NetSuite, al 28\/\d\d\/\d{4}$/).waitFor()
   await page.getByRole('button', { name: 'Copia i dati per un report' }).waitFor()
   await page.screenshot({ path: `${work}/sintesi.png`, fullPage: true })
 

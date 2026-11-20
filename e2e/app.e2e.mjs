@@ -516,6 +516,8 @@ try {
   await forecastRow('PRJ000101').getByText('16.010,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('27.200,00').waitFor()
   // How a row was computed is said under it, across the table, when the row is opened.
+  // The data of a code are under its row once the code is chosen by its name.
+  await forecastRow('PRJ000303').getByRole('button').first().click()
   await page.getByRole('button', { name: 'Calcolo e dettagli, PRJ000303', exact: true }).click()
   await page
     .locator('table.data tbody tr:has-text("PRJ000303") + tr.row-details')
@@ -534,6 +536,7 @@ try {
   await forecastRow('PRJ000101').getByText('33.200,00').waitFor({ timeout: TIMEOUT_MS })
   await forecastRow('PRJ000101').getByText('51,78%').waitFor()
   // What the PM adds for a code is typed in its row; the rest opens under it. One save for all.
+  await forecastRow('PRJ000202').getByRole('button').first().click()
   await page.getByRole('button', { name: 'Calcolo e dettagli, PRJ000202', exact: true }).click()
   const inputs202 = page.getByRole('group', { name: 'Dati del mese per PRJ000202' })
   await cell(inputs202, 'Nome, riga 1').fill('Studio Blu')
@@ -566,10 +569,10 @@ try {
 
   // Demo 57: the sheet of a project code over its whole life is a section of its own.
   await openSheetPart('Sintesi')
-  await page.getByRole('region', { name: 'Ordine', exact: true }).waitFor({ timeout: TIMEOUT_MS })
+  await page.getByLabel('Le cifre della commessa').waitFor({ timeout: TIMEOUT_MS })
   // How far the code is comes with what says so: here no system was read, so it is not told.
   await page.getByText('Avanzamento', { exact: true }).first().waitFor()
-  await page.getByRole('region', { name: 'Costi e margine', exact: true }).waitFor()
+  await page.getByRole('table', { name: 'Ordine, ricavi e da regolare' }).waitFor()
   await page.getByRole('table', { name: 'Ore e costi per persona' }).waitFor()
   await page.getByText('Documento interno: costi e margini non vanno al cliente.').waitFor()
   await page.screenshot({ path: `${work}/commessa.png`, fullPage: true })

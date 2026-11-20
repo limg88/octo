@@ -876,7 +876,9 @@ export const messages = {
       noOrder: 'Senza ordine',
       ordered: 'Ordinato',
       received: 'Ricevuto',
-      receivedNote: 'è il costo sulla commessa',
+      receivedNote: '«Ricevuto» è il costo sulla commessa.',
+      source: 'Fonte',
+      fromSystem: 'NetSuite',
       invoiced: 'Fatturato',
       toInvoice: 'Da fatturare',
       noSuppliers: 'Nessun ordine a fornitore su questa commessa.',
@@ -893,13 +895,25 @@ export const messages = {
       code: 'Commessa',
       through: (month: string) =>
         `Dall’inizio della commessa a ${month}. Per i mesi ancora da leggere in NetSuite, le ore del tracker sono una stima.`,
-      groups: { order: 'Ordine', margin: 'Costi e margine', settle: 'Da regolare' },
+      band: 'Le cifre della commessa',
+      entries: 'Ordine, ricavi e da regolare',
+      entry: 'Voce',
+      value: 'Valore',
+      byOcto: 'Octo',
+      bySystem: 'NetSuite',
+      orderNote: (order: string) => `ordine ${order}`,
+      atEnd: (shareText: string) => `a finire ${shareText}`,
+      variance: 'Scostamento da NetSuite',
+      varianceToCheck: 'Da verificare',
+      varianceNone: 'Nessuno',
+      invoicedPlain: 'Fatturato',
+      recognizedPlain: 'Ricavi riconosciuti',
       suppliersLine: 'Fornitori',
       suppliersSource: 'ricevuto dai fornitori, da NetSuite',
       wip: 'Lavoro non fatturato',
-      wipNote: 'WIP: costi a oggi meno fatturato',
+      wipNote: 'WIP',
       toBill: 'Fatture da emettere',
-      toBillNote: 'FRD: ricavi riconosciuti meno fatturato',
+      toBillNote: 'FRD',
       withSuppliers: (hours: string, amount: string) => `${hours} ore · fornitori ${amount}`,
       doubleCount:
         'Ci sono sia esterni dichiarati a mano sia ricevimenti da fornitore: se sono le stesse persone il costo è contato due volte. Togli dal «Previsionale» gli esterni che hanno un ordine a fornitore.',
@@ -909,8 +923,8 @@ export const messages = {
         cost: 'Costo',
         total: 'Totale',
         none: 'NetSuite non ha ancora costi su questa commessa.',
-        compare: (computed: string, difference: string) =>
-          `Calcolati da Octo: ${computed}. Scostamento da NetSuite: ${difference}.`,
+        compare: (computed: string) =>
+          `Calcolati da Octo: ${computed}. Lo scostamento è nella fascia in alto.`,
         same: (computed: string) => `Calcolati da Octo: ${computed}. Coincidono con NetSuite.`,
       },
       rules: {
@@ -1083,7 +1097,6 @@ export const messages = {
     columnOwnRevenue: 'Ricavi corretti',
     columnOwnNote: 'Tua nota',
     groupComputed: 'Calcolato da Octo',
-    groupOwn: 'Da te, per questo mese',
     inputsHint:
       'I campi sono facoltativi. Se scrivi i ricavi corretti, sostituiscono quelli calcolati. Nel modello Excel ritrovi anche Da fatturare e Tua nota.',
     noRows:
@@ -1139,7 +1152,6 @@ export const messages = {
     inputsTitle: (code: string) => `Dati del mese per ${code}`,
     externals: 'Ore degli esterni nel mese',
     toInvoice: 'Da fatturare nel mese',
-    revenue: 'Ricavi decisi da te',
     budgetCosts: 'Costi totali a budget',
     budgetCostsHint:
       'Solo per un progetto a corpo: quanto hai previsto di spendere in tutto. L’avanzamento è la parte di questa cifra già spesa fino al mese. Lo scrivi una volta: vale anche per i mesi successivi.',
@@ -1148,14 +1160,8 @@ export const messages = {
       'Quanto pensi che costerà il progetto quando sarà finito. Serve a calcolare il margine finale; senza, quella colonna resta vuota.',
     totalCostsBeforeMonth:
       'La cifra qui sopra arriva fino al mese scorso: aggiungi tu i costi di questo mese',
-    note: 'Nota da aggiungere',
-    addNote: '+ Aggiungi una nota',
-    editNote: 'Modifica la nota',
-    noteTitle: (code: string) => `Nota per ${code}`,
-    removeNote: 'Elimina la nota',
-    noteHint:
-      'Finisce accanto a come Octo ha calcolato la riga, e nel modello Excel se lo compili. Salvandola salvi anche gli altri dati del mese che hai scritto.',
-    noteSave: 'Salva la nota',
+    missing: 'manca',
+    ownTitle: (project: string, month: string) => `${project} — i tuoi dati di ${month}`,
     /** A project as it is named in a row: its name, then its code. */
     project: (name: string, code: string) => (name === '' ? code : `${name} · ${code}`),
     projectName: (name: string, code: string, kind: string) =>
@@ -1179,6 +1185,19 @@ export const messages = {
     firstTime:
       'Per confrontare le ore servono due letture del mese scelto: i timesheet e le ore segnate sul tracker. Octo le fa da solo.',
     steps: { timesheets: '1 · Timesheet da NetSuite', tracker: '2 · Ore da Jira' },
+    notRead: {
+      timesheets: (month: string) => `Non letti per ${month}`,
+      tracker: (month: string) => `Non lette per ${month}`,
+    },
+    read: { timesheets: 'Letti', tracker: 'Lette' },
+    shortNote: {
+      timesheets: 'con il tuo utente di sola lettura, per i mesi interi del periodo',
+      tracker:
+        'con il tuo token di sola lettura: di ogni registrazione tengo persona, giorno, ore e ticket',
+    },
+    about: 'Che cosa legge e che cosa tiene',
+    period: 'il periodo scelto',
+    comparisonLater: 'Il confronto delle ore compare qui dopo le due letture.',
     haveExports: 'Ho già le esportazioni nella cartella',
     refreshTitle: 'Leggi di nuovo le ore',
     refreshHint: 'Leggono i mesi interi del periodo scelto.',

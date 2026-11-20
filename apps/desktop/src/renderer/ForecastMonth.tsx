@@ -8,26 +8,15 @@ import {
 } from '@octo/domain'
 import { useEffect, useId, useState } from 'react'
 import { type DataColumn, DataTable } from './DataTable.tsx'
-import { Dialog } from './Dialog.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { messages } from './messages.ts'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import type { Section } from './sections.ts'
+import { monthText } from './today-text.ts'
+import { useSelection } from './use-selection.ts'
 
 const text = messages.forecast
-
-/** The signs of the two things done to a note; the button says its name to who does not see them. */
-const PENCIL = (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
-  </svg>
-)
-const BIN = (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />
-  </svg>
-)
 
 type Props = {
   view: View
@@ -57,19 +46,16 @@ const EXTERNAL_COLUMNS: RowsColumn<ExternalKey>[] = [
   { key: 'hours', label: text.columns.hours, kind: 'amount', width: '140px' },
 ]
 
-/** How many columns Octo fills and how many the PM does: the two groups of the heading. */
-const COMPUTED_COLUMNS = 9
-const OWN_COLUMNS = 3
+/** The form of the month: the command that saves it stands with the commands of the page. */
+export const FORECAST_FORM_ID = 'forecast-month'
 /**
  * Each column as wide as its heading on one line: the room the note left goes to them, and a
  * page narrower than their sum scrolls the table sideways.
  */
-const CODE_WIDTH = '190px'
+const CODE_WIDTH = '260px'
 const ORDERED_WIDTH = '104px'
 const FIGURE_WIDTH = { internal: '104px', external: '104px', revenue: '92px', margin: '118px' }
-const QUANTITY_WIDTH = '100px'
-const INPUT_WIDTH = '116px'
-const NOTE_WIDTH = '140px'
+const QUANTITY_WIDTH = '116px'
 
 const AMOUNT_FIELDS = ['toInvoice', 'revenue', 'budgetCosts', 'totalCosts'] as const
 type AmountField = (typeof AMOUNT_FIELDS)[number]
@@ -132,13 +118,23 @@ export function ForecastMonth({
   onOpenSection,
 }: Props) {
   const { rows } = view.forecast
+  const ownTitleId = useId()
   const saved = settings.months[month]
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [problems, setProblems] = useState<Record<string, Problems>>({})
-  /** The code whose less used data are open under its row. */
+  /** The code whose data of the month are in view under its row; before a choice, the first. */
+  const [chosen, setChosen] = useState<string | null>(null)
+  const selected = useSelection(
+    rows.map((row) => row.code),
+    chosen,
+  )
+  /** The code whose less used data are open too. */
   const [open, setOpen] = useState<string | null>(null)
-  /** The note being written in its window, with the code it is of. */
-  const [noting, setNoting] = useState<{ code: string; typed: string } | null>(null)
+  /** Shows a code with its less used data: where a missing datum is put right. */
+  const openCode = (code: string) => {
+    setChosen(code)
+    setOpen(code)
+  }
   // What is typed follows what is saved: another month, or a save, starts from there.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the codes of the model change only with the view of the month.
   useEffect(() => {
@@ -167,20 +163,13 @@ export function ForecastMonth({
       const of = found[row.code]
       return of !== undefined && of.externals.length + of.amounts.length > 0
     })
-    if (firstWrong) return setOpen(firstWrong.code)
+    if (firstWrong) return openCode(firstWrong.code)
     void onSaveMonth(Object.fromEntries(rows.map((row) => [row.code, inputsOf(typed(row.code))])))
   }
 
-  /** A note written or taken off in its window is kept at once, with the rest of the month. */
-  function saveNote(code: string, note: string) {
-    const next = { ...draftFor(code), note: note.trim() }
-    change(code, next)
-    setNoting(null)
-    save({ [code]: next })
-  }
-
-  const amountCell = (row: ForecastRow, name: AmountField, label: string) => (
-    <>
+  const amountInput = (row: ForecastRow, name: AmountField, label: string) => (
+    <label className="field">
+      {label}
       <input
         type="text"
         inputMode="decimal"
@@ -192,8 +181,10 @@ export function ForecastMonth({
       <FieldProblems
         lines={problems[row.code]?.amounts.includes(name) ? [messages.amountWrong] : []}
       />
-    </>
+    </label>
   )
+  /** A figure nothing tells is said to be missing: never a dash to be guessed. */
+  const missing = <span className="pill pill-warning">{text.missing}</span>
   const figure = <Value extends number | null>(
     key: string,
     label: string,
@@ -205,13 +196,12 @@ export function ForecastMonth({
     label,
     kind: 'number',
     width,
-    cell: (row) => show(of(row)),
+    cell: (row) => (of(row) === null ? missing : show(of(row))),
     sort: (row) => of(row),
   })
   // A column of dashes says nothing: days and progress are there when a code of the month has them.
   const showDays = rows.some((row) => !row.values.quantityIsShare)
   const showProgress = rows.some((row) => row.values.quantityIsShare)
-  const computedColumns = COMPUTED_COLUMNS - (showDays ? 0 : 1) - (showProgress ? 0 : 1)
   const daysColumn: DataColumn<ForecastRow> = {
     key: 'days',
     label: text.columnDays,
@@ -235,33 +225,20 @@ export function ForecastMonth({
       width: CODE_WIDTH,
       cell: (row) => (
         <>
-          <span
-            className="tip project-tip"
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: a name cut short is read whole with the keyboard too.
-            tabIndex={0}
-            aria-describedby={`forecast-name-${row.code}`}
+          <button
+            type="button"
+            className="quiet cell-button project-name"
+            aria-pressed={selected === row.code}
+            title={text.projectName(row.description, row.code, text.kinds[row.revenueKind])}
+            onClick={() => setChosen(row.code)}
           >
-            <span className="project-name">{text.project(row.description, row.code)}</span>
-            <span role="tooltip" id={`forecast-name-${row.code}`}>
-              {text.projectName(row.description, row.code, text.kinds[row.revenueKind])}
+            {text.project(row.description, row.code)}
+          </button>
+          {incomplete.has(row.code) && (
+            <span className="pill pill-late" title={text.incompleteHint}>
+              {text.incomplete}
             </span>
-          </span>
-          <span className="project-row-actions">
-            <button
-              type="button"
-              className="quiet cell-button"
-              aria-expanded={open === row.code}
-              aria-label={text.forCode(text.moreData, row.code)}
-              onClick={() => setOpen(open === row.code ? null : row.code)}
-            >
-              {text.moreData}
-            </button>
-            {incomplete.has(row.code) && (
-              <span className="pill pill-late" title={text.incompleteHint}>
-                {text.incomplete}
-              </span>
-            )}
-          </span>
+          )}
         </>
       ),
       sort: (row) => text.project(row.description, row.code),
@@ -272,7 +249,7 @@ export function ForecastMonth({
       label: text.columnOrdered,
       kind: 'number',
       width: ORDERED_WIDTH,
-      cell: (row) => (row.ordered === null ? text.none : text.money(row.ordered)),
+      cell: (row) => (row.ordered === null ? missing : text.money(row.ordered)),
       sort: (row) => row.ordered,
     },
     figure(
@@ -313,68 +290,6 @@ export function ForecastMonth({
       (row) => row.values.marginEnd,
       text.share,
     ),
-    {
-      key: 'ownRevenue',
-      label: text.columnOwnRevenue,
-      kind: 'number',
-      width: INPUT_WIDTH,
-      cell: (row) => amountCell(row, 'revenue', text.revenue),
-    },
-    {
-      key: 'toInvoice',
-      label: text.columnToInvoice,
-      kind: 'number',
-      width: INPUT_WIDTH,
-      cell: (row) => amountCell(row, 'toInvoice', text.toInvoice),
-    },
-    {
-      key: 'ownNote',
-      label: text.columnOwnNote,
-      width: NOTE_WIDTH,
-      cell: (row) => {
-        const { note } = draftFor(row.code)
-        const write = () => setNoting({ code: row.code, typed: note })
-        if (note === '') {
-          return (
-            <button
-              type="button"
-              className="quiet cell-button"
-              aria-label={text.forCode(text.addNote, row.code)}
-              onClick={write}
-            >
-              {text.addNote}
-            </button>
-          )
-        }
-        return (
-          <>
-            <p className="note-text" title={note}>
-              {note}
-            </p>
-            <span className="row-actions">
-              <button
-                type="button"
-                className="quiet icon-button"
-                aria-label={text.forCode(text.editNote, row.code)}
-                title={text.editNote}
-                onClick={write}
-              >
-                {PENCIL}
-              </button>
-              <button
-                type="button"
-                className="quiet icon-button"
-                aria-label={text.forCode(text.removeNote, row.code)}
-                title={text.removeNote}
-                onClick={() => saveNote(row.code, '')}
-              >
-                {BIN}
-              </button>
-            </span>
-          </>
-        )
-      },
-    },
   ]
 
   // A row whose figures miss something says so itself: the list of what is missing is below.
@@ -399,7 +314,7 @@ export function ForecastMonth({
       view={view}
       settings={settings}
       onSaveSettings={onSaveSettings}
-      onOpenCode={setOpen}
+      onOpenCode={openCode}
       onOpenSection={onOpenSection}
     />
   )
@@ -414,6 +329,7 @@ export function ForecastMonth({
   return (
     <>
       <form
+        id={FORECAST_FORM_ID}
         aria-label={text.monthData}
         className="forecast-month"
         onSubmit={(event) => {
@@ -421,106 +337,96 @@ export function ForecastMonth({
           save()
         }}
       >
-        <p className="hint">{text.inputsHint}</p>
-        <div className="table-wide">
-          <DataTable
-            label={text.monthData}
-            groups={[
-              { label: text.groupComputed, span: computedColumns },
-              { label: text.groupOwn, span: OWN_COLUMNS },
-            ]}
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.code}
-            footer={
-              rows.length > 1 ? (
-                <tr>
-                  <th scope="row">{text.totalRow}</th>
-                  <td className="number">
-                    {totals.ordered === null ? text.none : text.money(totals.ordered)}
-                  </td>
-                  <td className="number">{text.money(totals.internal)}</td>
-                  <td className="number">{text.money(totals.external)}</td>
-                  <td className="number">{text.money(totals.revenue)}</td>
-                  {showDays && (
+        <div className="panel">
+          <div className="panel-head panel-head-slim">
+            <span className="eyebrow">{text.groupComputed}</span>
+          </div>
+          <div className="table-wide">
+            <DataTable
+              label={text.monthData}
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.code}
+              rowClassName={(row) => (row.code === selected ? 'row-selected' : undefined)}
+              footer={
+                rows.length > 1 ? (
+                  <tr>
+                    <th scope="row">{text.totalRow}</th>
                     <td className="number">
-                      {totals.days === 0 ? text.none : text.days(totals.days)}
+                      {totals.ordered === null ? text.none : text.money(totals.ordered)}
                     </td>
-                  )}
-                  {showProgress && <td />}
-                  <td className="number">{text.share(totals.margin)}</td>
-                  <td colSpan={OWN_COLUMNS + 1} />
-                </tr>
-              ) : undefined
-            }
-            detail={(row) =>
-              open === row.code ? (
-                <>
-                  {row.note !== '' && (
-                    <p className="hint row-note">
-                      {text.howComputed} {row.note}
-                    </p>
-                  )}
-                  <CodeDetails
-                    code={row.code}
-                    wholeFirst={row.revenueKind === 'fixed_price'}
-                    draft={draftFor(row.code)}
-                    problems={problems[row.code]}
-                    externalNames={settings.externals
-                      .filter((external) => external.code === row.code)
-                      .map((external) => external.name)}
-                    onChange={(part) => change(row.code, part)}
-                  />
-                </>
-              ) : null
-            }
-          />
+                    <td className="number">{text.money(totals.internal)}</td>
+                    <td className="number">{text.money(totals.external)}</td>
+                    <td className="number">{text.money(totals.revenue)}</td>
+                    {showDays && (
+                      <td className="number">
+                        {totals.days === 0 ? text.none : text.days(totals.days)}
+                      </td>
+                    )}
+                    {showProgress && <td />}
+                    <td className="number">{text.share(totals.margin)}</td>
+                    <td />
+                  </tr>
+                ) : undefined
+              }
+              detail={(row) =>
+                row.code === selected ? (
+                  <section className="own-data" aria-labelledby={`${ownTitleId}-${row.code}`}>
+                    <div className="title-row">
+                      <h4 id={`${ownTitleId}-${row.code}`}>
+                        {text.ownTitle(text.project(row.description, row.code), monthText(month))}
+                      </h4>
+                      <button
+                        type="button"
+                        className="quiet"
+                        aria-expanded={open === row.code}
+                        aria-label={text.forCode(text.moreData, row.code)}
+                        onClick={() => setOpen(open === row.code ? null : row.code)}
+                      >
+                        {text.moreData}
+                      </button>
+                    </div>
+                    <div className="own-fields">
+                      {amountInput(row, 'revenue', text.columnOwnRevenue)}
+                      {amountInput(row, 'toInvoice', text.toInvoice)}
+                      <label className="field">
+                        {text.columnOwnNote}
+                        <input
+                          type="text"
+                          aria-label={text.forCode(text.columnOwnNote, row.code)}
+                          value={draftFor(row.code).note}
+                          onChange={(event) => change(row.code, { note: event.target.value })}
+                        />
+                      </label>
+                    </div>
+                    <p className="hint">{text.inputsHint}</p>
+                    {open === row.code && (
+                      <>
+                        {row.note !== '' && (
+                          <p className="hint row-note">
+                            {text.howComputed} {row.note}
+                          </p>
+                        )}
+                        <CodeDetails
+                          code={row.code}
+                          wholeFirst={row.revenueKind === 'fixed_price'}
+                          draft={draftFor(row.code)}
+                          problems={problems[row.code]}
+                          externalNames={settings.externals
+                            .filter((external) => external.code === row.code)
+                            .map((external) => external.name)}
+                          onChange={(part) => change(row.code, part)}
+                        />
+                      </>
+                    )}
+                  </section>
+                ) : null
+              }
+            />
+          </div>
         </div>
-        <div className="actions">
-          <button type="submit" className="quiet-submit">
-            {text.saveInputs}
-          </button>
-          {wrong && <NotSaved text={messages.notSaved} />}
-        </div>
+        {wrong && <NotSaved text={messages.notSaved} />}
       </form>
-      {noting && (
-        <Dialog title={text.noteTitle(noting.code)} onClose={() => setNoting(null)}>
-          <form
-            className="dialog-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              saveNote(noting.code, noting.typed)
-            }}
-          >
-            <label className="field">
-              {text.note}
-              <textarea
-                rows={6}
-                value={noting.typed}
-                onChange={(event) => setNoting({ ...noting, typed: event.target.value })}
-              />
-            </label>
-            <p className="hint">{text.noteHint}</p>
-            <footer className="dialog-footer">
-              {draftFor(noting.code).note !== '' && (
-                <button
-                  type="button"
-                  className="danger dialog-footer-start"
-                  onClick={() => saveNote(noting.code, '')}
-                >
-                  {text.removeNote}
-                </button>
-              )}
-              <button type="button" onClick={() => setNoting(null)}>
-                {messages.cancel}
-              </button>
-              <button type="submit" className="primary">
-                {text.noteSave}
-              </button>
-            </footer>
-          </form>
-        </Dialog>
-      )}
       {gaps}
     </>
   )
@@ -660,13 +566,15 @@ function Gaps({
     ...(otherCodes.length > 0 ? [text.otherCodes(otherCodes.join(', '))] : []),
   ]
   return (
-    <section aria-label={text.gapsTitle}>
-      <h3>{text.gapsTitle}</h3>
+    <section className="gaps-part" aria-label={text.gapsTitle}>
+      <div className="gaps-title">
+        <h3>{text.gapsTitle}</h3>
+        {gaps.length + notes.length > 0 && <span className="hint">{text.gapsIntro}</span>}
+      </div>
       {gaps.length + notes.length === 0 ? (
         <p className="badge badge-ok">{text.noGaps}</p>
       ) : (
         <>
-          <p className="hint">{text.gapsIntro}</p>
           {proposals.size > 0 && (
             <div className="actions">
               {[...proposals.entries()].map(([key, rates]) => (
@@ -683,10 +591,11 @@ function Gaps({
               <span className="hint">{text.copyRatesHint}</span>
             </div>
           )}
-          <ol className="missing gaps" aria-label={text.gapsTitle}>
+          <ol className="entries gaps" aria-label={text.gapsTitle}>
             {gaps.map((gap) => (
-              <li key={gapText(gap)}>
-                {gapText(gap)}
+              <li key={gapText(gap)} className="list-row">
+                <span className="pill pill-warning">{text.missing}</span>
+                <span className="gap-text">{gapText(gap)}</span>
                 <Remedy
                   gap={gap}
                   settings={settings}
@@ -697,7 +606,9 @@ function Gaps({
               </li>
             ))}
             {notes.map((note) => (
-              <li key={note}>{note}</li>
+              <li key={note} className="list-row">
+                <span className="gap-text">{note}</span>
+              </li>
             ))}
           </ol>
         </>

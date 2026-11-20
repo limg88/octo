@@ -152,7 +152,10 @@ describe('the forecast', () => {
     // Days sold and progress of a fixed price each in its own column: the other stays empty.
     const table = screen.getByRole('table', { name: text.monthData })
     const cellsOf = (code: string) =>
-      within(within(table).getByRole('row', { name: new RegExp(`· ${code} `) }))
+      // The first row so named is that of the figures; the next holds the data of the PM.
+      within(
+        within(table).getAllByRole('row', { name: new RegExp(`· ${code} `) })[0] as HTMLElement,
+      )
         .getAllByRole('cell')
         .map((cell) => cell.textContent)
     expect(cellsOf('P1').slice(1, 7)).toEqual([
@@ -187,7 +190,6 @@ describe('the forecast', () => {
     // The months of timesheets nobody read are said on the page and on the code they belong to.
     expect(screen.getByText(text.unreadMonths('2026-04, 2026-05'))).toBeTruthy()
     expect(screen.getByText(text.gap.unread_months('P2', '2026-04, 2026-05'))).toBeTruthy()
-    expect(screen.getByText(text.internal)).toBeTruthy()
   })
 
   it('shows no total for a single code, and no mark on a row that misses nothing', async () => {
@@ -214,19 +216,21 @@ describe('the forecast', () => {
     // A month sold by the day only has no column of dashes for the progress.
     expect(headings(table)).toContain(text.columnDays)
     expect(headings(table)).not.toContain(text.columnProgress)
-    const cells = within(within(table).getByRole('row', { name: /· P1 / })).getAllByRole('cell')
+    const cells = within(
+      // The first row so named is that of the figures; the next holds the data of the PM.
+      within(table).getAllByRole('row', { name: /· P1 / })[0] as HTMLElement,
+    ).getAllByRole('cell')
     expect(cells.map((cell) => cell.textContent).slice(1, 7)).toEqual([
-      text.none,
+      text.missing,
       '3.200,00',
       '750,00',
       '6.400,00',
       '18,5',
       '38,28%',
     ])
-    // Octo fills one column less: the heading of its group covers those that are there.
-    expect(
-      within(table).getByRole('columnheader', { name: text.groupComputed }).getAttribute('colspan'),
-    ).toBe('8')
+    // The table holds only what Octo computes: what the PM adds is under the row in view.
+    expect(headings(table)).not.toContain(text.columnOwnRevenue)
+    expect(screen.getByText(text.groupComputed)).toBeTruthy()
   })
 
   it('shows the progress and no days for a month sold at a fixed price only', async () => {
@@ -259,9 +263,6 @@ describe('the forecast', () => {
       '',
       '38,28%',
     ])
-    expect(
-      within(table).getByRole('columnheader', { name: text.groupComputed }).getAttribute('colspan'),
-    ).toBe('8')
   })
 
   it('says it is reading until the settings come, then shows the month or why it cannot', async () => {
@@ -356,8 +357,18 @@ describe('the forecast', () => {
     const form = await screen.findByRole('form', { name: text.monthData })
     const cell = (label: string, code: string) =>
       within(form).getByLabelText<HTMLInputElement>(text.forCode(label, code))
+    /** Puts the data of a code in view under its row. */
+    const choose = (name: string, code: string) =>
+      fireEvent.click(within(form).getByRole('button', { name: text.project(name, code) }))
+    // The first code is in view: its data of the month are under its row, and only its.
     await waitFor(() => expect(cell(text.toInvoice, 'P1').value).toBe('12000'))
-    // What is used less often opens under the row of its code.
+    expect(within(form).queryByLabelText(text.forCode(text.toInvoice, 'P2'))).toBeNull()
+    expect(
+      within(form)
+        .getByRole('button', { name: text.project('Sviluppo', 'P1') })
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
+    // What is used less often opens from there.
     expect(screen.queryByRole('group', { name: text.inputsTitle('P1') })).toBeNull()
     // How a row is computed is read with its details, not under every row.
     const howP1 = `${text.howComputed} timesheet approvati`
@@ -373,7 +384,7 @@ describe('the forecast', () => {
     fireEvent.change(more.getByLabelText(text.cell(text.columns.hours, 1)), {
       target: { value: 'tante' },
     })
-    fireEvent.change(cell(text.revenue, 'P2'), { target: { value: 'boh' } })
+    fireEvent.change(cell(text.columnOwnRevenue, 'P1'), { target: { value: 'boh' } })
     fireEvent.click(screen.getByRole('button', { name: text.saveInputs }))
     expect(more.getByText(text.wrong.hours(1))).toBeTruthy()
     expect(within(form).getByText(messages.amountWrong)).toBeTruthy()
@@ -383,36 +394,19 @@ describe('the forecast', () => {
     fireEvent.change(more.getByLabelText(text.cell(text.columns.hours, 1)), {
       target: { value: '20' },
     })
-    fireEvent.change(cell(text.revenue, 'P2'), { target: { value: '' } })
-    fireEvent.change(cell(text.revenue, 'P1'), { target: { value: '7.000,50' } })
+    fireEvent.change(cell(text.columnOwnRevenue, 'P1'), { target: { value: '7.000,50' } })
     fireEvent.change(more.getByLabelText(text.budgetCosts), { target: { value: '' } })
     fireEvent.change(more.getByLabelText(text.totalCosts), { target: { value: '60000' } })
     fireEvent.click(more.getByLabelText(text.totalCostsBeforeMonth))
-    // The note is written in a window of its own, opened from the row.
-    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.addNote, 'P2') }))
-    fireEvent.click(screen.getByRole('button', { name: messages.cancel }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.addNote, 'P1') }))
-    const noteWindow = within(screen.getByRole('dialog', { name: text.noteTitle('P1') }))
-    // A new note has nothing to take off.
-    expect(noteWindow.queryByRole('button', { name: text.removeNote })).toBeNull()
-    fireEvent.change(noteWindow.getByLabelText(text.note), {
-      target: { value: ' SAL di giugno ' },
-    })
-    fireEvent.click(noteWindow.getByRole('button', { name: text.noteSave }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByText('SAL di giugno')).toBeTruthy()
-    // Saving the note saves the month as typed, the note with it.
-    await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(api.saveForecastSettings).mock.calls[0]?.[1].months['2026-06']?.P1?.note).toBe(
-      'SAL di giugno',
-    )
-    vi.mocked(api.saveForecastSettings).mockClear()
-    // Pointing at a code tells the name of its project and how it is sold.
-    expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toEqual([
-      text.projectName('Sviluppo', 'P1', text.kinds.time_material),
+    // The note is a field beside the two amounts, kept with the rest of the month.
+    fireEvent.change(cell(text.columnOwnNote, 'P1'), { target: { value: 'SAL di giugno' } })
+    // The name of a code says whole what it is and how it is sold.
+    expect(within(form).getByRole('button', { name: text.project('A corpo', 'P2') }).title).toBe(
       text.projectName('A corpo', 'P2', text.kinds.fixed_price),
-    ])
+    )
+    // Another code in view: what was typed for the first is kept until the month is saved.
+    choose('A corpo', 'P2')
+    expect(within(form).queryByLabelText(text.forCode(text.toInvoice, 'P1'))).toBeNull()
     fireEvent.change(cell(text.toInvoice, 'P2'), { target: { value: '500' } })
     fireEvent.click(screen.getByRole('button', { name: text.saveInputs }))
     await waitFor(() => expect(api.saveForecastSettings).toHaveBeenCalled())
@@ -437,28 +431,11 @@ describe('the forecast', () => {
         note: '',
       },
     })
-    await waitFor(() => expect(api.forecastView).toHaveBeenCalledTimes(3))
-    // A note that is there is changed in the same window, or taken off: from there or the row.
-    const noteOf = () => vi.mocked(api.saveForecastSettings).mock.lastCall?.[1].months['2026-06']
-    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.editNote, 'P1') }))
-    const editing = within(screen.getByRole('dialog', { name: text.noteTitle('P1') }))
-    expect(editing.getByLabelText<HTMLTextAreaElement>(text.note).value).toBe('SAL di giugno')
-    fireEvent.change(editing.getByLabelText(text.note), { target: { value: 'SAL di luglio' } })
-    fireEvent.click(editing.getByRole('button', { name: text.noteSave }))
-    await waitFor(() => expect(noteOf()?.P1?.note).toBe('SAL di luglio'))
-    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.editNote, 'P1') }))
-    fireEvent.click(screen.getByRole('button', { name: text.removeNote }))
-    await waitFor(() => expect(noteOf()?.P1?.note).toBe(''))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: text.forCode(text.addNote, 'P1') })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: text.forCode(text.addNote, 'P1') }))
-    fireEvent.change(screen.getByLabelText(text.note), { target: { value: 'da togliere' } })
-    fireEvent.click(screen.getByRole('button', { name: text.noteSave }))
-    fireEvent.click(
-      await screen.findByRole('button', { name: text.forCode(text.removeNote, 'P1') }),
-    )
-    await waitFor(() => expect(noteOf()?.P1?.note).toBe(''))
-    // The details close with a second click.
+    await waitFor(() => expect(api.forecastView).toHaveBeenCalledTimes(2))
+    choose('Sviluppo', 'P1')
+    expect(cell(text.columnOwnNote, 'P1').value).toBe('SAL di giugno')
+    // The details stayed open, and close with a second click.
+    expect(screen.getByRole('group', { name: text.inputsTitle('P1') })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: text.forCode(text.moreData, 'P1') }))
     expect(screen.queryByRole('group', { name: text.inputsTitle('P1') })).toBeNull()
   })
@@ -531,7 +508,8 @@ describe('the forecast', () => {
     const onOpenSection = vi.fn()
     const api = fakeApi({ forecastSettings: vi.fn(async () => ok(before)) })
     render(<ForecastView api={api} project={project} now={now} onOpenSection={onOpenSection} />)
-    expect(await screen.findByText(text.setupIntro)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    expect(screen.getByText(text.setupIntro)).toBeTruthy()
     // The month is computed with no model; only filling the spreadsheet needs one.
     await waitFor(() => expect(api.forecastView).toHaveBeenCalledWith('p-1', '2026-06'))
     expect(screen.queryByRole('button', { name: text.compile })).toBeNull()
@@ -628,7 +606,8 @@ describe('the forecast', () => {
         ),
     })
     render(<ForecastView api={api} project={project} now={now} />)
-    fireEvent.click(await screen.findByRole('button', { name: text.readOrders }))
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    fireEvent.click(screen.getByRole('button', { name: text.readOrders }))
     await waitFor(() =>
       expect(
         screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnOrdered, 'P1')).value,
@@ -642,7 +621,8 @@ describe('the forecast', () => {
     // Asked by itself, a NetSuite that is not linked is no error to show.
     await waitFor(() => expect(unlinked.readForecastOrders).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('alert')).toBeNull()
-    fireEvent.click(await screen.findByRole('button', { name: text.readOrders }))
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    fireEvent.click(screen.getByRole('button', { name: text.readOrders }))
     expect((await screen.findByRole('alert')).textContent).toMatch(/non è ancora configurata/)
   })
 
@@ -670,7 +650,8 @@ describe('the forecast', () => {
       readForecastOrders: vi.fn(async () => ordersRead(known)),
     })
     render(<ForecastView api={api} project={project} now={now} />)
-    // Nobody pressed anything: the code was not in the settings, and NetSuite was asked.
+    // Nobody asked for it: the code was not in the settings, and NetSuite was asked.
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
     await waitFor(() =>
       expect(
         screen.getByLabelText<HTMLSelectElement>(text.forCode(text.columnKind, 'P2')).value,
@@ -688,7 +669,8 @@ describe('the forecast', () => {
       forecastView: vi.fn(async () => ok(fixed)),
     })
     render(<ForecastView api={settled} project={project} now={now} />)
-    expect(await screen.findByText(text.ratesTitle)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    expect(screen.getByText(text.ratesTitle)).toBeTruthy()
     expect(settled.readForecastOrders).not.toHaveBeenCalled()
 
     cleanup()
@@ -700,6 +682,7 @@ describe('the forecast', () => {
       readForecastOrders: vi.fn(async () => ordersRead(known)),
     })
     render(<ForecastView api={asking} project={project} now={now} />)
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
     const start = () =>
       screen.getByLabelText<HTMLInputElement>(text.forCode(text.columnStartMonth, 'P2'))
     await waitFor(() => expect(start().value).toBe('2026-04'))
@@ -790,18 +773,17 @@ describe('the forecast', () => {
 
   it('asks the costs of the whole project first for a fixed price, the externals first by the day', async () => {
     render(<ForecastView api={fakeApi()} project={project} now={now} />)
-    const order = async (code: string) => {
-      fireEvent.click(
-        await screen.findByRole('button', { name: text.forCode(text.moreData, code) }),
-      )
+    const order = async (name: string, code: string) => {
+      fireEvent.click(await screen.findByRole('button', { name: text.project(name, code) }))
+      fireEvent.click(screen.getByRole('button', { name: text.forCode(text.moreData, code) }))
       const group = screen.getByRole('group', { name: text.inputsTitle(code) })
       const budget = within(group).getByLabelText(text.budgetCosts)
       const externals = within(group).getByRole('heading', { name: text.externals })
       // Whether the costs at budget come before the hours of the externals.
       return Boolean(budget.compareDocumentPosition(externals) & Node.DOCUMENT_POSITION_FOLLOWING)
     }
-    expect(await order('P2')).toBe(true)
-    expect(await order('P1')).toBe(false)
+    expect(await order('A corpo', 'P2')).toBe(true)
+    expect(await order('Sviluppo', 'P1')).toBe(false)
   })
 
   it('chooses the model from the dialog of the system, and says when it is elsewhere', async () => {
@@ -815,7 +797,8 @@ describe('the forecast', () => {
         .mockResolvedValue(ok('amministrazione/Altro.xlsx')),
     })
     render(<ForecastView api={api} project={project} now={now} />)
-    const model = (await screen.findByLabelText(text.modelPath)) as HTMLInputElement
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     const choose = screen.getByRole('button', {
       name: `${messages.choosePath}: ${text.modelPath}`,
     })
@@ -840,7 +823,8 @@ describe('the forecast', () => {
       })),
     })
     render(<ForecastView api={api} project={project} now={now} />)
-    const model = (await screen.findByLabelText(text.modelPath)) as HTMLInputElement
+    fireEvent.click(await screen.findByRole('button', { name: text.settings }))
+    const model = screen.getByLabelText(text.modelPath) as HTMLInputElement
     await waitFor(() => expect(api.forecastCandidates).toHaveBeenCalled())
     expect(model.value).toBe('')
     fireEvent.change(model, { target: { value: '../fuori.xlsx' } })

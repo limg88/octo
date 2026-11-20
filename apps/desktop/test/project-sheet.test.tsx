@@ -117,11 +117,17 @@ const days: Lifetime = {
   unreadMonths: ['2026-09'],
 }
 
-/** The figures of a group, each as it is read: its name, its value and the line that reads it. */
-const figuresOf = (group: string): string[] =>
-  within(screen.getByRole('region', { name: group }))
+/** The figures of the band, each as it is read: its name, its value and the line that reads it. */
+const band = (): string[] =>
+  within(screen.getByLabelText(words.band))
     .getAllByRole('term')
     .map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent}`)
+/** The other figures, a row each: what it is with its note, what it is worth, where it is from. */
+const entries = (): Array<string | null> =>
+  within(screen.getByRole('table', { name: words.entries }))
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent)
 
 afterEach(() => {
   cleanup()
@@ -139,17 +145,23 @@ describe('the sheet of a project code', () => {
     expect(screen.getByText(text.internal)).toBeTruthy()
     expect(screen.getByText(words.through('novembre 2026'))).toBeTruthy()
     // What the company's system says of the order, each amount with its share of it.
-    expect(figuresOf(words.groups.order)).toEqual([
+    // The figures to read first are one band; NetSuite's costs were not read: no variance.
+    expect(band()).toEqual([
       `${words.ordered}: 7.500,00`,
       `${words.invoiced}: 2.250,00${words.ofOrdered('30%')}`,
-      `${words.toInvoice}: 5.250,00${words.ofOrdered('70%')}`,
-      `${words.recognized}: 5.250,00${words.ofOrdered('70%')}`,
-    ])
-    expect(figuresOf(words.groups.margin)).toEqual([
       `${words.costs}: 3.457,00${words.hoursWorked('68')}`,
-      `${words.marginToDate}: 53,91%`,
-      `${words.progress}: 55%${words.progressSources.system('31/10/2026')}`,
-      `${words.marginAtEnd}: 36%${words.onCosts('4.800,00')}`,
+      `${words.marginToDate}: 53,91%${words.atEnd('36%')}`,
+    ])
+    // The others are a table: what Octo computes says so, what is not known where from says nothing.
+    expect(entries()).toEqual([
+      `${words.ordered}7.500,00`,
+      `${words.invoicedPlain} · ${words.ofOrdered('30%')}2.250,00`,
+      `${words.toInvoice} · ${words.ofOrdered('70%')}5.250,00${words.byOcto}`,
+      `${words.recognizedPlain} · ${words.ofOrdered('70%')}5.250,00`,
+      `${words.progress} · ${words.progressSources.system('31/10/2026')}55%${words.bySystem}`,
+      `${words.marginAtEnd} · ${words.onCosts('4.800,00')}36%${words.byOcto}`,
+      `${words.wip} · ${words.wipNote}1.207,00${words.byOcto}`,
+      `${words.toBill} · ${words.toBillNote}3.000,00${words.byOcto}`,
     ])
     const rows = within(table)
       .getAllByRole('row')
@@ -181,15 +193,10 @@ describe('the sheet of a project code', () => {
     expect(screen.getByText(text.unreadMonths('2026-09'))).toBeTruthy()
     expect(screen.getByText(words.withoutCost('Neri Ugo'))).toBeTruthy()
     // What is not known is a dash with its reason, never a zero.
-    expect(figuresOf(words.groups.order)).toEqual([
-      `${words.ordered}: —`,
-      `${words.invoiced}: —`,
-      `${words.toInvoice}: —`,
-      `${words.recognized}: —`,
-    ])
-    expect(figuresOf(words.groups.margin).slice(2)).toEqual([
-      `${words.progress}: —${words.noProgress}`,
-      `${words.marginAtEnd}: —${words.noExpected}`,
+    expect(band().slice(0, 2)).toEqual([`${words.ordered}: —`, `${words.invoiced}: —`])
+    expect(entries().slice(4, 6)).toEqual([
+      `${words.progress} · ${words.noProgress}—`,
+      `${words.marginAtEnd} · ${words.noExpected}—`,
     ])
     // Back from another section the same code is shown.
     unmount()
@@ -370,9 +377,9 @@ describe('the sheet of a project code', () => {
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([life])) })
     render(<Sheet api={api} project={project} />)
     await screen.findByRole('table', { name: words.people })
-    expect(figuresOf(words.groups.settle)).toEqual([
-      `${words.wip}: 1.207,00${words.wipNote}`,
-      `${words.toBill}: 3.000,00${words.toBillNote}`,
+    expect(entries().slice(-2)).toEqual([
+      `${words.wip} · ${words.wipNote}1.207,00${words.byOcto}`,
+      `${words.toBill} · ${words.toBillNote}3.000,00${words.byOcto}`,
     ])
     // The rules of the sheet of the administration, one line for each figure.
     const rules = screen.getByText(words.rules.title).closest('details') as HTMLElement
@@ -391,9 +398,11 @@ describe('the sheet of a project code', () => {
     const api = fakeApi({ projectSheets: vi.fn(async () => ok([withSuppliers])) })
     render(<Sheet api={api} project={project} />)
     await screen.findByRole('table', { name: words.people })
-    expect(figuresOf(words.groups.margin)[0]).toBe(
-      `${words.costs}: 4.657,00${words.withSuppliers('68', '1.200,00')}`,
-    )
+    expect(band()[2]).toBe(`${words.costs}: 4.657,00${words.withSuppliers('68', '1.200,00')}`)
+    // What Octo computes differs from what NetSuite booked: said in the band, to be checked.
+    expect(band()[4]).toBe(`${words.variance}: 157,00${words.varianceToCheck}`)
+    // What is read from NetSuite says so in its row.
+    expect(entries()[0]).toBe(`${words.ordered}7.500,00${words.bySystem}`)
     // What the suppliers delivered is a line of the table: its total is the costs of the page.
     expect(rowsOf(words.people).slice(-2)).toEqual([
       `${words.suppliersLine}1.200,00${words.suppliersSource}`,
@@ -406,9 +415,13 @@ describe('the sheet of a project code', () => {
       'Service1.200,00',
       `${words.ledger.total}4.500,00`,
     ])
-    expect(screen.getByText(words.ledger.compare('4.657,00', '157,00'))).toBeTruthy()
-    // An external declared by hand and a receipt of a supplier may be the same cost twice.
+    expect(screen.getByText(words.ledger.compare('4.657,00'))).toBeTruthy()
+    // An external declared by hand and a receipt of a supplier may be the same cost twice: the
+    // forecast, where the external is taken away, is a click from the warning.
     expect(screen.getByText(words.doubleCount)).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: messages.openSection(messages.sheet.parts.forecast) }),
+    ).toBeTruthy()
     cleanup()
     const same: Lifetime = {
       ...withSuppliers,
@@ -419,6 +432,7 @@ describe('the sheet of a project code', () => {
       <Sheet api={fakeApi({ projectSheets: vi.fn(async () => ok([same])) })} project={project} />,
     )
     expect(await screen.findByText(words.ledger.same('4.500,00'))).toBeTruthy()
+    expect(band()[4]).toBe(`${words.variance}: 0,00${words.varianceNone}`)
     expect(screen.queryByText(words.doubleCount)).toBeNull()
     cleanup()
     const empty: Lifetime = {
@@ -452,22 +466,19 @@ describe('the sheet of a project code', () => {
     fireEvent.click(tab)
     expect(tab.getAttribute('aria-selected')).toBe('true')
     expect(rowsOf(bill.clientTable)).toEqual([
-      `${bill.salesOrder}set 2026ott 2026${bill.total}`,
-      `${bill.noSalesOrder}300,00300,00`,
-      'SO-12.250,001.000,003.250,00',
+      `${bill.salesOrder}set 2026ott 2026${bill.total}${bill.source}`,
+      `${bill.noSalesOrder}300,00300,00${bill.fromSystem}`,
+      `SO-12.250,001.000,003.250,00${bill.fromSystem}`,
       `${bill.total}2.250,001.300,003.550,00`,
     ])
-    expect(figuresOf(bill.suppliers)).toEqual([
-      `${bill.ordered}: 2.000,00`,
-      `${bill.received}: 1.200,00${bill.receivedNote}`,
-      `${bill.invoiced}: 800,00`,
-      `${bill.toInvoice}: 1.200,00`,
-    ])
+    // The totals of the suppliers are the last row of their table, not figures above it.
     expect(rowsOf(bill.suppliersTable)).toEqual([
-      `${bill.vendor}${bill.order}${bill.ordered}${bill.received}${bill.invoiced}`,
-      'Studio BluPO-312.000,001.200,00800,00',
-      `${bill.noVendor}${bill.noOrder}0,000,000,00`,
+      `${bill.vendor}${bill.order}${bill.ordered}${bill.received}${bill.invoiced}${bill.toInvoice}${bill.source}`,
+      `Studio BluPO-312.000,001.200,00800,001.200,00${bill.fromSystem}`,
+      `${bill.noVendor}${bill.noOrder}0,000,000,000,00${bill.fromSystem}`,
+      `${bill.total}2.000,001.200,00800,001.200,00`,
     ])
+    expect(screen.getByText(bill.receivedNote)).toBeTruthy()
     // The figures of the summary are not repeated here.
     expect(screen.queryByRole('table', { name: words.people })).toBeNull()
   })

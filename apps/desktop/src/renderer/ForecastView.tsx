@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
-import { ForecastMonth } from './ForecastMonth.tsx'
+import { FORECAST_FORM_ID, ForecastMonth } from './ForecastMonth.tsx'
 import { ForecastRates } from './ForecastRates.tsx'
 import { amountField, amountOf, amountText } from './forecast-text.ts'
 import { MonthField } from './MonthField.tsx'
@@ -66,6 +66,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
   const [compiling, setCompiling] = useState(false)
   const [file, setFile] = useState<ForecastFile | null>(null)
   const [readingOrders, setReadingOrders] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   /** The forecast of a month; the project codes it holds, or null when it could not be computed. */
   async function loadView(wanted: string): Promise<string[] | null> {
@@ -174,30 +175,7 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
     <div className="dashboard">
       {error && <Failure code={error} onOpen={onOpenSection} />}
       {savedNote.note}
-      <details className="dashboard-settings">
-        <summary>{text.settings}</summary>
-        <p className="hint">{text.setupIntro}</p>
-        <div className="actions">
-          <button type="button" disabled={readingOrders} onClick={() => void readOrders()}>
-            {text.readOrders}
-          </button>
-          <span className="hint">{readingOrders ? text.readingOrders : text.readOrdersHint}</span>
-        </div>
-        <SettingsForm
-          settings={settings}
-          candidates={candidates}
-          codes={view?.forecast.rows.map((row) => row.code) ?? []}
-          onSave={save}
-          onChooseModel={chooseModel}
-        />
-        <ForecastRates
-          settings={settings}
-          codes={view?.forecast.rows.map((row) => row.code) ?? []}
-          onSave={save}
-        />
-      </details>
-      <p className="badge badge-warning">{text.internal}</p>
-      <div className="range-fields">
+      <div className="command-row">
         <MonthField
           label={text.month}
           value={month}
@@ -206,17 +184,49 @@ export function ForecastView({ api, project, now = () => new Date(), onOpenSecti
             void loadView(value)
           }}
         />
+        <span className="command-row-gap" />
+        <button
+          type="button"
+          className="quiet"
+          aria-expanded={showSettings}
+          onClick={() => setShowSettings(!showSettings)}
+        >
+          {text.settings}
+        </button>
         {view && view.forecast.rows.length > 0 && settings.modelPath !== '' && (
-          <button
-            type="button"
-            className="primary"
-            disabled={compiling}
-            onClick={() => void compile()}
-          >
+          <button type="button" disabled={compiling} onClick={() => void compile()}>
             {text.compile}
           </button>
         )}
+        {view && view.forecast.rows.length > 0 && (
+          <button type="submit" form={FORECAST_FORM_ID} className="primary">
+            {text.saveInputs}
+          </button>
+        )}
       </div>
+      {showSettings && (
+        <section className="dashboard-settings" aria-label={text.settings}>
+          <p className="hint">{text.setupIntro}</p>
+          <div className="actions">
+            <button type="button" disabled={readingOrders} onClick={() => void readOrders()}>
+              {text.readOrders}
+            </button>
+            <span className="hint">{readingOrders ? text.readingOrders : text.readOrdersHint}</span>
+          </div>
+          <SettingsForm
+            settings={settings}
+            candidates={candidates}
+            codes={view?.forecast.rows.map((row) => row.code) ?? []}
+            onSave={save}
+            onChooseModel={chooseModel}
+          />
+          <ForecastRates
+            settings={settings}
+            codes={view?.forecast.rows.map((row) => row.code) ?? []}
+            onSave={save}
+          />
+        </section>
+      )}
       {compiling && (
         <p className="progress" role="status">
           {text.compiling}

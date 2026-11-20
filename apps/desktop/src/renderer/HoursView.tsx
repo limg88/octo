@@ -1,10 +1,11 @@
 import type { HoursCandidates, TrackerHoursRun, HoursView as View } from '@octo/application'
 import type { HoursPeriod, HoursRow, HoursSettings, Project } from '@octo/domain'
-import { useEffect, useId, useState } from 'react'
+import { type ReactNode, useEffect, useId, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { Failure } from './Failure.tsx'
 import { FieldProblems, NotSaved } from './FieldProblems.tsx'
+import { InfoTip } from './InfoTip.tsx'
 import { KnownList } from './KnownList.tsx'
 import { MonthField } from './MonthField.tsx'
 import { dateText, dateTimeText, messages } from './messages.ts'
@@ -12,6 +13,7 @@ import { PathField } from './PathField.tsx'
 import { blankRow, orOneRow, type Row, type RowsColumn, RowsField } from './RowsField.tsx'
 import { useSavedNote } from './SavedNote.tsx'
 import { Waiting } from './Spinner.tsx'
+import { monthText } from './today-text.ts'
 import { Unlinked } from './Unlinked.tsx'
 
 type HoursApi = Pick<
@@ -59,8 +61,34 @@ export function monthPeriod(month: string): HoursPeriod | null {
 /** Green for what adds up, neutral for an absence foreseen, amber for what is to check. */
 function statusClass(status: HoursRow['status']): string {
   if (status === 'ok') return 'status status-ok'
-  if (status === 'expected') return 'status status-neutral'
+  if (status === 'expected') return 'status'
   return 'status status-warning'
+}
+
+/** One of the two readings the comparison needs: what it is, whether it was made, the command. */
+function ReadingRow(props: {
+  /** What the row is, to who cannot see it. */
+  label: string
+  name: string
+  done: boolean
+  notRead: string
+  read: string
+  /** What the reading is made with, in a line; the whole of it is behind the «i». */
+  note: string
+  about: string
+  children: ReactNode
+}) {
+  return (
+    <section className="list-row" aria-label={props.label}>
+      <strong className="reading-name">{props.name}</strong>
+      <span className={props.done ? 'status status-ok' : 'status'}>
+        {props.done ? props.read : props.notRead}
+      </span>
+      <span className="list-row-text hint">{props.note}</span>
+      <InfoTip title={text.about} steps={[]} note={props.about} />
+      {props.children}
+    </section>
+  )
 }
 
 /** Timesheet hours against the hours logged on the tracker, computed by the app. */
@@ -206,10 +234,13 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
       {text.readTracker}
     </button>
   )
+  const wholeMonth =
+    period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''
+  const periodName = wholeMonth === '' ? text.period : monthText(wholeMonth)
   const month = (
     <MonthField
       label={text.month}
-      value={period.from.slice(0, 7) === period.to.slice(0, 7) ? period.from.slice(0, 7) : ''}
+      value={wholeMonth}
       onChange={(value) => {
         const chosen = monthPeriod(value)
         if (chosen) changePeriod(chosen)
@@ -246,21 +277,38 @@ export function HoursView({ api, project, now = () => new Date(), onOpenSources 
     return (
       <div className="dashboard">
         {error && <Failure code={error} />}
-        <p className="hint">{text.firstTime}</p>
-        <div className="range-fields">{month}</div>
+        <div className="command-row">
+          {month}
+          <span className="hint">{text.firstTime}</span>
+        </div>
         {/* The two readings come first: they fill in the paths by themselves. */}
-        <section aria-label={text.timesheetsTitle}>
-          <h3>{text.steps.timesheets}</h3>
-          <p className="hint">{text.timesheetsIntro}</p>
-          {timesheetsStatus}
-          <div className="actions">{timesheetsButton(true)}</div>
-        </section>
-        <section aria-label={text.trackerTitle}>
-          <h3>{text.steps.tracker}</h3>
-          <p className="hint">{text.trackerIntro}</p>
-          {trackerStatus}
-          <div className="actions">{trackerButton(true)}</div>
-        </section>
+        <div className="panel">
+          <ReadingRow
+            label={text.timesheetsTitle}
+            name={text.steps.timesheets}
+            done={settings.timesheetPath !== ''}
+            notRead={text.notRead.timesheets(periodName)}
+            read={text.read.timesheets}
+            note={text.shortNote.timesheets}
+            about={text.timesheetsIntro}
+          >
+            {timesheetsButton(settings.timesheetPath === '')}
+          </ReadingRow>
+          <ReadingRow
+            label={text.trackerTitle}
+            name={text.steps.tracker}
+            done={settings.worklogPath !== ''}
+            notRead={text.notRead.tracker(periodName)}
+            read={text.read.tracker}
+            note={text.shortNote.tracker}
+            about={text.trackerIntro}
+          >
+            {trackerButton(settings.timesheetPath !== '' && settings.worklogPath === '')}
+          </ReadingRow>
+        </div>
+        {timesheetsStatus}
+        {trackerStatus}
+        <p className="placeholder">{text.comparisonLater}</p>
         {/* The other way, for who already keeps the exports in the folder: open when found. */}
         <details className="dashboard-settings" open={found || undefined}>
           <summary>{text.haveExports}</summary>

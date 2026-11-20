@@ -2040,15 +2040,68 @@ details.advanced[open] > summary {
   font-weight: 500;
 }
 
-/* A month with one step back and one forward beside it. */
+/* A month with its name on the left and one step back and one forward beside it. */
 .month-field {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.month-field-step {
+  display: flex;
   gap: 4px;
+}
+
+.month-field input {
+  width: 150px;
 }
 
 .month-field button {
   min-width: 30px;
   padding: 0;
+}
+
+/* The commands of a page on one row: what is chosen on the left, what is done on the right. */
+.command-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.command-row-gap {
+  flex: 1;
+}
+
+.command-row > button {
+  margin-left: -8px;
+}
+
+.command-row > .hint {
+  flex: 1 1 320px;
+}
+
+/* Where something will be shown once what it needs is there. */
+.placeholder {
+  padding: 28px 16px;
+  border: 1px dashed var(--field-line);
+  border-radius: var(--radius-large);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.reading-name {
+  flex: none;
+  width: 210px;
+}
+
+/* A reading is a part of the page and a row of its list: the row wins. */
+.dashboard section.list-row {
+  flex-direction: row;
+  gap: 10px;
 }
 
 /* The sections of a project, in the sidebar: grouped by how often they are used. */
@@ -2124,93 +2177,55 @@ details.advanced[open] > summary {
 }
 
 /* A project in its row: name and code on one line, cut short when long and read whole on hover. */
-.project-tip {
-  display: block;
-}
-
 .project-name {
-  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
 }
 
-/* What can be done with the row and what it lacks, on a line of their own under the name. */
-.project-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  margin-top: 6px;
-}
-
-/* With the note in its own window the figures have room: no heading breaks. */
+/* The headings of the figures keep to one line. */
 .forecast-month thead th,
 .forecast-month thead th button {
   white-space: nowrap;
 }
 
 .forecast-month table.data {
-  min-width: 1040px;
+  min-width: 760px;
 }
 
-/* The note of a row: two lines of it at most, the whole of it in its window. */
-.forecast-month .note-text {
-  margin: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
+/* The row whose data of the month are in view under it. */
+table.data tr.row-selected > td,
+table.data tr.row-selected > th {
+  background: var(--accent-soft);
 }
 
-.forecast-month .row-actions {
+table.data tr.row-selected > :first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* What the PM adds for the code in view: two amounts and a note, on one line. */
+.own-data {
   display: flex;
-  gap: 4px;
-  margin-top: 2px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* A button that is a sign only: square, with the look of the signs of the app. */
-.icon-button {
+.own-data h4 {
+  font-size: 14px;
+}
+
+.own-fields {
   display: grid;
-  place-items: center;
-  width: 26px;
-  min-height: 26px;
-  padding: 0;
+  grid-template-columns: 160px 160px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
 }
 
-.icon-button svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* A word that says more of itself when pointed at or reached with the keyboard. */
-.tip {
-  position: relative;
-  cursor: help;
-}
-
-.tip > [role="tooltip"] {
-  display: none;
-  position: absolute;
-  left: calc(100% + 8px);
-  top: -4px;
-  z-index: 2;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
-  color: var(--text);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-.tip:hover > [role="tooltip"],
-.tip:focus-visible > [role="tooltip"] {
-  display: block;
+.panel-head-slim {
+  min-height: 0;
+  padding: 5px 10px;
 }
 
 .forecast-month td input {
@@ -2273,30 +2288,32 @@ details.advanced[open] > summary {
   background: var(--panel);
 }
 
-/* What is missing, one thing a row, numbered: the text, and under it what puts it right. */
-.gaps {
+/* What is missing, one thing a row: that it is missing, what, and what puts it right. */
+.gaps-part {
   display: flex;
   flex-direction: column;
-  max-width: 860px;
-  margin: 0;
+  gap: 8px;
 }
 
-.gaps li {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+.gaps-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
 }
 
-.gaps li:last-child {
-  border-bottom: 0;
+.gap-text {
+  flex: 1;
+  min-width: 0;
 }
 
-/* What puts a missing datum right, on a line of its own under what is missing. */
+/* What puts a missing datum right, at the end of its row. */
 .remedy {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  margin-top: 6px;
 }
 
 .remedy input.amount {
@@ -3490,7 +3507,8 @@ span.marker-warning {
   .split,
   .today .split,
   .answer.split,
-  .deliverable-body .answer.split {
+  .deliverable-body .answer.split,
+  .sheet-columns {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3712,10 +3730,39 @@ span.marker-warning {
   white-space: normal;
 }
 
-/* Four figures of a group stand on a row, or two by two: never three and one left alone. */
-.figures-four {
-  grid-auto-flow: row;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* The page of a project code: the band, then the tables side by side. */
+.sheet-summary,
+.sheet-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sheet-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.sheet-column section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.figure-note .status {
+  margin-left: 0;
+}
+
+.sheet-summary > .notice-bar {
+  margin: 0;
+}
+
+.title-row > .hint {
+  flex: 1;
+  min-width: 0;
 }
 
 /* A small window: a band of figures goes on two rows. */
@@ -3724,10 +3771,6 @@ span.marker-warning {
   .metrics {
     grid-auto-flow: row;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .figures-four {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* A critical thing keeps when, what and the way out: its kind gives room. */

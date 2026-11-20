@@ -6,7 +6,7 @@ Dal 18/11/2026 (R1, demo 60) «Ore» e «Previsionale» non sono più voci della
 
 Dal 18/11/2026 (R4, demo 63) «Avanzamento» e «Allineamento» non sono più sezioni: sono deliverable del progetto con script, sotto il catalogo di «Deliverable». I copioni scritti prima che le nominano come sezioni (per esempio il giro completo della demo 22) vanno letti di conseguenza.
 
-Dal 20/11/2026 (revisione con Claude Design, demo 78–84) le schermate sono state ridisegnate. Nei copioni scritti prima: «Riunioni di oggi» sono le righe delle riunioni dentro «Adesso», e la scheda di una riunione si apre da «N cose da portare»; il modulo di «Il punto» compare dopo «Aggiungi»; «Da tenere d'occhio» è un elenco, non una tabella.
+Dal 20/11/2026 (revisione con Claude Design, demo 78–84) le schermate sono state ridisegnate. Nei copioni scritti prima: «Riunioni di oggi» sono le righe delle riunioni dentro «Adesso», e la scheda di una riunione si apre da «N cose da portare»; il modulo di «Il punto» compare dopo «Aggiungi»; «Da tenere d'occhio» è un elenco, non una tabella. In «Commessa» i gruppi «Ordine», «Costi e margine» e «Da regolare» sono la fascia in alto e la tabella «Ordine, ricavi e da regolare»; nel previsionale «Ricavi corretti», «Da fatturare» e «Tua nota» stanno sotto la riga del codice scelto (la nota è un campo, non più una finestra) e le impostazioni si aprono dal comando in alto.
 
 | # | Demo | Comando | Copione |
 |---|---|---|---|
@@ -94,5 +94,6 @@ Dal 20/11/2026 (revisione con Claude Design, demo 78–84) le schermate sono sta
 | 78 | Revisione con Claude Design, 1: regole comuni. Una forma sola per stati ed etichette (grigio la categoria, blu solo la fonte, ambra da verificare, verde con il suo bordo), intestazioni di sezione in 15 px, cifre in una fascia unica, rosso leggibile in tema scuro | `bash demo/78-stati-e-regole-comuni/run.sh` | [COPIONE](78-stati-e-regole-comuni/COPIONE.md) |
 | 79 | Revisione con Claude Design, 2: «Oggi». Ordine nuovo (il punto, adesso, da fare, criticità, da tenere d'occhio), riunioni come righe di «Adesso» con la scheda sotto, «Il punto» vuoto in una riga, righe uniche, ore in tabella nel dettaglio, valutazione su due righe | `bash demo/79-oggi-rivista/run.sh` | [COPIONE](79-oggi-rivista/COPIONE.md) |
 | 80 | Revisione con Claude Design, 3: «Deliverable». Una riga per documento con lo stato, catalogo a elenco per gruppi («Per il cliente», «Interno»), rilettura in due parti («Calcolato da Octo», «Valutato da Claude»), registro con stato e riga dei totali | `bash demo/80-deliverable-rivisti/run.sh` | [COPIONE](80-deliverable-rivisti/COPIONE.md) |
+| 81 | Revisione con Claude Design, 4: «Commessa». Fascia di cinque cifre con lo scostamento da NetSuite, tabella «Ordine, ricavi e da regolare» con la fonte di ogni voce, fornitori in tabella con totale, «Ore» come due righe da leggere, i dati del PM nel previsionale sotto la riga scelta | `bash demo/81-commessa-rivista/run.sh` | [COPIONE](81-commessa-rivista/COPIONE.md) |
 
 `pnpm e2e:condivisa` segue i passi della demo 42 in due finestre vere aperte sulla stessa cartella, ognuna con la sua cartella dei dati, la sua persona e il suo nome di computer.

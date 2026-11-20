@@ -19,9 +19,9 @@ export function MonthField({ label, value, onChange }: Props) {
   const id = useId()
   const step = (steps: number) => () => onChange(shiftMonth(value, steps))
   return (
-    <div className="field">
+    <div className="month-field">
       <label htmlFor={id}>{label}</label>
-      <span className="month-field">
+      <span className="month-field-step">
         <button
           type="button"
           aria-label={messages.monthBefore}

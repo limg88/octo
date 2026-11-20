@@ -32,11 +32,13 @@ export function InfoTip({ title, steps, note }: Props) {
       {open && (
         <span id={panel} className="info-tip-panel" role="note">
           <strong>{title}</strong>
-          <ol>
-            {steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
+          {steps.length > 0 && (
+            <ol>
+              {steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          )}
           {note && <span className="hint">{note}</span>}
         </span>
       )}

@@ -176,6 +176,17 @@ describe('hours', () => {
     expect(screen.getByText(text.steps.tracker)).toBeTruthy()
     expect(screen.getByRole('button', { name: text.readTimesheets }).className).toBe('primary')
     // Typing the paths is the other way: folded while nothing was found in the folder.
+    // Each reading is a row: whether it was made for the month, a line on it, the rest behind «i».
+    const timesheets = screen.getByRole('region', { name: text.timesheetsTitle })
+    expect(timesheets.textContent).toContain(text.notRead.timesheets('giugno 2026'))
+    expect(timesheets.textContent).toContain(text.shortNote.timesheets)
+    expect(within(timesheets).queryByText(text.timesheetsIntro)).toBeNull()
+    fireEvent.click(within(timesheets).getByRole('button', { name: text.about }))
+    expect(within(timesheets).getByText(text.timesheetsIntro)).toBeTruthy()
+    // The first reading still to make is the one action of the page.
+    expect(screen.getByRole('button', { name: text.readTimesheets }).className).toBe('primary')
+    expect(screen.getByRole('button', { name: text.readTracker }).className).toBe('')
+    expect(screen.getByText(text.comparisonLater)).toBeTruthy()
     const other = screen.getByText(text.haveExports).closest('details')
     expect(other?.open).toBe(false)
   })
@@ -256,7 +267,7 @@ describe('hours', () => {
       />,
     )
     const expected = await screen.findByText(text.status.expected)
-    expect(expected.className).toBe('status status-neutral')
+    expect(expected.className).toBe('status')
     expect(screen.getByText(text.status.ok).className).toBe('status status-ok')
     expect(text.status.expected).not.toBe(text.status.ok)
   })

@@ -535,7 +535,7 @@ export function App({ api, notify = systemNotify }: Props) {
             <header className="project-header">
               <div className="page-title">
                 <h2 className="eyebrow">{selected.name}</h2>
-                <h3 className="page-heading">{SECTION_LABELS[tab]}</h3>
+                <h3 className="page-heading">{SECTION_LABELS[listedSection(tab)]}</h3>
               </div>
               <details className="folder-detail">
                 <summary>{messages.shell.folder}</summary>

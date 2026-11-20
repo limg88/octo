@@ -2,7 +2,6 @@ import type { Lifetime, SupplierCycle } from '@octo/domain'
 import { type DataColumn, DataTable } from './DataTable.tsx'
 import { shortMonthText } from './forecast-text.ts'
 import { messages } from './messages.ts'
-import { type Figure, Figures } from './ProjectSheetSummary.tsx'
 import { Resizable } from './Resizable.tsx'
 import type { Section } from './sections.ts'
 
@@ -17,6 +16,9 @@ const { money } = messages.forecast
 const BLANK = ''
 
 type SupplierOrder = SupplierCycle['orders'][number]
+/** Everything on this page is read from the company's system: each row says so. */
+const fromSystem = <span className="pill pill-source">{text.fromSystem}</span>
+const SOURCE_WIDTH = '140px'
 const paid = (
   key: 'ordered' | 'received' | 'invoiced',
   label: string,
@@ -24,7 +26,7 @@ const paid = (
   key,
   label,
   kind: 'number',
-  width: '130px',
+  width: '120px',
   cell: (order) => money(order[key]),
 })
 const SUPPLIER_COLUMNS: DataColumn<SupplierOrder>[] = [
@@ -41,6 +43,14 @@ const SUPPLIER_COLUMNS: DataColumn<SupplierOrder>[] = [
   paid('ordered', text.ordered),
   paid('received', text.received),
   paid('invoiced', text.invoiced),
+  {
+    key: 'toInvoice',
+    label: text.toInvoice,
+    kind: 'number',
+    width: '120px',
+    cell: (order) => money(order.ordered - order.invoiced),
+  },
+  { key: 'source', label: text.source, width: SOURCE_WIDTH, cell: () => fromSystem },
 ]
 
 /** What was invoiced to the client on each sales order, month by month. */
@@ -67,6 +77,9 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
                 <th scope="col" className="number">
                   {text.total}
                 </th>
+                <th scope="col" style={{ width: SOURCE_WIDTH }}>
+                  {text.source}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -81,6 +94,7 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
                     </td>
                   ))}
                   <td className="number">{money(order.invoiced)}</td>
+                  <td>{fromSystem}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,6 +108,7 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
                     </td>
                   ))}
                   <td className="number">{money(economics.invoiced)}</td>
+                  <td />
                 </tr>
               </tfoot>
             )}
@@ -106,22 +121,28 @@ function ClientBilling({ sheet }: { sheet: Lifetime }) {
 
 /** The orders to the suppliers: what was ordered, what was delivered, what they invoiced. */
 function SupplierBilling({ suppliers }: { suppliers: SupplierCycle }) {
-  const figures: Figure[] = [
-    { label: text.ordered, value: money(suppliers.ordered) },
-    { label: text.received, value: money(suppliers.received), note: text.receivedNote },
-    { label: text.invoiced, value: money(suppliers.invoiced) },
-    { label: text.toInvoice, value: money(suppliers.toInvoice) },
-  ]
   return (
-    <>
-      <Figures title={text.suppliers} figures={figures} />
+    <section aria-label={text.suppliers}>
+      <h4>{text.suppliers}</h4>
       <DataTable
         label={text.suppliersTable}
         columns={SUPPLIER_COLUMNS}
         rows={suppliers.orders}
         rowKey={(order) => `${order.vendor} ${order.order}`}
+        footer={
+          <tr>
+            <th scope="row">{text.total}</th>
+            <td />
+            <td className="number">{money(suppliers.ordered)}</td>
+            <td className="number">{money(suppliers.received)}</td>
+            <td className="number">{money(suppliers.invoiced)}</td>
+            <td className="number">{money(suppliers.toInvoice)}</td>
+            <td />
+          </tr>
+        }
       />
-    </>
+      <p className="hint">{text.receivedNote}</p>
+    </section>
   )
 }
 
