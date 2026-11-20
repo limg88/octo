@@ -21,6 +21,7 @@ import {
   type RecordedMeeting,
   readMeetingManifest,
   sameExport,
+  tellingPresence,
   withMeetingChoice,
 } from '../src/index.ts'
 
@@ -445,6 +446,32 @@ describe('the project the people of a meeting point to', () => {
     expect(likelierProject([], 'p-b', teams)).toBeNull()
     expect(likelierProject(['Luca Verdi'], 'p-c', teams)).toBeNull()
     expect(likelierProject(people, 'p-altro', teams)).toBe('p-a')
+  })
+})
+
+describe('whether who took part tells a meeting as of a project', () => {
+  const team = {
+    projectId: 'p-a',
+    people: ['Rossi Mario', 'Anna Bianchi', 'Dario Cliente'],
+    clients: ['Dario Cliente'],
+  }
+
+  it('is told by somebody of the client, or by two of its people who are no fewer than the others', () => {
+    expect(tellingPresence(['Dario Cliente <dario@example.test>', 'Ugo', 'Lea', 'Pia'], team)).toBe(
+      true,
+    )
+    expect(tellingPresence(['Mario Rossi', 'BIANCHI, Anna'], team)).toBe(true)
+    expect(tellingPresence(['Mario Rossi', 'Anna Bianchi', 'Ugo', 'Lea'], team)).toBe(true)
+  })
+
+  it('is not told by one person of the supplier, nor by two among many others', () => {
+    expect(tellingPresence(['Mario Rossi'], team)).toBe(false)
+    expect(tellingPresence(['Anna Bianchi', 'Ugo', 'Lea'], team)).toBe(false)
+    expect(tellingPresence(['Mario Rossi', 'Anna Bianchi', 'Ugo', 'Lea', 'Pia'], team)).toBe(false)
+    expect(tellingPresence([], team)).toBe(false)
+    expect(
+      tellingPresence(['Dario Cliente'], { projectId: 'p-b', people: ['Dario Cliente'] }),
+    ).toBe(false)
   })
 })
 
