@@ -574,6 +574,9 @@ export const messages = {
   askChats: {
     title: 'Conversazioni',
     fresh: 'Nuova chat',
+    /** Which marker the source in view is of, and of which answer of the conversation. */
+    inView: (marker: number, answer: number, answers: number) =>
+      `Richiamo in vista: [${marker}] della risposta ${answer} di ${answers}.`,
     freshHint:
       'In questa chat Octo tiene conto delle tue domande precedenti e ricontrolla le fonti a ogni risposta.',
     none: 'Nessuna chat ancora.',

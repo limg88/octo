@@ -339,6 +339,31 @@ describe('the conversation with a project', () => {
     )
   })
 
+  it('keeps one source in view for the whole conversation: that of the last answer, or the one chosen', async () => {
+    const first = { ...asked('q-1', 'Prima domanda', 'c-1', '2026-11-15T10:00:00.000Z'), answer }
+    const second = { ...asked('q-2', 'Seconda domanda', 'c-1', '2026-11-15T11:00:00.000Z'), answer }
+    const api = askApi({ listQuestions: vi.fn(async () => ok([first, second])) })
+    render(<AskView api={api} project={aurora} />)
+    const list = await screen.findByRole('navigation', { name: chats.title })
+    // A new conversation is not the one action of the page: the question is.
+    expect(within(list).getByRole('button', { name: chats.fresh }).className).toBe('')
+    fireEvent.click(within(list).getByRole('button', { name: /Prima domanda/ }))
+    // Two answers, one panel: it says of which answer the citation in view is.
+    expect(screen.getAllByRole('complementary', { name: text.panel })).toHaveLength(1)
+    expect(panel().textContent).toContain(chats.inView(1, 2, 2))
+    const markers = screen.getAllByRole('button', { name: text.marker(3) })
+    expect(markers).toHaveLength(2)
+    // A marker of the first answer is chosen: the panel moves there, and only that marker is pressed.
+    fireEvent.click(markers[0] as HTMLElement)
+    expect(panel().textContent).toContain(chats.inView(3, 1, 2))
+    expect(panel().textContent).toContain('ci confermate entro lunedì')
+    expect(
+      screen
+        .getAllByRole('button', { name: text.marker(3) })
+        .map((button) => button.getAttribute('aria-pressed')),
+    ).toEqual(['true', 'false'])
+  })
+
   it('says so when no conversation was had yet', async () => {
     render(<AskView api={askApi({ listQuestions: vi.fn(async () => ok([])) })} project={aurora} />)
     expect(await screen.findByText(chats.none)).toBeTruthy()

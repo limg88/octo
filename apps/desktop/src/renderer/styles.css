@@ -3398,6 +3398,52 @@ span.marker-warning {
   font-size: 13px;
 }
 
+/* The sources of an answer and what can be done with it, on one row under its text. */
+.sources-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.sources-part {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.answer .sources-part > h3 {
+  margin: 0;
+}
+
+.answer .sources-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding-left: 18px;
+}
+
+.sources-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* The marker whose source is in view. */
+button.marker[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
+}
+
+/* The way to the whole path and the command that opens the source, on one row. */
+.citation-open {
+  align-items: flex-start;
+}
+
 /* A long list of sources is one line that opens. */
 .answer details.sources-fold > summary {
   cursor: pointer;
@@ -4000,6 +4046,24 @@ span.marker-warning {
   padding-bottom: 20px;
 }
 
+/* The conversation scrolls; the one source in view stays beside it. */
+.ask-reading {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ask-fresh .ask-reading {
+  flex: none;
+}
+
+.ask-source {
+  flex: none;
+  width: 344px;
+  padding: 20px 24px 0 0;
+  overflow-y: auto;
+}
+
 .ask-welcome {
   display: flex;
   flex-direction: column;
@@ -4074,6 +4138,19 @@ span.marker-warning {
   }
 }
 
+/* A small window: the source in view goes under the conversation, as wide as the page. */
+@media (max-width: 1120px) {
+  .ask-reading {
+    flex-direction: column;
+  }
+
+  .ask-source {
+    width: auto;
+    max-height: 40%;
+    padding: 0 24px 12px;
+  }
+}
+
 .conversation {
   flex: 1;
   overflow-y: auto;
@@ -4098,14 +4175,20 @@ span.marker-warning {
   flex: none;
 }
 
-/* An answer has its source beside it: an exchange has the room of two columns. */
+/* An exchange is as wide as a text is read: the source of what it cites stands beside the page. */
 .exchange {
   width: 100%;
-  max-width: 1160px;
+  max-width: 800px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* An answer ends where the next question begins: a line tells them apart. */
+.exchange:not(:last-of-type) > .asked-at {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 /* What the PM asked: a bubble on the right. What Octo answers is the page itself. */

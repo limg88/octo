@@ -17,6 +17,11 @@ type Props = {
   side?: ReactNode
   /** True when what the code found is told beside the text, by `AnswerChecks`, and not above it. */
   checksAside?: boolean
+  /**
+   * The citation in view when one panel stands for several answers: the answer then shows no
+   * source beside itself, and says which of its markers was chosen.
+   */
+  cited?: { selected: number | null; onSelect: (marker: number) => void }
 }
 
 /**
@@ -32,12 +37,14 @@ export const SOURCES_SHOWN = 8
  * The answer as the model wrote it, with what the code found about each of its sources. A marker
  * shows its source beside the text, so the answer is never left to read where it comes from.
  */
-export function AnswerView({ answer, onOpenSource, actions, side, checksAside }: Props) {
-  const [selected, setSelected] = useState<number | null>(answer.citations[0]?.n ?? null)
+export function AnswerView({ answer, onOpenSource, actions, side, checksAside, cited }: Props) {
+  const [own, setOwn] = useState<number | null>(answer.citations[0]?.n ?? null)
+  const selected = cited ? cited.selected : own
+  const setSelected = cited ? cited.onSelect : setOwn
   const statusOf = new Map(answer.citations.map((citation) => [citation.n, citation.status]))
   const sourcesTitle = `${messages.sources} · ${answer.citations.length}`
   const sources = (
-    <ol className="sources">
+    <ol className="sources sources-inline">
       {answer.citations.map((citation) => (
         <li key={citation.n} id={sourceElementId(citation.n)} value={citation.n}>
           <button
@@ -56,8 +63,9 @@ export function AnswerView({ answer, onOpenSource, actions, side, checksAside }:
       ))}
     </ol>
   )
+  const folded = answer.citations.length > SOURCES_SHOWN
   return (
-    <div className="answer split">
+    <div className={cited ? 'answer' : 'answer split'}>
       <div className="answer-main">
         {!checksAside && <Summary answer={answer} />}
         <div className="answer-text">
@@ -108,32 +116,39 @@ export function AnswerView({ answer, onOpenSource, actions, side, checksAside }:
           </p>
         ))}
         {!checksAside && <Missing answer={answer} boxed />}
-        {actions && <div className="actions">{actions}</div>}
-        {answer.citations.length > 0 && (
-          <section aria-label={messages.sources}>
-            {answer.citations.length > SOURCES_SHOWN ? (
-              <details className="sources-fold">
-                <summary>{sourcesTitle}</summary>
-                {sources}
-              </details>
-            ) : (
-              <>
-                <h3>{sourcesTitle}</h3>
-                {sources}
-              </>
+        {/* The sources and what can be done with the answer, on one row under its text. */}
+        {(answer.citations.length > 0 || actions) && (
+          <div className="sources-row">
+            {answer.citations.length > 0 && (
+              <section className="sources-part" aria-label={messages.sources}>
+                {folded ? (
+                  <details className="sources-fold">
+                    <summary>{sourcesTitle}</summary>
+                    {sources}
+                  </details>
+                ) : (
+                  <>
+                    <h3>{sourcesTitle}</h3>
+                    {sources}
+                  </>
+                )}
+              </section>
             )}
-          </section>
+            {actions && <div className="actions sources-actions">{actions}</div>}
+          </div>
         )}
       </div>
-      <div className="answer-side">
-        {side}
-        <CitationPanel
-          citations={answer.citations}
-          selected={selected}
-          onSelect={setSelected}
-          onOpen={onOpenSource}
-        />
-      </div>
+      {!cited && (
+        <div className="answer-side">
+          {side}
+          <CitationPanel
+            citations={answer.citations}
+            selected={selected}
+            onSelect={setSelected}
+            onOpen={onOpenSource}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { CheckedCitation } from '@octo/domain'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Result } from '../shared/api.ts'
 import { provenanceOf, sourceTitle } from './answer-text.ts'
 import { citationStatusText, dateText, messages } from './messages.ts'
@@ -16,6 +16,8 @@ type Props = {
   selected: number | null
   onSelect: (marker: number) => void
   onOpen: OpenSource
+  /** Which answer the citation in view is of, where the panel stands for more than one. */
+  note?: ReactNode
 }
 
 /** A file that is not there, or not of the project, cannot be handed to the system. */
@@ -33,7 +35,7 @@ function provenanceText(path: string): string {
  * The source of one citation, beside the answer that cites it: what the file is, where it comes
  * from, the sentence quoted and what the check found. The answer stays in view.
  */
-export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) {
+export function CitationPanel({ citations, selected, onSelect, onOpen, note }: Props) {
   const [opening, setOpening] = useState(false)
   const [failed, setFailed] = useState(false)
   /** The latest opening asked: an older one that ends later says nothing here. */
@@ -124,6 +126,7 @@ export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) 
         </span>
       </div>
       <div className="panel-body" aria-live="polite" aria-busy={opening || undefined}>
+        {note}
         <p>
           <span className="pill pill-source">
             {provenanceText(citation.path)} ·{' '}
@@ -141,11 +144,11 @@ export function CitationPanel({ citations, selected, onSelect, onOpen }: Props) 
         </p>
         <p className="hint">{verified ? text.foundNote : text.notFoundNote}</p>
         {others.length > 0 && <p className="hint">{text.sameFile(others.join(', '))}</p>}
-        <details className="path-detail">
-          <summary>{text.path}</summary>
-          <p className="mono folder-path">{citation.path}</p>
-        </details>
-        <div className="actions">
+        <div className="title-row citation-open">
+          <details className="path-detail">
+            <summary>{text.path}</summary>
+            <p className="mono folder-path">{citation.path}</p>
+          </details>
           <BusyButton
             busy={opening}
             busyLabel={messages.wait.opening}

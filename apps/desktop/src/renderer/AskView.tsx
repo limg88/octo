@@ -12,6 +12,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi } from '../shared/api.ts'
 import { AnswerView } from './AnswerView.tsx'
+import { CitationPanel } from './CitationPanel.tsx'
 import type { Handoff } from './context.ts'
 import { InfoTip } from './InfoTip.tsx'
 import { Logo } from './Logo.tsx'
@@ -84,6 +85,8 @@ export function AskView({
   /** The conversation in view; null: a new one, with nothing asked yet. */
   const [chatId, setChatId] = useState<string | null>(null)
   const [sought, setSought] = useState('')
+  /** The citation the PM chose among those of the answers in view; null: that of the last answer. */
+  const [chosen, setChosen] = useState<{ record: string; n: number } | null>(null)
   /** The conversation in view when an answer comes back: the PM may have moved meanwhile. */
   const viewing = useRef<string | null>(null)
   viewing.current = chatId
@@ -186,6 +189,7 @@ export function AskView({
 
   function openChat(next: string | null) {
     setChatId(next)
+    setChosen(null)
     setError(null)
     if (next === null) field.current?.focus()
   }
@@ -205,11 +209,25 @@ export function AskView({
     setProgress(null)
     if (!result.ok) return setError(result.code)
     setRecords((previous) => [...previous, result.value])
+    // The source in view follows the answer that just came.
+    setChosen(null)
     // The conversation just started is now one of the list: the page stays on it.
     if (viewing.current === chat) setChatId(conversationOf(result.value))
   }
 
   const fresh = shown.length === 0 && !pendingHere
+  // One source in view for the whole conversation: the one chosen, else the first of the last
+  // answer that cites any.
+  const cites = (record: QuestionRecord): boolean => (record.answer?.citations.length ?? 0) > 0
+  const citing =
+    shown.find(
+      (record) =>
+        record.id === chosen?.record &&
+        record.answer?.citations.some((citation) => citation.n === chosen.n),
+    ) ?? shown.findLast(cites)
+  const citedN =
+    citing?.id === chosen?.record ? chosen?.n : (citing?.answer?.citations[0]?.n ?? null)
+  const answered = shown.filter((record) => record.answer)
   const groups = chatGroups(listed, Date.now())
 
   return (
@@ -217,7 +235,6 @@ export function AskView({
       <nav className="ask-chats" aria-label={chats.title}>
         <button
           type="button"
-          className="primary"
           aria-current={chatId === null ? 'page' : undefined}
           onClick={() => openChat(null)}
         >
@@ -261,61 +278,85 @@ export function AskView({
         )}
       </nav>
       <div className="ask-main">
-        <div className="conversation">
-          {fresh && (
-            <div className="ask-welcome">
-              <Logo size={44} />
-              <p className="ask-welcome-title">{chats.welcome(project.name)}</p>
-              <p className="hint">{chatId === null ? chats.freshHint : messages.askEmpty}</p>
+        <div className="ask-reading">
+          <div className="conversation">
+            {fresh && (
+              <div className="ask-welcome">
+                <Logo size={44} />
+                <p className="ask-welcome-title">{chats.welcome(project.name)}</p>
+                <p className="hint">{chatId === null ? chats.freshHint : messages.askEmpty}</p>
+              </div>
+            )}
+            {shown.map((record) => (
+              <article key={record.id} className="exchange">
+                <p className="question">{record.question}</p>
+                {record.answer && (
+                  <AnswerView
+                    answer={record.answer}
+                    onOpenSource={(path, quote) => api.openEvidence(project.id, path, quote)}
+                    cited={{
+                      selected: record.id === citing?.id ? (citedN ?? null) : null,
+                      onSelect: (n) => setChosen({ record: record.id, n }),
+                    }}
+                    actions={
+                      <>
+                        {onDraft && (
+                          <button
+                            type="button"
+                            className="quiet"
+                            onClick={() =>
+                              record.answer &&
+                              onDraft({ question: record.question, answer: record.answer })
+                            }
+                          >
+                            {messages.askDraft}
+                          </button>
+                        )}
+                        {record.work && record.work.files.length > 0 && (
+                          <WorkFiles work={record.work} onKeep={() => void keepWork(record.id)} />
+                        )}
+                      </>
+                    }
+                  />
+                )}
+                {record.error && <p className="warning">{errorText(record.error)}</p>}
+                <p className="asked-at">
+                  {dateTimeText(record.askedAt)}
+                  {record.model && ` · ${messages.models.used(record.model)}`}
+                </p>
+              </article>
+            ))}
+            {pending !== null && pendingHere && (
+              <article className="exchange">
+                <p className="question">{pending.question}</p>
+                <Waiting>{progress ? progressText(progress) : messages.working}</Waiting>
+              </article>
+            )}
+            {error && (
+              <p className="warning" role="alert">
+                {errorText(error)}
+              </p>
+            )}
+            <div ref={end} />
+          </div>
+          {citing?.answer && (
+            <div className="ask-source">
+              <CitationPanel
+                citations={citing.answer.citations}
+                selected={citedN ?? null}
+                onSelect={(n) => setChosen({ record: citing.id, n })}
+                onOpen={(path, quote) => api.openEvidence(project.id, path, quote)}
+                note={
+                  answered.length > 1 &&
+                  citedN != null && (
+                    <p className="hint">
+                      {chats.inView(citedN, answered.indexOf(citing) + 1, answered.length)}
+                    </p>
+                  )
+                }
+              />
             </div>
           )}
-          {shown.map((record) => (
-            <article key={record.id} className="exchange">
-              <p className="question">{record.question}</p>
-              {record.answer && (
-                <AnswerView
-                  answer={record.answer}
-                  onOpenSource={(path, quote) => api.openEvidence(project.id, path, quote)}
-                  actions={
-                    <>
-                      {onDraft && (
-                        <button
-                          type="button"
-                          className="quiet"
-                          onClick={() =>
-                            record.answer &&
-                            onDraft({ question: record.question, answer: record.answer })
-                          }
-                        >
-                          {messages.askDraft}
-                        </button>
-                      )}
-                      {record.work && record.work.files.length > 0 && (
-                        <WorkFiles work={record.work} onKeep={() => void keepWork(record.id)} />
-                      )}
-                    </>
-                  }
-                />
-              )}
-              {record.error && <p className="warning">{errorText(record.error)}</p>}
-              <p className="asked-at">
-                {dateTimeText(record.askedAt)}
-                {record.model && ` · ${messages.models.used(record.model)}`}
-              </p>
-            </article>
-          ))}
-          {pending !== null && pendingHere && (
-            <article className="exchange">
-              <p className="question">{pending.question}</p>
-              <Waiting>{progress ? progressText(progress) : messages.working}</Waiting>
-            </article>
-          )}
-          {error && (
-            <p className="warning" role="alert">
-              {errorText(error)}
-            </p>
-          )}
-          <div ref={end} />
         </div>
         <form className="composer" onSubmit={(event) => void submit(event)}>
           {attached.length > 0 && (
@@ -401,7 +442,6 @@ export function AskView({
               <button
                 key={ready.label}
                 type="button"
-                className="quiet"
                 title={ready.question}
                 onClick={() => {
                   setQuestion(ready.question)
