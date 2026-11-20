@@ -217,7 +217,12 @@ export function TeamSection({ api, project }: Props) {
         </button>
       ),
     },
-    { key: 'role', label: text.columns.role, cell: ({ row }) => row.role },
+    {
+      key: 'role',
+      label: text.columns.role,
+      // Cut short when long: read whole on hover.
+      cell: ({ row }) => <span title={row.role}>{row.role}</span>,
+    },
     {
       key: 'side',
       label: text.columns.side,

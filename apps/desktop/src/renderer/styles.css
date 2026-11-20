@@ -2145,8 +2145,15 @@ button.marker::after {
   min-width: 580px;
 }
 
-/* A person is one row: a role or a date is not broken in two. */
-.team-list table.data td {
+/*
+ * A person is one row. What does not fit its column is cut short with three dots, as the name
+ * is: it never runs over the column beside, however narrow the PM makes it.
+ */
+.team-list table.data td,
+.team-list table.data th,
+.team-list table.data th > button.sort {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -4113,9 +4120,14 @@ button.marker[aria-pressed="true"] {
   margin-left: 0;
 }
 
-/* Where a figure comes from is read on one line. */
+/* Where a figure comes from is read on one line, and stays inside its column. */
 .sheet-column table.data :is(.status, .pill, .badge) {
   white-space: nowrap;
+}
+
+.sheet-column table.data td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sheet-summary > .notice-bar {
