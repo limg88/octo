@@ -1621,8 +1621,7 @@ export const messages = {
     'Revisione (min)',
     'Giri',
   ],
-  deliverableRegisterTotals: (count: number, draft: number, review: number, rounds: number) =>
-    `Approvati: ${count} · scrittura ${draft} min · revisione ${review} min · ${rounds} giri.`,
+  deliverableRegisterApproved: (count: number) => `Approvati: ${count}`,
   deliverableNone: 'Nessun deliverable ancora. Scegline uno dal catalogo.',
   deliverableChoose: 'Che cosa vuoi preparare?',
   memoryKinds: {
@@ -1663,8 +1662,7 @@ export const messages = {
   deliverableFiles: 'File pronti',
   deliverableFailed: 'La scrittura non è riuscita.',
   deliverableLastChangeFailed: 'L’ultima modifica non è riuscita: la bozza è rimasta com’era.',
-  deliverableCost: (draft: number, review: number, rounds: number) =>
-    `Scrittura ${draft} min · Revisione ${review} min · ${rounds === 1 ? '1 giro' : `${rounds} giri`}`,
+  deliverableRounds: (rounds: number) => (rounds === 1 ? '1 giro' : `${rounds} giri`),
   deliverableSourcesNote:
     'I numeri fra parentesi rimandano alle fonti: spariscono dal file approvato.',
   guideTitle: 'Avvio del progetto',
@@ -1882,6 +1880,8 @@ export const messages = {
   },
   review: {
     panel: 'Rilettura',
+    computed: 'Calcolato da Octo',
+    judged: 'Valutato da Claude',
     draft: 'Bozza',
     seen: 'Visto',
     seenDone: 'Visto ✓',
@@ -1909,8 +1909,6 @@ export const messages = {
         : ['Correggi i rilievi della rilettura critica:', ...findings.map((f) => `- ${f}`)].join(
             '\n',
           ),
-    phases: (write: number, check: number, review: number) =>
-      `ultimo giro: scrittura ${write} s, controllo delle fonti ${check} s, rilettura critica ${review} s`,
   },
 } as const
 

@@ -203,7 +203,21 @@ describe('DeliverablesView', () => {
     expect(within(filter).getByText(messages.deliverableClientFilterKind.money)).toBeTruthy()
     expect(screen.getByText('Chi firma il verbale')).toBeTruthy()
     expect(screen.getByText(DELIVERABLE_CATALOG[0]?.checklist[0] ?? '')).toBeTruthy()
-    expect(screen.getByText(/Scrittura 2 min · Revisione 0 min · 1 giro/)).toBeTruthy()
+    // Under the title: what it is, who reads it, how many rounds. The times are in the register.
+    expect(
+      screen.getByText(
+        new RegExp(`${messages.deliverableFor.client} · ${messages.deliverableRounds(1)}`),
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByText(/Scrittura 2 min/)).toBeNull()
+    // What the code computed and what Claude judged are told apart beside the draft.
+    const computed = screen.getByRole('region', { name: messages.review.computed })
+    expect(within(computed).getByText('Chi firma il verbale')).toBeTruthy()
+    expect(
+      within(computed).getByRole('region', { name: messages.deliverableClientFilter }),
+    ).toBeTruthy()
+    const judged = screen.getByRole('region', { name: messages.review.judged })
+    expect(within(judged).getByRole('button', { name: messages.deliverableApprove })).toBeTruthy()
   })
 
   it('shows the draft as soon as it is written, while its critical reading goes on', async () => {
@@ -478,7 +492,12 @@ describe('DeliverablesView', () => {
         checklist: ['Nessun nome interno'],
       }),
     )
-    expect(await screen.findByText(/Per il cliente · Tuo/)).toBeTruthy()
+    // A kind of the PM is in the group of who reads it, marked as theirs, with short commands.
+    const group = await screen.findByRole('list', { name: messages.deliverableFor.client })
+    expect(within(group).getByText(messages.ownKindBadge)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Modifica Nota di rilascio' }).textContent).toBe(
+      messages.ownKindEdit,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifica Nota di rilascio' }))
     expect(screen.getByLabelText<HTMLInputElement>(messages.ownKindTitle).value).toBe(
@@ -524,7 +543,9 @@ describe('DeliverablesView', () => {
 
     const row = (await screen.findByRole('cell', { name: 'Collaudo' })).closest('tr')
     expect(row?.textContent).toContain('Email al clienteCollaudoApprovato281')
-    expect(screen.getByText(messages.deliverableRegisterTotals(1, 2, 8, 1))).toBeTruthy()
+    // The totals are a row of the table, under the columns they add up.
+    const total = screen.getByRole('rowheader', { name: messages.deliverableRegisterApproved(1) })
+    expect(total.closest('tr')?.textContent).toBe(`${messages.deliverableRegisterApproved(1)}281`)
   })
 
   it('keeps for the project what the PM adds to how a kind is written', async () => {
@@ -749,7 +770,7 @@ describe('the review beside the draft', () => {
     render(<DeliverablesView api={api} project={project} />)
     fireEvent.click(await screen.findByRole('button', { name: /Collaudo/ }))
     const panel = () => screen.getByRole('complementary', { name: messages.review.panel })
-    expect(screen.getAllByText(messages.deliverableFor.client).length).toBeGreaterThan(0)
+    expect(screen.getByText(new RegExp(messages.deliverableFor.client))).toBeTruthy()
     expect(within(panel()).getByText(messages.review.left(1))).toBeTruthy()
 
     fireEvent.click(within(panel()).getByRole('button', { name: messages.review.seen }))

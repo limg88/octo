@@ -336,11 +336,14 @@ try {
     .getByLabel(/^Come va scritto/)
     .fill('Scrivi le novità come le legge chi usa il prodotto.')
   await work06.getByRole('button', { name: 'Salva nel catalogo' }).click()
-  await work06.getByText(/Per il cliente · Tuo/).waitFor({ timeout: TIMEOUT_MS })
+  await work06
+    .getByRole('list', { name: 'Per il cliente' })
+    .getByText('Tuo', { exact: true })
+    .waitFor({ timeout: TIMEOUT_MS })
   assert.ok(existsSync(`${work}/Aurora/_octo/.tipi/proprio-nota-di-rilascio.json`))
   await work06.getByRole('button', { name: 'Registro' }).click()
   await work06.getByRole('cell', { name: 'Data di consegna' }).waitFor()
-  await work06.getByText(/^Approvati: 1 ·/).waitFor()
+  await work06.getByRole('rowheader', { name: 'Approvati: 1' }).waitFor()
   const register = readFileSync(`${work}/Aurora/_octo/deliverable/registro.md`, 'utf8')
   assert.match(register, /\| Email al cliente \| Data di consegna \| approvato \|/)
 

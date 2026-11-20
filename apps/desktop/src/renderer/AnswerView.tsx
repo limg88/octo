@@ -15,6 +15,8 @@ type Props = {
   actions?: ReactNode
   /** What stands beside the text, above the source in view: the review of a draft. */
   side?: ReactNode
+  /** True when what the code found is told beside the text, by `AnswerChecks`, and not above it. */
+  checksAside?: boolean
 }
 
 /**
@@ -30,7 +32,7 @@ export const SOURCES_SHOWN = 8
  * The answer as the model wrote it, with what the code found about each of its sources. A marker
  * shows its source beside the text, so the answer is never left to read where it comes from.
  */
-export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
+export function AnswerView({ answer, onOpenSource, actions, side, checksAside }: Props) {
   const [selected, setSelected] = useState<number | null>(answer.citations[0]?.n ?? null)
   const statusOf = new Map(answer.citations.map((citation) => [citation.n, citation.status]))
   const sourcesTitle = `${messages.sources} · ${answer.citations.length}`
@@ -57,7 +59,7 @@ export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
   return (
     <div className="answer split">
       <div className="answer-main">
-        <Summary answer={answer} />
+        {!checksAside && <Summary answer={answer} />}
         <div className="answer-text">
           <Markdown
             remarkPlugins={MARKDOWN_PLUGINS}
@@ -105,16 +107,7 @@ export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
             {messages.citation.orphan(marker)}
           </p>
         ))}
-        {answer.missing.length > 0 && (
-          <section className="box box-warning" aria-label={messages.missing}>
-            <h3>{messages.missingTitle}</h3>
-            <ul className="missing">
-              {answer.missing.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {!checksAside && <Missing answer={answer} boxed />}
         {actions && <div className="actions">{actions}</div>}
         {answer.citations.length > 0 && (
           <section aria-label={messages.sources}>
@@ -142,6 +135,31 @@ export function AnswerView({ answer, onOpenSource, actions, side }: Props) {
         />
       </div>
     </div>
+  )
+}
+
+/** What the answer says it did not find in the sources: to be confirmed by who reads. */
+function Missing({ answer, boxed }: { answer: CheckedAnswer; boxed?: boolean }) {
+  if (answer.missing.length === 0) return null
+  return (
+    <section className={boxed ? 'box box-warning' : 'missing-aside'} aria-label={messages.missing}>
+      <h3>{messages.missingTitle}</h3>
+      <ul className="missing">
+        {answer.missing.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** What the code found of an answer, to stand beside it: the counts, then what is missing. */
+export function AnswerChecks({ answer }: { answer: CheckedAnswer }) {
+  return (
+    <>
+      <Summary answer={answer} />
+      <Missing answer={answer} />
+    </>
   )
 }
 

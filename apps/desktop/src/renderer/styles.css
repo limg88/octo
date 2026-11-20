@@ -943,7 +943,7 @@ main > .warning,
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: 248px 1fr;
 }
 
 .deliverable-list {
@@ -963,10 +963,27 @@ main > .warning,
   gap: 2px;
 }
 
+/* A deliverable is a row: its title, cut where it does not fit, and its state. */
 .deliverable-list .project {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border-top: 0;
+  border-radius: var(--radius);
+  font-weight: 400;
+}
+
+.deliverable-list .project .status {
+  margin-left: 0;
+}
+
+.deliverable-list .project-selected,
+.deliverable-list .project-selected:hover:not(:disabled),
+.deliverable-list-shown,
+.deliverable-list-shown:hover:not(:disabled) {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.deliverable-list .project-selected {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .deliverable-body {
@@ -993,32 +1010,57 @@ main > .warning,
   margin: 0 0 6px;
 }
 
-.kinds {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 12px;
+/* The name of a kind in a row of the catalog: it opens the kind, and the rows line up on it. */
+.kind-name {
+  flex: none;
+  width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  font-weight: 600;
 }
 
-.kind {
+button.kind-name {
+  padding: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.catalog-part {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  text-align: left;
-  padding: 12px 14px;
-  border-color: var(--line);
-  border-radius: var(--radius-large);
-  font-size: 14px;
-  font-weight: 400;
+  gap: 8px;
+}
+
+/* The files of an approved deliverable, on the row that names them. */
+.files-row {
+  flex-wrap: wrap;
+}
+
+.files-row h4 {
+  flex: none;
+  width: 84px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .draft {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-large);
-  box-shadow: var(--shadow-control);
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* The text of the draft is the page: what was found of it stands beside, outside its frame. */
+.draft .answer-main {
+  padding: 18px 20px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-large);
+  background: var(--surface);
 }
 
 .red-team {
@@ -1196,21 +1238,6 @@ main > .warning,
   margin-top: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
-}
-
-.kind-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.kind-card .kind {
-  flex: 1;
-}
-
-.kind-card .actions button {
-  min-height: 24px;
-  padding: 0 6px;
 }
 
 /* Dashboard */
@@ -1706,10 +1733,6 @@ fieldset > button {
 
 .dashboard-settings > section {
   margin-bottom: 16px;
-}
-
-.kind-card .actions {
-  flex-wrap: wrap;
 }
 
 /* Under a field: what in it was not understood. */
@@ -3385,13 +3408,55 @@ span.marker-warning {
   gap: 8px;
 }
 
-.draft {
-  border-top: 2px solid var(--accent);
-  background: var(--surface);
+.deliverable-body .answer.split {
+  grid-template-columns: minmax(0, 1fr) 336px;
 }
 
-.review-panel .panel-body {
-  gap: 14px;
+/* The reading in two parts: what the code computed, then what Claude judged. */
+.review-part {
+  gap: 8px;
+}
+
+.review-part + .review-part {
+  border-top: 1px solid var(--line);
+}
+
+.review-part .answer-summary {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.missing-aside {
+  font-size: 13px;
+}
+
+.deliverable-body .answer .missing-aside h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* The verdict is a sentence, not a mark: as wide as the panel. */
+.red-team > .badge {
+  align-self: stretch;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.review-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.review-fold[open] {
+  flex-basis: 100%;
+}
+
+.review-commands {
+  justify-content: flex-end;
 }
 
 .review-panel .source-form {
@@ -3408,11 +3473,6 @@ span.marker-warning {
   gap: 4px;
 }
 
-/* The list of the deliverables gives room to the draft and its review. */
-.deliverables {
-  grid-template-columns: 200px 1fr;
-}
-
 .deliverable-body .answer h3 {
   font-size: 13px;
   font-weight: 500;
@@ -3426,20 +3486,11 @@ span.marker-warning {
 
 /* ------------------------------------------------------------------------------------------ */
 /* A small window: what stood beside goes below, and everything stays within reach. */
-@media (max-width: 1240px) {
-  .deliverable-body .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .deliverable-body .answer-side {
-    position: static;
-  }
-}
-
 @media (max-width: 1120px) {
   .split,
   .today .split,
-  .answer.split {
+  .answer.split,
+  .deliverable-body .answer.split {
     grid-template-columns: minmax(0, 1fr);
   }
 

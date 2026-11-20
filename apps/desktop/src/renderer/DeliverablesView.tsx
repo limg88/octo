@@ -15,6 +15,7 @@ import {
 import {
   type ChangeEvent,
   type FormEvent,
+  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -22,7 +23,7 @@ import {
   useState,
 } from 'react'
 import type { ErrorCode, OctoApi, Result } from '../shared/api.ts'
-import { AnswerView } from './AnswerView.tsx'
+import { AnswerChecks, AnswerView } from './AnswerView.tsx'
 import type { OpenSource } from './CitationPanel.tsx'
 import type { Handoff } from './context.ts'
 import { type DataColumn, DataTable } from './DataTable.tsx'
@@ -174,10 +175,18 @@ export function DeliverablesView({
   return (
     <section className="deliverables" aria-label={messages.deliverablesTab}>
       <nav className="deliverable-list" aria-label={messages.deliverablesTab}>
-        <button type="button" className="primary" onClick={() => setShown({ view: 'catalog' })}>
+        <button
+          type="button"
+          className={shown.view === 'catalog' ? 'primary' : undefined}
+          onClick={() => setShown({ view: 'catalog' })}
+        >
           {messages.deliverableNew}
         </button>
-        <button type="button" className="quiet" onClick={() => setShown({ view: 'register' })}>
+        <button
+          type="button"
+          className={shown.view === 'register' ? 'quiet deliverable-list-shown' : 'quiet'}
+          onClick={() => setShown({ view: 'register' })}
+        >
           {messages.deliverableRegister}
         </button>
         <ul>
@@ -185,11 +194,17 @@ export function DeliverablesView({
             <li>
               <button
                 type="button"
-                className={formKind?.id === making.kindId ? 'project project-selected' : 'project'}
+                className={
+                  formKind?.id === making.kindId
+                    ? 'project list-row project-selected'
+                    : 'project list-row'
+                }
                 onClick={() => setShown({ view: 'form', kindId: making.kindId })}
               >
-                <span>{kindOf(making.kindId)?.title ?? making.kindId}</span>
-                <span className="hint">{messages.deliverableMaking}</span>
+                <span className="list-row-text">
+                  {kindOf(making.kindId)?.title ?? making.kindId}
+                </span>
+                <span className="status">{messages.deliverableMaking}</span>
               </button>
             </li>
           )}
@@ -197,14 +212,16 @@ export function DeliverablesView({
             <li key={deliverable.id}>
               <button
                 type="button"
-                className={one?.id === deliverable.id ? 'project project-selected' : 'project'}
+                className={
+                  one?.id === deliverable.id
+                    ? 'project list-row project-selected'
+                    : 'project list-row'
+                }
+                title={kindOf(deliverable.kindId)?.title ?? deliverable.kindId}
                 onClick={() => setShown({ view: 'one', id: deliverable.id })}
               >
-                <span>{deliverable.title}</span>
-                <span className="hint">
-                  {kindOf(deliverable.kindId)?.title ?? deliverable.kindId} ·{' '}
-                  {messages.deliverableStatus[deliverable.status]}
-                </span>
+                <span className="list-row-text">{deliverable.title}</span>
+                <StatusMark status={deliverable.status} />
               </button>
             </li>
           ))}
@@ -308,6 +325,15 @@ export function DeliverablesView({
   )
 }
 
+/** The kinds of the catalog go by who reads them: what leaves the company first. */
+const AUDIENCES: ReadonlyArray<DeliverableKind['audience']> = ['client', 'internal']
+
+/** The state of a deliverable as a mark: amber while it waits for the PM, green once approved. */
+function StatusMark({ status }: { status: Deliverable['status'] }) {
+  const tone = status === 'review' ? ' status-warning' : status === 'approved' ? ' status-ok' : ''
+  return <span className={`status${tone}`}>{messages.deliverableStatus[status]}</span>
+}
+
 function Catalog({
   catalog,
   empty,
@@ -321,58 +347,80 @@ function Catalog({
   onEdit: (kindId: string | null) => void
   onRemove: (kindId: string) => void
 }) {
-  const card = (kind: DeliverableKind, title: string) => (
-    <div key={kind.id} className="kind-card">
+  const row = (kind: DeliverableKind, title: string) => (
+    <li key={kind.id} className="list-row">
       <button
         type="button"
-        className="kind"
+        className="quiet kind-name"
         aria-label={kind.title}
         onClick={() => onChoose(kind.id)}
       >
-        <strong>{title}</strong>
-        <span className="hint">
-          {messages.deliverableFor[kind.audience]}
-          {isOwnKind(kind.id) && ` · ${messages.ownKindBadge}`}
-        </span>
-        <span>{kind.summary}</span>
+        {title}
       </button>
+      {isOwnKind(kind.id) && <span className="status">{messages.ownKindBadge}</span>}
+      <span className="list-row-text hint">{kind.summary}</span>
       {isOwnKind(kind.id) && (
-        <div className="actions">
-          <button type="button" className="quiet" onClick={() => onEdit(kind.id)}>
-            {messages.ownKindEdit} {kind.title}
+        <>
+          <button
+            type="button"
+            className="quiet"
+            aria-label={`${messages.ownKindEdit} ${kind.title}`}
+            onClick={() => onEdit(kind.id)}
+          >
+            {messages.ownKindEdit}
           </button>
-          <button type="button" className="quiet" onClick={() => onRemove(kind.id)}>
-            {messages.ownKindRemove} {kind.title}
+          <button
+            type="button"
+            className="quiet"
+            aria-label={`${messages.ownKindRemove} ${kind.title}`}
+            onClick={() => onRemove(kind.id)}
+          >
+            {messages.ownKindRemove}
           </button>
-        </div>
+        </>
       )}
-    </div>
+    </li>
   )
   // The pages of the memory are not texts to send: they stand apart, and say what they are for.
   const memory = catalog.filter((kind) => kind.memoryPage !== undefined)
+  const toSend = catalog.filter((kind) => kind.memoryPage === undefined)
   return (
     <>
-      <h3>{messages.deliverableChoose}</h3>
-      {empty && <p className="hint">{messages.deliverableNone}</p>}
-      <div className="kinds">
-        {catalog
-          .filter((kind) => kind.memoryPage === undefined)
-          .map((kind) => card(kind, kind.title))}
-      </div>
-      {memory.length > 0 && (
-        <section aria-label={messages.memoryKinds.title}>
-          <h3>{messages.memoryKinds.title}</h3>
-          <p className="hint">{messages.memoryKinds.about}</p>
-          <div className="kinds">
-            {memory.map((kind) => card(kind, kind.title.replace(messages.memoryKinds.prefix, '')))}
-          </div>
-        </section>
-      )}
-      <div className="actions">
+      <div className="title-row">
+        <h3>{messages.deliverableChoose}</h3>
         <button type="button" onClick={() => onEdit(null)}>
           {messages.ownKindNew}
         </button>
       </div>
+      {empty && <p className="hint">{messages.deliverableNone}</p>}
+      <div className="grouped">
+        {AUDIENCES.map((audience) => {
+          const kinds = toSend.filter((kind) => kind.audience === audience)
+          if (kinds.length === 0) return null
+          const label = messages.deliverableFor[audience]
+          return (
+            <Fragment key={audience}>
+              <div className="list-group">
+                <span className="eyebrow">
+                  {label} · {kinds.length}
+                </span>
+              </div>
+              <ul className="entries" aria-label={label}>
+                {kinds.map((kind) => row(kind, kind.title))}
+              </ul>
+            </Fragment>
+          )
+        })}
+      </div>
+      {memory.length > 0 && (
+        <section className="catalog-part" aria-label={messages.memoryKinds.title}>
+          <h3>{messages.memoryKinds.title}</h3>
+          <p className="hint">{messages.memoryKinds.about}</p>
+          <ul className="entries">
+            {memory.map((kind) => row(kind, kind.title.replace(messages.memoryKinds.prefix, '')))}
+          </ul>
+        </section>
+      )}
     </>
   )
 }
@@ -509,9 +557,6 @@ const text = messages.review
 const findingKey = (finding: Pick<RedTeamFinding, 'where' | 'finding'>): string =>
   `${finding.where}-${finding.finding}`
 
-const MS_PER_SECOND = 1000
-const seconds = (ms: number): number => Math.round(ms / MS_PER_SECOND)
-
 function Review({
   deliverable,
   kind,
@@ -528,9 +573,7 @@ function Review({
   onApprove: () => void
 }) {
   const busy = step !== null
-  const cost = costOf(deliverable)
   const lastFailed = deliverable.rounds.at(-1)?.error ?? null
-  const phases = deliverable.rounds.at(-1)?.phases
   const inReview = deliverable.status === 'review'
   // What the PM marked as seen holds for the draft it was marked on: a new draft starts unmarked.
   const round = `${deliverable.id}:${deliverable.rounds.length}`
@@ -557,22 +600,21 @@ function Review({
     setTyped(null)
   }
 
+  const left = (deliverable.redTeam?.findings.length ?? 0) - seenKeys.length
   const side = (
     <aside className="panel review-panel" aria-label={messages.review.panel}>
       <div className="panel-head">
         <h4>{messages.review.panel}</h4>
-        {deliverable.redTeam && inReview && (
-          <span
-            className={
-              deliverable.redTeam.findings.length > seenKeys.length ? 'pill pill-warning' : 'pill'
-            }
-            role="status"
-          >
-            {messages.review.left(deliverable.redTeam.findings.length - seenKeys.length)}
-          </span>
-        )}
       </div>
-      <div className="panel-body">
+      {deliverable.draft && (
+        <section className="panel-body review-part" aria-label={messages.review.computed}>
+          <span className="eyebrow">{messages.review.computed}</span>
+          <AnswerChecks answer={deliverable.draft} />
+          {kind?.audience === 'client' && <ClientFilter text={deliverable.draft.text} />}
+        </section>
+      )}
+      <section className="panel-body review-part" aria-label={messages.review.judged}>
+        <span className="eyebrow">{messages.review.judged}</span>
         {deliverable.status === 'writing' && deliverable.draft && !deliverable.redTeam && (
           <Waiting>{messages.review.pending}</Waiting>
         )}
@@ -586,18 +628,24 @@ function Review({
             onFix={onRevise}
           />
         )}
-        {kind?.audience === 'client' && deliverable.draft && (
-          <ClientFilter text={deliverable.draft.text} />
-        )}
-        {inReview && kind && (
-          <details className="review-fold" aria-label={messages.deliverableChecklist}>
-            <summary>{messages.deliverableChecklist}</summary>
-            <ul className="missing">
-              {kind.checklist.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </details>
+        {inReview && (
+          <div className="review-row">
+            {deliverable.redTeam && (
+              <span className="hint" role="status">
+                {messages.review.left(left)}
+              </span>
+            )}
+            {kind && (
+              <details className="review-fold" aria-label={messages.deliverableChecklist}>
+                <summary>{messages.deliverableChecklist}</summary>
+                <ul className="missing">
+                  {kind.checklist.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         )}
         {inReview && (
           <form className="source-form" onSubmit={submit}>
@@ -609,7 +657,7 @@ function Review({
                 onChange={(event) => setTyped({ round, text: event.target.value })}
               />
             </label>
-            <div className="actions">
+            <div className="actions review-commands">
               <BusyButton
                 type="submit"
                 className="quiet-submit"
@@ -631,29 +679,34 @@ function Review({
             </div>
           </form>
         )}
-      </div>
+      </section>
     </aside>
   )
 
+  const rounds = costOf(deliverable).rounds
   return (
     <>
-      <div className="review-head">
-        <h3>{deliverable.title}</h3>
-        {kind && (
-          <span className={kind.audience === 'client' ? 'pill pill-warning' : 'pill'}>
-            {messages.deliverableFor[kind.audience]}
-          </span>
-        )}
-        <span className="pill">{messages.deliverableStatus[deliverable.status]}</span>
+      <div>
+        <div className="review-head">
+          <h3>{deliverable.title}</h3>
+          <StatusMark status={deliverable.status} />
+        </div>
+        <p className="hint">
+          {[
+            kind?.title ?? deliverable.kindId,
+            ...(kind ? [messages.deliverableFor[kind.audience]] : []),
+            messages.deliverableRounds(rounds),
+            ...(deliverable.models?.write
+              ? [
+                  messages.models.wroteAndReviewed(
+                    deliverable.models.write,
+                    deliverable.models.review,
+                  ),
+                ]
+              : []),
+          ].join(' · ')}
+        </p>
       </div>
-      <p className="hint">
-        {kind?.title ?? deliverable.kindId} · {messages.deliverableStatus[deliverable.status]} ·{' '}
-        {messages.deliverableCost(cost.draftMinutes, cost.reviewMinutes, cost.rounds)}
-        {deliverable.models?.write &&
-          ` · ${messages.models.wroteAndReviewed(deliverable.models.write, deliverable.models.review)}`}
-        {phases &&
-          ` · ${messages.review.phases(seconds(phases.writeMs), seconds(phases.checkMs), seconds(phases.reviewMs))}`}
-      </p>
       {deliverable.status === 'failed' && (
         <p className="warning" role="alert">
           {messages.deliverableFailed} {lastFailed && errorText(lastFailed)}
@@ -665,9 +718,9 @@ function Review({
         </p>
       )}
       {deliverable.files.length > 0 && (
-        <div className="preview">
-          <p>{messages.deliverableFiles}</p>
-          <div className="choices">
+        <div className="panel">
+          <div className="list-row files-row">
+            <h4>{messages.deliverableFiles}</h4>
             {deliverable.files.map((path) => (
               <button key={path} type="button" onClick={() => void onOpen(path)}>
                 {path.split('/').at(-1)}
@@ -678,7 +731,7 @@ function Review({
       )}
       {deliverable.draft ? (
         <div className="draft">
-          <AnswerView answer={deliverable.draft} onOpenSource={onOpen} side={side} />
+          <AnswerView answer={deliverable.draft} onOpenSource={onOpen} side={side} checksAside />
           {inReview && <p className="hint">{messages.deliverableSourcesNote}</p>}
         </div>
       ) : (
@@ -812,6 +865,9 @@ function RedTeam({
   )
 }
 
+/** The columns of the register that hold words: the total is named across them. */
+const REGISTER_WORD_COLUMNS = 4
+
 /** The columns of the register, in the order of their headings. */
 function registerColumns(titleOf: (kindId: string) => string): DataColumn<Deliverable>[] {
   const [created, kind, title, status, draft, review, rounds] = messages.deliverableRegisterHead
@@ -846,7 +902,7 @@ function registerColumns(titleOf: (kindId: string) => string): DataColumn<Delive
     {
       key: 'title',
       label: title ?? '',
-      cell: (deliverable) => deliverable.title,
+      cell: (deliverable) => <strong>{deliverable.title}</strong>,
       sort: (deliverable) => deliverable.title,
       text: (deliverable) => deliverable.title,
     },
@@ -854,7 +910,7 @@ function registerColumns(titleOf: (kindId: string) => string): DataColumn<Delive
       key: 'status',
       label: status ?? '',
       width: '130px',
-      cell: (deliverable) => messages.deliverableStatus[deliverable.status],
+      cell: (deliverable) => <StatusMark status={deliverable.status} />,
       sort: (deliverable) => messages.deliverableStatus[deliverable.status],
       text: (deliverable) => messages.deliverableStatus[deliverable.status],
     },
@@ -878,16 +934,18 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
           columns={registerColumns(titleOf)}
           rows={all}
           rowKey={(deliverable) => deliverable.id}
+          footer={
+            <tr>
+              <th scope="row" colSpan={REGISTER_WORD_COLUMNS}>
+                {messages.deliverableRegisterApproved(totals.deliverables)}
+              </th>
+              <td className="number">{totals.draftMinutes}</td>
+              <td className="number">{totals.reviewMinutes}</td>
+              <td className="number">{totals.rounds}</td>
+            </tr>
+          }
         />
       )}
-      <p className="badge">
-        {messages.deliverableRegisterTotals(
-          totals.deliverables,
-          totals.draftMinutes,
-          totals.reviewMinutes,
-          totals.rounds,
-        )}
-      </p>
     </>
   )
 }

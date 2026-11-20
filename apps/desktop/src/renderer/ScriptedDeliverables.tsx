@@ -100,10 +100,10 @@ function Scripted({
 
   if (!summary.installed) {
     return (
-      <li className="box">
-        <strong>{summary.title}</strong>
-        <p className="hint">{summary.about}</p>
-        <div className="actions">
+      <li className="panel">
+        <div className="list-row">
+          <strong className="kind-name">{summary.title}</strong>
+          <span className="list-row-text hint">{summary.about}</span>
           <button
             type="button"
             onClick={() => void step(null, () => api.installScripted(project.id, slug), onListed)}
@@ -111,7 +111,7 @@ function Scripted({
             {text.install}
           </button>
         </div>
-        {error && <p className="warning">{errorText(error)}</p>}
+        {error && <p className="warning panel-body">{errorText(error)}</p>}
       </li>
     )
   }
