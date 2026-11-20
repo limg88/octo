@@ -1040,6 +1040,11 @@ button.kind-name {
   gap: 8px;
 }
 
+/* In a small window the register scrolls inside its frame: its subject always has room. */
+.register-table table.data {
+  min-width: 960px;
+}
+
 /* The files of an approved deliverable, on the row that names them. */
 .files-row {
   flex-wrap: wrap;

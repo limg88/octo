@@ -929,22 +929,24 @@ function Register({ all, titleOf }: { all: Deliverable[]; titleOf: (kindId: stri
       {all.length === 0 ? (
         <p className="hint">{messages.deliverableRegisterEmpty}</p>
       ) : (
-        <DataTable
-          label={messages.deliverableRegister}
-          columns={registerColumns(titleOf)}
-          rows={all}
-          rowKey={(deliverable) => deliverable.id}
-          footer={
-            <tr>
-              <th scope="row" colSpan={REGISTER_WORD_COLUMNS}>
-                {messages.deliverableRegisterApproved(totals.deliverables)}
-              </th>
-              <td className="number">{totals.draftMinutes}</td>
-              <td className="number">{totals.reviewMinutes}</td>
-              <td className="number">{totals.rounds}</td>
-            </tr>
-          }
-        />
+        <div className="table-wide register-table">
+          <DataTable
+            label={messages.deliverableRegister}
+            columns={registerColumns(titleOf)}
+            rows={all}
+            rowKey={(deliverable) => deliverable.id}
+            footer={
+              <tr>
+                <th scope="row" colSpan={REGISTER_WORD_COLUMNS}>
+                  {messages.deliverableRegisterApproved(totals.deliverables)}
+                </th>
+                <td className="number">{totals.draftMinutes}</td>
+                <td className="number">{totals.reviewMinutes}</td>
+                <td className="number">{totals.rounds}</td>
+              </tr>
+            }
+          />
+        </div>
       )}
     </>
   )
