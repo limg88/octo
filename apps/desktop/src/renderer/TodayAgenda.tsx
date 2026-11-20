@@ -17,6 +17,8 @@ type Props = {
   /** The file being handed to the system, by the key of its meeting. */
   opening: string | null
   onOpen: (key: string, path: string) => void
+  /** Why a meeting comes first now, when it does: said before anything else in its row. */
+  mark?: (meeting: DayMeeting) => string | null
   /** How much there is to take to a meeting of today, in a few words; null when not known. */
   summary?: (meeting: DayMeeting) => string | null
   /** The card of a meeting of today: what to bring to it. */
@@ -39,47 +41,50 @@ function attendeesText(attendees: readonly string[]): string {
   return others > 0 ? text.andOthers(named, others) : named
 }
 
-/** The meetings of the day in the order they are held, and those of the next working day. */
-export function TodayAgenda({ agenda, now, opening, onOpen, summary, children }: Props) {
-  /** The card in view; before the PM chooses, that of the next meeting still to come. */
-  const [chosen, setChosen] = useState<string | null | undefined>(undefined)
-  if (agenda.today.length === 0 && agenda.next.meetings.length === 0) return null
-  const next = agenda.today.find((meeting) => Date.parse(meeting.start) > now)
-  const shownKey = chosen === undefined ? (next ? agendaKey(next) : null) : chosen
+/**
+ * The meetings of the day as rows of what comes now, in the order they are held, and a line on
+ * those of the next working day. The card of a meeting opens under its row.
+ */
+export function TodayAgenda({ agenda, now, opening, onOpen, mark, summary, children }: Props) {
+  const [shownKey, setShownKey] = useState<string | null>(null)
   return (
-    <section className="panel today-agenda" aria-label={text.title}>
-      <h4 className="today-title">
-        {text.title}
-        <span className="today-count">{text.count(agenda.today.length)}</span>
-      </h4>
+    <>
       {agenda.today.length > 0 && (
-        <ul className="today-meetings" aria-label={text.list}>
+        <ul className="entries" aria-label={text.list}>
           {agenda.today.map((meeting) => {
             const key = agendaKey(meeting)
             const over = endOf(meeting) <= now
             const shown = children !== undefined && shownKey === key
             const words = summary?.(meeting) ?? null
+            const why = mark?.(meeting) ?? null
+            const facts = [meeting.location, attendeesText(meeting.attendees)].filter(
+              (part) => part !== '',
+            )
             return (
               <li key={key} className={over ? 'today-meeting today-meeting-over' : 'today-meeting'}>
-                <div className="today-meeting-row">
-                  <span className="today-meeting-hours">{hoursOf(meeting)}</span>
-                  <span className="today-meeting-what">
-                    <strong>{meeting.subject}</strong>{' '}
-                    {meeting.repeats && <span className="pill">{text.repeats}</span>}{' '}
-                    {over && <span className="pill">{text.over}</span>}
-                    <span className="hint today-meeting-who">
-                      {[meeting.location, attendeesText(meeting.attendees)]
-                        .filter((part) => part !== '')
-                        .join(' · ')}
-                    </span>
+                <div className="list-row">
+                  <span className="list-row-lead">
+                    {over ? (
+                      <span className="pill">{text.over}</span>
+                    ) : (
+                      why !== null && <span className="pill pill-warning">{why}</span>
+                    )}
                   </span>
+                  <span className="list-row-text">
+                    <span className="today-meeting-hours">{hoursOf(meeting)}</span>
+                    {' · '}
+                    <strong>{meeting.subject}</strong>
+                    {facts.length > 0 && <span className="hint"> · {facts.join(' · ')}</span>}
+                  </span>
+                  {meeting.repeats && <span className="pill">{text.repeats}</span>}
+                  <span className="pill pill-source">{messages.today.kinds.meeting}</span>
                   {children && (
                     <button
                       type="button"
-                      className={shown ? 'quiet' : undefined}
+                      className="quiet"
                       aria-expanded={shown}
                       aria-label={`${text.card}: ${meeting.subject}`}
-                      onClick={() => setChosen(shown ? null : key)}
+                      onClick={() => setShownKey(shown ? null : key)}
                     >
                       {words ?? text.card}
                     </button>
@@ -101,7 +106,7 @@ export function TodayAgenda({ agenda, now, opening, onOpen, summary, children }:
         </ul>
       )}
       {agenda.next.meetings.length > 0 && (
-        <p className="hint today-agenda-next">
+        <p className="hint">
           {text.next(
             shortDayText(agenda.next.day),
             agenda.next.meetings
@@ -110,6 +115,6 @@ export function TodayAgenda({ agenda, now, opening, onOpen, summary, children }:
           )}
         </p>
       )}
-    </section>
+    </>
   )
 }

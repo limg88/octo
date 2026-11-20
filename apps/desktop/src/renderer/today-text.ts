@@ -31,6 +31,8 @@ export const weekdayText = (day: string): string => WEEKDAY.format(new Date(`${d
 /** The hour of an instant in Italy: `10:00`. */
 export const hourText = (instant: string): string => HOUR.format(new Date(instant))
 const hours = (value: number): string => NUMBER.format(value)
+/** Hours as a cell of a table says them. */
+export const hoursText = (value: number): string => `${hours(value)} ore`
 export const monthText = (month: string): string => MONTH.format(new Date(`${month}-01T00:00:00Z`))
 export const dayText = (day: string): string => DAY.format(new Date(`${day}T00:00:00Z`))
 /** A day in short, as a table writes it: `16/11/2026`. */
@@ -61,6 +63,16 @@ function personLine(person: HoursPersonFact): string {
     return `${person.person}: ${hours(person.worklogHours)} ore sul tracker, nessun timesheet`
   }
   return `${person.person}: ${hours(person.timesheetHours)} ore di timesheet, ${hours(person.worklogHours)} sul tracker`
+}
+
+/** What does not add up in the hours of a month besides the people: said after their table. */
+export function hoursNotes(facts: Extract<TodayFacts, { kind: 'hours' }>): string[] {
+  return [
+    ...(facts.duplicates > 0
+      ? [count(facts.duplicates, 'possibile doppione', 'possibili doppioni')]
+      : []),
+    ...(facts.tieOutOk ? [] : ['la quadratura delle ore approvate non torna']),
+  ]
 }
 
 function gapLine(gap: ForecastGap): string {
@@ -161,13 +173,7 @@ export function signalText(item: TodayItem): SignalText {
         detail: `Hai scritto ${facts.days} giorni fa e nessuno ha risposto.`,
       }
     case 'hours': {
-      const parts = [
-        ...facts.people.map(personLine),
-        ...(facts.duplicates > 0
-          ? [count(facts.duplicates, 'possibile doppione', 'possibili doppioni')]
-          : []),
-        ...(facts.tieOutOk ? [] : ['la quadratura delle ore approvate non torna']),
-      ]
+      const parts = [...facts.people.map(personLine), ...hoursNotes(facts)]
       return {
         title:
           facts.people.length > 0

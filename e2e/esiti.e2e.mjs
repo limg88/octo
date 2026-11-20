@@ -220,12 +220,12 @@ try {
   // The mark is the octopus that reads a page.
   await page.locator('img.logo').first().waitFor()
   // A column is made wider from the edge of its heading, and stays so.
-  await section('Oggi').click()
-  const watched = page.getByRole('table', { name: 'Da tenere d’occhio' })
-  const edge = watched.getByRole('separator', { name: 'Larghezza della colonna Che cosa' })
+  await section('Commessa').click()
+  const people = page.getByRole('table', { name: 'Ore e costi per persona' })
+  const edge = people.getByRole('separator', { name: 'Larghezza della colonna Persona' })
   await edge.focus()
   await edge.press('ArrowRight')
-  assert.match((await watched.locator('col').first().getAttribute('style')) ?? '', /width: \d+px/)
+  assert.match((await people.locator('col').first().getAttribute('style')) ?? '', /width: \d+px/)
   // The glossary: Claude proposes a pair, the PM takes it, and it is kept with the settings.
   await section('Impostazioni').click()
   await page.getByRole('tab', { name: 'Persone e calendario' }).click()

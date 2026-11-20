@@ -200,6 +200,7 @@ function ClosedRow(props: {
 export function TodayPoints(props: Props) {
   const { brief, day, closing, onAdd, onUpdate, onConfirm, onOpenFile } = props
   const [open, setOpen] = useState(true)
+  const [adding, setAdding] = useState(false)
   const [all, setAll] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   const [title, setTitle] = useState('')
@@ -216,6 +217,77 @@ export function TodayPoints(props: Props) {
     setTitle('')
     setOwner('')
     setDue('')
+    setAdding(false)
+  }
+
+  const closingText = [
+    ...(closing.unread > 0 ? [text.unread(closing.unread)] : []),
+    closing.at === null ? text.neverClosed : text.closedAt(dateTimeText(closing.at), closing.model),
+  ].join(' · ')
+  // The form takes the place of the command that opens it.
+  const commands = (
+    <>
+      {!adding && (
+        <button type="button" onClick={() => setAdding(true)}>
+          {text.add}
+        </button>
+      )}
+      {props.canJudge && (
+        <BusyButton
+          className="quiet"
+          busy={props.judging}
+          busyLabel={text.closing}
+          onClick={props.onClose}
+        >
+          {text.closeDay}
+        </BusyButton>
+      )}
+    </>
+  )
+  const form = adding && (
+    <form className="today-point-form" aria-label={text.addTitle} onSubmit={add}>
+      <input
+        aria-label={text.titleLabel}
+        placeholder={text.addHint}
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <input
+        aria-label={text.ownerLabel}
+        placeholder={text.ownerHint}
+        value={owner}
+        onChange={(event) => setOwner(event.target.value)}
+      />
+      <input
+        type="date"
+        aria-label={text.dueLabel}
+        min={day}
+        value={due}
+        onChange={(event) => setDue(event.target.value)}
+      />
+      <button type="submit" disabled={title.trim() === ''}>
+        {text.add}
+      </button>
+      <button type="button" className="quiet" onClick={() => setAdding(false)}>
+        {text.cancel}
+      </button>
+    </form>
+  )
+
+  // Nothing to read: the part is one row, with what can be done from it.
+  const nothing =
+    brief.queued.length + brief.toConfirm.length + brief.others.length + brief.closed.length === 0
+  if (nothing) {
+    return (
+      <section className="panel today-points today-points-empty" aria-label={text.title}>
+        <div className="list-row">
+          <h4 className="today-title">{text.title}</h4>
+          <span className="list-row-text hint">{[text.none, closingText].join(' · ')}</span>
+          {commands}
+        </div>
+        {form}
+      </section>
+    )
   }
 
   return (
@@ -276,7 +348,7 @@ export function TodayPoints(props: Props) {
             </ul>
           )}
           {brief.queued.length === 0 ? (
-            <p className="today-empty">{text.none}</p>
+            <p className="today-empty">{text.none}.</p>
           ) : (
             <ul className="today-point-list" aria-label={text.list}>
               {shown.map((entry) => (
@@ -324,50 +396,11 @@ export function TodayPoints(props: Props) {
               )}
             </>
           )}
-          <div className="actions today-closing">
-            <span className="hint">
-              {[
-                ...(closing.unread > 0 ? [text.unread(closing.unread)] : []),
-                closing.at === null
-                  ? text.neverClosed
-                  : text.closedAt(dateTimeText(closing.at), closing.model),
-              ].join(' · ')}
-            </span>
-            {props.canJudge && (
-              <BusyButton
-                className="quiet"
-                busy={props.judging}
-                busyLabel={text.closing}
-                onClick={props.onClose}
-              >
-                {text.closeDay}
-              </BusyButton>
-            )}
+          <div className="list-row today-closing">
+            <span className="list-row-text hint">{closingText}</span>
+            {commands}
           </div>
-          <form className="today-point-form" aria-label={text.addTitle} onSubmit={add}>
-            <input
-              aria-label={text.titleLabel}
-              placeholder={text.addHint}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-            <input
-              aria-label={text.ownerLabel}
-              placeholder={text.ownerHint}
-              value={owner}
-              onChange={(event) => setOwner(event.target.value)}
-            />
-            <input
-              type="date"
-              aria-label={text.dueLabel}
-              min={day}
-              value={due}
-              onChange={(event) => setDue(event.target.value)}
-            />
-            <button type="submit" disabled={title.trim() === ''}>
-              {text.add}
-            </button>
-          </form>
+          {form}
         </>
       )}
     </section>

@@ -340,6 +340,9 @@ describe('the brief of the open points', () => {
     fireEvent.click(screen.getByRole('button', { name: text.points.cancel }))
     expect(screen.queryByRole('form', { name: text.points.editTitle('Punto b') })).toBeNull()
 
+    // The form to add one is behind its command, and gives the place back when it is sent.
+    expect(screen.queryByRole('form', { name: text.points.addTitle })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: text.points.add }))
     const add = screen.getByRole('form', { name: text.points.addTitle })
     const button = within(add).getByRole('button', { name: text.points.add }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
@@ -490,7 +493,43 @@ describe('the brief of the open points', () => {
   })
 })
 
+describe('the brief of the open points with nothing in it', () => {
+  it('is one row: what there is, the command that adds and the one that closes the day', async () => {
+    const { api } = todayApi(view())
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const region = await screen.findByRole('region', { name: text.points.title })
+    expect(region.textContent).toContain(text.points.none)
+    expect(within(region).queryByRole('button', { name: text.points.fold })).toBeNull()
+    expect(within(region).getByRole('button', { name: text.points.closeDay })).toBeTruthy()
+    fireEvent.click(within(region).getByRole('button', { name: text.points.add }))
+    const form = within(region).getByRole('form', { name: text.points.addTitle })
+    fireEvent.click(within(form).getByRole('button', { name: text.points.cancel }))
+    expect(within(region).queryByRole('form', { name: text.points.addTitle })).toBeNull()
+  })
+})
+
 describe('the critical things of the week', () => {
+  it('does not say again what the warning on top already says', async () => {
+    const entry = (key: string, what: WeekEntry['what']): WeekEntry =>
+      ({ key, side: 'ongoing', day: null, overdueDays: 0, what }) as WeekEntry
+    const week = {
+      until: '2026-11-22',
+      ongoing: [
+        entry('a', { kind: 'signal', item: source }),
+        entry('b', { kind: 'signal', item: bugs }),
+      ],
+      coming: [],
+    }
+    const { api } = todayApi(view({ week }))
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const region = await screen.findByRole('region', { name: text.week.title })
+    const rows = within(within(region).getByRole('list', { name: text.week.ongoing })).getAllByRole(
+      'listitem',
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.textContent).toContain(signalText(bugs).title)
+  })
+
   const entry = (
     key: string,
     side: WeekEntry['side'],
@@ -575,7 +614,8 @@ describe('the critical things of the week', () => {
       within(region).getByRole('list', { name: text.week.ongoing }),
     ).getAllByRole('listitem') as HTMLElement[]
     expect(late?.textContent).toContain('scaduto da 3 giorni')
-    expect(late?.textContent).toContain('Open point Verbale')
+    expect(late?.textContent).toContain('Verbale')
+    expect(late?.textContent).toContain(text.week.kinds.point)
     expect(late?.textContent).toContain('di Rossi')
     expect(old?.textContent).toContain('adesso')
     expect(old?.textContent).toContain('tuo · aperto da 7 giorni lavorativi')
@@ -586,12 +626,13 @@ describe('the critical things of the week', () => {
       within(region).getByRole('list', { name: text.week.coming }),
     ).getAllByRole('listitem') as HTMLElement[]
     expect(dated?.textContent).toContain('mer 18/11')
-    expect(dated?.textContent).toContain('Rischio Ambiente non pronto')
+    expect(dated?.textContent).toContain('Ambiente non pronto')
+    expect(dated?.textContent).toContain(text.week.kinds.risk)
     expect(sprint?.textContent).toContain('gio 19/11')
     expect(sprint?.textContent).toContain(text.week.sprintEnd)
     expect(month?.textContent).toContain(text.week.thisWeek)
     // What the week tells is not told again among what is only watched: the candidates stay.
-    const watched = screen.getByRole('table', { name: text.watch })
+    const watched = screen.getByRole('list', { name: text.watch })
     expect(watched.textContent).not.toContain(signalText(bugs).title)
     expect(watched.textContent).toContain(signalText(risk).title)
 
@@ -745,11 +786,12 @@ describe('the meetings of the day', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     const { api } = todayApi(withCard([card()]))
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
-    // The meeting still to come is prepared without a click; the one over is a click away.
-    const region = await screen.findByRole('region', { name: text.prep.title('Collaudo') })
-    expect(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }).textContent).toBe(
-      '4 cose da portare',
-    )
+    // The row says how much there is to bring; the card opens under it at a click.
+    const opener = await screen.findByRole('button', { name: `${text.agenda.card}: Collaudo` })
+    expect(opener.textContent).toBe('4 cose da portare')
+    expect(screen.queryByRole('region', { name: text.prep.title('Collaudo') })).toBeNull()
+    fireEvent.click(opener)
+    const region = screen.getByRole('region', { name: text.prep.title('Collaudo') })
     expect(screen.getByRole('button', { name: `${text.agenda.card}: SAL` }).textContent).toBe(
       text.agenda.card,
     )
@@ -838,7 +880,8 @@ describe('the meetings of the day', () => {
       ),
     })
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const empty = await screen.findByRole('region', { name: text.prep.title('Collaudo') })
+    fireEvent.click(await screen.findByRole('button', { name: `${text.agenda.card}: Collaudo` }))
+    const empty = screen.getByRole('region', { name: text.prep.title('Collaudo') })
     expect(empty.textContent).toContain(text.prep.empty)
     expect(within(empty).queryByRole('button', { name: text.prep.copy })).toBeNull()
     expect(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }).textContent).toBe(
@@ -861,14 +904,56 @@ describe('the meetings of the day', () => {
     const { unmount } = render(
       <TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />,
     )
-    expect((await screen.findByRole('region', { name: text.agenda.title })).textContent).toContain(
-      'nessuna',
-    )
+    // The meetings are rows of what comes now: with none today, only the line on the next day.
+    expect((await screen.findByRole('region', { name: text.now })).textContent).toContain('Riesame')
     expect(screen.queryByRole('list', { name: text.agenda.list })).toBeNull()
     unmount()
     render(<TodayView api={todayApi().api} project={aurora} canJudge onOpenSection={() => {}} />)
     await screen.findByRole('alert')
-    expect(screen.queryByRole('region', { name: text.agenda.title })).toBeNull()
+    expect(screen.queryByRole('region', { name: text.now })).toBeNull()
+  })
+
+  it('tells a meeting of today once: its row says why it comes now, and a mail is cited once', async () => {
+    const soon = item(
+      KEY,
+      'due',
+      {
+        kind: 'meeting',
+        subject: 'Collaudo',
+        start: review.start,
+        location: '',
+        path: review.path,
+      },
+      { target: 'mail' },
+    )
+    const bringsMail = card({
+      bring: [
+        {
+          key: KEY,
+          text: 'Rispondi sul budget.',
+          path: 'Posta/2026-11/budget.md',
+          quote: 'budget',
+          verified: true,
+        },
+      ],
+    })
+    const page = withCard([bringsMail], [review])
+    const { api } = todayApi({ ...page, now: [{ item: soon, rule: 'meeting_soon', minutes: 40 }] })
+    render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
+    const now = await screen.findByRole('region', { name: text.now })
+    const [row] = within(within(now).getByRole('list', { name: text.agenda.list })).getAllByRole(
+      'listitem',
+    ) as HTMLElement[]
+    expect(row?.textContent).toContain(text.nowWhy.meetingSoon(40))
+    expect(row?.textContent).toContain(text.kinds.meeting)
+    // The signal of the meeting is not a second row.
+    expect(within(now).queryByRole('list', { name: text.nowList })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `${text.agenda.card}: Collaudo` }))
+    const prep = screen.getByRole('region', { name: text.prep.title('Collaudo') })
+    expect(within(prep).getByText('Rispondi sul budget.')).toBeTruthy()
+    expect(
+      within(prep).queryByRole('button', { name: `${text.nowSource}: Rispondi sul budget.` }),
+    ).toBeNull()
   })
 })
 
@@ -893,9 +978,20 @@ describe('the page of the day', () => {
     expect(first.textContent).toContain(text.dueShort.month_end)
     expect(first.getAttribute('aria-pressed')).toBe('true')
     // The hours: computed, with the people, the reason of the day and why they came back.
-    expect(detail.textContent).toContain('Bianchi Anna: 160 ore di timesheet, 80 sul tracker')
-    expect(detail.textContent).toContain('Neri Sara: 80 ore di timesheet, nessuna sul tracker')
-    expect(detail.textContent).toContain('Ugo Gialli: 120 ore sul tracker, nessun timesheet')
+    const people = within(detail).getByRole('table', { name: text.hoursPeople })
+    const cells = within(people)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      )
+    expect(cells).toEqual([
+      ['Bianchi Anna', '160 ore', '80 ore'],
+      ['Neri Sara', '80 ore', text.hoursNoWorklog],
+      ['Ugo Gialli', text.hoursNoTimesheet, '120 ore'],
+    ])
     expect(detail.textContent).toContain('1 possibile doppione')
     expect(detail.textContent).toContain(text.because.month_end)
     expect(detail.textContent).toContain(text.returned.worse(2, 3))
@@ -1124,7 +1220,7 @@ describe('the page of the day', () => {
     const first = await screen.findByRole('list', { name: text.nowList })
     expect(first.textContent).toContain(text.marks.worse)
     expect(screen.getByRole('list', { name: text.list }).textContent).toContain(text.marks.new)
-    expect(screen.getByRole('table', { name: text.watch }).textContent).toContain(text.marks.new)
+    expect(screen.getByRole('list', { name: text.watch }).textContent).toContain(text.marks.new)
     // The page tells how much it asks, and that it stayed open long enough to be looked at.
     expect(counted).toEqual([2])
     await waitFor(() => expect(api.markTodaySeen).toHaveBeenCalledWith('p-1'))
@@ -1953,12 +2049,12 @@ describe('the day as a list with its detail', () => {
       view({ items: [follow('di-luca', 'someone_else'), follow('a-tutti', 'everyone')] }),
     )
     render(<TodayView api={api} project={aurora} canJudge onOpenSection={() => {}} />)
-    const watched = await screen.findByRole('table', { name: text.watch })
+    const watched = await screen.findByRole('list', { name: text.watch })
     expect(watched.textContent).toContain('Recap del collaudo')
     expect(watched.textContent).not.toContain('Ambiente di prova')
     // The mail somebody else is to answer is one line, and a click away.
     expect(screen.getByText(text.watchOthers(1))).toBeTruthy()
-    const others = screen.getByRole('table', { name: text.watchOthersList, hidden: true })
+    const others = screen.getByRole('list', { name: text.watchOthersList, hidden: true })
     expect(others.textContent).toContain('Ambiente di prova')
     // What Claude judges and what Octo computes is explained behind «Dettagli», not in view.
     const details = screen.getByText(text.judgement.details).closest('details')
@@ -2111,7 +2207,7 @@ describe('the day as a list with its detail', () => {
         (await screen.findByRole('button', { name: new RegExp(`^${text.groups.mail}`) }))
           .textContent,
       ).toContain('1')
-      const watched = screen.getByRole('table', { name: text.watch })
+      const watched = screen.getByRole('list', { name: text.watch })
       expect(within(watched).getByText('Da seguire: «Aurora: recap» · Racis, Claudia')).toBeTruthy()
       fireEvent.click(
         within(watched).getByRole('button', {

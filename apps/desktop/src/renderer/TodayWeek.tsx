@@ -55,57 +55,60 @@ function WeekList(
   props: { label: string; entries: WeekEntry[]; empty: string } & Omit<Props, 'week'>,
 ) {
   return (
-    <div className="today-week-side">
-      <span className="eyebrow">
-        {props.label} · {props.entries.length}
-      </span>
-      {props.entries.length === 0 ? (
-        <p className="today-empty">{props.empty}</p>
-      ) : (
+    <>
+      <div className="list-group">
+        <span className="eyebrow">
+          {props.label} · {props.entries.length}
+        </span>
+        {props.entries.length === 0 && <span className="hint">{props.empty}</span>}
+      </div>
+      {props.entries.length > 0 && (
         <ul className="entries" aria-label={props.label}>
           {props.entries.map((entry) => {
             const words = wordsOf(entry)
             const { what } = entry
             return (
-              <li key={entry.key} className="week-entry">
-                <div className="week-entry-what">
-                  <span className="entry-meta">
-                    <span className={entry.overdueDays > 0 ? 'pill pill-warning' : 'pill'}>
-                      {whenOf(entry)}
-                    </span>
-                    <span className="pill">{words.label}</span>
-                  </span>{' '}
-                  <strong className="entry-title">{words.title}</strong>
-                  {words.detail !== '' && (
-                    <span className="hint today-point-facts">{words.detail}</span>
+              <li key={entry.key} className="list-row week-entry">
+                <span className="week-entry-when">
+                  <span className={entry.overdueDays > 0 ? 'pill pill-warning' : 'pill'}>
+                    {whenOf(entry)}
+                  </span>
+                </span>
+                <span className="list-row-text">
+                  <strong>{words.title}</strong>
+                  {words.detail !== '' && <span className="hint"> · {words.detail}</span>}
+                </span>
+                <span className="week-entry-kind">
+                  <span className="pill">{words.label}</span>
+                </span>
+                <span className="week-entry-action">
+                  {what.kind === 'signal' && (
+                    <button
+                      type="button"
+                      className="quiet"
+                      aria-label={`${messages.today.open[what.item.target]}: ${words.title}`}
+                      onClick={() => props.onOpen(what.item)}
+                    >
+                      {messages.today.open[what.item.target]}
+                    </button>
                   )}
-                </div>
-                {what.kind === 'signal' && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    aria-label={`${messages.today.open[what.item.target]}: ${words.title}`}
-                    onClick={() => props.onOpen(what.item)}
-                  >
-                    {messages.today.open[what.item.target]}
-                  </button>
-                )}
-                {what.kind === 'risk' && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    aria-label={`${text.openRisks}: ${words.title}`}
-                    onClick={props.onOpenRisks}
-                  >
-                    {text.openRisks}
-                  </button>
-                )}
+                  {what.kind === 'risk' && (
+                    <button
+                      type="button"
+                      className="quiet"
+                      aria-label={`${text.openRisks}: ${words.title}`}
+                      onClick={props.onOpenRisks}
+                    >
+                      {text.openRisks}
+                    </button>
+                  )}
+                </span>
               </li>
             )
           })}
         </ul>
       )}
-    </div>
+    </>
   )
 }
 
@@ -113,12 +116,12 @@ function WeekList(
 export function TodayWeek({ week, onOpen, onOpenRisks }: Props) {
   if (week.ongoing.length + week.coming.length === 0) return null
   return (
-    <section className="panel today-week" aria-label={text.title}>
+    <section className="today-part" aria-label={text.title}>
       <h4 className="today-title" title={text.hint}>
         {text.title}
         <span className="today-count">{text.until(shortDayText(week.until))}</span>
       </h4>
-      <div className="today-week-sides">
+      <div className="grouped">
         <WeekList
           label={text.ongoing}
           entries={week.ongoing}

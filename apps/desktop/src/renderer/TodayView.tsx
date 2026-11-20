@@ -2,6 +2,7 @@ import type { AgentProgress, TodayView as View } from '@octo/application'
 import {
   CLIENT_TRACKER_NAME,
   type HiddenItem,
+  type HoursPersonFact,
   isToDo,
   type MailTurn,
   meetingKey,
@@ -13,6 +14,8 @@ import {
   type TodayTarget,
   TRACKER_SOURCE_NAMES,
   touchesPm,
+  type WeekEntry,
+  type WeekView,
 } from '@octo/domain'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorCode, OctoApi, TodayDecisionChoice } from '../shared/api.ts'
@@ -37,6 +40,8 @@ import {
   ageText,
   asOfText,
   dayText,
+  hoursNotes,
+  hoursText,
   nowText,
   personOf,
   shortDayText,
@@ -438,69 +443,22 @@ export function TodayView({
     )
   }
 
-  const watchColumns: DataColumn<TodayItem>[] = [
-    {
-      key: 'what',
-      label: text.watchWhat,
-      cell: (item) => {
-        const mark = view?.marks[item.key]
-        return (
-          <>
-            {mark && <span className="pill pill-new">{text.marks[mark]}</span>}{' '}
-            <strong>{signalText(item).title}</strong>
-          </>
-        )
-      },
-      sort: (item) => signalText(item).title,
-      text: (item) => signalText(item).title,
-    },
-    {
-      key: 'detail',
-      label: text.watchDetail,
-      width: '34%',
-      cell: (item) => <span className="hint">{signalText(item).detail}</span>,
-      text: (item) => signalText(item).detail,
-    },
-    {
-      key: 'actions',
-      label: '',
-      name: text.watchActions,
-      kind: 'actions',
-      width: '290px',
-      cell: (item) => {
-        const title = signalText(item).title
-        return (
-          <>
-            {item.facts.kind === 'mail_follow' && (
-              <button
-                type="button"
-                className="quiet"
-                title={text.mineHint}
-                aria-label={`${text.mine}: ${title}`}
-                onClick={() => void mailTurn(item.key, 'mine')}
-              >
-                {text.mine}
-              </button>
-            )}
-            <button type="button" className="quiet" onClick={() => open(item)}>
-              {text.open[item.target]}
-            </button>
-            <button
-              type="button"
-              className="quiet"
-              aria-label={`${text.mute}: ${title}`}
-              onClick={() => void decide({ key: item.key, title }, 'muted')}
-            >
-              ×
-            </button>
-          </>
-        )
-      },
-    },
-  ]
-
   const prepByKey = new Map(view.prep.map((prep) => [prep.key, prep]))
   const alerts = view.items.filter((item) => item.band === 'alert')
+  // What the warning on top already says is not said again among the critical things.
+  const alertKeys = new Set(alerts.map((item) => item.key))
+  const notWarned = (entry: WeekEntry): boolean =>
+    entry.what.kind !== 'signal' || !alertKeys.has(entry.what.item.key)
+  const week: WeekView = {
+    ...view.week,
+    ongoing: view.week.ongoing.filter(notWarned),
+    coming: view.week.coming.filter(notWarned),
+  }
+  // A meeting of today is one row: why it comes first is said in the row of the agenda.
+  const agendaKeys = new Set(view.agenda.today.map(meetingKey))
+  const nowWhy = new Map(first.map((entry) => [entry.item.key, nowText(entry)]))
+  const firstRows = first.filter((entry) => !agendaKeys.has(entry.item.key))
+  const hasAgenda = view.agenda.today.length + view.agenda.next.meetings.length > 0
   // A source that is a warning already says how old it is: it is not said twice.
   const warned = new Set(
     alerts.flatMap((item) =>
@@ -552,6 +510,13 @@ export function TodayView({
   })).filter((entry) => entry.count > 0)
   const byClaude = view.hiddenItems.filter((hidden) => hidden.state === 'claude').length
   const selected = shown.find((item) => item.key === selectedKey) ?? null
+  const watchActions = {
+    marks: view.marks,
+    onOpen: open,
+    onMine: (item: TodayItem) => void mailTurn(item.key, 'mine'),
+    onMute: (item: TodayItem) =>
+      void decide({ key: item.key, title: signalText(item).title }, 'muted'),
+  }
   const select = (key: string) => {
     setLater(null)
     setFocus({ ...focus, key })
@@ -666,58 +631,63 @@ export function TodayView({
         onOpenFile={(key, path) => void openFile(key, path)}
       />
 
-      <TodayAgenda
-        agenda={view.agenda}
-        now={minute}
-        opening={opening}
-        onOpen={(key, path) => void openFile(key, path)}
-        summary={(meeting) => {
-          const prep = prepByKey.get(meetingKey(meeting))
-          return prep ? prepSummary(prep) : null
-        }}
-      >
-        {(meeting) => {
-          const prep = prepByKey.get(meetingKey(meeting))
-          return prep ? (
-            <TodayPrep
-              meeting={meeting}
-              prep={prep}
-              judging={judging}
-              onOpenFile={(key, path) => void openFile(key, path)}
-              onOpen={open}
-            />
-          ) : null
-        }}
-      </TodayAgenda>
-
-      {first.length > 0 && (
-        <section className="panel today-now" aria-label={text.now}>
+      {(firstRows.length > 0 || hasAgenda) && (
+        <section className="today-part" aria-label={text.now}>
           <h4 className="today-title" title={text.nowHint}>
             {text.now}
+            <span className="today-count">{view.agenda.today.length + firstRows.length}</span>
           </h4>
-          <ul className="entries" aria-label={text.nowList}>
-            {first.map((entry) => (
-              <li key={entry.item.key}>
-                <SignalRow
-                  item={entry.item}
-                  mark={view.marks[entry.item.key]}
-                  why={nowText(entry)}
-                  selected={entry.item.key === focus.key}
-                  judging={judging}
-                  onSelect={() =>
-                    entry.item.key === focus.key
-                      ? setFocus({ ...focus, key: null })
-                      : select(entry.item.key)
-                  }
-                />
-                {entry.item.key === focus.key && (
-                  <section className="panel today-now-detail" aria-label={text.detailTitle}>
-                    {detailOf(entry.item)}
-                  </section>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="grouped">
+            <TodayAgenda
+              agenda={view.agenda}
+              now={minute}
+              opening={opening}
+              onOpen={(key, path) => void openFile(key, path)}
+              mark={(meeting) => nowWhy.get(meetingKey(meeting)) ?? null}
+              summary={(meeting) => {
+                const prep = prepByKey.get(meetingKey(meeting))
+                return prep ? prepSummary(prep) : null
+              }}
+            >
+              {(meeting) => {
+                const prep = prepByKey.get(meetingKey(meeting))
+                return prep ? (
+                  <TodayPrep
+                    meeting={meeting}
+                    prep={prep}
+                    judging={judging}
+                    onOpenFile={(key, path) => void openFile(key, path)}
+                    onOpen={open}
+                  />
+                ) : null
+              }}
+            </TodayAgenda>
+            {firstRows.length > 0 && (
+              <ul className="entries today-now-rows" aria-label={text.nowList}>
+                {firstRows.map((entry) => (
+                  <li key={entry.item.key}>
+                    <SignalRow
+                      item={entry.item}
+                      mark={view.marks[entry.item.key]}
+                      why={nowText(entry)}
+                      selected={entry.item.key === focus.key}
+                      judging={judging}
+                      onSelect={() =>
+                        entry.item.key === focus.key
+                          ? setFocus({ ...focus, key: null })
+                          : select(entry.item.key)
+                      }
+                    />
+                    {entry.item.key === focus.key && (
+                      <section className="today-now-detail" aria-label={text.detailTitle}>
+                        {detailOf(entry.item)}
+                      </section>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           {view.nowSummary.length > 0 && (
             <details className="today-now-summary" aria-label={text.nowSummary}>
               <summary className="eyebrow today-now-why">{text.nowSummary}</summary>
@@ -739,8 +709,6 @@ export function TodayView({
           )}
         </section>
       )}
-
-      <TodayWeek week={view.week} onOpen={open} onOpenRisks={() => setShowRisks(true)} />
 
       <h4 className="today-title">
         {text.toDo}
@@ -811,25 +779,22 @@ export function TodayView({
         </>
       )}
 
-      {watched.length > 0 && <h4 className="today-title">{text.watch}</h4>}
-      {watch.length > 0 && (
-        <DataTable
-          label={text.watch}
-          columns={watchColumns}
-          rows={watch}
-          rowKey={(item) => item.key}
-        />
-      )}
-      {watchOthers.length > 0 && (
-        <details className="today-aside">
-          <summary>{text.watchOthers(watchOthers.length)}</summary>
-          <DataTable
-            label={text.watchOthersList}
-            columns={watchColumns}
-            rows={watchOthers}
-            rowKey={(item) => item.key}
-          />
-        </details>
+      <TodayWeek week={week} onOpen={open} onOpenRisks={() => setShowRisks(true)} />
+
+      {watched.length > 0 && (
+        <section className="today-part" aria-label={text.watch}>
+          <h4 className="today-title">
+            {text.watch}
+            <span className="today-count">{watch.length}</span>
+          </h4>
+          {watch.length > 0 && <WatchList label={text.watch} items={watch} {...watchActions} />}
+          {watchOthers.length > 0 && (
+            <details className="today-aside">
+              <summary>{text.watchOthers(watchOthers.length)}</summary>
+              <WatchList label={text.watchOthersList} items={watchOthers} {...watchActions} />
+            </details>
+          )}
+        </section>
       )}
 
       {view.muteOffers.length === 1 &&
@@ -948,15 +913,8 @@ export function TodayView({
         onUpdate={() => void evaluate(false)}
         onAll={() => void evaluate(true)}
         onStop={() => void api.cancelEvaluateToday(project.id)}
+        onOpenSettings={onOpenSettings}
       />
-
-      {onOpenSettings && (
-        <div className="actions">
-          <button type="button" className="quiet" onClick={onOpenSettings}>
-            {text.settings}
-          </button>
-        </div>
-      )}
     </section>
   )
 }
@@ -979,6 +937,71 @@ function FilterChip(props: {
   )
 }
 
+/** The kinds that name the source a signal comes from: only these are marked in blue. */
+const SOURCE_KINDS: ReadonlySet<TodayKind> = new Set([
+  'meeting',
+  'mail_reply',
+  'mail_follow',
+  'mail_waiting',
+])
+
+function KindMark({ kind }: { kind: TodayKind }) {
+  return (
+    <span className={SOURCE_KINDS.has(kind) ? 'pill pill-source' : 'pill'}>{text.kinds[kind]}</span>
+  )
+}
+
+/** What is only watched, a row each: what it is, what is known of it, the ways out. */
+function WatchList(props: {
+  label: string
+  items: TodayItem[]
+  marks: View['marks']
+  onOpen: (item: TodayItem) => void
+  /** Takes up a conversation that is followed: the PM says it is theirs. */
+  onMine: (item: TodayItem) => void
+  onMute: (item: TodayItem) => void
+}) {
+  return (
+    <ul className="entries" aria-label={props.label}>
+      {props.items.map((item) => {
+        const words = signalText(item)
+        const mark = props.marks[item.key]
+        return (
+          <li key={item.key} className="list-row">
+            <span className="list-row-text">
+              {mark && <span className="pill pill-new">{text.marks[mark]}</span>}{' '}
+              <strong>{words.title}</strong>
+              {words.detail !== '' && <span className="hint"> · {words.detail}</span>}
+            </span>
+            {item.facts.kind === 'mail_follow' && (
+              <button
+                type="button"
+                className="quiet"
+                title={text.mineHint}
+                aria-label={`${text.mine}: ${words.title}`}
+                onClick={() => props.onMine(item)}
+              >
+                {text.mine}
+              </button>
+            )}
+            <button type="button" className="quiet" onClick={() => props.onOpen(item)}>
+              {text.open[item.target]}
+            </button>
+            <button
+              type="button"
+              className="quiet"
+              aria-label={`${text.mute}: ${words.title}`}
+              onClick={() => props.onMute(item)}
+            >
+              ×
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 /** One thing to do in the list: what it is, where it comes from, how long it has waited. */
 function SignalRow(props: {
   item: TodayItem
@@ -991,30 +1014,31 @@ function SignalRow(props: {
   onSelect: () => void
 }) {
   const { item } = props
-  const facts = item.facts
-  const age = ageText(item)
-  const judgement = facts.kind === 'mail_reply' ? facts.judgement : null
+  const judgement = item.facts.kind === 'mail_reply' ? item.facts.judgement : null
+  // Why it is here comes before what it is; without a why, what it is leads the row.
+  const why = props.why ?? (item.dueBecause ? text.dueShort[item.dueBecause] : undefined)
+  const kind = <KindMark kind={item.facts.kind} />
+  const facts = [
+    ...[ageText(item)].filter((age) => age !== ''),
+    ...(judgement ? [`Claude: ${text.judgement.importance[judgement.importance]}`] : []),
+    ...(item.facts.kind === 'mail_reply' && !judgement && props.judging ? [text.judging] : []),
+  ]
   return (
     <button
       type="button"
-      className={props.selected ? 'entry entry-selected' : 'entry'}
+      className={props.selected ? 'entry list-row entry-selected' : 'entry list-row'}
       aria-pressed={props.selected}
       onClick={props.onSelect}
     >
-      <span className="entry-meta">
+      <span className="list-row-lead">
         {props.mark && <span className="pill pill-new">{text.marks[props.mark]}</span>}
-        {props.why !== undefined && <span className="pill pill-warning">{props.why}</span>}
-        {props.why === undefined && item.dueBecause && (
-          <span className="pill pill-warning">{text.dueShort[item.dueBecause]}</span>
-        )}
-        <span className="pill">{text.kinds[facts.kind]}</span>
-        {age !== '' && <span>{age}</span>}
-        {judgement && <span>· Claude: {text.judgement.importance[judgement.importance]}</span>}
-        {facts.kind === 'mail_reply' && !judgement && props.judging && (
-          <span>· {text.judging}</span>
-        )}
+        {why === undefined ? kind : <span className="pill pill-warning">{why}</span>}
       </span>
-      <strong className="entry-title">{signalText(item).title}</strong>
+      <span className="list-row-text">
+        <strong className="entry-title">{signalText(item).title}</strong>
+        {facts.length > 0 && <span className="hint"> · {facts.join(' · ')}</span>}
+      </span>
+      {why !== undefined && kind}
     </button>
   )
 }
@@ -1130,6 +1154,33 @@ function HiddenList(props: {
   )
 }
 
+/** The people whose hours do not add up: what each wrote, and what the tracker says. */
+const HOURS_COLUMNS: DataColumn<HoursPersonFact>[] = [
+  { key: 'person', label: text.hoursPerson, cell: (person) => person.person },
+  {
+    key: 'timesheet',
+    label: text.hoursTimesheet,
+    kind: 'number',
+    cell: (person) =>
+      person.status === 'no_timesheet' ? (
+        <span className="hint">{text.hoursNoTimesheet}</span>
+      ) : (
+        hoursText(person.timesheetHours)
+      ),
+  },
+  {
+    key: 'tracker',
+    label: text.hoursTracker,
+    kind: 'number',
+    cell: (person) =>
+      person.status === 'no_worklog' ? (
+        <span className="hint">{text.hoursNoWorklog}</span>
+      ) : (
+        hoursText(person.worklogHours)
+      ),
+  },
+]
+
 type DetailProps = {
   item: TodayItem
   day: string
@@ -1161,14 +1212,28 @@ function SignalDetail(props: DetailProps) {
     <>
       <div className="panel-head">
         <span className="eyebrow">{text.computed}</span>
-        <span className="pill">{text.kinds[facts.kind]}</span>
+        <KindMark kind={facts.kind} />
       </div>
       <div className="panel-body">
         <h4 className="detail-title">{words.title}</h4>
-        <p className="today-item-detail">
-          {words.detail}
-          {asOf !== '' && <span className="hint"> · {asOf}</span>}
-        </p>
+        {facts.kind === 'hours' && facts.people.length > 0 ? (
+          <>
+            <DataTable
+              label={text.hoursPeople}
+              columns={HOURS_COLUMNS}
+              rows={facts.people}
+              rowKey={(person) => person.person}
+            />
+            {(hoursNotes(facts).length > 0 || asOf !== '') && (
+              <p className="hint">{[...hoursNotes(facts), asOf].filter(Boolean).join(' · ')}</p>
+            )}
+          </>
+        ) : (
+          <p className="today-item-detail">
+            {words.detail}
+            {asOf !== '' && <span className="hint"> · {asOf}</span>}
+          </p>
+        )}
         {item.dueBecause && (
           <p className="box box-warning">
             <strong>{text.dueShort[item.dueBecause]}.</strong> {text.because[item.dueBecause]}
@@ -1236,11 +1301,11 @@ function SignalDetail(props: DetailProps) {
               {text.askAboutMail}
             </button>
           )}
-        </div>
-        <div className="actions today-decisions">
-          <button type="button" className="quiet" onClick={() => props.onDecide('done')}>
+          <button type="button" onClick={() => props.onDecide('done')}>
             {text.done}
           </button>
+        </div>
+        <div className="actions today-decisions">
           <button
             type="button"
             className="quiet"
@@ -1325,46 +1390,58 @@ type JudgementProps = {
   onUpdate: () => void
   onAll: () => void
   onStop: () => void
+  /** Opens the settings of the page; absent where there are none to open. */
+  onOpenSettings: (() => void) | undefined
 }
 
 /** What Claude judged, apart from what the code computed: when, with which model, and how to ask again. */
 function Judgement({ view, canJudge, judging, step, hasMail, ...actions }: JudgementProps) {
   const { at, model } = view.evaluation
-  if (!hasMail && at === null && !judging) return null
+  const settings = actions.onOpenSettings && (
+    <button type="button" className="quiet" onClick={actions.onOpenSettings}>
+      {text.settings}
+    </button>
+  )
+  if (!hasMail && at === null && !judging) {
+    return settings ? <div className="actions">{settings}</div> : null
+  }
   return (
     <aside className="today-evaluation" aria-label={text.judgement.title}>
-      <p>
-        <strong>{at ? text.judgement.when(dateTimeText(at), model) : text.judgement.never}</strong>
-      </p>
-      <details>
-        <summary className="hint">{text.judgement.details}</summary>
-        <p className="hint">{text.judgement.explain}</p>
-        <p className="hint">{text.judgement.filterToo}</p>
-        <p className="hint">{text.judgement.risksToo}</p>
-      </details>
-      {judging ? (
-        <>
-          <Waiting>{step ? progressText(step) : text.judgement.running}</Waiting>
-          <div className="actions">
+      <div className="list-row">
+        <strong className="list-row-text">
+          {at ? text.judgement.when(dateTimeText(at), model) : text.judgement.never}
+        </strong>
+        {judging ? (
+          <>
+            <Waiting>{step ? progressText(step) : text.judgement.running}</Waiting>
             <button type="button" onClick={actions.onStop}>
               {text.judgement.stop}
             </button>
-          </div>
-        </>
-      ) : (
-        canJudge && (
-          <div className="actions">
-            <button type="button" onClick={actions.onUpdate}>
-              {text.judgement.update}
-            </button>
-            {hasMail && at !== null && (
-              <button type="button" className="quiet" onClick={actions.onAll}>
-                {text.judgement.all}
+          </>
+        ) : (
+          canJudge && (
+            <>
+              <button type="button" onClick={actions.onUpdate}>
+                {text.judgement.update}
               </button>
-            )}
-          </div>
-        )
-      )}
+              {hasMail && at !== null && (
+                <button type="button" className="quiet" onClick={actions.onAll}>
+                  {text.judgement.all}
+                </button>
+              )}
+            </>
+          )
+        )}
+      </div>
+      <div className="list-row today-evaluation-more">
+        <details>
+          <summary className="hint">{text.judgement.details}</summary>
+          <p className="hint">{text.judgement.explain}</p>
+          <p className="hint">{text.judgement.filterToo}</p>
+          <p className="hint">{text.judgement.risksToo}</p>
+        </details>
+        {settings}
+      </div>
     </aside>
   )
 }

@@ -2419,17 +2419,15 @@ details.advanced[open] > summary {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
-.today-now {
+/* A part of the page: its heading, then what it holds. */
+.today-part {
   display: flex;
   flex-direction: column;
-  /* A panel clips what overflows: in the column of the page it would shrink to nothing. */
   flex-shrink: 0;
-  gap: 6px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--accent);
+  gap: 8px;
 }
 
-.today-now .today-title {
+.today-part > .today-title {
   margin: 0;
 }
 
@@ -2439,7 +2437,15 @@ details.advanced[open] > summary {
   flex-shrink: 0;
   gap: 6px;
   padding: 10px 12px;
-  border-left: 3px solid var(--text);
+}
+
+/* Nothing in it: the part is its one row, flush with the frame. */
+.today-points-empty {
+  padding: 0;
+}
+
+.today-points-empty > .today-point-form {
+  padding: 0 12px 10px;
 }
 
 .today-points .today-title {
@@ -2490,7 +2496,8 @@ details.advanced[open] > summary {
 }
 
 .today-closing {
-  justify-content: space-between;
+  padding: 0;
+  border-top: 0;
 }
 
 .pill.pill-late {
@@ -2498,42 +2505,22 @@ details.advanced[open] > summary {
   color: var(--danger);
 }
 
-.today-week {
+/* A critical thing on one row: when, what, of which kind, the way out. */
+.week-entry-when {
+  flex: none;
   display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: 6px;
-  padding: 10px 12px;
+  width: 84px;
 }
 
-.today-week .today-title {
-  margin: 0;
-}
-
-.today-week-sides {
+.week-entry-kind,
+.week-entry-action {
+  flex: none;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  width: 150px;
 }
 
-.today-week-side {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-/* A critical thing reads as the other lists do: when and what above, the title, the way out. */
-.week-entry {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 14px;
-}
-
-.week-entry-what {
-  flex: 1;
-  min-width: 0;
+.week-entry-action {
+  justify-content: flex-end;
 }
 
 /* What is counted and a click away: the meetings to assign, what is of other people. */
@@ -2553,54 +2540,13 @@ details.advanced[open] > summary {
   justify-content: space-between;
 }
 
-.today-agenda {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: 6px;
-  padding: 10px 12px;
-}
-
-.today-agenda .today-title {
-  margin: 0;
-}
-
-.today-meetings {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.today-meeting + .today-meeting {
-  border-top: 1px solid var(--line);
-}
-
-.today-meeting-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 5px 0;
-}
-
 .today-meeting-hours {
-  flex: 0 0 96px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.today-meeting-what {
-  flex: 1;
-  min-width: 0;
-}
-
-.today-meeting-who {
-  display: block;
-}
-
 .today-meeting-over .today-meeting-hours,
-.today-meeting-over .today-meeting-what strong {
+.today-meeting-over strong {
   color: var(--muted);
   font-weight: 500;
 }
@@ -2609,7 +2555,7 @@ details.advanced[open] > summary {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0 0 8px 106px;
+  margin: 0 12px 8px;
   padding: 8px 10px;
   border-left: 2px solid var(--accent);
   background: var(--hover);
@@ -2625,10 +2571,6 @@ details.advanced[open] > summary {
   padding-left: 0;
 }
 
-.today-agenda-next {
-  margin: 0;
-}
-
 .pill-new {
   background: var(--accent);
   color: var(--panel);
@@ -2638,8 +2580,6 @@ details.advanced[open] > summary {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--line);
 }
 
 .today-now-summary p {
@@ -2652,7 +2592,7 @@ details.advanced[open] > summary {
 
 /* The thing chosen among those that come first opens right under its row. */
 .today-now-detail {
-  margin: 4px 0 8px;
+  border-top: 1px solid var(--line);
 }
 
 .today-hidden {
@@ -2678,12 +2618,24 @@ details.advanced[open] > summary {
 }
 
 .today-evaluation {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px dashed var(--line);
+  flex-shrink: 0;
+  border: 1px dashed var(--field-line);
   border-radius: var(--radius-large);
+}
+
+.today-evaluation > .list-row:first-child {
+  border-top: 0;
+}
+
+/* The details open downwards: the command beside them keeps to the top. */
+.today-evaluation-more {
+  align-items: flex-start;
+}
+
+.today-evaluation-more > details {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
 }
 
 .today-watch li {
@@ -2992,6 +2944,96 @@ button[data-loading] .button-label {
   font-weight: 400;
 }
 
+/* A row of a list: everything on one line, the words that do not fit cut with an ellipsis. */
+.list-row,
+.entry.list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.entries > li:first-child > .list-row,
+.entries > .list-row:first-child,
+.entries .entry.list-row {
+  border-top: 0;
+}
+
+.list-row-lead {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  min-width: 96px;
+}
+
+.list-row-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-row .hint,
+.list-row-text.hint {
+  font-size: 13px;
+}
+
+.list-row .entry-title {
+  display: inline;
+}
+
+.list-row .today-title {
+  margin: 0;
+}
+
+.list-row button {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Lists that go together stand in one frame, each under the row that names it. */
+.grouped {
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-large);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.grouped > .entries {
+  border: 0;
+  border-radius: 0;
+}
+
+.grouped > .entries + .entries {
+  border-top: 1px solid var(--line);
+}
+
+.grouped > p {
+  padding: 6px 12px;
+}
+
+.list-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.list-group:first-child {
+  border-top: 0;
+}
+
+.list-group:last-child {
+  border-bottom: 0;
+}
+
 .entry:focus-visible {
   outline-offset: -2px;
 }
@@ -2999,7 +3041,7 @@ button[data-loading] .button-label {
 .entry-selected,
 .entry-selected:hover:not(:disabled) {
   background: var(--accent-soft);
-  box-shadow: inset 2px 0 var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .entry-meta {
@@ -3200,6 +3242,21 @@ fieldset.metrics {
   white-space: nowrap;
 }
 
+/* What comes now is led by why it does: a longer mark than a kind. */
+.today-part .today-meeting .list-row-lead,
+.today-now-rows .list-row-lead {
+  min-width: 168px;
+}
+
+.today .split {
+  grid-template-columns: minmax(0, 1fr) 440px;
+}
+
+/* The commands of the detail that put a thing away stand on one line, quiet. */
+.today .today-decisions {
+  margin-left: -6px;
+}
+
 /* Several warnings stand close together, flush with the page: the list stays near the top. */
 .today > .notice-bar {
   margin: 0;
@@ -3381,6 +3438,7 @@ span.marker-warning {
 
 @media (max-width: 1120px) {
   .split,
+  .today .split,
   .answer.split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3619,6 +3677,11 @@ span.marker-warning {
 
   .figures-four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* A critical thing keeps when, what and the way out: its kind gives room. */
+  .week-entry-kind {
+    display: none;
   }
 }
 

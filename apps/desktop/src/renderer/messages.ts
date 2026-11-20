@@ -95,6 +95,12 @@ export const messages = {
     noneInFilter: 'Nessuna voce con questo filtro.',
     dueShort: { month_end: 'Fine mese', sprint_end: 'Fine sprint', deadline: 'Scadenza' },
     computed: 'Calcolato da Octo',
+    hoursPeople: 'Persone le cui ore non tornano',
+    hoursPerson: 'Persona',
+    hoursTimesheet: 'Timesheet',
+    hoursTracker: 'Tracker',
+    hoursNoTimesheet: 'nessuno',
+    hoursNoWorklog: 'nessuna',
     evidence: 'Fonte',
     judging: 'Valutazione in corso…',
     refreshing: 'Aggiorno le fonti: ciò che vedi è dell’ultima lettura.',
@@ -140,7 +146,7 @@ export const messages = {
       toConfirmCount: (count: number) => `${count} da confermare`,
       fold: 'Riduci',
       unfold: 'Espandi',
-      none: 'Nessun open point in coda.',
+      none: 'Nessun open point in coda',
       others: (count: number) =>
         count === 1 ? '1 punto di un’altra persona' : `${count} punti di altre persone`,
       othersList: 'Open point di altre persone',
@@ -252,10 +258,7 @@ export const messages = {
             : `${project} · fra ${minutes} minuti · ${count} cose da portare`,
     },
     agenda: {
-      title: 'Riunioni di oggi',
       list: 'Riunioni di oggi, in ordine d’orario',
-      count: (count: number) =>
-        count === 0 ? 'nessuna' : count === 1 ? '1 riunione' : `${count} riunioni`,
       repeats: 'ricorrente',
       over: 'finita',
       openInvite: 'Apri l’invito',
@@ -309,9 +312,6 @@ export const messages = {
         ? '1 conversazione che non tocca a te'
         : `${count} conversazioni che non toccano a te`,
     watchOthersList: 'Conversazioni che non toccano a te',
-    watchWhat: 'Che cosa',
-    watchDetail: 'Dettaglio',
-    watchActions: 'Azioni',
     mutedNone: 'Nessuno: mostro ogni tipo di segnalazione.',
     nothing: 'Oggi Octo non ha nulla da segnalarti.',
     nothingToDo: 'Niente da fare oggi.',

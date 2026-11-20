@@ -30,6 +30,10 @@ export function prepSummary(prep: MeetingPrep): string {
 export function TodayPrep({ meeting, prep, judging, onOpenFile, onOpen }: Props) {
   const [copied, setCopied] = useState(false)
   const empty = prepCount(prep) === 0 && prep.last === null && prep.numbers.length === 0
+  // A mail listed among those of who takes part is opened from there: not again as a source.
+  const mailPaths = new Set(
+    prep.mails.flatMap((item) => ('path' in item.facts ? [item.facts.path] : [])),
+  )
 
   async function copy() {
     await navigator.clipboard?.writeText(prepText(meeting, prep))
@@ -127,16 +131,17 @@ export function TodayPrep({ meeting, prep, judging, onOpenFile, onOpen }: Props)
           <ul aria-label={`${text.bring}: ${meeting.subject}`}>
             {prep.bring.map((note) => (
               <li key={`${note.path}\n${note.quote}`}>
-                {note.text}{' '}
-                <button
-                  type="button"
-                  className="quiet"
-                  title={`«${note.quote}»`}
-                  aria-label={`${messages.today.nowSource}: ${note.text}`}
-                  onClick={() => onOpenFile(prep.key, note.path)}
-                >
-                  {messages.today.nowSource}
-                </button>
+                <span title={`«${note.quote}»`}>{note.text}</span>{' '}
+                {!mailPaths.has(note.path) && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    aria-label={`${messages.today.nowSource}: ${note.text}`}
+                    onClick={() => onOpenFile(prep.key, note.path)}
+                  >
+                    {messages.today.nowSource}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
