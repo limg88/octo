@@ -328,16 +328,17 @@ export function ProjectSheetSummary({ sheet, onUseBudget, onOpenForecast }: Prop
         </p>
       )}
       <Band figures={bandFigures(sheet)} />
-      {sheet.supplierCosts > 0 && sheet.lines.some((line) => line.source === 'declared') && (
-        <div className="notice-bar notice-bar-warning">
-          <p>{text.doubleCount}</p>
-          {onOpenForecast && (
-            <button type="button" onClick={onOpenForecast}>
-              {messages.openSection(messages.sheet.parts.forecast)}
-            </button>
-          )}
-        </div>
-      )}
+      {sheet.supplierCosts > 0 &&
+        sheet.lines.some((line) => line.source === 'declared' && (line.cost ?? 0) > 0) && (
+          <div className="notice-bar notice-bar-warning">
+            <p>{text.doubleCount}</p>
+            {onOpenForecast && (
+              <button type="button" onClick={onOpenForecast}>
+                {messages.openSection(messages.sheet.parts.forecast)}
+              </button>
+            )}
+          </div>
+        )}
       {proposal && (
         <p className="hint">
           {text.proposed(

@@ -444,6 +444,20 @@ describe('the sheet of a project code', () => {
     expect(band()[4]).toBe(`${words.variance}: 0,00${words.varianceNone}`)
     expect(screen.queryByText(words.doubleCount)).toBeNull()
     cleanup()
+    // An external kept only for the rate it is sold at, at no cost, counts nothing twice.
+    const atNoCost: Lifetime = {
+      ...withSuppliers,
+      lines: life.lines.map((line) => (line.source === 'declared' ? { ...line, cost: 0 } : line)),
+    }
+    render(
+      <Sheet
+        api={fakeApi({ projectSheets: vi.fn(async () => ok([atNoCost])) })}
+        project={project}
+      />,
+    )
+    await screen.findAllByRole('table')
+    expect(screen.queryByText(words.doubleCount)).toBeNull()
+    cleanup()
     const empty: Lifetime = {
       ...life,
       economics: {
