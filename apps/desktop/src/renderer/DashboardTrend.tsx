@@ -46,14 +46,16 @@ export function DashboardTrend({
       </section>
       {flow && (
         <section aria-label={text.flowTitle}>
-          <h3>{text.flowTitle}</h3>
-          <p className="hint">{text.flowIntro}</p>
+          <div className="gaps-title">
+            <h3>{text.flowTitle}</h3>
+            <span className="hint">{text.flowIntro}</span>
+          </div>
           <dl className="figures">
             {(['toVerify', 'toValidated', 'toClosed'] as const).map((step) => (
               <Figure
                 key={step}
                 label={text[step]}
-                value={text.days(flow[step].median)}
+                value={flow[step].median === null ? null : text.days(flow[step].median)}
                 note={[
                   text.sample(flow[step].sample),
                   text.flowBefore(flowBefore?.[step].median ?? null),
@@ -66,19 +68,21 @@ export function DashboardTrend({
         </section>
       )}
       <section aria-label={text.commentTitle}>
-        <h3>{text.commentTitle}</h3>
-        <p className="hint">{text.commentIntro}</p>
-        <div className="actions">
-          <BusyButton
-            busy={commenting}
-            busyLabel={text.commenting}
-            disabled={!canAsk}
-            onClick={onComment}
-          >
-            {comment ? text.commentAgain : text.comment}
-          </BusyButton>
-          {!canAsk && <span className="hint">{text.needsClaude}</span>}
+        <div className="title-row">
+          <h3>{text.commentTitle}</h3>
+          <div className="actions">
+            {!canAsk && <span className="hint">{text.needsClaude}</span>}
+            <BusyButton
+              busy={commenting}
+              busyLabel={text.commenting}
+              disabled={!canAsk}
+              onClick={onComment}
+            >
+              {comment ? text.commentAgain : text.comment}
+            </BusyButton>
+          </div>
         </div>
+        <p className="hint">{text.commentIntro}</p>
         {commentError && <Failure code={commentError} />}
         {comment && (
           <div className={old ? 'box box-warning' : 'box box-source'}>

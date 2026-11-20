@@ -23,14 +23,15 @@ export function Figure({
   note,
 }: {
   label: string
-  value: string | number
+  /** Null when nothing tells it: said in words, never as a dash to be guessed. */
+  value: string | number | null
   note?: string
 }) {
   return (
     <div className="figure">
       <dt>{label}</dt>
       <dd>
-        {value}
+        {value ?? <span className="figure-none">{text.noFigure}</span>}
         {note && <span className="figure-note">{note}</span>}
       </dd>
     </div>

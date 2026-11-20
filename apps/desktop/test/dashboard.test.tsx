@@ -319,7 +319,7 @@ describe('dashboard', () => {
     expect(within(open).getAllByText('Totale sbagliato')).toHaveLength(2)
     expect(within(open).getAllByText(new RegExp(text.stuckBadge)).length).toBeGreaterThan(0)
     expect(within(open).getByText(/In attesa del dato/)).toBeTruthy()
-    expect(screen.getByText(text.total(10))).toBeTruthy()
+    expect(screen.getByText(new RegExp(text.total(10)))).toBeTruthy()
     expect(screen.getByText(new RegExp(text.age.fresh))).toBeTruthy()
     expect(api.dashboardView).toHaveBeenCalledWith('p-1', wholeDays(presetRange('w8', NOW)), null)
     openTab(text.tabs.trend)
@@ -328,7 +328,8 @@ describe('dashboard', () => {
     expect(text.days(14.7)).toBe('14,7 gg')
     expect(text.flowBefore(9.5)).toBe('periodo prima: 9,5 gg')
     expect(text.days(null)).toBe('—')
-    expect(screen.getAllByText(text.days(null)).length).toBeGreaterThan(0)
+    // A step nothing tells of says so in words, not with a dash.
+    expect(screen.getAllByText(text.noFigure).length).toBeGreaterThan(0)
     expect(screen.getByRole('img', { name: text.trendTitle })).toBeTruthy()
     // The stretch before, beside the median of the period.
     expect(screen.getByText(new RegExp(text.flowBefore(9)))).toBeTruthy()
@@ -531,6 +532,7 @@ describe('dashboard', () => {
     const api = fakeApi()
     render(<DashboardView api={api} project={project} now={now} />)
     await screen.findByRole('region', { name: text.qualityTitle })
+    fireEvent.click(screen.getByRole('button', { name: text.settings }))
     fireEvent.click(screen.getByLabelText('P2'))
     fireEvent.click(screen.getByLabelText('06 - Ready for Test'))
     fireEvent.change(screen.getByLabelText(/04 - In Progress/), { target: { value: 'closed' } })
@@ -642,8 +644,8 @@ describe('the bugs as counts that open their lists', () => {
     const later: View = { ...view, bugs: { ...view.bugs, total: 77 } }
     await act(async () => answers[1]?.(ok(later)))
     await act(async () => answers[0]?.(ok(view)))
-    expect(screen.getByText(text.total(77))).toBeTruthy()
-    expect(screen.queryByText(text.total(10))).toBeNull()
+    expect(screen.getByText(new RegExp(text.total(77)))).toBeTruthy()
+    expect(screen.queryByText(new RegExp(text.total(10)))).toBeNull()
   })
 })
 
@@ -1194,6 +1196,7 @@ describe('a tracker kept as a register of activities', () => {
     expect(await screen.findByText(words.noHours)).toBeTruthy()
     // Without an address on the tracker the id is a text, not a button.
     expect(screen.queryByRole('button', { name: 'AUR-1' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: text.settings }))
     expect(screen.getByText(text.typesHint('Task (3), Story (2)'))).toBeTruthy()
     // The types read are ticked, not typed: a Task can be counted as a story.
     const stories = screen.getByRole('group', { name: text.storyTypes })

@@ -1355,6 +1355,8 @@ export const messages = {
     closed: 'Chiusi',
     stuck: (days: number) => `Fermi da oltre ${days} giorni`,
     total: (count: number) => `su ${count} bug nel perimetro`,
+    timeUnknown: 'tempo non noto',
+    noFigure: 'nessun dato',
     trendTitle: 'Andamento',
     trendApproximate:
       'Senza cronologia: entrati alla data di creazione, chiusi alla data dell’ultimo cambio di stato.',

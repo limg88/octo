@@ -114,19 +114,17 @@ export function DashboardBugs({
               aria-pressed={focus.filter === filter}
               onClick={() => onFocus({ ...focus, filter })}
             >
-              <span className="metric-value">{count(filter)}</span>
               <span className="metric-label">
                 {part && <span className="metric-part">{text.ofWhich} </span>}
                 {labels[filter]}
               </span>
-              {filter === 'open' && (
-                <span className="metric-part">{text.total(view.bugs.total)}</span>
-              )}
-              {before && (
-                <span className="metric-part metric-delta">
-                  {text.sinceStart(count(filter) - before[BEFORE[filter]])}
-                </span>
-              )}
+              <span className="metric-value">{count(filter)}</span>
+              <span className="metric-part">
+                {[
+                  ...(filter === 'open' ? [text.total(view.bugs.total)] : []),
+                  ...(before ? [text.sinceStart(count(filter) - before[BEFORE[filter]])] : []),
+                ].join(' · ')}
+              </span>
             </button>
           )
         })}
@@ -135,13 +133,6 @@ export function DashboardBugs({
         {text.relation(count('open'), count('stuck'), count('validated'), stuckDays)}
         {!before && ` ${text.noHistoryDelta}`}
       </p>
-      <Waiting
-        view={view}
-        answerWorkdays={answerWorkdays}
-        canAsk={canAsk}
-        onOpenItem={onOpenItem}
-        onReminder={onReminder}
-      />
       {facets.length > 0 && (
         <fieldset className="breakdowns" aria-label={text.breakdownsLabel}>
           {facets.map((facet) => (
@@ -171,7 +162,16 @@ export function DashboardBugs({
           ))}
         </fieldset>
       )}
-      <div className="bug-filters">
+      {/* What waits for an answer, and how the list below is searched and ordered, on one row. */}
+      <div className="command-row bug-filters">
+        <Waiting
+          view={view}
+          answerWorkdays={answerWorkdays}
+          canAsk={canAsk}
+          onOpenItem={onOpenItem}
+          onReminder={onReminder}
+        />
+        <span className="command-row-gap" />
         <label className="bug-filter">
           {text.search}
           <input
@@ -239,21 +239,32 @@ export function DashboardBugs({
                 <li key={row.id}>
                   <button
                     type="button"
-                    className={row.id === selectedId ? 'entry entry-selected' : 'entry'}
+                    className={
+                      row.id === selectedId ? 'entry list-row entry-selected' : 'entry list-row'
+                    }
                     aria-pressed={row.id === selectedId}
                     onClick={() => onFocus({ ...focus, bugId: row.id })}
                   >
-                    <span className="entry-meta">
-                      <span className="mono">#{row.id}</span>
-                      <span>{row.assignee ?? text.unassigned}</span>
-                      <span>{row.state}</span>
-                      {row.severity && <span>{row.severity}</span>}
-                      <span className={row.stuck ? 'pill pill-warning' : 'pill'}>
-                        {text.days(row.daysInState)}
-                        {row.stuck && ` · ${text.stuckBadge}`}
-                      </span>
+                    <span className="bug-id">#{row.id}</span>
+                    <span className="list-row-text">
+                      <strong className="entry-title">{row.title}</strong>
                     </span>
-                    <strong className="entry-title">{row.title}</strong>
+                    <span className="hint">
+                      {[
+                        row.assignee ?? text.unassigned,
+                        ...(row.severity ? [row.severity] : []),
+                      ].join(' · ')}
+                    </span>
+                    <span className="pill">{row.state}</span>
+                    {row.stuck ? (
+                      <span className="pill pill-warning">
+                        {text.days(row.daysInState)} · {text.stuckBadge}
+                      </span>
+                    ) : (
+                      <span className="hint">
+                        {row.daysInState === null ? text.timeUnknown : text.days(row.daysInState)}
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}

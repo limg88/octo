@@ -105,6 +105,7 @@ export function DashboardView({
   const [error, setError] = useState<ErrorCode | null>(null)
   const savedNote = useSavedNote()
   const [loading, setLoading] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [reading, setReading] = useState(false)
   const [run, setRun] = useState<TrackerSnapshotRun | null>(null)
   /** The tracker a reading would be asked of: Jira for a project without Azure DevOps. */
@@ -376,13 +377,30 @@ export function DashboardView({
       <div className="dashboard">
         {error && <Failure code={error} />}
         {savedNote.note}
-        <section className="dashboard-range" aria-label={text.rangeTitle}>
-          <fieldset className="chips" aria-label={text.rangeTitle}>
+        {view && (
+          <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
+            {shownTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={shownTab === tab}
+                className={shownTab === tab ? 'tab tab-selected' : 'tab'}
+                onClick={() => setFocus({ ...focus, tab })}
+              >
+                {text.tabs[tab]}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* The period, how old the data are, and the way to newer ones, on one row. */}
+        <section className="command-row" aria-label={text.rangeTitle}>
+          <fieldset className="segmented" aria-label={text.rangeTitle}>
             {RANGE_PRESETS.map((candidate) => (
               <button
                 key={candidate}
                 type="button"
-                className={candidate === preset ? 'chip chip-selected' : 'chip'}
+                className={candidate === preset ? 'segment segment-selected' : 'segment'}
                 aria-pressed={candidate === preset}
                 onClick={() => choosePreset(candidate)}
               >
@@ -390,64 +408,71 @@ export function DashboardView({
               </button>
             ))}
           </fieldset>
-          {preset === 'custom' && (
-            <div className="range-fields">
-              <label>
-                {text.from}
-                <input
-                  type="date"
-                  value={range.from}
-                  onChange={(event) => changeRange({ from: event.target.value })}
-                />
-              </label>
-              <label>
-                {text.to}
-                <input
-                  type="date"
-                  value={range.to}
-                  onChange={(event) => changeRange({ to: event.target.value })}
-                />
-              </label>
-              <label>
-                {text.granularity}
-                <select
-                  value={range.granularity}
-                  onChange={(event) =>
-                    changeRange({ granularity: event.target.value === 'month' ? 'month' : 'week' })
-                  }
-                >
-                  <option value="week">{text.week}</option>
-                  <option value="month">{text.month}</option>
-                </select>
-              </label>
-            </div>
-          )}
-        </section>
-        {loading && <Waiting>{text.loading}</Waiting>}
-        {/* How old the data are, and the way to newer ones, side by side. */}
-        <div className="actions">
+          <span className="command-row-gap" />
           {view && (
-            <p className={view.age === 'fresh' ? 'badge badge-ok' : 'badge badge-warning'}>
+            <span className={view.age === 'fresh' ? 'status status-ok' : 'status status-warning'}>
               {view.exportedAt
                 ? text.exportedAt(dateTimeText(view.exportedAt))
                 : text.exportedUnknown}
               {' · '}
               {text.age[view.age]}
-            </p>
+            </span>
           )}
           {readButton(false)}
-        </div>
+          <button
+            type="button"
+            className="quiet"
+            aria-expanded={showSettings}
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            {text.settings}
+          </button>
+        </section>
+        {preset === 'custom' && (
+          <div className="range-fields">
+            <label>
+              {text.from}
+              <input
+                type="date"
+                value={range.from}
+                onChange={(event) => changeRange({ from: event.target.value })}
+              />
+            </label>
+            <label>
+              {text.to}
+              <input
+                type="date"
+                value={range.to}
+                onChange={(event) => changeRange({ to: event.target.value })}
+              />
+            </label>
+            <label>
+              {text.granularity}
+              <select
+                value={range.granularity}
+                onChange={(event) =>
+                  changeRange({ granularity: event.target.value === 'month' ? 'month' : 'week' })
+                }
+              >
+                <option value="week">{text.week}</option>
+                <option value="month">{text.month}</option>
+              </select>
+            </label>
+          </div>
+        )}
+        {loading && <Waiting>{text.loading}</Waiting>}
         {reader}
-        <details className="dashboard-settings">
-          <summary>{text.settings}</summary>
-          <DashboardSettingsForm
-            settings={settings}
-            candidates={candidates}
-            view={view}
-            onSave={async (next) => void (await save(next))}
-            onChooseFile={chooseFile}
-          />
-        </details>
+        {showSettings && (
+          <section className="dashboard-settings" aria-label={text.settings}>
+            <DashboardSettingsForm
+              settings={settings}
+              candidates={candidates}
+              view={view}
+              onSave={async (next) => void (await save(next))}
+              onChooseFile={chooseFile}
+            />
+          </section>
+        )}
         {refreshing && view && view.age !== 'fresh' && (
           <Waiting>{text.refreshing(trackerName)}</Waiting>
         )}
@@ -461,20 +486,6 @@ export function DashboardView({
         )}
         {view && (
           <>
-            <div className="dashboard-tabs" role="tablist" aria-label={text.tabsLabel}>
-              {shownTabs.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={shownTab === tab}
-                  className={shownTab === tab ? 'tab tab-selected' : 'tab'}
-                  onClick={() => setFocus({ ...focus, tab })}
-                >
-                  {text.tabs[tab]}
-                </button>
-              ))}
-            </div>
             {hiddenTabs.length > 0 && view.parts.activities && (
               <p className="hint">
                 {text.hiddenTabs(hiddenTabs.map((tab) => text.tabs[tab]).join(', '))}

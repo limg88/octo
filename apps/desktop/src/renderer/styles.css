@@ -1617,26 +1617,33 @@ table.data th.number > button.sort > .sort-mark {
   max-height: 240px;
 }
 
+/* The chart tells its three series by shape, in the greys of the page: no colour to learn. */
 .trend-axis {
+  stroke: var(--field-line);
+}
+
+.trend-grid {
   stroke: var(--line);
+  stroke-dasharray: 3 4;
 }
 
 .trend-label {
   fill: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .trend-entered {
-  fill: var(--warning);
+  fill: var(--muted);
 }
 
 .trend-closed {
-  fill: var(--ok);
+  fill: var(--surface);
+  stroke: var(--input-line);
 }
 
 .trend-open {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--text);
   stroke-width: 2;
 }
 
@@ -1656,16 +1663,20 @@ table.data th.number > button.sort > .sort-mark {
   width: 10px;
   height: 10px;
   margin-right: 6px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.trend-legend .legend-entered::before {
-  background: var(--warning);
+  vertical-align: -1px;
+  background: var(--muted);
 }
 
 .trend-legend .legend-closed::before {
-  background: var(--ok);
+  border: 1px solid var(--input-line);
+  background: var(--surface);
+}
+
+.trend-legend .legend-open::before {
+  width: 14px;
+  height: 2px;
+  vertical-align: 4px;
+  background: var(--text);
 }
 
 /* Each state of the tracker with its phase beside it, not at the far edge of the form. */
@@ -2098,10 +2109,18 @@ details.advanced[open] > summary {
   width: 210px;
 }
 
-/* A reading is a part of the page and a row of its list: the row wins. */
-.dashboard section.list-row {
+/* A part of the page that is a row of a list or of commands: the row wins. */
+.dashboard section.list-row,
+.dashboard section.command-row {
   flex-direction: row;
+}
+
+.dashboard section.list-row {
   gap: 10px;
+}
+
+.dashboard section.command-row {
+  gap: 8px 16px;
 }
 
 /* The sections of a project, in the sidebar: grouped by how often they are used. */
@@ -3506,6 +3525,7 @@ span.marker-warning {
 @media (max-width: 1120px) {
   .split,
   .today .split,
+  .dashboard .split,
   .answer.split,
   .deliverable-body .answer.split,
   .sheet-columns {
@@ -3566,9 +3586,72 @@ span.marker-warning {
   margin-bottom: 8px;
 }
 
-.metric-delta {
+/* The period as one control: its choices side by side, the one in use tinted. */
+.segmented {
+  display: inline-flex;
+  flex-direction: row;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.segment {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--field-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.segment:first-child {
+  border-left: 0;
+}
+
+.segment-selected,
+.segment-selected:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.command-row > .status {
+  margin-left: 0;
+}
+
+/* What waits for an answer opens under the row of the commands it is on. */
+.command-row > .dashboard-fold[open] {
+  order: 1;
+  flex-basis: 100%;
+}
+
+.bug-id {
+  flex: none;
   font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.figure-none {
+  font-size: 15px;
+  line-height: 29px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* The detail of a bug is as wide as that of the page of the day; its commands keep one line. */
+.dashboard .split {
+  grid-template-columns: minmax(0, 1fr) 440px;
+}
+
+.dashboard .split-detail .actions {
+  flex-wrap: wrap;
+}
+
+.dashboard .split-detail .actions button {
+  white-space: nowrap;
 }
 
 /* Where the bugs gather: three short lists side by side, each row a filter of the list below. */
@@ -3634,23 +3717,16 @@ span.marker-warning {
   color: var(--warning);
 }
 
-.bug-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
-}
-
 .bug-filter {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12.5px;
-  color: var(--muted);
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .bug-filters input[type="search"] {
-  min-width: 240px;
+  width: 200px;
 }
 
 .active-filters {

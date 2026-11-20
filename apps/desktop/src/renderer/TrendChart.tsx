@@ -25,6 +25,7 @@ export function TrendChart({ trend }: { trend: TrendBucket[] }) {
     <div className="trend">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={text.trendTitle}>
         <line className="trend-axis" x1={PAD.left} x2={WIDTH - PAD.right} y1={y(0)} y2={y(0)} />
+        <line className="trend-grid" x1={PAD.left} x2={WIDTH - PAD.right} y1={y(top)} y2={y(top)} />
         <text className="trend-label" x={PAD.left - 6} y={y(top) + 4} textAnchor="end">
           {top}
         </text>
