@@ -571,8 +571,10 @@ try {
   await openSheetPart('Sintesi')
   await page.getByLabel('Le cifre della commessa').waitFor({ timeout: TIMEOUT_MS })
   // How far the code is comes with what says so: here no system was read, so it is not told.
-  await page.getByText('Avanzamento', { exact: true }).first().waitFor()
-  await page.getByRole('table', { name: 'Ordine, ricavi e da regolare' }).waitFor()
+  await page
+    .getByRole('table', { name: 'Ordine, ricavi e da regolare' })
+    .getByRole('row', { name: /^Avanzamento/ })
+    .waitFor()
   await page.getByRole('table', { name: 'Ore e costi per persona' }).waitFor()
   await page.getByText('Documento interno: costi e margini non vanno al cliente.').waitFor()
   await page.screenshot({ path: `${work}/commessa.png`, fullPage: true })
@@ -709,7 +711,7 @@ try {
 
   // Demo 16: the dashboard from Azure DevOps as it is now, read with the token of the source.
   await page.getByRole('tab', { name: 'Cruscotto' }).click()
-  await page.locator('.dashboard-settings summary').click()
+  await page.getByRole('button', { name: 'Impostazioni del cruscotto' }).click()
   await page.getByRole('button', { name: 'Leggi da Azure DevOps' }).click()
   await page.getByText(/Lette \d voci, \d con la cronologia/).waitFor({ timeout: TIMEOUT_MS })
   await page.getByText('su 1 bug nel perimetro').waitFor({ timeout: TIMEOUT_MS })
