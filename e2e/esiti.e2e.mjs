@@ -121,7 +121,8 @@ try {
   await section('Impostazioni').click()
   await page.getByRole('tab', { name: 'Persone e calendario' }).click()
   const team = page.getByRole('region', { name: 'Persone e calendario' })
-  await team.getByRole('button', { name: 'Aggiungi una persona' }).click()
+  // A person is changed beside the list, once chosen in it.
+  await team.getByRole('button', { name: 'Mostra Carla Bianchi' }).click()
   await team.getByLabel('Nome, persona 4').fill('Carla Bianchi')
   await team.getByLabel('Parte, persona 4').selectOption('client')
   await team.getByLabel('Tu / lei, persona 4').selectOption('tu')

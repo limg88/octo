@@ -294,13 +294,15 @@ export function TeamSection({ api, project }: Props) {
             </button>
           </div>
           <div className="team-people">
-            <DataTable
-              label={text.people}
-              columns={listColumns}
-              rows={listed}
-              rowKey={({ index }) => String(index)}
-              rowClassName={({ index }) => (index === personAt ? 'row-selected' : undefined)}
-            />
+            <div className="table-wide team-list">
+              <DataTable
+                label={text.people}
+                columns={listColumns}
+                rows={listed}
+                rowKey={({ index }) => String(index)}
+                rowClassName={({ index }) => (index === personAt ? 'row-selected' : undefined)}
+              />
+            </div>
             {person && (
               <section className="panel team-person" aria-label={text.personN(personAt + 1)}>
                 <div className="panel-head">

@@ -997,6 +997,12 @@ main > .warning,
   gap: 14px;
 }
 
+/* A frame clips what overflows: in a column that scrolls it would shrink to nothing. */
+.deliverable-body > *,
+.sources-page > * {
+  flex-shrink: 0;
+}
+
 .deliverable-body > * {
   max-width: 1120px;
 }
@@ -2090,6 +2096,11 @@ details.advanced[open] > summary {
   grid-template-columns: minmax(0, 1fr) 400px;
   align-items: start;
   gap: 16px;
+}
+
+/* In a small window the list scrolls inside its frame: a role is never squeezed to a letter. */
+.team-list table.data {
+  min-width: 720px;
 }
 
 .panel-body.team-fields {
