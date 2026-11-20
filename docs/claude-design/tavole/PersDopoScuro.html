@@ -69,6 +69,55 @@ body{background:#e4e4e8}
 .octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
 .octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+.octo.t,.octo.m{display:flex;flex-direction:column}
+.octo.t{width:768px;min-height:1024px}
+.octo.m{width:390px;min-height:844px;font-size:15px}
+.octo .solo-m{display:none}
+.octo.m .solo-m{display:flex}
+.octo.m .no-m{display:none !important}
+.octo .barra{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .logo{font-size:20px;font-weight:600;letter-spacing:-0.03em}
+.octo .nav2{display:flex;align-items:flex-end;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .nav2 .g{display:flex;flex-direction:column;gap:2px;padding:0 8px;border-left:1px solid var(--line)}
+.octo .nav2 .g:first-child{border-left:0}
+.octo .nav2 .g>div{display:flex;gap:2px}
+.octo .nav2 .cap{padding-left:12px}
+.octo .nav2 a{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 12px;border-radius:6px;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav2 a.sel{background:var(--accent-soft);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo.m .nav2{order:99;position:sticky;bottom:0;margin-top:auto;border-bottom:0;border-top:1px solid var(--line);padding:4px;align-items:stretch}
+.octo.m .nav2 .g,.octo.m .nav2 .g>div{display:contents}
+.octo.m .nav2 .cap{display:none}
+.octo.m .nav2 a{flex:1;flex-direction:column;gap:2px;min-height:52px;padding:0 2px;font-size:12px}
+.octo.m .nav2 a.sel{box-shadow:inset 0 2px 0 var(--accent)}
+.octo .tit{display:flex;align-items:flex-end;gap:8px;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.octo.m .tit h1{font-size:20px}
+.octo .pag2{flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:16px}
+.octo.t .btn,.octo.m .btn{height:44px;padding:0 14px;font-size:14px}
+.octo.t .btn.quieto,.octo.m .btn.quieto{padding:0 8px}
+.octo.t .riga,.octo.m .riga{min-height:48px}
+.octo.t .campo,.octo.m .campo{min-height:44px;font-size:16px}
+.octo.t .tab,.octo.m .tab{height:44px;padding:0 12px;font-size:14px;white-space:nowrap}
+.octo.m .tabs{overflow-x:auto}
+.octo.m .riga{flex-wrap:wrap;row-gap:2px;padding:8px 12px}
+.octo.m .riga .uno{flex:1 1 100%;order:2;white-space:normal}
+.octo.m .avviso{flex-wrap:wrap}
+.octo .affianca{display:flex;gap:16px;align-items:flex-start}
+.octo .affianca>.largo{flex:1;min-width:0}
+.octo .affianca>.stretto{width:300px;flex:none;display:flex;flex-direction:column;gap:12px}
+.octo.m .affianca{flex-direction:column;align-items:stretch}
+.octo.m .affianca>.stretto{width:auto;order:-1}
+.octo .fascia{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line)}
+.octo .fascia .kpi{border-left:0;background:var(--surface)}
+.octo.t .fascia .kpi:nth-child(5){grid-column:span 2}
+.octo.m .fascia{grid-template-columns:repeat(2,minmax(0,1fr))}
+.octo.m .fascia .kpi:nth-child(5){grid-column:1 / -1}
+.octo .fisse{display:none}
+.octo.m .fisse{display:flex;gap:8px;position:sticky;bottom:61px;margin:0 -16px -16px;padding:8px 16px;background:var(--bg);border-top:1px solid var(--line)}
+.octo.m .fisse .btn{flex:1;justify-content:center}
+.octo .scorre{overflow-x:auto}
+.octo.m td,.octo.m th{padding:10px 8px}
+.octo.m td.va{white-space:normal}
+.octo .dett{padding:12px;display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);background:var(--surface)}
 
 body{margin:0}
 
@@ -107,7 +156,8 @@ body{margin:0}
 <section style="display: flex; flex-direction: column; gap: 8px">
 <div style="display: flex; align-items: center; gap: 8px"><h2>Persone</h2><span class="muted p13">2 righe</span><span style="flex: 1"></span><button class="btn">Aggiungi una persona</button></div>
 <div style="display: flex; gap: 16px; align-items: flex-start">
-<div class="box" style="flex: 1; min-width: 0">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div class="box">
 <table>
 <thead><tr><th>Nome</th><th>Ruolo</th><th>Parte</th><th class="n">Allocazione %</th><th>Dal</th><th>Al</th></tr></thead>
 <tbody>
@@ -116,8 +166,16 @@ body{margin:0}
 </tbody>
 </table>
 </div>
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><h2>Calendario: periodi e sprint</h2><span class="muted p13">1 riga</span><span style="flex: 1"></span><button class="btn">Aggiungi un periodo</button></div>
+<div class="box">
+<div class="riga" style="min-height: 32px; background: var(--panel); font-size: 13px; font-weight: 600"><span style="flex: 1">Periodo</span><span style="width: 130px; flex: none">Dal</span><span style="width: 130px; flex: none">Al</span><span style="width: 30px; flex: none"></span></div>
+<div class="riga"><span style="flex: 1; min-width: 0"><input class="campo" type="text" value="Sprint 28" aria-label="Periodo"></span><span style="width: 130px; flex: none"><input class="campo" type="text" value="26/10/2026" aria-label="Dal"></span><span style="width: 130px; flex: none"><input class="campo" type="text" value="13/11/2026" aria-label="Al"></span><button class="btn quieto" aria-label="Togli Sprint 28">×</button></div>
+</div>
+</section>
+</div>
 <div class="box" style="width: 400px; flex: none">
-<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line)"><h2 style="font-size: 14px">Neri Sara</h2><button class="btn quieto" aria-label="Togli Neri Sara">×</button></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line)"><h2 style="font-size: 14px">Neri Sara</h2><button class="btn quieto" aria-label="Togli Neri Sara">Togli</button></div>
 <div style="padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
 <div style="display: flex; flex-direction: column; gap: 4px"><label for="p-nome" class="p13" style="font-weight: 500">Nome</label><input id="p-nome" class="campo" type="text" value="Neri Sara"></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><label for="p-ruolo" class="p13" style="font-weight: 500">Ruolo</label><input id="p-ruolo" class="campo" type="text" value="analista"></div>
@@ -135,13 +193,6 @@ body{margin:0}
 </div>
 </section>
 
-<section style="display: flex; flex-direction: column; gap: 8px">
-<div style="display: flex; align-items: center; gap: 8px"><h2>Calendario: periodi e sprint</h2><span class="muted p13">1 riga</span><span style="flex: 1"></span><button class="btn">Aggiungi un periodo</button></div>
-<div class="box">
-<div class="riga" style="min-height: 32px; background: var(--panel); font-size: 13px; font-weight: 600"><span style="flex: 1">Periodo</span><span style="width: 150px; flex: none">Dal</span><span style="width: 150px; flex: none">Al</span><span style="width: 30px; flex: none"></span></div>
-<div class="riga"><span style="flex: 1; min-width: 0"><input class="campo" type="text" value="Sprint 28" aria-label="Periodo"></span><span style="width: 150px; flex: none"><input class="campo" type="text" value="26/10/2026" aria-label="Dal"></span><span style="width: 150px; flex: none"><input class="campo" type="text" value="13/11/2026" aria-label="Al"></span><button class="btn quieto" aria-label="Togli Sprint 28">×</button></div>
-</div>
-</section>
 
 <div class="box"><div class="riga"><button class="btn quieto" style="color: var(--text); margin-left: -6px; font-size: 15px; font-weight: 600">▸ Glossario: sigle e nomi sentiti male</button><span class="uno muted p13">0 righe · la forma giusta di ciò che le trascrizioni scrivono come lo sentono</span><button class="btn">Chiedi a Claude le coppie</button></div></div>
 

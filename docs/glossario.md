@@ -33,10 +33,14 @@ Le parole che Octo usa con chi lo usa. Una cosa ha un nome solo; i nomi tecnici 
 | budget (di una commessa) | ciò che si è pianificato quando la commessa è stata venduta, riga per riga e mese per mese | baseline |
 | actual, forecast | i mesi che sono un fatto e quelli ancora da venire, come li chiama la scheda progetto | consuntivo e previsione (nella griglia) |
 | commessa assegnata | una commessa di cui in NetSuite sei il project manager | — |
-| richiamo in vista | il richiamo di una risposta di cui «Fonte citata» mostra la fonte: quello scelto, o il primo dell'ultima risposta | citazione attiva |
-| credenziale | ciò con cui Octo legge una fonte: «su questo computer», «di chi condivide la cartella», «nessuna», «non serve» | token, password (nelle etichette) |
+| richiamo scelto | il richiamo di una risposta di cui «Fonte citata» mostra la fonte: quello che hai premuto, o il primo dell'ultima risposta. Non segue lo scorrimento | richiamo in vista, citazione attiva |
+| credenziale | ciò con cui Octo legge una fonte; resta sul computer di chi la inserisce. Se una fonte è stata letta da un altro computer, lo dice lo stato della lettura | token, password (nelle etichette) |
 | Octo (come fonte) | nella colonna «Fonte» di «Commessa»: la cifra è calcolata da Octo, non letta da un sistema | calcolato (da solo) |
 | manca | un dato che nessuna fonte dice: la cella lo dice a parole, non con un trattino | n/d, — |
+| Previsionale (come fonte) | nella colonna «Fonte» di «Commessa», quando NetSuite non è stato letto: la cifra è quella tenuta con il previsionale del progetto | manuale, locale |
+| non nota (fonte) | nella colonna «Fonte»: la cifra non c'è, quindi non ha una provenienza | cella vuota |
+| N ordini di vendita | sotto «Ordinato», quando gli ordini di vendita sono più d'uno; con uno solo, «ordine» e il suo numero | — |
+| Togli (una persona) | il comando nel dettaglio della persona che la leva dall'elenco: una parola, non «×»; a chi non vede dice «Togli» e il nome | ×, Elimina, Rimuovi |
 | scostamento da NetSuite | i costi che calcola Octo meno quelli registrati da NetSuite: «Da verificare» se non è zero | delta, differenza |
 | Calcolato da Octo, Valutato da Claude | le due parti della rilettura di un deliverable: ciò che il codice ha contato e ciò che Claude ha giudicato | controlli automatici, AI review |
 

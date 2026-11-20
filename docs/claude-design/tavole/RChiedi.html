@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>19 · Chiedi, risposta — tablet, chiaro</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+.octo.t,.octo.m{display:flex;flex-direction:column}
+.octo.t{width:768px;min-height:1024px}
+.octo.m{width:390px;min-height:844px;font-size:15px}
+.octo .solo-m{display:none}
+.octo.m .solo-m{display:flex}
+.octo.m .no-m{display:none !important}
+.octo .barra{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .logo{font-size:20px;font-weight:600;letter-spacing:-0.03em}
+.octo .nav2{display:flex;align-items:flex-end;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .nav2 .g{display:flex;flex-direction:column;gap:2px;padding:0 8px;border-left:1px solid var(--line)}
+.octo .nav2 .g:first-child{border-left:0}
+.octo .nav2 .g>div{display:flex;gap:2px}
+.octo .nav2 .cap{padding-left:12px}
+.octo .nav2 a{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 12px;border-radius:6px;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav2 a.sel{background:var(--accent-soft);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo.m .nav2{order:99;position:sticky;bottom:0;margin-top:auto;border-bottom:0;border-top:1px solid var(--line);padding:4px;align-items:stretch}
+.octo.m .nav2 .g,.octo.m .nav2 .g>div{display:contents}
+.octo.m .nav2 .cap{display:none}
+.octo.m .nav2 a{flex:1;flex-direction:column;gap:2px;min-height:52px;padding:0 2px;font-size:12px}
+.octo.m .nav2 a.sel{box-shadow:inset 0 2px 0 var(--accent)}
+.octo .tit{display:flex;align-items:flex-end;gap:8px;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.octo.m .tit h1{font-size:20px}
+.octo .pag2{flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:16px}
+.octo.t .btn,.octo.m .btn{height:44px;padding:0 14px;font-size:14px}
+.octo.t .btn.quieto,.octo.m .btn.quieto{padding:0 8px}
+.octo.t .riga,.octo.m .riga{min-height:48px}
+.octo.t .campo,.octo.m .campo{min-height:44px;font-size:16px}
+.octo.t .tab,.octo.m .tab{height:44px;padding:0 12px;font-size:14px;white-space:nowrap}
+.octo.m .tabs{overflow-x:auto}
+.octo.m .riga{flex-wrap:wrap;row-gap:2px;padding:8px 12px}
+.octo.m .riga .uno{flex:1 1 100%;order:2;white-space:normal}
+.octo.m .avviso{flex-wrap:wrap}
+.octo .affianca{display:flex;gap:16px;align-items:flex-start}
+.octo .affianca>.largo{flex:1;min-width:0}
+.octo .affianca>.stretto{width:300px;flex:none;display:flex;flex-direction:column;gap:12px}
+.octo.m .affianca{flex-direction:column;align-items:stretch}
+.octo.m .affianca>.stretto{width:auto;order:-1}
+.octo .fascia{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line)}
+.octo .fascia .kpi{border-left:0;background:var(--surface)}
+.octo.t .fascia .kpi:nth-child(5){grid-column:span 2}
+.octo.m .fascia{grid-template-columns:repeat(2,minmax(0,1fr))}
+.octo.m .fascia .kpi:nth-child(5){grid-column:1 / -1}
+.octo .fisse{display:none}
+.octo.m .fisse{display:flex;gap:8px;position:sticky;bottom:61px;margin:0 -16px -16px;padding:8px 16px;background:var(--bg);border-top:1px solid var(--line)}
+.octo.m .fisse .btn{flex:1;justify-content:center}
+.octo .scorre{overflow-x:auto}
+.octo.m td,.octo.m th{padding:10px 8px}
+.octo.m td.va{white-space:normal}
+.octo .dett{padding:12px;display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);background:var(--surface)}
+
+body{margin:0}
+</style>
+</head>
+<body>
+<div class="octo chiaro t">
+<header class="barra"><span class="logo">octo</span><button class="btn" style="font-weight: 600">Aurora ▾</button><span class="sp"></span><button class="btn quieto no-m" style="color: var(--muted)">▸ Cartella del progetto</button><span class="tag no-m">Tema</span></header>
+<nav class="nav2" aria-label="Sezioni">
+<div class="g"><span class="cap">Ogni giorno</span><div><a href="#oggi">Oggi <span class="badge">5</span></a></div></div>
+<div class="g"><span class="cap">Lavoro</span><div><a class="sel" href="#chiedi">Chiedi</a><a href="#deliverable">Deliverable</a><a href="#cruscotto">Cruscotto</a></div></div>
+<div class="g no-m"><span class="cap">Ogni mese</span><div><a href="#commessa">Commessa</a></div></div>
+<div class="g no-m"><span class="cap">Progetto</span><div><a href="#impostazioni">Impostazioni</a></div></div>
+<span class="solo-m" style="flex: 1"><a href="#altro">Altro</a></span>
+</nav>
+<div class="tit"><div><div class="cap">Aurora</div><h1>Chiedi</h1></div><span class="sp"></span><button class="btn">Chat di oggi · 1</button><button class="btn">Nuova chat</button></div>
+<main id="chiedi" class="pag2">
+<div class="affianca" style="flex: 1">
+<div class="largo" style="display: flex; flex-direction: column; gap: 14px">
+
+<div class="bolla">Quando consegniamo il modulo ordini?</div>
+<div class="sez">
+<div class="fila"><span class="tag ok">1 citazione riscontrata nel file</span></div>
+<p style="margin: 0">La consegna è il 12 dicembre <span class="rich vista">1</span>.</p>
+<div class="fila p13" style="flex-wrap: wrap"><span class="muted">Fonti · 1</span><span>1. <a href="#fonte" style="color: var(--source); font-weight: 600">wiki · stato</a></span><span class="sp"></span><button class="btn quieto">Prepara un deliverable da questa risposta</button></div>
+<div class="muted p13" style="padding-bottom: 12px; border-bottom: 1px solid var(--line)">20/11/26, 09:16 · modello claude-fake-default</div>
+</div>
+
+<div class="bolla">E il budget? #inventa</div>
+<div class="sez">
+<div class="fila"><span class="tag verifica">1 punto da controllare</span></div>
+<p style="margin: 0">La consegna è il 12 dicembre <span class="rich">1</span>. Il budget residuo è di 99.000 euro <span class="rich no">2</span>.</p>
+<div class="fila p13" style="flex-wrap: wrap"><span class="muted">Fonti · 2</span><span>1. <a href="#fonte" style="color: var(--source); font-weight: 600">wiki · stato</a></span><span>2. <a href="#fonte" style="color: var(--source); font-weight: 600">wiki · stato</a></span><span class="tag verifica">La frase non è nel file</span><span class="sp"></span><button class="btn quieto">Prepara un deliverable da questa risposta</button></div>
+<div class="muted p13" style="padding-bottom: 12px; border-bottom: 1px solid var(--line)">20/11/26, 09:16 · modello claude-fake-default</div>
+</div>
+
+<div class="bolla">Quando consegniamo il modulo ordini?</div>
+<div class="sez">
+<div class="fila"><span class="tag verifica">1 punto da controllare</span></div>
+<p style="margin: 0">La consegna è il 12 dicembre <span class="rich">1</span>. Il budget residuo è di 99.000 euro <span class="rich no">2</span>.</p>
+<div class="fila p13" style="flex-wrap: wrap"><span class="muted">Fonti · 2</span><span>1. <a href="#fonte" style="color: var(--source); font-weight: 600">wiki · stato</a></span><span>2. <a href="#fonte" style="color: var(--source); font-weight: 600">wiki · stato</a></span><span class="tag verifica">La frase non è nel file</span><span class="sp"></span><button class="btn quieto">Prepara un deliverable da questa risposta</button></div>
+<div class="muted p13">20/11/26, 09:16 · modello claude-sonnet-fake</div>
+</div>
+
+<span class="sp"></span>
+
+<div class="box solo-m" style="flex-direction: column">
+<div class="head"><h2 style="font-size: 14px">Fonte citata</h2><span class="p13">1 / 1</span></div>
+<div class="riga" style="border-top: 0"><span class="rich vista">1</span><span class="tag fonte">File del progetto · 20 nov 2026</span><span class="uno"><span style="font-weight: 600">wiki · stato</span> · «fissata al 12 dicembre 2026»</span><span class="tag ok">Frase riscontrata nel file</span><span class="sp"></span><button class="btn">Apri la fonte</button></div>
+</div>
+
+<div class="scrivi">
+<label for="domanda" class="muted">Chiedi qualcosa su questo progetto…</label>
+<textarea id="domanda" rows="1" style="border: 0; outline: 0; resize: none; background: transparent; color: var(--text); font: 400 16px Inter, system-ui, sans-serif; padding: 0"></textarea>
+<div class="fila"><button class="tondo" style="width: 44px; height: 44px; border-radius: 22px" aria-label="Allega un file">+</button><button class="btn" style="border-radius: 22px">Con calcoli</button><span class="sp"></span><button class="invia" style="width: 44px; height: 44px; border-radius: 22px" aria-label="Invia la domanda"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg></button></div>
+</div>
+</div>
+
+<div class="stretto no-m" id="fonte">
+<div class="box">
+<div class="head"><h2 style="font-size: 14px">Fonte citata</h2><span class="p13">1 / 1</span></div>
+<div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+<div class="muted p13">Richiamo scelto: <span class="rich vista" style="margin: 0 4px">1</span> della risposta 1 di 3</div>
+<div style="display: flex"><span class="tag fonte">File del progetto · 20 nov 2026</span></div>
+<div style="font-size: 15px; font-weight: 600"><span style="font-family: 'IBM Plex Mono', monospace">[1]</span> wiki · stato</div>
+<div style="padding: 6px 12px; border-left: 2px solid var(--source); background: var(--panel); border-radius: 0 6px 6px 0" class="p13">«fissata al 12 dicembre 2026»</div>
+<div style="display: flex"><span class="tag ok">Frase riscontrata nel file</span></div>
+<div class="muted p13">Leggi il contesto della fonte per valutare la conclusione.</div>
+<button class="btn" style="align-self: flex-start">Apri la fonte</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

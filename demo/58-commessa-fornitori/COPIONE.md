@@ -37,7 +37,7 @@ Durata: 5 minuti. Le regole della scheda progetto dell'amministrazione entrano i
    Dimostra: Octo non sa se Verdi Sara e Studio Blu sono la stessa cosa: non indovina, avvisa.
 
 7. **Scorri alla tabella «Ore e costi per persona».**
-   Atteso: le tre persone, poi la riga «Fornitori 1.200,00, ricevuto dai fornitori, da NetSuite», totale 63,5 ore e 3.147,50.
+   Atteso: le tre persone, poi la riga «Fornitori 1.200,00, ricevuto, da NetSuite», totale 63,5 ore e 3.147,50.
    Dimostra: il totale della tabella è il «Costi a oggi» dei riquadri.
 
 8. **Leggi «Costi secondo NetSuite».**

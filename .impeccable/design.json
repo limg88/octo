@@ -1,0 +1,423 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T15:00:00Z",
+  "title": "Design System: Octo",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Viola dell'azione",
+        "canonical": "light-dark(#5040c4, #b9acff)",
+        "tonalRamp": [
+          "#1a1139",
+          "#2f2580",
+          "#4133a8",
+          "#5040c4",
+          "#7a6bdc",
+          "#a79bf0",
+          "#c9bff3",
+          "#f0edff"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Viola al passaggio",
+        "canonical": "light-dark(#5f50cb, #c6bbff)"
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Fondo della voce scelta",
+        "canonical": "light-dark(#f0edff, #24203b)"
+      },
+      "accent-edge": {
+        "role": "primary",
+        "displayName": "Bordo della voce scelta",
+        "canonical": "light-dark(#c9bff3, #504479)"
+      },
+      "on-accent": {
+        "role": "primary",
+        "displayName": "Testo sul viola",
+        "canonical": "light-dark(#ffffff, #1a1139)"
+      },
+      "source": {
+        "role": "secondary",
+        "displayName": "Blu della fonte",
+        "canonical": "light-dark(#225a88, #a6d1ff)",
+        "tonalRamp": [
+          "#0c2136",
+          "#142739",
+          "#1b466b",
+          "#225a88",
+          "#3b7fb5",
+          "#7fb1dc",
+          "#bcd7ef",
+          "#eaf4ff"
+        ]
+      },
+      "source-bg": {
+        "role": "secondary",
+        "displayName": "Fondo della fonte",
+        "canonical": "light-dark(#eaf4ff, #142739)"
+      },
+      "source-edge": {
+        "role": "secondary",
+        "displayName": "Bordo della fonte",
+        "canonical": "light-dark(#bcd7ef, #3b5b77)"
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Ambra della verifica",
+        "canonical": "light-dark(#80500e, #ffd08a)",
+        "tonalRamp": [
+          "#302319",
+          "#573609",
+          "#80500e",
+          "#a86e1f",
+          "#c8914a",
+          "#dbb46f",
+          "#f2d7a6",
+          "#fff5e1"
+        ]
+      },
+      "warning-bg": {
+        "role": "tertiary",
+        "displayName": "Fondo della verifica",
+        "canonical": "light-dark(#fff5e1, #302319)"
+      },
+      "warning-edge": {
+        "role": "tertiary",
+        "displayName": "Bordo della verifica",
+        "canonical": "light-dark(#dbb46f, #795528)"
+      },
+      "ok": {
+        "role": "tertiary",
+        "displayName": "Verde della conferma",
+        "canonical": "light-dark(#1a6b46, #6fcf9f)",
+        "tonalRamp": [
+          "#0b1f15",
+          "#13281d",
+          "#145236",
+          "#1a6b46",
+          "#2f8f63",
+          "#6fcf9f",
+          "#9fcfb5",
+          "#e6f4ec"
+        ]
+      },
+      "ok-bg": {
+        "role": "tertiary",
+        "displayName": "Fondo della conferma",
+        "canonical": "light-dark(#e6f4ec, #13281d)"
+      },
+      "ok-edge": {
+        "role": "tertiary",
+        "displayName": "Bordo della conferma",
+        "canonical": "light-dark(#9fcfb5, #2f6b4c)"
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Rosso dell'errore",
+        "canonical": "light-dark(#b42318, #f47067)",
+        "tonalRamp": [
+          "#3a0c08",
+          "#6e150e",
+          "#931c13",
+          "#b42318",
+          "#d14b41",
+          "#f47067",
+          "#f8a8a2",
+          "#fdeceb"
+        ]
+      },
+      "on-danger": {
+        "role": "tertiary",
+        "displayName": "Testo sul rosso",
+        "canonical": "#ffffff"
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Fondo",
+        "canonical": "light-dark(#ffffff, #0a0a0b)",
+        "tonalRamp": [
+          "#0a0a0b",
+          "#111112",
+          "#202022",
+          "#2a2a2d",
+          "#6c6c73",
+          "#c8c8cd",
+          "#f0f0f2",
+          "#ffffff"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Riquadro",
+        "canonical": "light-dark(#ffffff, #111112)"
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Pannello",
+        "canonical": "light-dark(#f6f6f6, #101011)"
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Passaggio",
+        "canonical": "light-dark(#f0f0f2, #202022)"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Testo",
+        "canonical": "light-dark(#171719, #f5f5f5)"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Testo secondario",
+        "canonical": "light-dark(#606064, #a9a9af)"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Separatore",
+        "canonical": "light-dark(#dedee1, #2a2a2d)"
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Bordo di pulsanti e riquadri",
+        "canonical": "light-dark(#c8c8cd, #3b3b40)"
+      },
+      "input-line": {
+        "role": "neutral",
+        "displayName": "Bordo dei campi in cui si scrive",
+        "canonical": "light-dark(#8c8c93, #6c6c73)"
+      },
+      "logo-tile": {
+        "role": "neutral",
+        "displayName": "Tessera del marchio nel tema scuro",
+        "canonical": "#f1efff"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Titolo della sezione",
+        "purpose": "Il titolo nella testata: 24 px, peso 680."
+      },
+      "title": {
+        "displayName": "Titolo di gruppo",
+        "purpose": "Il titolo di un gruppo dentro la pagina."
+      },
+      "figure": {
+        "displayName": "Cifra",
+        "purpose": "La cifra di un riquadro in «Commessa» e «Cruscotto», con cifre tabulari."
+      },
+      "body": {
+        "displayName": "Testo",
+        "purpose": "Il testo corrente."
+      },
+      "label": {
+        "displayName": "Controllo",
+        "purpose": "Pulsanti, schede, tabelle: la misura più frequente."
+      },
+      "mark": {
+        "displayName": "Etichetta",
+        "purpose": "Etichette di stato e di categoria."
+      },
+      "eyebrow": {
+        "displayName": "Maiuscoletto",
+        "purpose": "Nome del progetto sopra il titolo e titoli dei sottogruppi."
+      },
+      "headline-narrow": {
+        "displayName": "Titolo della sezione, finestra stretta",
+        "purpose": "Sotto i 960 px di larghezza il titolo scende a 20 px."
+      },
+      "subhead": {
+        "displayName": "Titolo di dettaglio",
+        "purpose": "Il titolo di un dettaglio aperto, della guida d'avvio e il primo titolo dentro una risposta."
+      },
+      "wordmark": {
+        "displayName": "Scritta del marchio",
+        "purpose": "Solo la scritta «octo» accanto al marchio."
+      },
+      "sort-mark": {
+        "displayName": "Segno dell'ordinamento",
+        "purpose": "Il glifo nell'intestazione di una colonna ordinata."
+      },
+      "info-glyph": {
+        "displayName": "«i» delle spiegazioni",
+        "purpose": "La «i» corsiva del pulsante tondo che apre una spiegazione."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-control",
+        "value": "0 1px 1px light-dark(rgba(15, 16, 20, 0.05), rgba(0, 0, 0, 0.3))",
+        "purpose": "Sotto pulsanti e campi, appena percettibile."
+      },
+      {
+        "name": "shadow-header",
+        "value": "0 2px 4px light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5))",
+        "purpose": "Sotto l'intestazione di tabella che resta in vista."
+      },
+      {
+        "name": "shadow-raised",
+        "value": "0 1px 2px light-dark(rgba(15, 16, 20, 0.06), rgba(0, 0, 0, 0.4)), 0 8px 28px light-dark(rgba(15, 16, 20, 0.12), rgba(0, 0, 0, 0.5))",
+        "purpose": "Solo per ciò che sta sopra la pagina: dialoghi e menu."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "0.12s",
+        "purpose": "Fondo e bordo di pulsanti e campi al cambio di stato. Spento con prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "detail-below",
+        "value": "1120px"
+      },
+      {
+        "name": "narrow",
+        "value": "1040px"
+      },
+      {
+        "name": "narrower",
+        "value": "1000px"
+      },
+      {
+        "name": "minimum",
+        "value": "960px"
+      },
+      {
+        "name": "touch",
+        "value": "(pointer: coarse)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Pulsante normale",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Il comando di tutti i giorni: bordo sottile, nessun colore.",
+      "html": "<button class=\"ds-btn\">Leggi ora</button>",
+      "css": ".ds-btn { min-height: 30px; padding: 0 12px; border: 1px solid var(--field-line); border-radius: 6px; background: var(--bg); color: var(--text); box-shadow: var(--shadow-control); font: 500 13px/1.5 'Inter Variable', Inter, system-ui, sans-serif; cursor: pointer; transition: background-color 0.12s, border-color 0.12s; } .ds-btn:hover { background: var(--hover); } .ds-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Pulsante pieno",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "L'azione per cui il modulo o il risultato esistono. Uno solo per contesto.",
+      "html": "<button class=\"ds-btn-primary\">Approva</button>",
+      "css": ".ds-btn-primary { min-height: 30px; padding: 0 12px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-control); font: 500 13px/1.5 'Inter Variable', Inter, system-ui, sans-serif; cursor: pointer; transition: background-color 0.12s, border-color 0.12s; } .ds-btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Pulsante quieto",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "L'azione dentro una riga: senza cornice finché il puntatore non ci passa sopra.",
+      "html": "<button class=\"ds-btn-quiet\">Apri la mail</button>",
+      "css": ".ds-btn-quiet { min-height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--accent-text); font: 500 13px/1.5 'Inter Variable', Inter, system-ui, sans-serif; cursor: pointer; transition: background-color 0.12s; } .ds-btn-quiet:hover { background: var(--hover); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Il campo in cui si scrive: il bordo si distingue dal fondo da solo.",
+      "html": "<input class=\"ds-input\" type=\"text\" value=\"Sprint 28\" aria-label=\"Periodo\">",
+      "css": ".ds-input { min-height: 32px; padding: 5px 10px; border: 1px solid var(--input-line); border-radius: 6px; background: var(--bg); color: var(--text); box-shadow: var(--shadow-control); font: 400 14px/1.5 'Inter Variable', Inter, system-ui, sans-serif; transition: border-color 0.12s, box-shadow 0.12s; } .ds-input:hover { border-color: var(--muted); } .ds-input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }"
+    },
+    {
+      "name": "Etichette di stato",
+      "kind": "chip",
+      "refersTo": "status",
+      "description": "Neutra, confermato, da verificare, fonte: sempre con la parola, mai con l'aspetto di un pulsante.",
+      "html": "<span class=\"ds-status\">Ore</span> <span class=\"ds-status ds-status-ok\">Approvato</span> <span class=\"ds-status ds-status-warning\">Da rivedere</span> <span class=\"ds-status ds-status-source\">NetSuite</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border: 1px solid var(--field-line); border-radius: 4px; background: var(--hover); color: var(--text); font: 500 12px/1.45 'Inter Variable', Inter, system-ui, sans-serif; } .ds-status-ok { border-color: var(--ok-edge); background: var(--ok-bg); color: var(--ok); } .ds-status-warning { border-color: var(--warning-edge); background: var(--warning-bg); color: var(--warning); } .ds-status-source { border-color: var(--source-edge); background: var(--source-bg); color: var(--source); }"
+    },
+    {
+      "name": "Schede interne",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "Le schede di una sezione: quella in uso è tinta, più pesante e sottolineata.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-selected\">Sintesi</button><button class=\"ds-tab\">Fatturazione</button><button class=\"ds-tab\">Ore</button><button class=\"ds-tab\">Previsionale</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); } .ds-tab { min-height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); font: 500 13px/1.5 'Inter Variable', Inter, system-ui, sans-serif; cursor: pointer; } .ds-tab:hover { color: var(--text); } .ds-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } .ds-tab-selected, .ds-tab-selected:hover { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; box-shadow: inset 0 -2px var(--accent); }"
+    },
+    {
+      "name": "Voce della colonna di sinistra",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Una sezione nella colonna di sinistra, con il badge del conteggio.",
+      "html": "<div class=\"ds-nav\"><button class=\"ds-nav-item ds-nav-item-selected\">Oggi <span class=\"ds-nav-count\">4</span></button><button class=\"ds-nav-item\">Chiedi</button><button class=\"ds-nav-item\">Deliverable</button></div>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 1px; width: 212px; padding: 10px; background: var(--panel); } .ds-nav-item { min-height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); text-align: left; font: 400 14px/1.5 'Inter Variable', Inter, system-ui, sans-serif; cursor: pointer; } .ds-nav-item:hover { background: var(--hover); } .ds-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } .ds-nav-item-selected, .ds-nav-item-selected:hover { background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); font-weight: 600; } .ds-nav-count { margin-left: 8px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--panel); font-size: 0.75em; font-weight: 600; }"
+    },
+    {
+      "name": "Riquadro con cifra",
+      "kind": "card",
+      "refersTo": "figure",
+      "description": "Una cifra guida con la sua etichetta, la nota e, quando serve, lo stato.",
+      "html": "<dl class=\"ds-figure\"><dt>Scostamento da NetSuite</dt><dd>560,00<span class=\"ds-figure-note\">Octo 3.147,50 · NetSuite 2.587,50</span></dd></dl>",
+      "css": ".ds-figure { margin: 0; width: 240px; padding: 12px 14px; border: 1px solid var(--field-line); border-radius: 8px; background: var(--surface); color: var(--text); font-family: 'Inter Variable', Inter, system-ui, sans-serif; } .ds-figure dt { font-size: 13px; color: var(--muted); } .ds-figure dd { margin: 2px 0 0; font-size: 22px; font-weight: 600; letter-spacing: -0.012em; line-height: 1.3; font-variant-numeric: tabular-nums; } .ds-figure-note { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Lo strumento da banco",
+    "overview": "Octo è un attrezzo di precisione, non una vetrina. Ogni comando sta al suo posto, la forma non chiede attenzione e il colore compare solo come segnale. Chi lo usa è un Project Manager che lo apre più volte al giorno, spesso fra una riunione e l'altra: legge molto, scrive poco, e deve potersi fidare di ciò che legge.\n\nPer questo la pagina è densa e piatta. I fondi sono neutri nei due temi, distinti da piccoli scarti di luminosità; i riquadri hanno un bordo sottile e quasi nessuna ombra; i controlli sono bassi. I componenti sono sobri nella forma ed espliciti nel testo: la forma tace, la parola parla. Uno stato è sempre scritto, mai affidato al solo colore.\n\nIl tema chiaro e quello scuro sono lo stesso sistema: ogni colore è una coppia `light-dark()`, e nessuna proposta vale se non regge in entrambi.",
+    "keyCharacteristics": [
+      "Denso e piatto: una riga per elemento, controlli da 30 px, ombre quasi assenti.",
+      "Fondi neutri; cinque colori, ognuno con un significato solo.",
+      "Ogni stato ha un testo; nessuno stato ha l'aspetto di un pulsante.",
+      "Un solo pulsante pieno per contesto.",
+      "Misure a destra, con cifre tabulari.",
+      "Chiaro e scuro alla pari."
+    ],
+    "rules": [
+      {
+        "name": "La regola del significato solo",
+        "body": "Viola per agire e scegliere, blu per la fonte, ambra per ciò che va verificato, verde per ciò che è confermato, rosso per l'errore. Un colore non prende mai in prestito il significato di un altro: una categoria non è blu, un destinatario non è ambra.",
+        "section": "colors"
+      },
+      {
+        "name": "La regola dei fondi neutri",
+        "body": "Nessun fondo colorato per decorare. Un fondo tinto esiste solo dentro un'etichetta di stato, un avviso o una voce scelta.",
+        "section": "colors"
+      },
+      {
+        "name": "La regola del bordo che si vede",
+        "body": "Il bordo di un campo in cui si scrive (`input-line`) sta almeno a 3:1 sul fondo. `field-line` è più tenue e non va mai su un campo.",
+        "section": "colors"
+      },
+      {
+        "name": "La regola delle misure a destra",
+        "body": "Ore, importi, percentuali e conteggi sono allineati a destra con `font-variant-numeric: tabular-nums`, totali compresi.",
+        "section": "typography"
+      },
+      {
+        "name": "La regola dei pesi",
+        "body": "400 per il testo, 500 per i controlli, 600 per i titoli di gruppo e per ciò che è scelto. Salgono oltre solo i titoli grandi (650–680) e la scritta del marchio (750): Inter è variabile e questi pesi intermedi sono voluti.",
+        "section": "typography"
+      },
+      {
+        "name": "La regola del piatto",
+        "body": "Un riquadro nella pagina non ha ombra. L'ombra «sollevato» dice una cosa sola: questo sta sopra il resto.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usare un solo pulsante pieno per contesto; gli altri sono normali o quieti.",
+      "Do scrivere ogni stato con la sua parola, dentro l'etichetta di stato.",
+      "Do allineare le misure a destra con cifre tabulari, totali compresi.",
+      "Do tenere una riga per elemento finché non si apre un dettaglio.",
+      "Do verificare ogni proposta nei due temi: testo ad almeno 4,5:1, bordo dei campi ad almeno 3:1.",
+      "Do distinguere a vista ciò che calcola Octo da ciò che valuta Claude.",
+      "Do rispettare `prefers-reduced-motion`: il movimento è minimo e si spegne."
+    ],
+    "donts": [
+      "Don't usare il blu per una categoria o l'ambra per un destinatario: il blu è la fonte, l'ambra è ciò che va verificato.",
+      "Don't colorare un fondo per decorare.",
+      "Don't dare a uno stato l'aspetto di un pulsante, né a un comando l'aspetto di un testo.",
+      "Don't mettere `field-line` sul bordo di un campo in cui si scrive.",
+      "Don't dare ombra a un riquadro nella pagina.",
+      "Don't far scorrere in orizzontale la pagina: scorre solo una tabella nel suo riquadro.",
+      "Don't introdurre parole inglesi o un secondo nome per una cosa che il glossario ha già nominato."
+    ]
+  }
+}

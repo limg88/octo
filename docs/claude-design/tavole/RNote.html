@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Tablet e telefono: problemi, regole, consegna</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+.octo.t,.octo.m{display:flex;flex-direction:column}
+.octo.t{width:768px;min-height:1024px}
+.octo.m{width:390px;min-height:844px;font-size:15px}
+.octo .solo-m{display:none}
+.octo.m .solo-m{display:flex}
+.octo.m .no-m{display:none !important}
+.octo .barra{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .logo{font-size:20px;font-weight:600;letter-spacing:-0.03em}
+.octo .nav2{display:flex;align-items:flex-end;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .nav2 .g{display:flex;flex-direction:column;gap:2px;padding:0 8px;border-left:1px solid var(--line)}
+.octo .nav2 .g:first-child{border-left:0}
+.octo .nav2 .g>div{display:flex;gap:2px}
+.octo .nav2 .cap{padding-left:12px}
+.octo .nav2 a{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 12px;border-radius:6px;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav2 a.sel{background:var(--accent-soft);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo.m .nav2{order:99;position:sticky;bottom:0;margin-top:auto;border-bottom:0;border-top:1px solid var(--line);padding:4px;align-items:stretch}
+.octo.m .nav2 .g,.octo.m .nav2 .g>div{display:contents}
+.octo.m .nav2 .cap{display:none}
+.octo.m .nav2 a{flex:1;flex-direction:column;gap:2px;min-height:52px;padding:0 2px;font-size:12px}
+.octo.m .nav2 a.sel{box-shadow:inset 0 2px 0 var(--accent)}
+.octo .tit{display:flex;align-items:flex-end;gap:8px;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.octo.m .tit h1{font-size:20px}
+.octo .pag2{flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:16px}
+.octo.t .btn,.octo.m .btn{height:44px;padding:0 14px;font-size:14px}
+.octo.t .btn.quieto,.octo.m .btn.quieto{padding:0 8px}
+.octo.t .riga,.octo.m .riga{min-height:48px}
+.octo.t .campo,.octo.m .campo{min-height:44px;font-size:16px}
+.octo.t .tab,.octo.m .tab{height:44px;padding:0 12px;font-size:14px;white-space:nowrap}
+.octo.m .tabs{overflow-x:auto}
+.octo.m .riga{flex-wrap:wrap;row-gap:2px;padding:8px 12px}
+.octo.m .riga .uno{flex:1 1 100%;order:2;white-space:normal}
+.octo.m .avviso{flex-wrap:wrap}
+.octo .affianca{display:flex;gap:16px;align-items:flex-start}
+.octo .affianca>.largo{flex:1;min-width:0}
+.octo .affianca>.stretto{width:300px;flex:none;display:flex;flex-direction:column;gap:12px}
+.octo.m .affianca{flex-direction:column;align-items:stretch}
+.octo.m .affianca>.stretto{width:auto;order:-1}
+.octo .fascia{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line)}
+.octo .fascia .kpi{border-left:0;background:var(--surface)}
+.octo.t .fascia .kpi:nth-child(5){grid-column:span 2}
+.octo.m .fascia{grid-template-columns:repeat(2,minmax(0,1fr))}
+.octo.m .fascia .kpi:nth-child(5){grid-column:1 / -1}
+.octo .fisse{display:none}
+.octo.m .fisse{display:flex;gap:8px;position:sticky;bottom:61px;margin:0 -16px -16px;padding:8px 16px;background:var(--bg);border-top:1px solid var(--line)}
+.octo.m .fisse .btn{flex:1;justify-content:center}
+.octo .scorre{overflow-x:auto}
+.octo.m td,.octo.m th{padding:10px 8px}
+.octo.m td.va{white-space:normal}
+.octo .dett{padding:12px;display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);background:var(--surface)}
+
+body{margin:0}
+.octo .m{display:grid;grid-template-columns:84px 200px minmax(0,1fr);gap:14px;padding:6px 14px;border-top:1px solid var(--line);font-size:13px;line-height:1.4}
+.octo .k{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;padding:6px 14px;border-top:1px solid var(--line);font-size:13px;line-height:1.4}
+.octo .t{border-top:0;background:var(--panel);font-weight:600}
+.octo .m>:first-child,.octo .k>:first-child{font-weight:600}
+.octo code{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="octo" style="box-sizing: border-box; width: 1280px; min-height: 1700px; padding: 36px 40px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div class="cap">Octo · revisione dell’interfaccia · giro 5</div>
+<h1>Tablet e telefono: problemi, regole, consegna</h1>
+<div class="muted p13" style="max-width: 900px">Octo oggi è un’app desktop che legge una cartella del computer: su tablet e telefono servirebbe prima un’altra via ai dati, e questo non è un problema di disegno. Qui c’è solo come si adatta l’interfaccia. I problemi sono dedotti dalla struttura delle schermate a 1.280 px, non da schermate strette, che non esistono.</div>
+</div>
+
+<h2>Che cosa ostacola, in ordine di gravità</h2>
+<div class="box">
+<div class="m t"><div>Gravità</div><div>Dove</div><div>Che cosa ostacola</div></div>
+<div class="m"><div>Alta</div><div>Colonna di sinistra</div><div>È fissa a 232 px: a 768 px toglie il 30% della larghezza, a 390 px il 60%.</div></div>
+<div class="m"><div>Alta</div><div>Tutti i comandi</div><div>Controlli alti 30 px, azioni quiete di solo testo, «×» da 16 px: sotto i 44 px che servono al dito.</div></div>
+<div class="m"><div>Alta</div><div>Elenco con dettaglio a fianco</div><div>Oggi, Cruscotto, Deliverable, Persone e la fonte di «Chiedi» mettono due colonne: a 390 px non ci stanno, a 768 px una delle due resta sotto i 300 px.</div></div>
+<div class="m"><div>Alta</div><div>Campi in cui si scrive</div><div>Testo a 13 px: sotto i 16 px il telefono ingrandisce la pagina a ogni tocco su un campo.</div></div>
+<div class="m"><div>Media</div><div>Tabelle larghe</div><div>Previsionale (8 colonne) e Registro (7) non entrano; le colonne trascinabili e ridimensionabili non si usano con il dito.</div></div>
+<div class="m"><div>Media</div><div>Ciò che vive sul puntatore</div><div>Fondo al passaggio del puntatore e spiegazioni dietro la «i»: al tocco non compaiono, devono aprirsi con un tocco.</div></div>
+<div class="m"><div>Media</div><div>Commessa</div><div>«Documento interno» scorre via con la pagina: su un telefono, davanti al cliente, deve restare in vista.</div></div>
+<div class="m"><div>Bassa</div><div>Testata</div><div>«Cartella del progetto» e il selettore del tema non hanno posto al telefono: vanno sotto «Altro».</div></div>
+</div>
+
+<h2>Regole per larghezza</h2>
+<div class="box">
+<div class="k t"><div>Larghezza</div><div>Che cosa succede</div></div>
+<div class="k"><div>Da 1.120 px in su</div><div>Come nei giri precedenti.</div></div>
+<div class="k"><div>Tablet · da 768 a 1.119 px</div><div>La colonna di sinistra diventa due fasce in alto: marchio e progetto, poi le sezioni in riga con i quattro gruppi e i loro nomi. Contenuto su una colonna. Il dettaglio si apre sotto la riga scelta. «Rilettura» e «Fonte citata» restano a fianco, a 300 px. Fasce di cifre su tre colonne.</div></div>
+<div class="k"><div>Telefono · sotto 768 px</div><div>Sezioni in una barra in basso: Oggi (con il badge), Chiedi, Deliverable, Cruscotto, Altro; «Altro» porta a Commessa, Impostazioni, cartella e tema. Ogni elemento su due righe: etichette, poi titolo; le azioni della riga stanno nel dettaglio. «Fonte citata» è un riquadro compatto sotto il testo. «Approva» e «Chiedi modifica» in una barra fissa in basso. Fasce di cifre su due colonne. Le tabelle scorrono nel loro riquadro.</div></div>
+<div class="k"><div>Tutte le larghezze al tocco</div><div>Pulsanti e schede alti 44 px, righe almeno 48 px, campi con testo a 16 px. Colonne non trascinabili né ridimensionabili.</div></div>
+</div>
+
+<h2>Deroghe ai vincoli, dichiarate</h2>
+<div class="box">
+<div class="riga"><span class="tag">vincolo 6</span><span>Al telefono un elemento occupa due righe (etichette, titolo), non una.</span></div>
+<div class="riga"><span class="tag">da non toccare</span><span>La fonte «a fianco della risposta»: al telefono non c’è un fianco, la fonte sta sotto il testo. Il richiamo numerato resta.</span></div>
+<div class="riga"><span class="tag">da non toccare</span><span>I gruppi della colonna di sinistra: restano tutti al tablet; al telefono «Ogni giorno» e «Lavoro» sono nella barra, «Ogni mese» e «Progetto» sotto «Altro».</span></div>
+<div class="riga"><span class="tag">etichette nuove</span><span>«Altro» nella barra; «Chat di oggi · 1» al posto dell’elenco delle chat; il titolo del documento come selettore («2.4 di novembre ▾»).</span></div>
+</div>
+
+<h2>Consegna</h2>
+<div class="box">
+<div class="k t"><div>Nome</div><div>Valori</div></div>
+<div class="k"><div>Soglie</div><div><code>@media (max-width: 1119px)</code> per il tablet, <code>@media (max-width: 767px)</code> per il telefono; <code>@media (pointer: coarse)</code> per le misure al tocco.</div></div>
+<div class="k"><div><code>SectionNav.tsx</code>, <code>ProjectSwitcher.tsx</code></div><div>Tablet: fascia <code>padding: 8px 16px; background: var(--panel)</code>, poi sezioni in riga, voci <code>min-height: 44px; padding: 0 12px</code>, gruppi divisi da <code>border-left: 1px solid var(--line)</code>, voce scelta <code>background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent)</code>. Telefono: <code>position: sticky; bottom: 0; border-top: 1px solid var(--line)</code>, cinque voci <code>flex: 1; min-height: 52px; font-size: 12px</code>, scelta con <code>box-shadow: inset 0 2px 0 var(--accent)</code>.</div></div>
+<div class="k"><div>Pulsanti, schede, righe, campi</div><div>Al tocco: pulsanti e schede <code>height: 44px; font-size: 14px</code>; righe <code>min-height: 48px</code>; campi <code>min-height: 44px; font-size: 16px</code>.</div></div>
+<div class="k"><div>Riga di elenco al telefono</div><div><code>flex-wrap: wrap; row-gap: 2px; padding: 8px 12px</code>; il titolo <code>flex: 1 1 100%; order: 2; white-space: normal</code>; azioni quiete e categoria nascoste, nel dettaglio.</div></div>
+<div class="k"><div><code>.split-detail</code> e le altre colonne a fianco</div><div>Tablet: 300 px. Telefono: <code>flex-direction: column</code>, larghezza piena; «Rilettura» prima del documento (<code>order: -1</code>).</div></div>
+<div class="k"><div>Fasce di cifre</div><div>Tablet: <code>grid-template-columns: repeat(3, minmax(0, 1fr))</code>, la quinta cifra su due colonne. Telefono: due colonne, la quinta a tutta larghezza. Divisori con <code>gap: 1px; background: var(--line)</code>.</div></div>
+<div class="k"><div><code>DataTable.tsx</code>, <code>Resizable.tsx</code></div><div>Sotto 1.120 px niente trascinamento né ridimensionamento. Riquadro con <code>overflow-x: auto</code>; al telefono celle <code>padding: 10px 8px</code> e la prima colonna con <code>white-space: normal</code>.</div></div>
+<div class="k"><div>«Approva», «Chiedi modifica»</div><div>Telefono: barra <code>position: sticky; bottom: 61px; padding: 8px 16px; border-top: 1px solid var(--line)</code>, pulsanti <code>flex: 1</code>. Il campo «Che cosa vuoi cambiare?» si apre da «Chiedi modifica».</div></div>
+</div>
+
+<div class="muted p13" style="max-width: 900px">Disegnate nei due formati e nei due temi: Oggi, Chiedi con risposta, Deliverable con documento da rivedere, Commessa · Sintesi. Le altre quattordici seguono le stesse regole e non sono disegnate. Non disegnati: i dettagli aperti al tocco, il menu «Altro», la tastiera aperta, il tablet in orizzontale (1.024 px, vale la regola del tablet).</div>
+</div>
+</body>
+</html>

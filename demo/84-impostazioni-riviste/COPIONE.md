@@ -13,8 +13,8 @@ Durata: 5 minuti. Settimo e ultimo incremento della revisione fatta con Claude D
    ```
    Atteso, scheda «Collegamenti»: «Avvio del progetto» è un titolo con una riga sotto («N su 6 collegati…») e «Leggi tutte le fonti» pieno a destra: niente riquadro.
 2. **Le fonti sono un elenco.**
-   Atteso: un solo riquadro con le colonne Fonte, Stato, Credenziale e, a destra, i comandi. Sette righe: Posta, Riunioni (Verbale), Azure DevOps, Jira, Confluence, NetSuite, Documenti. La colonna «Credenziale» dice «su questo computer», «nessuna» (in grigio) o «non serve» (Documenti). «Collega» è un pulsante normale.
-   Sotto l'elenco, una volta sola, che cosa vuol dire «di chi condivide la cartella» e a che cosa servono i «Documenti».
+   Atteso: un solo riquadro con le colonne Fonte e Stato e, a destra, i comandi. Sette righe: Posta, Riunioni (Verbale), Azure DevOps, Jira, Confluence, NetSuite, Documenti. Se un altro computer ha letto una fonte, lo stato dice chi e quando. «Collega» è un pulsante normale.
+   Sotto l'elenco, una volta sola, che cosa succede quando la credenziale è di chi condivide la cartella e a che cosa servono i «Documenti».
 3. **Apri una fonte.** Premi «Collega» su Jira.
    Atteso: il modulo si apre sotto la sua riga, dentro lo stesso riquadro; «Chiudi» lo richiude.
 4. **«Persone e calendario».**
