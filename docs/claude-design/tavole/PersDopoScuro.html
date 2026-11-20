@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>5 · Impostazioni, Persone e calendario — dopo, scuro</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+
+body{margin:0}
+
+body{margin:0}
+</style>
+</head>
+<body>
+<div class="octo scuro" style="width: 1280px; min-height: 900px; display: flex">
+<nav class="side" aria-label="Sezioni">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 8px 6px"><span style="font-size: 20px; font-weight: 600; letter-spacing: -0.03em">octo</span><span class="tag">Tema</span></div>
+<div class="nav-g" style="padding-top: 4px">Progetto</div>
+<button class="btn" style="justify-content: space-between; width: 100%; font-size: 14px; font-weight: 600">Aurora <span aria-hidden="true">▾</span></button>
+<div class="nav-g">Ogni giorno</div>
+<a class="nav-i" href="#oggi">Oggi <span class="badge">5</span></a>
+<div class="nav-g">Lavoro</div>
+<a class="nav-i" href="#chiedi">Chiedi</a>
+<a class="nav-i" href="#deliverable">Deliverable</a>
+<a class="nav-i" href="#cruscotto">Cruscotto</a>
+<div class="nav-g">Ogni mese</div>
+<a class="nav-i" href="#commessa">Commessa</a>
+<div class="nav-g">Progetto</div>
+<a class="nav-i sel" href="#impostazioni">Impostazioni</a>
+<div style="margin-top: auto; padding: 0 8px; display: flex; flex-direction: column; gap: 6px" class="muted p13"><span>Sei Paola Verdi · Esci</span><span>Claude 9.9.9 (Fake Claude)</span></div>
+</nav>
+<div style="flex: 1; min-width: 0">
+<div class="testata"><div><div class="cap">Aurora</div><h1>Impostazioni</h1></div><button class="btn quieto" style="color: var(--muted)">▸ Cartella del progetto</button></div>
+<div id="impostazioni" style="padding: 18px 24px 28px; display: flex; flex-direction: column; gap: 16px">
+
+<div style="display: flex; gap: 2px; border-bottom: 1px solid var(--line)"><button class="tab">Collegamenti</button><button class="tab sel">Persone e calendario</button><button class="tab">Pagina «Oggi»</button><button class="tab">Carta intestata</button><button class="tab">Avanzate</button></div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div><h2 style="font-size: 17px">Persone e calendario</h2><div class="muted p13">Chi lavora al progetto e chi ne legge i risultati, e le date dei periodi. Risposte e deliverable li leggono e li citano.</div></div>
+<div style="display: flex; align-items: center; gap: 12px; flex: none"><span class="muted p13">Nessuna modifica da salvare</span><button class="btn pieno">Salva persone e calendario</button></div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><h2>Persone</h2><span class="muted p13">2 righe</span><span style="flex: 1"></span><button class="btn">Aggiungi una persona</button></div>
+<div style="display: flex; gap: 16px; align-items: flex-start">
+<div class="box" style="flex: 1; min-width: 0">
+<table>
+<thead><tr><th>Nome</th><th>Ruolo</th><th>Parte</th><th class="n">Allocazione %</th><th>Dal</th><th>Al</th></tr></thead>
+<tbody>
+<tr style="background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent)"><td style="font-weight: 600">Neri Sara</td><td>analista</td><td>nostra</td><td class="n">50</td><td class="muted">dall’inizio</td><td>31/01/2026</td></tr>
+<tr><td style="font-weight: 600">Carla Bianchi</td><td>referente</td><td>cliente</td><td class="n muted">non indicata</td><td class="muted">dall’inizio</td><td class="muted">c’è ancora</td></tr>
+</tbody>
+</table>
+</div>
+<div class="box" style="width: 400px; flex: none">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line)"><h2 style="font-size: 14px">Neri Sara</h2><button class="btn quieto" aria-label="Togli Neri Sara">×</button></div>
+<div style="padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-nome" class="p13" style="font-weight: 500">Nome</label><input id="p-nome" class="campo" type="text" value="Neri Sara"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-ruolo" class="p13" style="font-weight: 500">Ruolo</label><input id="p-ruolo" class="campo" type="text" value="analista"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-parte" class="p13" style="font-weight: 500">Parte</label><select id="p-parte" class="campo"><option>nostra</option><option>cliente</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-all" class="p13" style="font-weight: 500">Allocazione %</label><input id="p-all" class="campo" type="text" value="50" style="text-align: right"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-tetto" class="p13" style="font-weight: 500">Tetto (giorni)</label><input id="p-tetto" class="campo" type="text" value="" style="text-align: right"></div>
+<div class="muted p13" style="align-self: end; padding-bottom: 4px">L’allocazione è la parte del suo tempo sul progetto: vuota se non la sai.</div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-dal" class="p13" style="font-weight: 500">Dal</label><input id="p-dal" class="campo" type="text" placeholder="gg/mm/aaaa"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="p-al" class="p13" style="font-weight: 500">Al</label><input id="p-al" class="campo" type="text" value="31/01/2026"></div>
+<div class="muted p13" style="grid-column: 1 / -1; margin-top: -6px">Le date restano vuote se la persona c’è dall’inizio o c’è ancora.</div>
+<div style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px"><label for="p-come" class="p13" style="font-weight: 500">Come scrivergli</label><input id="p-come" class="campo" type="text" value=""><span class="muted p13">Ciò che un’email deve rispettare, per esempio «prima la richiesta».</span></div>
+<div style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px"><label for="p-tu" class="p13" style="font-weight: 500">Tu / lei</label><select id="p-tu" class="campo"><option>come nelle mail</option><option>tu</option><option>lei</option></select><span class="muted p13">Con «come nelle mail» chi scrive segue le mail che le hai già mandato, e dà del lei se non ce ne sono.</span></div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><h2>Calendario: periodi e sprint</h2><span class="muted p13">1 riga</span><span style="flex: 1"></span><button class="btn">Aggiungi un periodo</button></div>
+<div class="box">
+<div class="riga" style="min-height: 32px; background: var(--panel); font-size: 13px; font-weight: 600"><span style="flex: 1">Periodo</span><span style="width: 150px; flex: none">Dal</span><span style="width: 150px; flex: none">Al</span><span style="width: 30px; flex: none"></span></div>
+<div class="riga"><span style="flex: 1; min-width: 0"><input class="campo" type="text" value="Sprint 28" aria-label="Periodo"></span><span style="width: 150px; flex: none"><input class="campo" type="text" value="26/10/2026" aria-label="Dal"></span><span style="width: 150px; flex: none"><input class="campo" type="text" value="13/11/2026" aria-label="Al"></span><button class="btn quieto" aria-label="Togli Sprint 28">×</button></div>
+</div>
+</section>
+
+<div class="box"><div class="riga"><button class="btn quieto" style="color: var(--text); margin-left: -6px; font-size: 15px; font-weight: 600">▸ Glossario: sigle e nomi sentiti male</button><span class="uno muted p13">0 righe · la forma giusta di ciò che le trascrizioni scrivono come lo sentono</span><button class="btn">Chiedi a Claude le coppie</button></div></div>
+
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -22,6 +22,7 @@
     "release:passphrase": "node scripts/release-rekey.mjs",
     "release:sign": "node scripts/release-sign.mjs",
     "e2e": "pnpm build && node e2e/app.e2e.mjs",
+    "galleria": "pnpm e2e && node e2e/galleria.mjs",
     "e2e:cruscotto": "pnpm build && node e2e/cruscotto.e2e.mjs",
     "e2e:commessa": "pnpm build && node e2e/commessa.e2e.mjs",
     "e2e:riunioni": "pnpm build && node e2e/riunioni.e2e.mjs",

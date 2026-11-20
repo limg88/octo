@@ -29,7 +29,9 @@
   --warning-edge: light-dark(#dbb46f, #795528);
   --ok: light-dark(#1a6b46, #6fcf9f);
   --ok-bg: light-dark(#e6f4ec, #13281d);
-  --danger: light-dark(#b42318, #d14343);
+  --ok-edge: light-dark(#9fcfb5, #2f6b4c);
+  /* Red is read as text on both grounds: 4.5 to 1 at least. */
+  --danger: light-dark(#b42318, #f47067);
   --on-danger: #ffffff;
   --shade: light-dark(rgba(15, 16, 20, 0.32), rgba(0, 0, 0, 0.6));
   --shadow-control: 0 1px 1px light-dark(rgba(15, 16, 20, 0.05), rgba(0, 0, 0, 0.3));
@@ -674,31 +676,55 @@ main {
   text-decoration: none;
 }
 
-.marker-warning,
-.badge-warning,
-.status-warning {
+.marker-warning {
   background: var(--warning-bg);
   color: var(--warning);
 }
 
+/* A mark of kind or of state has one shape: always with its word, never by colour alone, and
+   never with the look of a button. */
+.status,
+.badge,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  max-width: 100%;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--field-line);
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .badge {
   align-self: flex-start;
-  padding: 2px 8px;
-  border-radius: 5px;
-  border: 1px solid var(--line);
-  font-size: 13px;
-  font-weight: 500;
 }
 
 .badge-ok,
 .status-ok {
+  border-color: var(--ok-edge);
   background: var(--ok-bg);
   color: var(--ok);
 }
 
-.badge-ok,
-.badge-warning {
-  border-color: transparent;
+.badge-warning,
+.status-warning,
+.pill-warning {
+  border-color: var(--warning-edge);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+/* Blue only when the mark names a source. */
+.pill-source {
+  border-color: var(--source-edge);
+  background: var(--source-bg);
+  color: var(--source);
 }
 
 .answer .sources {
@@ -723,16 +749,6 @@ main {
 
 .status {
   margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Something foreseen: neither a success nor a thing to check. */
-.status-neutral {
-  background: var(--hover);
-  color: var(--muted);
 }
 
 .source-date {
@@ -1291,18 +1307,25 @@ main > .warning,
   font-weight: 600;
 }
 
-.figures {
+/* A band of figures: one frame, as many equal cells as it has figures, a line between them. */
+.figures,
+.metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   margin: 0;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-large);
+  background: var(--surface);
+  overflow: hidden;
 }
 
-.figure {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-large);
-  background: var(--bg);
-  box-shadow: var(--shadow-control);
+/* The line on the left of the first cell of a row falls outside the frame, which clips it. */
+.figure,
+.metric {
+  margin: -1px 0 0 -1px;
+  border: solid var(--line);
+  border-width: 1px 0 0 1px;
   padding: 12px 14px;
 }
 
@@ -1315,7 +1338,8 @@ main > .warning,
   margin: 2px 0 0;
   font-size: 22px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2324,16 +2348,15 @@ details.advanced[open] > summary {
   align-items: baseline;
   gap: 8px;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+  letter-spacing: -0.012em;
 }
 
 .today-count {
-  font-weight: 500;
-  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .today-empty {
@@ -2425,8 +2448,6 @@ details.advanced[open] > summary {
 
 .today-points-toggle {
   margin-left: auto;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .today-point-list {
@@ -3058,43 +3079,6 @@ h4.detail-title {
   color: var(--text);
 }
 
-/* A mark of kind or of state: always with its word, never by colour alone. */
-.pill {
-  display: inline-block;
-  max-width: 100%;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--hover);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-.pill-source {
-  border-color: var(--source-edge);
-  background: var(--source-bg);
-  color: var(--source);
-}
-
-.pill-warning {
-  border-color: var(--warning-edge);
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-.pill-warning::before {
-  content: "";
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin-right: 5px;
-  border: 1px solid currentColor;
-  transform: rotate(45deg);
-  vertical-align: 2px;
-}
-
 .box {
   padding: 9px 12px;
   border-left: 2px solid var(--accent);
@@ -3136,9 +3120,13 @@ blockquote.quote {
   padding-left: 12px;
 }
 
-fieldset.chips,
-fieldset.metrics {
+fieldset.chips {
   border: 0;
+  padding: 0;
+}
+
+fieldset.metrics {
+  min-width: 0;
   padding: 0;
 }
 
@@ -3155,30 +3143,24 @@ fieldset.metrics {
   gap: 10px;
 }
 
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-}
-
 .metric {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0;
+  gap: 2px;
   height: 100%;
-  padding: 9px 12px 10px;
+  border-radius: 0;
+  box-shadow: none;
   text-align: left;
   font-weight: 400;
 }
 
 .metric-value {
-  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1.2;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
 }
 
 .metric-label {
@@ -3195,8 +3177,7 @@ fieldset.metrics {
 .metric-selected,
 .metric-selected:hover:not(:disabled) {
   background: var(--accent-soft);
-  border-color: var(--accent-edge);
-  box-shadow: inset 0 -2px var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -3624,10 +3605,18 @@ span.marker-warning {
 
 /* Four figures of a group stand on a row, or two by two: never three and one left alone. */
 .figures-four {
+  grid-auto-flow: row;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* A small window: a band of figures goes on two rows. */
 @media (max-width: 1040px) {
+  .figures,
+  .metrics {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .figures-four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -73,7 +73,7 @@ function WeekList(
                     <span className={entry.overdueDays > 0 ? 'pill pill-warning' : 'pill'}>
                       {whenOf(entry)}
                     </span>
-                    <span className="pill pill-source">{words.label}</span>
+                    <span className="pill">{words.label}</span>
                   </span>{' '}
                   <strong className="entry-title">{words.title}</strong>
                   {words.detail !== '' && (

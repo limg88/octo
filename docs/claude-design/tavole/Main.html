@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Problemi per gravità</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+
+body{margin:0}
+a{color:#5040c4}a:hover{color:#3b2e99}
+</style>
+</head>
+<body>
+<div style="width: 1280px; min-height: 1500px; box-sizing: border-box; padding: 48px 56px; background: #ffffff; color: #171719; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; letter-spacing: -0.006em; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #606064">Octo · revisione dell'interfaccia · giro 1</div>
+<h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.012em">Che cosa ostacola, in ordine di gravità</h1>
+<p style="margin: 0; color: #606064; max-width: 860px">Dalle 18 schermate allegate, lette nei due temi. Ogni riga dice dove, che cosa, e quale vincolo del brief è in gioco. Le righe segnate «proposta» sono le tre schermate che ridisegnerei.</p>
+</div>
+
+<div style="display: flex; flex-direction: column; border: 1px solid #c8c8cd; border-radius: 8px; overflow: hidden">
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 9px 16px; background: #f6f6f6; border-bottom: 1px solid #dedee1; font-size: 13px; font-weight: 600">
+<div>Gravità</div><div>Dove</div><div>Che cosa ostacola</div><div>Vincolo</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Oggi</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 1</span></div>
+<div>La pagina è alta 2.226 px: due finestre e mezzo. «Da fare oggi», che il badge conta, comincia a 1.470 px; il primo schermo è occupato da un avviso, da «Il punto» vuoto con il suo modulo a quattro campi e da una riunione.</div>
+<div style="font-size: 13px; color: #606064">5 · risultato nel primo schermo</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Oggi</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 1</span></div>
+<div>La stessa cosa è detta due o tre volte: il tracker vecchio di 5 giorni è avviso in cima e prima criticità; la riunione delle 09:59 è in «Riunioni di oggi» e in «Adesso»; la mail di Carla Bianchi compare in tre riquadri.</div>
+<div style="font-size: 13px; color: #606064">11 · un posto solo</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Deliverable · documento</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 2</span></div>
+<div>Due pulsanti pieni nella stessa vista («Nuovo deliverable», «Approva»). Il verdetto verde «Può uscire» sta accanto all'ambra «1 informazione mancante», e ciò che manca è in fondo al testo, lontano dal punto in cui si decide.</div>
+<div style="font-size: 13px; color: #606064">4 · un pieno · 8 · stati</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Commessa · Sintesi</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 3</span></div>
+<div>Dieci riquadri di pari peso: nessuna cifra guida, il margine è in seconda fila. Lo scostamento da NetSuite (560,00), il controllo che conta di più, è una riga grigia in fondo alla pagina, senza stato.</div>
+<div style="font-size: 13px; color: #606064">5 · gerarchia · 8 · stati</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Deliverable · registro</span></div>
+<div>La colonna «Oggetto» è larga una sillaba: i titoli vanno a capo lettera per lettera e le righe diventano alte 170 px. È una correzione di larghezze, non un ridisegno: la metto nell'elenco di consegna.</div>
+<div style="font-size: 13px; color: #606064">6 · una riga per elemento</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Alta</div>
+<div><span style="font-weight: 600">Cruscotto</span></div>
+<div>Tre righe di comandi (periodo, lettura del tracker, «Impostazioni del cruscotto») prima delle schede e del risultato: le cifre cominciano a 330 px. Lo stesso schema torna in «Previsionale».</div>
+<div style="font-size: 13px; color: #606064">5 · dettagli sotto il risultato</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Tutte</span></div>
+<div>Il colore porta più di un significato. Ambra: «Per il cliente» (un destinatario), «Documento interno», avvisi di calcolo. Blu: oltre alle fonti, le categorie («Sprint», «Calendario», «Ore»). Il marrone di «Entrati» nel grafico è fuori dai token.</div>
+<div style="font-size: 13px; color: #606064">3 · un significato solo</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Commessa · schede</span></div>
+<div>Il titolo della pagina cambia con la scheda («Ore», «Previsionale» al posto di «Commessa»). L'avviso «Documento interno» sta in tre posizioni diverse e in «Ore» manca. «Ore» ha due pulsanti pieni.</div>
+<div style="font-size: 13px; color: #606064">coerenza · 4 · un pieno</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Chiedi · risposta</span></div>
+<div>Il riquadro «Fonte citata» è ripetuto intero per ogni risposta: una risposta di una riga occupa 450 px, e nella finestra ne sta una sola. La fonte a fianco resta; va deciso se il riquadro si apre sul richiamo in vista.</div>
+<div style="font-size: 13px; color: #606064">densità · 6 · dettaglio su richiesta</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Oggi</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 1</span></div>
+<div>Ogni elemento occupa due o tre righe (etichette, titolo, nota) e le azioni a destra sono tutte uguali: «Apri «Cruscotto»» tre volte, «Apri «Impostazioni»» due. Il dettaglio di «Da fare oggi» offre cinque azioni dello stesso peso.</div>
+<div style="font-size: 13px; color: #606064">6 · una riga per elemento</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Deliverable · documento</span> <span style="font-size: 12px; color: #5040c4; font-weight: 500">· proposta 2</span></div>
+<div>Sotto il titolo una riga di nove misure («Scrittura 0 min · Revisione 0 min · 1 giro · modello…») che sono del registro. Lo stato «Da rivedere» è scritto tre volte: elenco, etichetta, riga grigia. Nell'elenco è solo testo grigio.</div>
+<div style="font-size: 13px; color: #606064">5 · dettagli · 8 · stati</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Deliverable · catalogo</span></div>
+<div>Quattordici schede di pari peso in tre gruppi, con descrizioni di tre righe. «Modifica» ed «Elimina Nota di rilascio» stanno fuori dalla loro scheda. Due tipi quasi omonimi: «Note di rilascio» e «Nota di rilascio».</div>
+<div style="font-size: 13px; color: #606064">6 · una riga · gerarchia</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Impostazioni · Collegamenti</span></div>
+<div>La nota «Su questo computer non c'è la credenziale…» è ripetuta identica in tre riquadri. Tre pulsanti pieni («Leggi tutte le fonti», due «Collega»). «Non collegato.» è in un riquadro bordato che sembra un pulsante.</div>
+<div style="font-size: 13px; color: #606064">4 · un pieno · 8 · stati</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Media</div>
+<div><span style="font-weight: 600">Impostazioni · Persone; Commessa · Previsionale</span></div>
+<div>Le tabelle con i campi escono dal bordo già a 1.280 px: la colonna «Al» è tagliata, in «Previsionale» il primo campo da scrivere è nascosto oltre il margine. A 900 px sono inservibili. In «Persone» ci sono due «Salva» pieni.</div>
+<div style="font-size: 13px; color: #606064">6 · 12 · finestra minima</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px; border-bottom: 1px solid #dedee1">
+<div style="font-weight: 600">Bassa</div>
+<div><span style="font-weight: 600">Tutte</span></div>
+<div>Tre stili per l'intestazione di un gruppo: maiuscoletto 13 («Oggi»), grassetto 15 («Commessa»), monospazio maiuscolo 11 (nei dettagli). Due riquadri-cifra diversi: Inter 22 in «Commessa», monospazio in «Cruscotto».</div>
+<div style="font-size: 13px; color: #606064">coerenza fra sezioni</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 84px 196px minmax(0, 1fr) 150px; gap: 16px; padding: 11px 16px">
+<div style="font-weight: 600">Bassa</div>
+<div><span style="font-weight: 600">Etichette e stati</span></div>
+<div>Alcuni stati hanno l'aspetto di un comando («Tutti i rilievi rivisti», «Approvati: 2 · …», «Non collegato.») e alcuni comandi quello di un testo («Riduci», «Chiudi la giornata»). Serve una forma sola per lo stato e una per l'azione quieta.</div>
+<div style="font-size: 13px; color: #606064">8 · stati</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<div style="border: 1px solid #c8c8cd; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; font-weight: 500; color: #5040c4">Proposta 1</div>
+<div style="font-size: 17px; font-weight: 600">Oggi</div>
+<div style="color: #606064">È la pagina aperta più volte al giorno e la più lunga. Togliere i doppioni e portare a una riga per elemento la riporta dentro una finestra e mezzo.</div>
+</div>
+<div style="border: 1px solid #c8c8cd; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; font-weight: 500; color: #5040c4">Proposta 2</div>
+<div style="font-size: 17px; font-weight: 600">Deliverable · documento</div>
+<div style="color: #606064">È dove il PM mette la firma. Da rivedere e approvato diventano due stati della stessa tavola: un verdetto, ciò che manca accanto, un solo pulsante pieno.</div>
+</div>
+<div style="border: 1px solid #c8c8cd; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; font-weight: 500; color: #5040c4">Proposta 3</div>
+<div style="font-size: 17px; font-weight: 600">Commessa · Sintesi</div>
+<div style="color: #606064">È la pagina con più cifre e meno gerarchia. La testata che ne esce (titolo fisso, avviso interno, schede) vale per tutte e quattro le schede e per «Cruscotto».</div>
+</div>
+</div>
+
+<p style="margin: 0; font-size: 13px; color: #606064; max-width: 900px">Non viste in questo giro: finestra minima 900×600, stati vuoti e d'errore, dialoghi dei progetti (la galleria non li apre). Le schermate 16–18 di «Impostazioni» non sono entrate nell'elenco. I contrasti dei due temi li misuro sulle tavole del ridisegno.</p>
+</div>
+</body>
+</html>

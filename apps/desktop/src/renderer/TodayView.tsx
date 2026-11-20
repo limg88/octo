@@ -1007,7 +1007,7 @@ function SignalRow(props: {
         {props.why === undefined && item.dueBecause && (
           <span className="pill pill-warning">{text.dueShort[item.dueBecause]}</span>
         )}
-        <span className="pill pill-source">{text.kinds[facts.kind]}</span>
+        <span className="pill">{text.kinds[facts.kind]}</span>
         {age !== '' && <span>{age}</span>}
         {judgement && <span>· Claude: {text.judgement.importance[judgement.importance]}</span>}
         {facts.kind === 'mail_reply' && !judgement && props.judging && (
@@ -1161,7 +1161,7 @@ function SignalDetail(props: DetailProps) {
     <>
       <div className="panel-head">
         <span className="eyebrow">{text.computed}</span>
-        <span className="pill pill-source">{text.kinds[facts.kind]}</span>
+        <span className="pill">{text.kinds[facts.kind]}</span>
       </div>
       <div className="panel-body">
         <h4 className="detail-title">{words.title}</h4>

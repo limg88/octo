@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Elenco di consegna per lo sviluppo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+
+body{margin:0}
+.octo .k{display:grid;gap:16px;padding:8px 14px;border-top:1px solid var(--line);font-size:13px}
+.octo .k.t{border-top:0;background:var(--panel);font-weight:600}
+.octo .k4{grid-template-columns:170px 150px 170px minmax(0,1fr)}
+.octo .k2{grid-template-columns:300px minmax(0,1fr)}
+.octo code{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="octo" style="width: 1280px; min-height: 1500px; padding: 44px 48px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div class="cap">Octo · revisione dell’interfaccia · giro 2</div>
+<h1>Elenco di consegna per lo sviluppo</h1>
+<div class="muted">Per Claude Code: <code>apps/desktop/src/renderer/styles.css</code> e i componenti React. I nomi delle classi vengono dall’elenco dei selettori di oggi; le regole dentro ciascuna vanno lette prima di cambiarle.</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Token cambiati</h2>
+<div class="box">
+<div class="k k4 t"><div>Token</div><div>Oggi</div><div>Proposto</div><div>Motivo</div></div>
+<div class="k k4"><div><code>--danger</code> (scuro)</div><div><code>#d14343</code></div><div><code>#f47067</code></div><div>Testo rosso a 4,33:1 su <code>--bg</code> e 4,13:1 su <code>--surface</code>: sotto 4,5. Con il nuovo valore 6,94:1 e 6,61:1. Il chiaro resta <code>#b42318</code> (6,57:1).</div></div>
+<div class="k k4"><div><code>--ok-edge</code> (nuovo)</div><div>non esiste</div><div><code>light-dark(#9fcfb5, #2f6b4c)</code></div><div>L’etichetta verde non aveva bordo, ambra e blu sì: una forma sola per lo stato.</div></div>
+</div>
+<div class="muted p13">Gli altri token restano. Minimi misurati, chiaro / scuro: <code>--muted</code> 5,44 / 6,68 (su <code>--accent-soft</code>) · <code>--accent</code> 6,36 / 7,74 · <code>--source</code> su <code>--source-bg</code> 6,54 / 9,56 · <code>--warning</code> su <code>--warning-bg</code> 6,32 / 10,61 · <code>--ok</code> su <code>--ok-bg</code> 5,72 / 8,23 · <code>--on-accent</code> su <code>--accent</code> 7,31 / 8,80 · bordo dei campi <code>--input-line</code> 3,34 / 3,62. <code>--field-line</code> (1,67 / 1,69) resta solo su pulsanti e riquadri, mai su un campo in cui si scrive.</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Componenti cambiati</h2>
+<div class="box">
+<div class="k k2 t"><div>Nome di oggi</div><div>Che cosa cambia</div></div>
+<div class="k k2"><div><code>.status</code> <code>.status-ok</code> <code>.status-warning</code> <code>.status-neutral</code></div><div>Forma unica dello stato: <code>height: 20px; padding: 0 6px; border-radius: 4px; border: 1px solid; font-size: 12px; font-weight: 500</code>. <code>.status-ok</code>: <code>border-color: var(--ok-edge)</code>. <code>.status-neutral</code>: <code>background: var(--hover); border-color: var(--field-line); color: var(--text)</code>. Nessuno stato dentro un riquadro con l’aspetto di <code>button</code>.</div></div>
+<div class="k k2"><div><code>.chip</code> (etichette di categoria)</div><div>Colori di <code>.status-neutral</code>. I colori <code>--source*</code> solo quando l’etichetta nomina una fonte.</div></div>
+<div class="k k2"><div>Intestazione di sezione (<code>.today-title</code> e simili)</div><div><code>font: 600 15px Inter; letter-spacing: -0.012em; text-transform: none</code>. Il maiuscoletto IBM Plex Mono 11 px resta ai sottogruppi («In corso · 1», «Calcolato da Octo»).</div></div>
+<div class="k k2"><div><code>TodayView.tsx</code></div><div>Ordine: avviso, <code>TodayPoints</code>, «Adesso», «Da fare oggi», <code>TodayWeek</code>, «Da tenere d’occhio», valutazione. Una criticità con lo stesso testo dell’avviso in cima non entra in <code>TodayWeek</code>.</div></div>
+<div class="k k2"><div><code>TodayAgenda.tsx</code> · <code>.today-meetings</code></div><div>Non è più una sezione: ogni riunione di oggi è una riga di <code>.today-now</code>, ordinata per ora. <code>TodayPrep.tsx</code> si apre sotto la riga da «N cose da portare» e cita una mail una volta sola.</div></div>
+<div class="k k2"><div><code>TodayPoints.tsx</code> · <code>.today-point-form</code></div><div>Senza open point: una riga di 40 px con lo stato, «Aggiungi» e «Chiudi la giornata». <code>.today-point-form</code> compare dopo «Aggiungi». «Riduci» solo con almeno un open point.</div></div>
+<div class="k k2"><div><code>.today-now</code> · <code>.week-entry</code> · <code>.today-watch</code> · <code>.today-item</code></div><div>Riga unica: <code>display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 5px 12px</code>; titolo 600 e nota <code>--muted</code> 13 px nello stesso <code>span</code> con <code>white-space: nowrap; overflow: hidden; text-overflow: ellipsis</code>. In <code>.week-entry</code>: data 84 px, categoria 150 px, azione 150 px a destra.</div></div>
+<div class="k k2"><div><code>.today-aside</code></div><div><code>width: 440px</code>. Le ore in <code>DataTable</code> (Persona, Timesheet, Tracker; misure a destra). Azioni: «Apri «…»» pieno, «Fatto» normale, «Rimanda», «Segna come open point», «Non mi interessa» quiete su una riga.</div></div>
+<div class="k k2"><div><code>DeliverablesView.tsx</code> · <code>.deliverable-list</code></div><div><code>width: 248px</code>. Una riga per documento: titolo con ellissi e <code>.status-warning</code> «Da rivedere» o <code>.status-ok</code> «Approvato». «Nuovo deliverable» pieno solo senza documento aperto.</div></div>
+<div class="k k2"><div><code>DeliverablesView.tsx</code> · <code>.deliverable-body</code></div><div>Sotto il titolo: «tipo · destinatario · N giri · modello». Via tempi di scrittura, revisione e ultimo giro (restano nel registro). «Per il cliente» testo <code>--muted</code>, non <code>.pill-warning</code>.</div></div>
+<div class="k k2"><div><code>.review-panel</code> · <code>.review-head</code> · <code>.missing</code></div><div>Larghezza 336 px. Due blocchi: «Calcolato da Octo» (conteggio citazioni, conteggio mancanti e l’elenco <code>.missing</code>, tolto dal fondo del testo) e «Valutato da Claude» (verdetto, «Tutti i rilievi rivisti» come testo, <code>.review-fold</code>, campo, «Chiedi modifica», «Approva»). Con stato approvato: niente campo né pulsanti.</div></div>
+<div class="k k2"><div><code>ProjectSheetSummary.tsx</code> · <code>.figures-four</code> · <code>.figure</code></div><div>Una fascia: <code>grid-template-columns: repeat(5, minmax(0, 1fr))</code>, un solo bordo esterno, divisori <code>border-left: 1px solid var(--line)</code>. Cifre: Ordinato, Fatturato (NetSuite), Costi a oggi, Margine a oggi, Scostamento da NetSuite con <code>.status-warning</code> «Da verificare» se diverso da zero, <code>.status-ok</code> altrimenti. Le altre cifre in una <code>DataTable</code> «Ordine, ricavi e da regolare» (Voce, Valore, Fonte).</div></div>
+<div class="k k2"><div><code>ProjectSheetSummary.tsx</code> · tabelle</div><div>Colonna «Fonte» con <code>.status</code>: fonte letta in <code>--source*</code>, «Octo» neutro, «senza timesheet, dichiarate» <code>.status-warning</code>. Due colonne da 1.120 px in su. «Copia i dati per un report» nella riga del titolo.</div></div>
+<div class="k k2"><div><code>ProjectSheetView.tsx</code> · <code>.sheet-header</code> · <code>HoursView.tsx</code> · <code>ForecastView.tsx</code></div><div>Il titolo della testata resta «Commessa» in tutte le schede. L’avviso «Documento interno» sta subito sotto le schede in tutte e quattro, «Ore» compresa.</div></div>
+<div class="k k2"><div><code>.box-warning</code> (avviso sugli esterni)</div><div>Aggiunge un pulsante normale a destra: «Apri «Previsionale»».</div></div>
+<div class="k k2"><div><code>DataTable.tsx</code> nel registro dei deliverable</div><div>Colonna «Oggetto»: <code>min-width: 200px</code>, testo su una riga con ellissi. È una correzione: non è nelle tavole.</div></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Schermate toccate</h2>
+<div class="box">
+<div class="riga"><span class="tag">01</span><span>Oggi: ridisegnata.</span></div>
+<div class="riga"><span class="tag">09 · 10</span><span>Deliverable, documento approvato e da rivedere: ridisegnate.</span></div>
+<div class="riga"><span class="tag">02</span><span>Commessa, Sintesi: ridisegnata.</span></div>
+<div class="riga"><span class="tag">03 · 04 · 05</span><span>Commessa, altre schede: solo testata e posizione dell’avviso interno.</span></div>
+<div class="riga"><span class="tag">08 · 11</span><span>Deliverable, catalogo e registro: solo la colonna di sinistra; nel registro la larghezza di «Oggetto».</span></div>
+<div class="riga"><span class="tag">tutte</span><span>Etichette di stato e di categoria; <code>--danger</code> nel tema scuro.</span></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Finestra minima 900×600</h2>
+<div class="muted p13">Non disegnata: sono regole. Sotto 1.120 px il dettaglio di «Da fare oggi», la colonna «Rilettura» e «Fonte citata» e la seconda colonna di tabelle di «Commessa» vanno sotto il contenuto, a tutta larghezza. Sotto 1.040 px la fascia delle cifre va su due righe (3 + 2) e nelle criticità sparisce la colonna della categoria. Scorre in orizzontale solo una tabella dentro il suo riquadro.</div>
+</section>
+</div>
+</body>
+</html>

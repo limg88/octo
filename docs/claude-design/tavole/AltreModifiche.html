@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Altre dodici schermate: modifiche</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+
+body{margin:0}
+.octo .m{display:grid;grid-template-columns:150px minmax(0,1.3fr) minmax(0,1fr) 96px;gap:14px;padding:6px 14px;border-top:1px solid var(--line);font-size:13px;line-height:1.4}
+.octo .m.t{border-top:0;background:var(--panel);font-weight:600}
+.octo .m>:first-child{font-weight:600}
+.octo .m>:last-child{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="octo" style="width: 1280px; min-height: 1500px; padding: 36px 40px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div class="cap">Octo · revisione dell’interfaccia · giro 4</div>
+<h1>Altre dodici schermate: modifiche</h1>
+</div>
+<div class="box">
+<div class="m t"><div>Schermata</div><div>Che cosa cambia</div><div>Perché</div><div>Vincolo</div></div>
+<div class="m"><div>03 Fatturazione</div><div>I quattro riquadri «Dai fornitori» diventano la riga «Totale» della tabella, con la colonna «Da fatturare».</div><div>Ripetevano i totali di una tabella di una riga.</div><div>11</div></div>
+<div class="m"><div></div><div>Colonna «Fonte» con l’etichetta blu «NetSuite».</div><div>Ogni cifra dice da dove viene.</div><div>3</div></div>
+<div class="m"><div>04 Ore</div><div>Le due letture sono due righe: nome, stato, nota breve, pulsante. Pieno solo sulla prima da fare; i paragrafi dietro la «i».</div><div>Due pulsanti pieni e due paragrafi sopra il risultato.</div><div>4 · 5</div></div>
+<div class="m"><div></div><div>Riquadro tratteggiato «Il confronto delle ore compare qui dopo le due letture.»</div><div>Non si vedeva dove sarebbe arrivato il risultato.</div><div>8</div></div>
+<div class="m"><div></div><div>Titolo «Commessa» e avviso «Documento interno» sotto le schede.</div><div>Il titolo diceva «Ore» e l’avviso mancava.</div><div>coerenza</div></div>
+<div class="m"><div>05 Previsionale</div><div>La tabella tiene le sole colonne calcolate; i campi da scrivere stanno nel dettaglio sotto la riga scelta.</div><div>Il primo campo era oltre il bordo già a 1.280 px.</div><div>6 · 12</div></div>
+<div class="m"><div></div><div>«Salva i dati del mese» pieno nella riga del mese; «Impostazioni del previsionale» quieto accanto.</div><div>Le impostazioni stavano sopra il risultato.</div><div>4 · 5</div></div>
+<div class="m"><div></div><div>«Margine finale» vuoto mostra l’etichetta ambra «manca».</div><div>Un trattino non diceva perché.</div><div>8</div></div>
+<div class="m"><div>06 Chiedi, nuova chat</div><div>«Nuova chat» normale; pieno solo il pulsante di invio. Le quattro domande pronte sono pulsanti normali.</div><div>Si è già in una chat nuova; le domande sembravano link.</div><div>4 · 8</div></div>
+<div class="m"><div>07 Chiedi, risposta</div><div>«Fonte citata» è un solo riquadro, fisso a fianco, per il richiamo in vista.</div><div>Era ripetuto per ogni risposta: da 1.588 a circa 940 px.</div><div>6 · 11</div></div>
+<div class="m"><div></div><div>Il richiamo in vista ha un anello viola; quello non riscontrato resta ambra.</div><div>Si vede a quale richiamo si riferisce il riquadro.</div><div>3</div></div>
+<div class="m"><div></div><div>«Fonti» e «Prepara un deliverable da questa risposta» su una riga.</div><div>Occupavano quattro righe per risposta.</div><div>6</div></div>
+<div class="m"><div>08 Deliverable, catalogo</div><div>Le schede diventano un elenco: una riga per tipo, in due gruppi, «Per il cliente» e «Interno».</div><div>Quattordici schede di pari peso: da 1.299 a circa 1.060 px.</div><div>6</div></div>
+<div class="m"><div></div><div>«Modifica» ed «Elimina» nella riga del tipo «Tuo»; «Crea un tipo tuo» nella riga del titolo.</div><div>Stavano fuori dalla scheda e in fondo all’elenco.</div><div>5 · coerenza</div></div>
+<div class="m"><div>11 Deliverable, registro</div><div>«Oggetto» su una riga, «Stato» come etichetta, totali nella riga «Approvati: 2».</div><div>Oggetto a capo lettera per lettera; totali in un riquadro che sembrava un pulsante.</div><div>6 · 7 · 8</div></div>
+<div class="m"><div>12 Cruscotto, Bug</div><div>Schede in cima; periodo, stato della lettura, «Leggi da Azure DevOps» e impostazioni su una riga.</div><div>Tre righe di comandi prima delle cifre.</div><div>5</div></div>
+<div class="m"><div></div><div>I cinque riquadri sono una fascia come in «Commessa», con le cifre in Inter 22.</div><div>Due riquadri-cifra diversi fra sezioni.</div><div>coerenza</div></div>
+<div class="m"><div></div><div>Bug su una riga, con «tempo non noto» al posto del trattino; pulsanti del dettaglio su una riga.</div><div>Il trattino non aveva testo; i pulsanti andavano a capo.</div><div>6 · 8</div></div>
+<div class="m"><div>13 Cruscotto, Andamento</div><div>Grafico in neutri: «Entrati» grigio pieno, «Usciti» solo contorno, «Aperti» linea nel colore del testo.</div><div>Marrone, verde e viola senza il loro significato.</div><div>3</div></div>
+<div class="m"><div></div><div>«—» diventa «nessun dato»; «Commenta il periodo» nella riga del titolo.</div><div>Lo stato vuoto non aveva testo.</div><div>8 · 5</div></div>
+<div class="m"><div>16 Pagina «Oggi»</div><div>Tre righe con etichetta a sinistra e comando a destra; «Nessuno: mostro ogni tipo…» come etichetta di stato.</div><div>Stessa forma delle altre schede di «Impostazioni».</div><div>coerenza · 8</div></div>
+<div class="m"><div>17 Carta intestata</div><div>Due righe: nome, stato, azione. Le spiegazioni una volta sotto.</div><div>Lo stato «Nessuna…» sembrava un pulsante.</div><div>6 · 8</div></div>
+<div class="m"><div>18 Avanzate</div><div>Etichetta a sinistra e menu di 320 px a destra; «Salva i modelli» nella riga del titolo, con lo stato accanto.</div><div>Tre menu larghi 720 px per tre parole.</div><div>5</div></div>
+</div>
+
+<h2>Etichette nuove o cambiate</h2>
+<div class="box">
+<div class="riga"><span class="tag">nuova</span><span>«Non letti per ottobre 2026», «Non lette per ottobre 2026», «Il confronto delle ore compare qui dopo le due letture.» in «Ore».</span></div>
+<div class="riga"><span class="tag">nuova</span><span>«manca» in «Previsionale»; titolo del dettaglio «… — i tuoi dati di ottobre 2026».</span></div>
+<div class="riga"><span class="tag">dedotta</span><span>I campi «Ricavi corretti», «Da fatturare», «Tua nota»: i nomi vengono dal testo d’aiuto, i campi veri sono oltre il bordo.</span></div>
+<div class="riga"><span class="tag">nuova</span><span>«Richiamo in vista: [1] della prima risposta.» in «Fonte citata»; gruppi «Per il cliente · 5» e «Interno · 6» nel catalogo.</span></div>
+<div class="riga"><span class="tag">accorciata</span><span>«Modifica Nota di rilascio» ed «Elimina Nota di rilascio» diventano «Modifica» ed «Elimina» (il nome intero resta per i lettori di schermo).</span></div>
+<div class="riga"><span class="tag">nuova</span><span>«tempo non noto», «nessun dato», «Mario Rossi · 1» in «Cruscotto»; «Notifica del sistema» e «Nessuna modifica da salvare» in «Impostazioni».</span></div>
+</div>
+</div>
+</body>
+</html>

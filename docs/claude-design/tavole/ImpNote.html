@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Impostazioni: modifiche e consegna</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{background:#e4e4e8}
+.octo{--bg:#ffffff;--surface:#ffffff;--panel:#f6f6f6;--hover:#f0f0f2;--text:#171719;--muted:#606064;--line:#dedee1;--field-line:#c8c8cd;--input-line:#8c8c93;--accent:#5040c4;--accent-soft:#f0edff;--accent-edge:#c9bff3;--on-accent:#ffffff;--source:#225a88;--source-bg:#eaf4ff;--source-edge:#bcd7ef;--warning:#80500e;--warning-bg:#fff5e1;--warning-edge:#dbb46f;--ok:#1a6b46;--ok-bg:#e6f4ec;--ok-edge:#9fcfb5;--danger:#b42318}
+.octo.scuro{--bg:#0a0a0b;--surface:#111112;--panel:#101011;--hover:#202022;--text:#f5f5f5;--muted:#a9a9af;--line:#2a2a2d;--field-line:#3b3b40;--input-line:#6c6c73;--accent:#b9acff;--accent-soft:#24203b;--accent-edge:#504479;--on-accent:#1a1139;--source:#a6d1ff;--source-bg:#142739;--source-edge:#3b5b77;--warning:#ffd08a;--warning-bg:#302319;--warning-edge:#795528;--ok:#6fcf9f;--ok-bg:#13281d;--ok-edge:#2f6b4c;--danger:#f47067}
+.octo{font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;letter-spacing:-0.006em;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums}
+.octo *{box-sizing:border-box}
+.octo .side{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.octo .nav-g{font-size:13px;color:var(--muted);padding:12px 8px 4px}
+.octo .nav-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;border-left:2px solid transparent;color:var(--text);text-decoration:none;font-size:14px}
+.octo .nav-i.sel{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.octo .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 5px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:600}
+.octo .testata{display:flex;align-items:flex-end;justify-content:space-between;height:68px;padding:0 24px 10px;border-bottom:1px solid var(--line)}
+.octo .cap{font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.octo h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.012em;line-height:1.2}
+.octo h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.012em}
+.octo .muted{color:var(--muted)}
+.octo .p13{font-size:13px}
+.octo .btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.octo .btn.pieno{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.octo .btn.quieto{border-color:transparent;background:transparent;color:var(--accent);padding:0 6px}
+.octo .tag{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 6px;border-radius:4px;border:1px solid var(--field-line);background:var(--hover);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.octo .tag.fonte{color:var(--source);background:var(--source-bg);border-color:var(--source-edge)}
+.octo .tag.verifica{color:var(--warning);background:var(--warning-bg);border-color:var(--warning-edge)}
+.octo .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-edge)}
+.octo .box{border:1px solid var(--field-line);border-radius:8px;background:var(--surface);overflow:hidden}
+.octo .riga{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 12px;border-top:1px solid var(--line)}
+.octo .riga:first-child{border-top:0}
+.octo .riga.sel{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.octo .uno{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.octo .avviso{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .campo{display:block;width:100%;border:1px solid var(--input-line);border-radius:6px;background:var(--surface);color:var(--text);padding:6px 10px;font:400 13px Inter,system-ui,sans-serif}
+.octo .rich{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600}
+.octo .tab{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:0;border-radius:6px 6px 0 0;background:transparent;color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .tab.sel{background:var(--accent-soft);color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.octo table{width:100%;border-collapse:collapse;font-size:13px}
+.octo th{background:var(--panel);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--field-line);white-space:nowrap}
+.octo td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.octo tr:last-child td{border-bottom:0}
+.octo .n{text-align:right}
+.octo .tot td{font-weight:600}
+.octo .pag{padding:18px 24px 28px;display:flex;flex-direction:column;gap:16px}
+.octo .sez{display:flex;flex-direction:column;gap:8px}
+.octo .fila{display:flex;align-items:center;gap:8px}
+.octo .sp{flex:1}
+.octo .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.octo .kpi{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);min-width:0}
+.octo .kpi:first-child{border-left:0}
+.octo .kpi b{font-size:22px;font-weight:600;letter-spacing:-0.012em;line-height:1.3}
+.octo .kpi.sel{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.octo .head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.octo .lab{font-size:13px;font-weight:500}
+.octo .interno{display:inline-flex;padding:4px 10px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-size:13px}
+.octo .bolla{align-self:flex-end;background:var(--accent-soft);padding:7px 14px;border-radius:14px}
+.octo .rich.no{background:var(--warning-bg);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning-edge)}
+.octo .rich.vista{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.octo .col{width:248px;flex:none;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px}
+.octo .col .riga{border-top:0;border-radius:6px}
+.octo .seg{display:inline-flex;border:1px solid var(--field-line);border-radius:6px;overflow:hidden}
+.octo .seg button{height:28px;padding:0 10px;border:0;border-left:1px solid var(--field-line);background:var(--surface);color:var(--text);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.octo .seg button:first-child{border-left:0}
+.octo .seg button.sel{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.octo .invia{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.octo .tondo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:15px;border:1px solid var(--field-line);background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.octo .scrivi{border:1px solid var(--input-line);border-radius:14px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.octo .prima2{display:flex;gap:80px;background:#e4e4e8}
+
+body{margin:0}
+.octo .m{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) 130px;gap:16px;padding:8px 14px;border-top:1px solid var(--line);font-size:13px}
+.octo .m.t{border-top:0;background:var(--panel);font-weight:600}
+.octo .k{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;padding:8px 14px;border-top:1px solid var(--line);font-size:13px}
+.octo .k.t{border-top:0;background:var(--panel);font-weight:600}
+.octo code{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="octo" style="width: 1280px; min-height: 1500px; padding: 44px 48px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div class="cap">Octo · revisione dell’interfaccia · giro 3</div>
+<h1>Impostazioni: modifiche e consegna</h1>
+<div class="muted">«Collegamenti» e «Persone e calendario». Nessun token nuovo oltre a quelli del giro 2.</div>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2>4 · Impostazioni · Collegamenti</h2><span class="muted p13">altezza da 1.198 a circa 620 px</span></div>
+<div class="box">
+<div class="m t"><div>Che cosa cambia</div><div>Perché</div><div>Vincolo</div></div>
+<div class="m"><div>Sette riquadri diventano un elenco: una riga per fonte con stato, credenziale e azioni.</div><div>Le sette fonti non stavano in una finestra; per confrontare gli stati si scorreva.</div><div class="muted">6 · una riga</div></div>
+<div class="m"><div>«Leggi tutte le fonti» è l’unico pulsante pieno; «Collega» diventa normale.</div><div>Tre pulsanti pieni nella stessa vista.</div><div class="muted">4 · un pieno</div></div>
+<div class="m"><div>«Avvio del progetto» da riquadro grigio a riga di titolo, con «4 su 6 collegati» e il pulsante a destra.</div><div>Un’introduzione di 180 px sopra il risultato.</div><div class="muted">5 · risultato</div></div>
+<div class="m"><div>La nota sulla credenziale si scrive una volta sotto l’elenco; ogni riga dice in una colonna di chi è la credenziale.</div><div>Lo stesso paragrafo era ripetuto in tre riquadri.</div><div class="muted">11 · un posto solo</div></div>
+<div class="m"><div>«Non collegato.» e «Le riunioni… non sono ancora collegate.» in etichetta neutra, «Mai letto.» ambra, le letture riuscite verdi con bordo.</div><div>Lo stato neutro stava in un riquadro che sembrava un pulsante.</div><div class="muted">8 · stati · 3</div></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2>5 · Impostazioni · Persone e calendario</h2><span class="muted p13">altezza da 1.115 a circa 900 px; nessuna colonna tagliata</span></div>
+<div class="box">
+<div class="m t"><div>Che cosa cambia</div><div>Perché</div><div>Vincolo</div></div>
+<div class="m"><div>«Persone» è un elenco di sola lettura con il dettaglio a fianco: i nove campi della persona scelta stanno nel dettaglio.</div><div>La tabella di campi usciva dal bordo già a 1.280 px: «Al» tagliata, «Come scrivergli» e «Tu / lei» fuori vista.</div><div class="muted">6 · 12 · finestra</div></div>
+<div class="m"><div>Le quattro righe di istruzioni diventano tre note sotto i campi a cui si riferiscono.</div><div>Le istruzioni occupavano più spazio delle persone.</div><div class="muted">5 · dettagli</div></div>
+<div class="m"><div>Le celle vuote hanno un testo: «dall’inizio», «c’è ancora», «non indicata».</div><div>Un campo vuoto non diceva che cosa significa.</div><div class="muted">8 · stati</div></div>
+<div class="m"><div>«Allocazione %» e «Tetto (giorni)» allineati a destra, in elenco e nei campi.</div><div>Sono misure.</div><div class="muted">7 · misure</div></div>
+<div class="m"><div>«Salva persone e calendario» sale nella riga del titolo, con accanto lo stato del salvataggio.</div><div>Stava a 780 px, sotto due tabelle.</div><div class="muted">5 · azione · 8</div></div>
+<div class="m"><div>«Aggiungi una persona» e «Aggiungi un periodo» nella riga del titolo della loro tabella.</div><div>Stesso posto in tutte e due le tabelle.</div><div class="muted">coerenza</div></div>
+<div class="m"><div>«Glossario» vuoto è una riga chiusa con «Chiedi a Claude le coppie»; aperto mostra la tabella e «Salva il glossario».</div><div>Zero righe occupavano 270 px e portavano un secondo pulsante pieno.</div><div class="muted">4 · un pieno · 5</div></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Etichette nuove o cambiate</h2>
+<div class="box">
+<div class="riga"><span class="tag">nuova</span><span>Colonna «Credenziale» con i valori «su questo computer», «di chi condivide la cartella», «nessuna», «non serve».</span></div>
+<div class="riga"><span class="tag">nuova</span><span>«dall’inizio», «c’è ancora», «non indicata» nelle celle vuote; «Nessuna modifica da salvare» accanto a «Salva persone e calendario».</span></div>
+<div class="riga"><span class="tag">accorciata</span><span>Le istruzioni di «Persone» e l’introduzione della scheda: stesso contenuto in frasi più brevi, sotto i campi.</span></div>
+<div class="riga"><span class="tag">accorciata</span><span>In «Avvio del progetto» resta «4 su 6 collegati. Ciò che non ti serve puoi lasciarlo com’è.»; il primo paragrafo esce.</span></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2>Componenti cambiati</h2>
+<div class="box">
+<div class="k t"><div>Nome di oggi</div><div>Che cosa cambia</div></div>
+<div class="k"><div><code>SetupGuide.tsx</code></div><div>Niente riquadro: titolo 17/600, una riga <code>--muted</code> 13 px, «Leggi tutte le fonti» pieno a destra (<code>display: flex; justify-content: space-between</code>).</div></div>
+<div class="k"><div><code>SourcesView.tsx</code> · <code>SourceHeader.tsx</code> · <code>FeedSection.tsx</code> · <code>MeetingsSection.tsx</code> · <code>DocumentsSection.tsx</code></div><div>Un solo riquadro con sette righe: <code>min-height: 40px; padding: 5px 12px</code>; colonne Fonte 150 px, Stato <code>1fr</code>, Credenziale 200 px, azioni 180 px a destra. Stato in <code>.status-ok</code>, <code>.status-warning</code> o <code>.status-neutral</code>. «Collega» senza la classe del pulsante pieno.</div></div>
+<div class="k"><div>Nota sulla credenziale e nota di «Documenti»</div><div>Una volta sola sotto l’elenco, <code>max-width: 760px</code>, <code>--muted</code> 13 px.</div></div>
+<div class="k"><div><code>TeamSection.tsx</code> · <code>RowsField.tsx</code></div><div>Elenco in <code>DataTable</code> di sola lettura (Nome, Ruolo, Parte, Allocazione %, Dal, Al) e dettaglio di 400 px a fianco con i nove campi su griglia a due colonne, <code>gap: 12px</code>. Riga scelta: <code>background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent)</code>. Sotto 1.120 px il dettaglio va sotto l’elenco.</div></div>
+<div class="k"><div><code>TeamSection.tsx</code> · salvataggio</div><div>«Salva persone e calendario» nella riga del titolo della scheda, con accanto il testo di stato: «Nessuna modifica da salvare» oppure il numero di modifiche in <code>.status-warning</code>.</div></div>
+<div class="k"><div><code>GlossarySection.tsx</code></div><div>Con zero righe è chiuso: una riga con titolo, «0 righe» e «Chiedi a Claude le coppie». Aperto: tabella, «Aggiungi una coppia», «Salva il glossario».</div></div>
+<div class="k"><div><code>ProjectSettings.tsx</code></div><div>Nessun cambio alle schede. Schermate toccate: 14 e 15; 16, 17 e 18 non viste.</div></div>
+</div>
+</section>
+</div>
+</body>
+</html>
